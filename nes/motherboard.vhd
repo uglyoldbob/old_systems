@@ -30,16 +30,24 @@ use IEEE.STD_LOGIC_1164.ALL;
 --use UNISIM.VComponents.all;
 
 entity motherboard is
-    Port ( clock : in  STD_LOGIC;
-			  whocares: out std_logic);
+    Port (whocares: out std_logic;
+		otherstuff: out std_logic_vector(15 downto 0));
 end motherboard;
 
 architecture Behavioral of motherboard is
-	signal cpu_clock: std_logic;
+	signal cpu_clock: std_logic := '0';
+	signal cpu_reset: std_logic := '0';
+	signal cpu_address: std_logic_vector(15 downto 0);
 begin
-	whocares <= clock;
-	
-	cpu: entity work.nes_cpu port map (clock => cpu_clock);
+	whocares <= cpu_clock;
+	otherstuff <= cpu_address;
+	cpu: entity work.nes_cpu port map (
+		clock => cpu_clock, 
+		reset => cpu_reset,
+		nmi => '1',
+		irq => '1',
+		tst => '0',
+		address => cpu_address);
 
 end Behavioral;
 
