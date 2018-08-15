@@ -61,7 +61,10 @@ architecture Behavioral of nes_cpu is
 	signal calculated_addr: std_logic_vector(15 downto 0);
 	
 	signal cycle_number: std_logic_vector(19 downto 0);
+	
+	signal data_in: std_logic_vector(7 downto 0);
 begin
+	m2 <= clock2;
 	process (reset, clock, clock0, clock_divider)
 	begin
 		if reset='0' then
@@ -81,10 +84,28 @@ begin
 		end if;
 	end process;
 	
-	process (reset, clock1)
+	process (reset, clock2)
 	begin
 		if reset='0' then
 			pc <= x"FFFE";
+		elsif rising_edge(clock2) then
+			data_in <= data;
+			if reset_vector='1' then
+				case instruction_cycle is
+					when "00110" =>
+						pc(7 downto 0) <= data;
+					when "00111" =>
+						pc(15 downto 8) <= data;
+					when others =>
+						null;
+				end case;
+			end if;
+		end if;
+	end process;
+	
+	process (reset, clock1)
+	begin
+		if reset='0' then
 			reset_vector <= '1';
 			address <= (others => 'Z');
 			data <= (others => 'Z');
@@ -121,8 +142,7 @@ begin
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when others =>
 						address <= pc;
-						pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
-						null;
+						reset_vector <= '0';
 				end case;
 			end if;
 		end if;
