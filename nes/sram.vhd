@@ -54,7 +54,7 @@ architecture Behavioral of sram_init is
 		variable RomFileLine : line;
 		variable rom : memory;
 		begin
-		for i in memory'range loop
+		for i in memory'low to memory'high loop
 		readline(romfile, RomFileLine);
 		hread(RomFileLine, rom(i));
 		end loop;

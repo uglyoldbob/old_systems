@@ -44,6 +44,8 @@ entity nes_cpu is
 end nes_cpu;
 
 architecture Behavioral of nes_cpu is
+	type memory is array (7 downto 0) of std_logic_vector(7 downto 0);
+
 	signal a: std_logic_vector(7 downto 0);
 	signal x: std_logic_vector(7 downto 0);
 	signal y: std_logic_vector(7 downto 0);
@@ -63,6 +65,8 @@ architecture Behavioral of nes_cpu is
 	signal cycle_number: std_logic_vector(19 downto 0);
 	
 	signal data_in: std_logic_vector(7 downto 0);
+	
+	signal executing_instruction: memory;
 begin
 	m2 <= clock2;
 	process (reset, clock, clock0, clock_divider)
@@ -99,6 +103,8 @@ begin
 					when others =>
 						null;
 				end case;
+			else
+				executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
 			end if;
 		end if;
 	end process;
@@ -120,29 +126,44 @@ begin
 				case instruction_cycle is
 					when "00000" =>
 						address <= calculated_addr;
+						reset_vector <= '1';
 						calculated_addr <= std_logic_vector(unsigned(calculated_addr) + to_unsigned(1,16));
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00001" =>
 						address <= calculated_addr;
+						reset_vector <= '1';
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00010" =>
 						address <= std_logic_vector(unsigned(sp) + to_unsigned(256,16));
+						reset_vector <= '1';
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00011" =>
 						address <= std_logic_vector(unsigned(sp) + to_unsigned(255,16));
+						reset_vector <= '1';
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00100" =>
 						address <= std_logic_vector(unsigned(sp) + to_unsigned(254,16));
+						reset_vector <= '1';
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00101" =>
 						address <= x"FFFC";
+						reset_vector <= '1';
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00110" =>
 						address <= x"FFFD";
+						reset_vector <= '1';
 						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when others =>
 						address <= pc;
 						reset_vector <= '0';
+						instruction_cycle <= (others => '0');
+				end case;
+			else
+				case instruction_cycle is
+					when "00000" =>
+						null;
+					when others =>
+						null;
 				end case;
 			end if;
 		end if;
