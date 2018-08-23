@@ -1,0 +1,26 @@
+Notes for a nes debugger.
+
+- Custom cartridge.
+- Modified nes motherboard (modifications TBD)
+
+- generate clock for chips on the cartridge
+- recover A15 in cartridge (or add A15 to cartridge connector)
+
+- signals to capture / monitor
+- capture cpu address and data lines, rw
+[25 = 8+16+1]
+- irq line
+[1]
+- m2
+[1]
+- capture ppu address(13) and data lines(8), r, w
+[23 = 13+8+2]
+
+[50 = 23 + 1 + 1 + 25]
+
+
+-methods of data presentation
+
+- 7 segment displays and led?
+
+- 4 + 2 for cpu, 4 + 2 for ppu, 4 for leds
