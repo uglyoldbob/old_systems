@@ -26,3 +26,6 @@ Notes for a nes debugger.
 - 7 segment displays and led?
 
 - 4 + 2 for cpu, 4 + 2 for ppu, 4 for leds
+
+-programmable logic options
+- atf1508as
