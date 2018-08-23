@@ -4,7 +4,9 @@ Notes for a nes debugger.
 - Modified nes motherboard (modifications TBD)
 
 - generate clock for chips on the cartridge
+- generate reset signal
 - recover A15 in cartridge (or add A15 to cartridge connector)
+[2 outputs from chip]
 
 - signals to capture / monitor
 - capture cpu address and data lines, rw
@@ -17,7 +19,7 @@ Notes for a nes debugger.
 [23 = 13+8+2]
 
 [50 = 23 + 1 + 1 + 25]
-
+[52 = 50 inputs(inouts) + 2 outputs]
 
 -methods of data presentation
 
