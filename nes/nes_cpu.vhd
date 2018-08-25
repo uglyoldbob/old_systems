@@ -53,10 +53,19 @@ architecture Behavioral of nes_cpu is
 	signal sp: std_logic_vector(7 downto 0);
 	signal flags: std_logic_vector(7 downto 0);
 	
-	signal clock0: std_logic;
-	signal clock1: std_logic;
+	constant FLAG_CARRY: integer := 0;
+	constant FLAG_ZERO: integer := 1;
+	constant FLAG_INTERRUPT: integer := 2;
+	constant FLAG_DECIMAL: integer := 3;
+	constant FLAG_BREAK: integer := 4;
+	constant FLAG_UNUSED: integer := 5;
+	constant FLAG_OVERFLOW: integer := 6;
+	constant FLAG_NEGATIVE: integer := 7;
+	
+	signal clock1: std_logic;	--clock1 toggles on the falling edge of the input clock, every 6 clock cycles
 	signal clock2: std_logic;
-	signal clock_divider: std_logic_vector(3 downto 0);
+	
+	signal johnson_divider: std_logic_vector(6 downto 0);
 	
 	signal reset_vector: std_logic;
 	signal instruction_cycle: std_logic_vector(4 downto 0);
@@ -67,44 +76,99 @@ architecture Behavioral of nes_cpu is
 	signal data_in: std_logic_vector(7 downto 0);
 	
 	signal executing_instruction: memory;
+	
+	signal opcode_bytes: std_logic_vector(2 downto 0); --calculation of (number of bytes - 1) to read for the current opcode
+	signal opcode_cycles: std_logic_vector(2 downto 0); --calculation of number of execution cycles for the current opcode
 begin
-	m2 <= clock2;
-	process (reset, clock, clock0, clock_divider)
+	m2 <= johnson_divider(6) or johnson_divider(0);
+	clock1 <= not johnson_divider(6);
+	clock2 <= johnson_divider(6);
+	process (reset, clock)
 	begin
 		if reset='0' then
-			clock_divider <= (others =>'0');
-			clock0 <= '0';
-			clock1 <= '0';
-			clock2 <= '0';
+			johnson_divider <= (others => '0');
 		elsif rising_edge(clock) then
-			if clock_divider = "0101" then
-				clock_divider <= (others =>'0');
-				clock0 <= not clock0;
-			else
-				clock_divider <= std_logic_vector(unsigned(clock_divider) + to_unsigned(1, clock_divider'length));
-			end if;
-			clock1 <= not clock0;
-			clock2 <= clock0;
+			johnson_divider(0) <= not johnson_divider(5);
+			johnson_divider(1) <= johnson_divider(0);
+			johnson_divider(2) <= johnson_divider(1);
+			johnson_divider(3) <= johnson_divider(2);
+			johnson_divider(4) <= johnson_divider(3);
+			johnson_divider(5) <= johnson_divider(4);
+		end if;
+		if falling_edge(clock) then
+			johnson_divider(6) <= johnson_divider(1);
 		end if;
 	end process;
 	
 	process (reset, clock2)
 	begin
 		if reset='0' then
-			pc <= x"FFFE";
+			reset_vector <= '1';
+			instruction_cycle <= (others => '0');
 		elsif rising_edge(clock2) then
 			data_in <= data;
 			if reset_vector='1' then
 				case instruction_cycle is
 					when "00110" =>
+						instruction_cycle <= (others => '0');
+						opcode_bytes <= "001";
+						reset_vector <= '0';
+					when others =>
+						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
+				end case;
+			else
+				null;
+			end if;
+		end if;
+	end process;
+	
+	--registers process
+	process (reset, clock2)
+	begin
+		if reset='0' then
+			pc <= x"FFFE";
+			sp <= "10001000";
+		elsif rising_edge(clock2) then
+			if reset_vector='1' then
+				case instruction_cycle is
+					when "00101" =>
 						pc(7 downto 0) <= data;
-					when "00111" =>
+					when "00110" =>
 						pc(15 downto 8) <= data;
 					when others =>
 						null;
 				end case;
 			else
-				executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+				null;
+			end if;
+		end if;
+	end process;
+	
+	process (reset, clock2)
+	begin
+		if reset='1' and rising_edge(clock2) then
+			if reset_vector='0' then
+				case instruction_cycle is
+					when "00000" =>
+						case data is
+							when x"0a" | x"10" | x"29" | x"30" | x"50" | x"69" | x"90" | x"b0" | x"d0" | x"f0" =>
+								opcode_cycles <= "001";
+							when x"24" | x"25" | x"4c" | x"65" =>
+								opcode_cycles <= "010";
+							when x"2c" | x"2d" | x"35" | x"39" | x"3d" | x"6d" | x"75" | x"79" | x"7d" =>
+								opcode_cycles <= "011";
+							when x"06" | x"31" | x"71" =>
+								opcode_cycles <= "100";
+							when x"0e" | x"16" | x"21" | x"61" =>
+								opcode_cycles <= "101";
+							when x"00" | x"1e" =>
+								opcode_cycles <= "110";
+							when others => 
+								opcode_cycles <= "111";
+						end case;
+					when others =>
+						null;
+				end case;
 			end if;
 		end if;
 	end process;
@@ -112,13 +176,10 @@ begin
 	process (reset, clock1)
 	begin
 		if reset='0' then
-			reset_vector <= '1';
 			address <= (others => 'Z');
 			data <= (others => 'Z');
-			instruction_cycle <= (others => '0');
 			cycle_number <= (others => '0');
 			calculated_addr <= "1010101010101010";
-			sp <= "10001000";
 		elsif rising_edge(clock1) then
 			cycle_number <= std_logic_vector(unsigned(cycle_number) + to_unsigned(1, cycle_number'length));
 			if reset_vector='1' then
@@ -126,39 +187,26 @@ begin
 				case instruction_cycle is
 					when "00000" =>
 						address <= calculated_addr;
-						reset_vector <= '1';
 						calculated_addr <= std_logic_vector(unsigned(calculated_addr) + to_unsigned(1,16));
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00001" =>
 						address <= calculated_addr;
-						reset_vector <= '1';
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00010" =>
 						address <= std_logic_vector(unsigned(sp) + to_unsigned(256,16));
-						reset_vector <= '1';
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00011" =>
 						address <= std_logic_vector(unsigned(sp) + to_unsigned(255,16));
-						reset_vector <= '1';
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00100" =>
 						address <= std_logic_vector(unsigned(sp) + to_unsigned(254,16));
-						reset_vector <= '1';
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00101" =>
 						address <= x"FFFC";
-						reset_vector <= '1';
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when "00110" =>
 						address <= x"FFFD";
-						reset_vector <= '1';
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 					when others =>
 						address <= pc;
-						reset_vector <= '0';
-						instruction_cycle <= (others => '0');
 				end case;
 			else
+				if instruction_cycle < opcode_bytes then
+					address <= pc;
+				end if;
 				case instruction_cycle is
 					when "00000" =>
 						null;

@@ -30,7 +30,7 @@ begin
 	recovered_address(14 downto 0) <= cpu_addr;
 	recovered_address(15) <= not romsel;
 	prg_rom: entity work.sram_init 
-		generic map (num_bits => 15, filename => "rom.txt")
+		generic map (num_bits => 15, filename => "rom_prg_rom.txt")
 		port map(
 			addr => cpu_addr(14 downto 0),
 			oe => not cpu_rw,

@@ -60,6 +60,14 @@ if {$magic1 == 78 && $magic2 == 69 && $magic3==83 && $magic4==26} {
 	puts [string length $chr_rom]
   }
   
+  set rom_prg_f [open "rom_prg_rom.txt" "w"]
+  for {set i 0} {$i < [string length $prg_rom]} {incr i} {
+	set c [string index $prg_rom $i]
+	scan $c "%c" asciiValue
+	puts $rom_prg_f [format %02X $asciiValue]
+  }
+  close $rom_prg_f
+  
   set opf [open "test.vhd" "w"]
   puts $opf "library IEEE;"
   puts $opf "use IEEE.STD_LOGIC_1164.ALL;"
@@ -90,6 +98,16 @@ if {$magic1 == 78 && $magic2 == 69 && $magic3==83 && $magic4==26} {
   puts $opf "begin"
   puts $opf "	recovered_address(14 downto 0) <= cpu_addr;"
   puts $opf "	recovered_address(15) <= not romsel;"
+  puts $opf "	process (cs, oe, we, addr, data)"
+  puts $opf "	begin"
+  puts $opf "		if cs='0' and oe='0' then"
+  puts $opf "			case addr is"
+  puts $opf "				when 0 => data <= x\"f3\";"
+  puts $opf "			end case;"
+  puts $opf "		else"
+  puts $opf "			data <= (others 'Z');"
+  puts $opf "		end if;"
+  puts $opf "	end process;"
   puts $opf "	prg_rom: entity work.sram_init "
   puts $opf "		generic map (num_bits => 15, filename => \"rom.txt\")"
   puts $opf "		port map("
