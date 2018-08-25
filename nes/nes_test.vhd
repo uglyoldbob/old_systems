@@ -152,7 +152,7 @@ BEGIN
 		addr => address(10 downto 0),
 		data => ram_d);
 
-	cartridge_romsel <= address(15) nor address(14);
+	cartridge_romsel <= address(15) nand m2;
 
 	cartridge1: entity work.nes_cartridge port map (
 		clock => clock,
