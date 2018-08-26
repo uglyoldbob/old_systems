@@ -19,6 +19,7 @@
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use ieee.std_logic_misc.all;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -110,8 +111,8 @@ begin
 			calculated_addr <= "1010101010101010";
 			instruction_cycle <= (others => '0');
 		elsif rising_edge(clock2) then
+			instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 			if reset_vector='1' then
-				instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 				case instruction_cycle is
 					when "00000" =>
 						null;
@@ -135,13 +136,26 @@ begin
 						reset_vector <= '0';
 				end case;
 			else
-				case instruction_cycle is
-					when "00000" =>
-						pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
-						
-					when others =>
-						null;
-				end case;
+				if or_reduce(instruction_cycle) = '0' then
+					pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+					calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+					executing_instruction(0) <= data;
+				else
+					case executing_instruction(0) is
+						when x"4c" =>
+							case instruction_cycle is
+								when "00001" =>
+									pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+									calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+								when others => 
+									pc <= data & executing_instruction(1);
+									calculated_addr <= data & executing_instruction(1);
+									instruction_cycle <= (others => '0');
+							end case;
+						when others => null;
+					end case;
+				end if;
 			end if;
 		end if;
 	end process;
