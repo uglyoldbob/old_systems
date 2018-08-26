@@ -153,6 +153,13 @@ begin
 									calculated_addr <= data & executing_instruction(1);
 									instruction_cycle <= (others => '0');
 							end case;
+						when x"a2" =>
+							pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+							calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+							x <= data;
+							flags(FLAG_ZERO) <= nand_reduce(data);
+							flags(FLAG_NEGATIVE) <= data(7);
+							instruction_cycle <= (others => '0');
 						when others => null;
 					end case;
 				end if;
