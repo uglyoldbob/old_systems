@@ -100,46 +100,48 @@ begin
 		end if;
 	end process;
 	
-	process (reset, clock2)
-	begin
-		if reset='0' then
-			reset_vector <= '1';
-			instruction_cycle <= (others => '0');
-		elsif rising_edge(clock2) then
-			data_in <= data;
-			if reset_vector='1' then
-				case instruction_cycle is
-					when "00110" =>
-						instruction_cycle <= (others => '0');
-						opcode_bytes <= "001";
-						reset_vector <= '0';
-					when others =>
-						instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
-				end case;
-			else
-				null;
-			end if;
-		end if;
-	end process;
-	
 	--registers process
 	process (reset, clock2)
 	begin
 		if reset='0' then
 			pc <= x"FFFE";
 			sp <= "10001000";
+			reset_vector <= '1';
+			calculated_addr <= "1010101010101010";
+			instruction_cycle <= (others => '0');
 		elsif rising_edge(clock2) then
 			if reset_vector='1' then
+				instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
 				case instruction_cycle is
+					when "00000" =>
+						null;
+					when "00001" =>
+						calculated_addr <= std_logic_vector(unsigned(calculated_addr) + to_unsigned(1,16));
+					when "00010" =>
+						calculated_addr <= std_logic_vector(unsigned(sp) + to_unsigned(256,16));
+					when "00011" =>
+						calculated_addr <= std_logic_vector(unsigned(sp) + to_unsigned(255,16));
+					when "00100" =>
+						calculated_addr <= std_logic_vector(unsigned(sp) + to_unsigned(254,16));
 					when "00101" =>
-						pc(7 downto 0) <= data;
+						calculated_addr <= x"FFFC";
 					when "00110" =>
+						pc(7 downto 0) <= data;
+						calculated_addr <= x"FFFD";
+					when others =>
 						pc(15 downto 8) <= data;
+						calculated_addr <= data & pc(7 downto 0);
+						instruction_cycle <= (others => '0');
+						reset_vector <= '0';
+				end case;
+			else
+				case instruction_cycle is
+					when "00000" =>
+						pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+						
 					when others =>
 						null;
 				end case;
-			else
-				null;
 			end if;
 		end if;
 	end process;
@@ -172,47 +174,20 @@ begin
 			end if;
 		end if;
 	end process;
-	
+
 	process (reset, clock1)
 	begin
 		if reset='0' then
 			address <= (others => 'Z');
 			data <= (others => 'Z');
 			cycle_number <= (others => '0');
-			calculated_addr <= "1010101010101010";
 		elsif rising_edge(clock1) then
 			cycle_number <= std_logic_vector(unsigned(cycle_number) + to_unsigned(1, cycle_number'length));
+			address <= calculated_addr;
 			if reset_vector='1' then
 				rw <= '1';
-				case instruction_cycle is
-					when "00000" =>
-						address <= calculated_addr;
-						calculated_addr <= std_logic_vector(unsigned(calculated_addr) + to_unsigned(1,16));
-					when "00001" =>
-						address <= calculated_addr;
-					when "00010" =>
-						address <= std_logic_vector(unsigned(sp) + to_unsigned(256,16));
-					when "00011" =>
-						address <= std_logic_vector(unsigned(sp) + to_unsigned(255,16));
-					when "00100" =>
-						address <= std_logic_vector(unsigned(sp) + to_unsigned(254,16));
-					when "00101" =>
-						address <= x"FFFC";
-					when "00110" =>
-						address <= x"FFFD";
-					when others =>
-						address <= pc;
-				end case;
 			else
-				if instruction_cycle < opcode_bytes then
-					address <= pc;
-				end if;
-				case instruction_cycle is
-					when "00000" =>
-						null;
-					when others =>
-						null;
-				end case;
+				null;
 			end if;
 		end if;
 	end process;
