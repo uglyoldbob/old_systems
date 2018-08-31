@@ -180,6 +180,9 @@ begin
 					calc_rw <= '1';
 				else
 					case executing_instruction(0) is
+						when x"18" =>
+							flags(FLAG_CARRY) <= '0';
+							next_instruction_cycle <= (others => '0');
 						when x"20" =>
 							case next_instruction_cycle is
 								when "00001" =>
@@ -248,12 +251,14 @@ begin
 							case next_instruction_cycle is
 								when "00001" =>
 									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
-									calculated_addr <= std_logic_vector(unsigned(pc) + unsigned(data) + to_unsigned(1,16));
-									calculated_addr(15 downto 8) <= pc(15 downto 8);
 									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
 									calc_rw <= '1';
 									if flags(FLAG_CARRY)='0' then
 										next_instruction_cycle <= (others => '0');
+										calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+									else
+										calculated_addr <= std_logic_vector(unsigned(pc) + unsigned(data) + to_unsigned(1,16));
+										calculated_addr(15 downto 8) <= pc(15 downto 8);
 									end if;
 								when "00010" =>
 									calculated_addr <= std_logic_vector(unsigned(pc) + unsigned(executing_instruction(1)));
