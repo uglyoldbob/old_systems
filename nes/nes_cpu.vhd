@@ -244,6 +244,32 @@ begin
 							flags(FLAG_NEGATIVE) <= data(7);
 							next_instruction_cycle <= (others => '0');
 							calc_rw <= '1';
+						when x"b0" =>
+							case next_instruction_cycle is
+								when "00001" =>
+									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+									calculated_addr <= std_logic_vector(unsigned(pc) + unsigned(data) + to_unsigned(1,16));
+									calculated_addr(15 downto 8) <= pc(15 downto 8);
+									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
+									calc_rw <= '1';
+									if flags(FLAG_CARRY)='0' then
+										next_instruction_cycle <= (others => '0');
+									end if;
+								when "00010" =>
+									calculated_addr <= std_logic_vector(unsigned(pc) + unsigned(executing_instruction(1)));
+									calculated_addr(15 downto 8) <= pc(15 downto 8);
+									next_pc <= std_logic_vector(unsigned(pc) + unsigned(executing_instruction(1)));
+									next_pc(15 downto 8) <= pc(15 downto 8);
+									if calculated_addr(8) = pc(8) then
+										next_instruction_cycle <= (others => '0');
+									end if;
+									calc_rw <= '1';
+								when others =>
+									calculated_addr <= std_logic_vector(unsigned(pc) + unsigned(executing_instruction(1)));
+									next_pc <= std_logic_vector(unsigned(pc) + unsigned(executing_instruction(1)));
+									next_instruction_cycle <= (others => '0');
+									calc_rw <= '1';
+							end case;
 						when x"ea" =>
 							next_instruction_cycle <= (others => '0');
 						when others => null;
