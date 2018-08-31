@@ -81,6 +81,7 @@ architecture Behavioral of nes_cpu is
 	signal johnson_divider: std_logic_vector(6 downto 0);
 	
 	signal reset_vector: std_logic;
+	signal next_instruction_cycle: std_logic_vector(4 downto 0);
 	signal instruction_cycle: std_logic_vector(4 downto 0);
 	signal calculated_addr: std_logic_vector(15 downto 0);
 	signal calc_rw: std_logic;
@@ -144,11 +145,11 @@ begin
 			sp <= "10001000";
 			reset_vector <= '1';
 			calculated_addr <= "1010101010101010";
-			instruction_cycle <= (others => '0');
+			next_instruction_cycle <= (others => '0');
 		elsif rising_edge(clock2) then
-			instruction_cycle <= std_logic_vector(unsigned(instruction_cycle) + to_unsigned(1,instruction_cycle'length));
+			next_instruction_cycle <= std_logic_vector(unsigned(next_instruction_cycle) + to_unsigned(1,next_instruction_cycle'length));
 			if reset_vector='1' then
-				case instruction_cycle is
+				case next_instruction_cycle is
 					when "00000" =>
 						null;
 					when "00001" =>
@@ -167,12 +168,12 @@ begin
 					when others =>
 						next_pc(15 downto 8) <= data;
 						calculated_addr <= data & pc(7 downto 0);
-						instruction_cycle <= (others => '0');
+						next_instruction_cycle <= (others => '0');
 						reset_vector <= '0';
 						calc_rw <= '1';
 				end case;
 			else
-				if or_reduce(instruction_cycle) = '0' then
+				if or_reduce(next_instruction_cycle) = '0' then
 					next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 					calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 					executing_instruction(0) <= data;
@@ -180,11 +181,11 @@ begin
 				else
 					case executing_instruction(0) is
 						when x"20" =>
-							case instruction_cycle is
+							case next_instruction_cycle is
 								when "00001" =>
 									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 									calculated_addr <= "00000001" & sp;
-									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
 									calc_rw <= '1';
 								when "00010" =>
 									calculated_addr <= "00000001" & sp;
@@ -200,37 +201,37 @@ begin
 									calculated_addr <= pc;
 									calc_rw <= '1';
 								when others =>
-									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
 									next_pc <= data & executing_instruction(1);
 									calculated_addr <= data & executing_instruction(1);
-									instruction_cycle <= (others => '0');
+									next_instruction_cycle <= (others => '0');
 									calc_rw <= '1';
 							end case;
 						when x"38" =>
 							flags(FLAG_CARRY) <= '1';
-							instruction_cycle <= (others => '0');
+							next_instruction_cycle <= (others => '0');
 						when x"4c" =>
-							case instruction_cycle is
+							case next_instruction_cycle is
 								when "00001" =>
 									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 									calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
-									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
 									calc_rw <= '1';
 								when others => 
 									next_pc <= data & executing_instruction(1);
 									calculated_addr <= data & executing_instruction(1);
-									instruction_cycle <= (others => '0');
+									next_instruction_cycle <= (others => '0');
 									calc_rw <= '1';
 							end case;
 						when x"86" =>
-							case instruction_cycle is
+							case next_instruction_cycle is
 								when "00001" =>
 									calculated_addr <= "00000000" & data;
-									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
 									calc_rw <= '0';
 									data_out <= x;
 								when others =>
-									instruction_cycle <= (others => '0');
+									next_instruction_cycle <= (others => '0');
 									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 									calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 									calc_rw <= '1';
@@ -241,10 +242,10 @@ begin
 							x <= data;
 							flags(FLAG_ZERO) <= nand_reduce(data);
 							flags(FLAG_NEGATIVE) <= data(7);
-							instruction_cycle <= (others => '0');
+							next_instruction_cycle <= (others => '0');
 							calc_rw <= '1';
 						when x"ea" =>
-							instruction_cycle <= (others => '0');
+							next_instruction_cycle <= (others => '0');
 						when others => null;
 					end case;
 				end if;
@@ -256,7 +257,7 @@ begin
 	begin
 		if reset='1' and rising_edge(clock2) then
 			if reset_vector='0' then
-				case instruction_cycle is
+				case next_instruction_cycle is
 					when "00000" =>
 						case data is
 							when x"0a" | x"10" | x"29" | x"30" | x"50" | x"69" | x"90" | x"b0" | x"d0" | x"f0" =>
@@ -291,6 +292,7 @@ begin
 			cycle_number <= std_logic_vector(unsigned(cycle_number) + to_unsigned(1, cycle_number'length));
 			address <= calculated_addr;
 			pc <= next_pc;
+			instruction_cycle <= next_instruction_cycle;
 			if reset_vector='1' then
 				rw_out <= '1';
 			else
