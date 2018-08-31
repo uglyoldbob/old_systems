@@ -222,6 +222,8 @@ begin
 							flags(FLAG_NEGATIVE) <= data(7);
 							instruction_cycle <= (others => '0');
 							calc_rw <= '1';
+						when x"ea" =>
+							instruction_cycle <= (others => '0');
 						when others => null;
 					end case;
 				end if;
