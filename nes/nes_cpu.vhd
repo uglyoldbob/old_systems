@@ -57,6 +57,15 @@ architecture Behavioral of nes_cpu is
 	signal next_pc: std_logic_vector(15 downto 0);
 	signal rw_out: std_logic;
 	
+	signal f_carry: std_logic;
+	signal f_zero: std_logic;
+	signal f_interrupt: std_logic;
+	signal f_decimal: std_logic;
+	signal f_break: std_logic;
+	signal f_unused: std_logic;
+	signal f_overflow: std_logic;
+	signal f_negative: std_logic;
+
 	constant FLAG_CARRY: integer := 0;
 	constant FLAG_ZERO: integer := 1;
 	constant FLAG_INTERRUPT: integer := 2;
@@ -105,7 +114,16 @@ begin
 			johnson_divider(6) <= johnson_divider(1);
 		end if;
 	end process;
-	
+
+	f_carry <= flags(FLAG_CARRY);
+	f_zero <= flags(FLAG_ZERO);
+	f_interrupt <= flags(FLAG_INTERRUPT);
+	f_decimal <= flags(FLAG_DECIMAL);
+	f_break <= flags(FLAG_BREAK);
+	f_unused <= flags(FLAG_UNUSED);
+	f_overflow <= flags(FLAG_OVERFLOW);
+	f_negative <= flags(FLAG_NEGATIVE);
+
 	rw <= rw_out;
 	process (clock1)
 	begin
@@ -188,6 +206,9 @@ begin
 									instruction_cycle <= (others => '0');
 									calc_rw <= '1';
 							end case;
+						when x"38" =>
+							flags(FLAG_CARRY) <= '1';
+							instruction_cycle <= (others => '0');
 						when x"4c" =>
 							case instruction_cycle is
 								when "00001" =>
