@@ -107,12 +107,14 @@ begin
 	end process;
 	
 	rw <= rw_out;
-	process (rw_out)
+	process (clock1)
 	begin
-		if rw_out='0' then
-			data <= data_out;
-		else
-			data <= (others => 'Z');
+		if rising_edge(clock1) then
+			if calc_rw='0' then
+				data <= data_out;
+			else
+				data <= (others => 'Z');
+			end if;
 		end if;
 	end process;
 	
@@ -159,6 +161,33 @@ begin
 					calc_rw <= '1';
 				else
 					case executing_instruction(0) is
+						when x"20" =>
+							case instruction_cycle is
+								when "00001" =>
+									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
+									calculated_addr <= "00000001" & sp;
+									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+									calc_rw <= '1';
+								when "00010" =>
+									calculated_addr <= "00000001" & sp;
+									sp <= std_logic_vector(unsigned(sp) - to_unsigned(1,8));
+									data_out <= pc(15 downto 8);
+									calc_rw <= '0';
+								when "00011" =>
+									calculated_addr <= "00000001" & sp;
+									sp <= std_logic_vector(unsigned(sp) - to_unsigned(1,8));
+									data_out <= pc(7 downto 0);
+									calc_rw <= '0';
+								when "00100" =>
+									calculated_addr <= pc;
+									calc_rw <= '1';
+								when others =>
+									executing_instruction(to_integer(unsigned(instruction_cycle))) <= data;
+									next_pc <= data & executing_instruction(1);
+									calculated_addr <= data & executing_instruction(1);
+									instruction_cycle <= (others => '0');
+									calc_rw <= '1';
+							end case;
 						when x"4c" =>
 							case instruction_cycle is
 								when "00001" =>
