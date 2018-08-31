@@ -247,13 +247,13 @@ begin
 							flags(FLAG_NEGATIVE) <= data(7);
 							next_instruction_cycle <= (others => '0');
 							calc_rw <= '1';
-						when x"b0" =>
+						when x"b0" | x"90" =>
 							case next_instruction_cycle is
 								when "00001" =>
 									next_pc <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 									executing_instruction(to_integer(unsigned(next_instruction_cycle))) <= data;
 									calc_rw <= '1';
-									if flags(FLAG_CARRY)='0' then
+									if flags(FLAG_CARRY)= (not executing_instruction(0)(5)) then
 										next_instruction_cycle <= (others => '0');
 										calculated_addr <= std_logic_vector(unsigned(pc) + to_unsigned(1,16));
 									else
