@@ -122,16 +122,16 @@
 \begin{tikztimingtable}
   Reset & 1L 30H \\
   Input Clock & 2{C} 9{C} 15{C} 5{C} \\
-  M2 & {2Z} 4H {9L} {15H} 1L \\
+  M2 & {2H} 4H {9L} {15H} 1L \\
   Data & 30Z 1Z \\
-  Address & 2Z 4D{?} 24D{?} 1D\\
+  Address & 2Z 4D 24D 1D\\
 \extracode
   \tablerules
 \end{tikztimingtable}
 
 \begin{tikztimingtable}
   M2 & 2H 16{2C} \\
-  Data & 2Z 2Z 2D 2Z 2D 2Z 2D 2Z 2D 2Z 2D 2Z 2D{PCL} 2Z 2D{PCH} 2Z 2D\\
+  Data & 2Z 2Z 2U 2Z 2U 2Z 2U 2Z 2U 2Z 2U 2Z 2D{PCL} 2Z 2D{PCH} 2Z 2U\\
   Address & 2D{?} 4D{?} 4D{?+1} 4D{SP+256} 4D{SP+255} 4D{SP+254} 4D{0xFFFC} 4D{0xFFFD} 4D{PCH:PCL}\\
 \extracode
   \tablerules

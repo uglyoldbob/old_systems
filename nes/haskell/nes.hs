@@ -45,7 +45,7 @@ cpuStep (CpuInputs One nmi irq test) (CpuState cd ii a x y s p pc) =
 cpuDoSomething (CpuInputs One nmi irq test) (CpuState cd ii a x y s p pc) =
     CpuState cd ii a x y s (p-1) 5
 
-cpuPowerOn = CpuState 0 0 0 0 0 0xFD 0x34 0xFFFE
+cpuPowerOn = CpuState 10 0 0 0 0 0xFD 0x34 0xFFFE
 cpuReset (CpuState cd ii a x y s p pc) = CpuState cd ii a x y (s-3) (p .|. 4) pc
 
 hiZByte = [HiZ|x<-[1..8]]
