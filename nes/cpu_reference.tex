@@ -1,0 +1,392 @@
+\documentclass[letterpaper,12pt,twoside]{book}
+
+% Uncomment the following line to allow the usage of graphics (.png, .jpg)
+%\usepackage[pdftex]{graphicx}
+% Comment the following line to NOT allow the usage of umlauts
+\usepackage[utf8]{inputenc}
+\usepackage {tabu}
+\usepackage{filecontents}
+\usepackage[table]{xcolor}
+\usepackage {longtable}
+\usepackage{fancyhdr}
+\usepackage{arydshln}
+
+% define lightgray
+\definecolor{lightgray}{gray}{0.9}
+
+% alternate rowcolors for all tables
+\let\oldtabular\tabular
+\let\endoldtabular\endtabular
+\renewenvironment{tabular}{\rowcolors{2}{white}{lightgray}\oldtabular}{\endoldtabular}
+
+% alternate rowcolors for all long-tables
+\let\oldlongtable\longtable
+\let\endoldlongtable\endlongtable
+\renewenvironment{longtable}{\rowcolors{2}{white}{lightgray}\oldlongtable} {
+\endoldlongtable}
+
+\usepackage{geometry}
+\geometry{textwidth=7.5in}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[CE,CO]{\leftmark}
+\fancyfoot[RE,RO]{NES CPU [DATASHEET]\thepage}
+\renewcommand{\headrulewidth}{2pt}
+\renewcommand{\footrulewidth}{1pt}
+
+% Start the document
+\begin{document}
+\title{NES CPU Technical Reference}
+\author{Thomas Epperson}
+\date{February 2017}
+\maketitle
+\newpage
+\tableofcontents
+\newpage
+% Create a new 1st level heading
+\chapter{Features}
+\begin{itemize}
+\item CPU
+\begin{itemize}
+\item MOS technology 6502 processor (without decimal mode)
+\item 8 bit external data bus
+\item 16 bit external address bus
+\item Instruction speed is clock speed / 12 (NTSC version) 
+\item Instruction speed is clock speed / 16 (PAL version) 
+\end{itemize}
+\item APU
+\begin{itemize}
+\item Audio processing unit used for generating audio
+\end{itemize}
+\end{itemize}
+\chapter{CPU}
+\section{Signal Description}
+\section{Package and pinout}
+\section{Official Instruction set}
+\begin{center}
+\begin{longtable}{|l|l|l|l|l|}
+\caption[Official instruction mnemonics opcodes and bytes per instruction]{Official instruction mnemonics opcodes and bytes per instruction} 
+\label{official_instruction_opcodes} \\ \hline
+
+\hline \rowcolor{white} \textbf{Mnemonic} & \textbf{Brief description} & \textbf{Opcode} &  \textbf{Number of bytes} & \textbf{Number of cycles} \\ \endfirsthead
+
+\rowcolor{white} \multicolumn{5}{c} {{\bfseries \tablename\ \thetable{} -- continued from previous page}} \\
+\hline \rowcolor{white} \textbf{Mnemonic} & \textbf{Brief description} & \textbf{Opcode} &  \textbf{Number of bytes} & \textbf{Number of cycles} \\ \hline
+\endhead
+\hline \rowcolor{white} \multicolumn{5}{|r|}{{Continued on next page}} \\ \hline
+\endfoot
+
+\hline \endlastfoot
+    \hline ADC &  Add with carry  & 0x69 & 2 &2\\ 
+    ADC & Add with carry & 0x65 & 2 &3\\
+    ADC & Add with carry  & 0x75 & 2 &4\\
+    ADC & Add with carry  & 0x6D & 3 &4\\
+    ADC & Add with carry  & 0x7D & 3 &4/5\\
+    ADC & Add with carry  & 0x79 & 3 &4/5\\
+    ADC & Add with carry  & 0x61 & 2 &6\\
+    ADC & Add with carry  & 0x71 & 2 &5/6\\
+    AND &  Bitwise AND  & 0x29 & 2 &2\\ 
+    AND &  Bitwise AND  & 0x25 & 2 &3\\ 
+    AND &  Bitwise AND  & 0x35 & 2 &4\\ 
+    AND &  Bitwise AND  & 0x2D & 3 &4\\ 
+    AND &  Bitwise AND  & 0x3D & 3 &4/5\\ 
+    AND &  Bitwise AND  & 0x39 & 3 &4/5\\ 
+    AND &  Bitwise AND  & 0x21 & 2 &6\\ 
+    AND &  Bitwise AND  & 0x31 & 2 &5\\
+     ASL &  Bitwise Left Shift  & 0x0A & 1 &2\\ 
+    ASL &  Bitwise Left Shift  & 0x06 & 2 &5\\ 
+    ASL &  Bitwise Left Shift  & 0x16 & 2 &6\\ 
+    ASL &  Bitwise Left Shift  & 0x0E & 3 &6\\ 
+    ASL &  Bitwise Left Shift  & 0x1E & 3 &7\\ 
+     BCC &  Branch when carry clear  & 0x90 & 2 &2/3/4\\ 
+     BCS &  Branch when carry set  & 0xB0 & 2 &2/3/4\\ 
+     BEQ &  Branch when zero set  & 0xF0 & 2 &2/3/4\\ 
+     BIT &  Test bits in memory  & 0x24 & 2 &3\\ 
+    BIT &  Test bits in memory  & 0x2C & 3 &4\\      
+    BMI &  Branch when negative set  & 0x30 & 2 &2/3/4\\      
+    BNE &  Branch when zero clear  & 0xD0 & 2 &2/3/4\\      
+    BPL &  Branch when negative clear  & 0x10 & 2 &2/3/4\\      
+    BRK &  Software interrupt  & 0x00 & 1 &7\\      
+    BVC &  Branch when overflow clear  & 0x50 & 2 &2/3/4\\      
+    BVS &  Branch when overflow set  & 0x70 & 2 &2/3/4\\      
+    CLC &  Clear carry flag  & 0x18 & 3 &2\\      
+    CLD &  Clear decimal flag  & 0xD8 & 3 &2\\      
+    CLI &  Clear interrupt disable  & 0x58 & 3 &2\\      
+    CLV &  Clear overflow flag  & 0xB8 & 3 &2\\      
+    CMP &  Compare memory  & 0xC9 & 2 &2\\
+    CMP &  Compare memory  & 0xC5 & 2 &3\\
+    CMP &  Compare memory  & 0xD5 & 2 &4\\
+    CMP &  Compare memory  & 0xCD & 3 &4\\
+    CMP &  Compare memory  & 0xDD & 3 &4/5\\
+    CMP &  Compare memory  & 0xD9 & 3 &4/5\\
+    CMP &  Compare memory  & 0xC1 & 2 &6\\
+    CMP &  Compare memory  & 0xD1 & 2 &5/6\\      
+    CPX &  Compare memory  & 0xE0 & 2 &2\\
+    CPX &  Compare memory  & 0xE4 & 2 &3\\
+    CPX &  Compare memory  & 0xEC & 3 &4\\      
+    CPY &  Compare memory  & 0xC0 & 2 &2\\
+    CPY &  Compare memory  & 0xC4 & 2 &3\\
+    CPY &  Compare memory  & 0xCC & 3 &4\\      
+    DEC &  Decrement  & 0xC6 & 2 &5\\
+    DEC &  Decrement  & 0xD6 & 2 &6\\
+    DEC &  Decrement  & 0xCE & 3 &6\\
+    DEC &  Decrement  & 0xDE & 3 &7\\      
+    DEX &  Decrement  & 0xCA & 1 &2\\      
+    DEY &  Decrement  & 0x88 & 1 &2\\ 
+    EOR &  Bitwise exclusive or  & 0x49 & 2 &2\\
+    EOR &  Bitwise exclusive or  & 0x45 & 2 &3\\
+    EOR &  Bitwise exclusive or  & 0x55 & 2 &4\\
+    EOR &  Bitwise exclusive or  & 0x4D & 3 &4\\
+    EOR &  Bitwise exclusive or  & 0x5D & 3 &4/5\\
+    EOR &  Bitwise exclusive or  & 0x59 & 3 &4/5\\
+    EOR &  Bitwise exclusive or  & 0x41 & 2 &6\\
+    EOR &  Bitwise exclusive or  & 0x51 & 2 &5/6\\      
+    INC &  Increment  & 0xE6 & 2 &5\\
+    INC &  Increment  & 0xF6 & 2 &6\\
+    INC &  Increment  & 0xEE & 3 &6\\
+    INC &  Increment  & 0xFE & 3 &7\\      
+    INX &  Increment  & 0xE8 & 1 &2\\      
+    INY &  Increment  & 0xC8 & 1 &2\\      
+    JMP &  Branch always  & 0x4C & 3 &3\\
+    JMP &  Branch always  & 0x6C & 3 &5\\      
+    JSR &  Jump to subroutine  & 0x20 & 3 &6\\      
+    LDA &  Load A  & 0xA9 & 2 &2\\
+    LDA &  Load A  & 0xA5 & 2 &3\\
+    LDA &  Load A  & 0xB5 & 2 &4\\
+    LDA &  Load A  & 0xAD & 3 &4\\
+    LDA &  Load A  & 0xBD & 3 &4/5\\
+    LDA &  Load A  & 0xB9 & 3 &4/5\\
+    LDA &  Load A  & 0xA1 & 2 &6\\
+    LDA &  Load A  & 0xB1 & 2 &5/6\\ 
+    LDX &  Load X  & 0xA2 & 2 &2\\
+    LDX &  Load X  & 0xA6 & 2 &3\\
+    LDX &  Load X  & 0xB6 & 2 &4\\
+    LDX &  Load X  & 0xAE & 3 &4\\
+    LDX &  Load X  & 0xBE & 3 &4/5\\      
+    LDY &  Load Y  & 0xA0 & 2 &2\\
+    LDY &  Load Y  & 0xA4 & 2 &3\\
+    LDY &  Load Y  & 0xB4 & 2 &4\\
+    LDY &  Load Y  & 0xAC & 3 &4\\
+    LDY &  Load Y  & 0xBC & 3 &4/5\\      
+    LSR &  Bitwise right shift  & 0x4A & 1 &2\\
+    LSR &  Bitwise right shift  & 0x46 & 2 &5\\
+    LSR &  Bitwise right shift  & 0x56 & 2 &6\\
+    LSR &  Bitwise right shift  & 0x4E & 3 &6\\
+    LSR &  Bitwise right shift  & 0x5E & 3 &7\\      
+    NOP &  No operation  & 0xEA & 1 &2\\      
+    ORA &  Bitwise or  & 0x09 & 2 &2\\
+    ORA &  Bitwise or  & 0x05 & 2 &3\\
+    ORA &  Bitwise or  & 0x15 & 2 &4\\
+    ORA &  Bitwise or  & 0x0D & 3 &4\\
+    ORA &  Bitwise or  & 0x1D & 3 &4/5\\
+    ORA &  Bitwise or  & 0x19 & 3 &4/5\\
+    ORA &  Bitwise or  & 0x01 & 2 &6\\
+    ORA &  Bitwise or  & 0x11 & 2 &5/6\\      
+    PHA &  Push A onto stack  & 0x48 & 1 &3\\      
+    PHP &  Push flags onto stack  & 0x08 & 1 &3\\      
+    PLA &  Pull A from stack  & 0x68 & 1 &4\\      
+    PLP &  Pull flags from stack  & 0x28 & 1 &4\\ 
+    ROL &  Bitwise rotate left  & 0x2A & 1 &2\\ 
+    ROL &  Bitwise rotate left  & 0x26 & 2 &5\\ 
+    ROL &  Bitwise rotate left  & 0x36 & 2 &6\\ 
+    ROL &  Bitwise rotate left  & 0x2E & 3 &6\\ 
+    ROL &  Bitwise rotate left  & 0x3E & 3 &7\\ 
+    ROR &  Bitwise rotate right  & 0x6A & 1 &2\\ 
+    ROR &  Bitwise rotate right  & 0x66 & 2 &5\\ 
+    ROR &  Bitwise rotate right  & 0x76 & 2 &6\\ 
+    ROR &  Bitwise rotate right  & 0x6E & 3 &6\\ 
+    ROR &  Bitwise rotate right  & 0x7E & 3 &7\\      
+    RTI &  Return from interrupt  & 0x40 & 1 &6\\      
+    RTS &  Return from subroutine  & 0x60 & 1 &6\\      
+    SBC &  Subtract with borrow  & 0xE9 & 2 &2\\
+    SBC &  Subtract with borrow  & 0xE5 & 2 &3\\
+    SBC &  Subtract with borrow  & 0xF5 & 2 &4\\
+    SBC &  Subtract with borrow  & 0xED & 3 &4\\
+    SBC &  Subtract with borrow  & 0xFD & 3 &4/5\\
+    SBC &  Subtract with borrow  & 0xF9 & 3 &4/5\\
+    SBC &  Subtract with borrow  & 0xE1 & 2 &6\\
+    SBC &  Subtract with borrow  & 0xF1 & 2 &5/6\\      
+    SEC &  Set carry flag  & 0x38 & 1 &2\\      
+    SED &  Set decimal flag  & 0xF8 & 1 &2\\      
+    SEI &  Set interrupt disable  & 0x78 & 1 &2\\      
+    STA &  Store A  & 0x85 & 2 &3\\
+    STA &  Store A  & 0x95 & 2 &4\\
+    STA &  Store A  & 0x8D & 3 &4\\
+    STA &  Store A  & 0x9D & 3 &5\\
+    STA &  Store A  & 0x99 & 3 &5\\
+    STA &  Store A  & 0x81 & 2 &6\\
+    STA &  Store A  & 0x91 & 2 &6\\      
+    STX &  Store X  & 0x86 & 2 &3\\
+    STX &  Store X  & 0x96 & 2 &4\\
+    STX &  Store X  & 0x8E & 3 &4\\      
+    STY &  Store Y  & 0x84 & 2 &3\\
+    STY &  Store Y  & 0x94 & 2 &4\\
+    STY &  Store Y  & 0x8C & 3 &4\\      
+    TAX &  Move A to X  & 0xAA & 1 &2\\      
+    TAY &  Move A to Y  & 0xA8 & 1 &2\\      
+    TSX &  Move S to X  & 0xBA & 1 &2\\      
+    TXA &  Move X to A  & 0x8A & 1 &2\\      
+    TXS &  Move X to S  & 0x9A & 1 &2\\ 
+    TYA &  Move Y to A  & 0x98 & 1 &2\\ 
+     
+\end{longtable}
+\end{center}
+\newpage
+\begin{center}
+\setlength{\tabcolsep}{0cm}
+\begin{longtable}{|l|p{1cm}|p{1cm}|p{1cm}|p{1cm}|m{2pt}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|m{2pt}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|m{2pt}|p{1cm}|p{1cm}|p{1cm}|p{1cm}|}
+\caption[Official instruction mnemonic karnaugh map]{Official instruction mnemonic k-map} \label{official_instructionm_kmap}\\
+\cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20} \hiderowcolors & \textbf{x0} & \textbf{x1} & \textbf{x3} & \textbf{x2} && \textbf{x4} & \textbf{x5} & \textbf{x7} & \textbf{x6} && \textbf{xC} & \textbf{xD} & \textbf{xF} & \textbf{xE} && \textbf{x8} & \textbf{x9} & \textbf{xB} & \textbf{xA} \\ \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+\endfirsthead
+
+\cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+\endlastfoot
+
+    \textbf{0x} 
+     &  BRK  &  ORA  &       &       &       
+     &       &  ORA  &       &  ASL  &      
+     &       &  ORA  &       &  ASL  &       
+     &  PHP  &  ORA  &       &  ASL  \\
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{1x}  
+     &  BPL  &  ORA  &       &       &       
+     &       &  ORA  &       &  ASL  &       
+     &       &  ORA  &       &  ASL  &       
+     &  CLC  &  ORA  &       &       \\
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{3x}  
+     &  BMI  &  AND  &       &       &       
+     &       &  AND  &       &  ROL  &       
+     &       &  AND  &       &  ROL  &       
+     &  SEC  &  AND  &       &       \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{2x}  
+     &  JSR  &  AND  &       &       &
+     &  BIT  &  AND  &       &  ROL  &       
+     &  BIT  &  AND  &       &  ROL  &       
+     &  PLP  &  AND  &       &  ROL  \\ 
+     \cline{1-5} \cline{7-10}\cline{12-15}\cline{17-20} 
+     \multicolumn{1}{r}{} \\
+     \cline{1-5} \cline{7-10}\cline{12-15}\cline{17-20}
+    
+    \textbf{4x} 
+     &  RTI  &  EOR  &       &       
+     &       &       &  EOR  &       
+     &  LSR  &       &  JMP  &  EOR  
+     &       &  LSR  &       &  PHA  
+     &  EOR  &       &  LSR  \\ 
+     \cline{1-5} \cline{7-10}\cline{12-15}\cline{17-20} 
+     
+    \textbf{5x}  
+     &  BVC  &  EOR  &       &       
+     &       &       &  EOR  &       
+     &  LSR  &       &       &  EOR  
+     &       &  LSR  &       &  CLI 
+     &  EOR  &       &       \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{7x}  
+     &  BVS  &  ADC  &       &       &       
+     &       &  ADC  &       &  ROR  &       
+     &       &  ADC  &       &  ROR  &       
+     &  SEI  &  ADC  &       &       \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+	 \textbf{6x}  
+     &  RTS  &  ADC  &       &       &       
+     &       &  ADC  &       &  ROR  &       
+     &  JMP  &  ADC  &       &  ROR  &       
+     &  PLA  &  ADC  &       &  ROR  \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     \multicolumn{1}{r}{} \\
+     \cline{1-5} \cline{7-10}\cline{12-15}\cline{17-20}
+    
+     
+    
+     
+    \textbf{Cx} 
+     &  CPY  &  CMP  &       &       
+     &       &  CPY  &  CMP  &       
+     &  DEC  &       &  CPY  &  CMP  
+     &       &  DEC  &       &  INY  
+     &  CMP  &       &  DEX  \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{Dx} 
+     &  BNE  &  CMP  &       &       
+     &       &       &  CMP  &       
+     &  DEC  &       &       &  CMP  
+     &       &  DEC  &       &  CLD  
+     &  CMP  &       &       \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{Fx} 
+     &  BEQ  &  SBC  &       &       
+     &       &       &  SBC  &       
+     &  INC  &       &       &  SBC  
+     &       &  INC  &       &  SED  
+     &  SBC  &       &       \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    \textbf{Ex} 
+     &  CPX  &  SBC  &       &       
+     &       &  CPX  &  SBC  &       
+     &  INC  &       &  CPX  &  SBC  
+     &       &  INC  &       &  INX 
+     &  SBC  &       &  NOP  \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     \multicolumn{1}{r}{} \\
+     \cline{1-5} \cline{7-10}\cline{12-15}\cline{17-20}
+     
+
+    \textbf{8x} 
+     &       &  STA  &       &       
+     &       &  STY  &  STA  &       
+     &  STX  &       &  STY  &  STA  
+     &       &  STX  &       &  DEY 
+     &  STA  &       &  TXA  \\
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+	 
+	 \textbf{9x} 
+     &  BCC  &  STA  &       &       
+     &       &  STY  &  STA  &       
+     &  STX  &       &       &  STA
+     &       &       &       &  TYA 
+     &  STA  &       &  TXS  \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+	 \textbf{Bx} 
+     &  BCS  &  LDA  &       &       
+     &       &  LDY  &  LDA  &       
+     &  LDX  &       &  LDY  &  LDA  
+     &       &  LDX  &       &  CLV 
+     &  LDA  &       &  TSX  \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+	 \textbf{Ax} 
+     &  LDY  &  LDA  &       &  LDX  
+     &       &  LDY  &  LDA  &       
+     &  LDX  &       &  LDY  &  LDA  
+     &       &  LDX  &       &  TAY 
+     &  LDA  &       &  TAX  \\ 
+     \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
+     
+    
+     
+    
+     
+    
+ 
+
+\end{longtable}
+\end{center}
+
+\section{Unofficial Instruction set}
+
+\chapter{APU}
+
+\end{document}
