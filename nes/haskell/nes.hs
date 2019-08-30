@@ -1,12 +1,30 @@
-module Things where
-
+import Control.Concurrent
 import qualified Data.Vector as V
 import Data.Word
 import Data.Bits as Bitwise
 
+import Control.Monad
+
+main = do
+    let nes = nesPowerOn
+    print nes
+    let maybeStep s n = n
+    let loop n = do
+        if (interestingCpu (cpu n)) then do
+            print 'I'
+            print n
+            threadDelay 1000000
+        else
+            print 'N'
+        loop (stepNes n)
+    loop nes
+    print "Exiting"
+
 data NesState = NesState {
     cpu :: CpuState,
+    ppu :: PpuState,
     cpuRam :: V.Vector Word8,
+    ppuRam :: V.Vector Word8,
     stuff :: Word8} deriving Show
 
 ramWrite st din addr = V.update st newval
@@ -14,16 +32,29 @@ ramWrite st din addr = V.update st newval
 
 ramRead st addr = (expandByte (st V.! addr))
        
-nesPowerOn = NesState cpuPowerOn ramPowerOn 0
+nesPowerOn = NesState cpuPowerOn ppuPowerOn ramPowerOn ramPowerOn 0
 ramPowerOn = (V.replicate 2048 0)
 
-stepNes sin = NesState nextCpu nextRam ((stuff sin) +1)
+stepNes sin = NesState nextCpu nextPpu nextRam (ppuRam sin) ((stuff sin) +1)
     where nextCpu = (cpuStep (CpuInputs One One One One 0) (cpu sin))
+          nextPpu = ppuStep (ppu sin)
           nextRam = (cpuRam sin)
 
 data Bit = One | Zero | HiZ | WeakOne | WeakZero | Invalid deriving Show
 
 data CpuInstruction = Reset | NMI deriving Show
+
+data PpuState = PpuState {
+    ppu_clock_div :: Word8 } deriving Show
+
+ppuPowerOn = PpuState 0
+
+ppuStep (PpuState x) = case x of
+    0 -> PpuState 1
+    1 -> PpuState 2
+    2 -> PpuState 3
+    3 -> PpuState 4
+    otherwise -> PpuState 0
 
 data CpuState = CpuState {
     clock_div :: Word8,
@@ -44,13 +75,7 @@ data CpuInputs = CpuInputs {
     test :: Bit,
     din :: Word8}
 
-firstCpuSteps x = mapM_ print (take x bla2)
-
-everyN n xs = y : everyN n ys
-    where y : ys = drop (n-1) xs
-
-bla2 = everyN 12 bla
-bla = cpuPowerOn : map (cpuStep (CpuInputs One One One One 0)) bla
+interestingCpu (CpuState cd ii i a x y s p pc addr) = (cd == 0)
 
 cpuStep :: CpuInputs -> CpuState -> CpuState
 cpuStep (CpuInputs Zero _ _ _ _) st = cpuReset st
