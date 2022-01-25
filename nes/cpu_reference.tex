@@ -152,6 +152,51 @@
 \end{tikztimingtable}
 
 \section{Package and pinout}
+
+The nes cpu is a 40 pin DIP.
+\begin {enumerate}
+\item AD1 - Audio pin output, 2 pulse wave channels
+\item AD2 - Audio pin output, triangle, noise, DPCM channels
+\item $\overline{RESET}$ - Reset pin
+\item A00 - Address bus pin
+\item A01 - Address bus pin
+\item A02 - Address bus pin
+\item A03 - Address bus pin
+\item A04 - Address bus pin
+\item A05 - Address bus pin
+\item A06 - Address bus pin
+\item A07 - Address bus pin
+\item A08 - Address bus pin
+\item A09 - Address bus pin
+\item A10 - Address bus pin
+\item A11 - Address bus pin
+\item A12 - Address bus pin
+\item A13 - Address bus pin
+\item A14 - Address bus pin
+\item A15 - Address bus pin
+\item GND - Power pin
+\item D7 - Data bus pin
+\item D6 - Data bus pin
+\item D5 - Data bus pin
+\item D4 - Data bus pin
+\item D3 - Data bus pin
+\item D2 - Data bus pin
+\item D1 - Data bus pin
+\item D0 - Data bus pin
+\item CLK - Clock input
+\item TST - Special pin only used on certain versions of the processor. Not used on regular NES hardware revisions.
+\item M2 - Indicates that signals on the address and data bus are ready.
+\item $\overline{IRQ}$ - Interrupt pin input
+\item $\overline{NMI}$ - Non-maskable interrupt input pin.
+\item R/$\overline{W}$ - Read write signal for the address/data bus lines
+\item $\overline{OE2}$ - Controller port enable for port 2
+\item $\overline{OE1}$ - Controller port enable for port 1
+\item OUT2 - Extra output pins used for the controllers
+\item OUT1 - Extra output pins used for the controllers
+\item OUT0 - Extra output pins used for the controllers
+\item VCC (+5V) - Power pin
+\end{enumerate}
+
 \section{Official Instruction set}
 \begin{center}
 \begin{longtable}{|l|l|l|l|l|}
@@ -464,15 +509,41 @@
      &  LDA  &       &  TAX  \\ 
      \cline{1-5}\cline{7-10}\cline{12-15}\cline{17-20}
      
-    
-     
-    
-     
-    
- 
-
 \end{longtable}
 \end{center}
+
+\subsection{ADC instruction}
+The ADC instruction performs add with carry operations.It adds the accumulator with a value and the carry flag. a = a + value + carry.
+\begin{center}
+\begin{tabular}{| l | r |}
+\hline Flag & Modified?  \\
+\hline Carry flag & Set if overflow in bit 7  \\
+Zero flag & Set if A=0 \\
+Interrupt disable flag & No change \\
+Decimal mode flag & No change \\
+Break command & No change \\
+Overflow flag & Set if sign bit is incorrect \\
+Negative flag & Set if bit 7 is set \\
+\hline
+\end{tabular}
+\end{center}
+\subsubsection {ADC Imediate Mode}
+Opcode 0x69. a = a + imm8 + carry. The value to work with is an 8-bit immediate value. Instruction is 2 bytes long and takes 2 cycles.
+\subsubsection{ADC Zero Page}
+Opcode 0x65. a = a + [imm8] + carry. The value to work with is an 8-bit address in the zero page (bits 8-15 of the address are 0). Instruction is 2 bytes long and takes 3 cycles.
+\subsubsection{ADC Zero Page X}
+Opcode 0x75. a = a + [imm8 + X] + carry. The value to work with is at 8-bit address specified plus the value of the X register. Bits 8-15 of the address are 0. Instruction is 2 bytes long and takes 4 cycles.
+\subsubsection {ADC Absolute}
+Opcode 0x6D. a = a + [imm16] + carry. The value to work with is a 16-bit address directly specified. Instruction is 3 bytes long and takes 4 cycles.
+\subsubsection {ADC Absolute X}
+Opcode 0x7D. a = a + [imm16 + X] + carry. The value to work with as a 16-bit address plus the contents of the X register. Instruction is 3 bytes and takes 4 or 5 cycles. 5 cycles is when the math of value + X croses a page boundary in the low 8 bits. The cpu issues an incorrect read cycle in this case. 0x03 + 0x12fe is 0x1301 which crosses a page boundary, so the cpu will issue a read for 0x1201 and 0x1301.
+\subsubsection {ADC Absolute Y}
+Opcode 0x79. a = a + [imm16 + Y] + carry. The value to work with as a 16-bit address plus the contents of the Y register. Instruction is 3 bytes and takes 4 or 5 cycles. 5 cycles is when the math of value + Y croses a page boundary in the low 8 bits. The cpu issues an incorrect read cycle in this case. 0x03 + 0x12fe is 0x1301 which crosses a page boundary, so the cpu will issue a read for 0x1201 and 0x1301.
+\subsubsection {ADC Indirect X}
+Opcode 0x61. a = a + [[val+x]] + carry. The value is at the address specified by the instruction and the contents of the X register added together. The upper 8-bits of the address are 0. The 16-bit address is loaded from the zero page (bits 8-15 of the address are 0). Instruction is 2 bytes long and takes 6 cycles.
+\subsubsection {ADC Indirect Y}
+Opcode 0x71. a = a + [val+[y]]. The value is at the address specified by the 16-bit contents of the memory specified by the Y register, added to the immediate value. Instruction is 2 bytes long and takes 5 or 6 cycles. 6 cycles is when the address calculated crosses a page boundary. 0x03 + 0x12fe is 0x1301 which crosses a page boundary, so the cpu will issue a read for 0x1201 and 0x1301.
+
 
 \section{Unofficial Instruction set}
 
