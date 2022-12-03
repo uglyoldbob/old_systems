@@ -1,9 +1,14 @@
 pub trait NesMemoryBus {
-    fn memory_cycle_read(addr: u16, out: [bool; 3], controllers: [bool; 2]) -> Option<u8>;
-    fn memory_cycle_write(addr: u16, data: u8, out: [bool; 3], controllers: [bool; 2]);
+    fn memory_cycle_read(
+        &mut self,
+        addr: u16,
+        out: [bool; 3],
+        controllers: [bool; 2],
+    ) -> Option<u8>;
+    fn memory_cycle_write(&mut self, addr: u16, data: u8, out: [bool; 3], controllers: [bool; 2]);
 }
 
-struct NesCpu {
+pub struct NesCpu {
     a: u8,
     x: u8,
     y: u8,
@@ -32,7 +37,7 @@ impl NesCpu {
         self.p |= 4; //set IRQ disable flag
     }
 
-    pub fn cycle(&mut self, bus: &mut NesMemoryBus) {
+    pub fn cycle(&mut self, bus: &mut dyn NesMemoryBus) {
         bus.memory_cycle_read(0, [false; 3], [true; 2]);
     }
 }
