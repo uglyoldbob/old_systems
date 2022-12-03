@@ -11,6 +11,7 @@
 \usepackage{fancyhdr}
 \usepackage{arydshln}
 \usepackage{tikz-timing}[2009/05/15]
+\usepackage{hyperref}
 
 % define lightgray
 \definecolor{lightgray}{gray}{0.9}
@@ -39,8 +40,8 @@
 % Start the document
 \begin{document}
 \title{NES CPU Technical Reference}
-\author{Thomas Epperson}
-\date{February 2017}
+\author{Thomas Epperson \\ email \href{mailto:thomas.epperson@gmail.com}{thomas.epperson@gmail.com}}
+\date{\today}
 \maketitle
 \newpage
 \tableofcontents
@@ -100,6 +101,8 @@
 
 
 \subsection {Write cycle}
+
+TODO: measure timing of the $\overline{W}$ pulse in relation to the M2 and clock signals
 
 \def\degr{${}^\circ$}
 \begin{tikztimingtable}
@@ -196,6 +199,9 @@ The nes cpu is a 40 pin DIP.
 \item OUT0 - Extra output pins used for the controllers
 \item VCC (+5V) - Power pin
 \end{enumerate}
+
+\subsection {Data bus}
+The data bus is comprised of the Data, address, R/$\overline{W}$, and M2 lines. Since the M2 signal is always output, this means that every cycle of the CPU is either a read or write with no exceptions.
 
 \section{Official Instruction set}
 \begin{center}
@@ -542,7 +548,7 @@ Opcode 0x79. a = a + [imm16 + Y] + carry. The value to work with as a 16-bit add
 \subsubsection {ADC Indirect X}
 Opcode 0x61. a = a + [[val+x]] + carry. The value is at the address specified by the instruction and the contents of the X register added together. The upper 8-bits of the address are 0. The 16-bit address is loaded from the zero page (bits 8-15 of the address are 0). Instruction is 2 bytes long and takes 6 cycles.
 \subsubsection {ADC Indirect Y}
-Opcode 0x71. a = a + [val+[y]]. The value is at the address specified by the 16-bit contents of the memory specified by the Y register, added to the immediate value. Instruction is 2 bytes long and takes 5 or 6 cycles. 6 cycles is when the address calculated crosses a page boundary. 0x03 + 0x12fe is 0x1301 which crosses a page boundary, so the cpu will issue a read for 0x1201 and 0x1301.
+Opcode 0x71. a = a + [val+[y]]. The value is at the address specified by the 16-bit contents of the memory specified by the Y register, added to the immediate value. Instruction is 2 bytes long and takes 5 or 6 cycles. 6 cycles is when the address calculated crosses a page boundary. 0x03 + 0x12fe is 0x1301 which crosses a page boundary, so the cpu will issue a read for address 0x1201 and 0x1301.
 
 
 \section{Unofficial Instruction set}
