@@ -1,3 +1,11 @@
+use std::io::Read;
+use std::io::Seek;
+
+mod mapper00;
+mod mapper01;
+
+pub trait NesMapper {}
+
 pub trait NesMemoryBusDevice {
     fn memory_cycle_read(
         &mut self,
@@ -9,25 +17,123 @@ pub trait NesMemoryBusDevice {
 }
 
 pub struct NesCartridge {
-    trainer: Option<[u8; 512]>,
+    trainer: Option<Vec<u8>>,
     prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
-    inst_rom: Option<[u8; 8192]>,
-    prom: Option<([u8; 16], [u8; 16])>,
+    inst_rom: Option<Vec<u8>>,
+    prom: Option<(Vec<u8>, Vec<u8>)>,
+    mapper: Box<dyn NesMapper>,
 }
 
 #[derive(Debug)]
-pub enum CartridgeError {}
+pub enum CartridgeError {
+    FsError(std::io::Error),
+    InvalidRom,
+    WrongInes2RomSize,
+    IncompatibleRom,
+    IncompatibleMapper(u16),
+}
 
 impl NesCartridge {
+    fn load_obsolete_ines(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+        Err(CartridgeError::IncompatibleRom)
+    }
+
+    fn load_ines1(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+        if rom_contents[0] != 'N' as u8
+            || rom_contents[1] != 'E' as u8
+            || rom_contents[2] != 'S' as u8
+            || rom_contents[3] != 0x1a
+        {
+            return Err(CartridgeError::InvalidRom);
+        }
+        let prg_rom_size = rom_contents[4] as usize * 16384;
+        let mut prg_rom = Vec::with_capacity(prg_rom_size);
+
+        let chr_rom_size = rom_contents[5] as usize * 8192;
+        let mut chr_rom = Vec::with_capacity(chr_rom_size);
+        let mut file_offset: usize = 16;
+        let mut trainer = if (rom_contents[6] & 8) != 0 {
+            let mut trainer = Vec::with_capacity(512);
+            for i in 0..512 {
+                trainer.push(rom_contents[file_offset + i]);
+            }
+            file_offset += 512;
+            Some(trainer)
+        } else {
+            None
+        };
+        for i in 0..prg_rom_size {
+            prg_rom.push(rom_contents[file_offset + i]);
+        }
+        file_offset += prg_rom_size;
+        if chr_rom_size != 0 {
+            for i in 0..chr_rom_size {
+                chr_rom.push(rom_contents[file_offset + i]);
+            }
+            file_offset += chr_rom_size;
+        }
+        let inst_rom = if (rom_contents[7] & 2) != 0 {
+            let mut irom = Vec::with_capacity(8192);
+            for i in 0..8192 {
+                irom.push(rom_contents[file_offset + i]);
+            }
+            file_offset += 8192;
+            Some(irom)
+        } else {
+            None
+        };
+
+        let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
+        let mapper = match mapper {
+            0 => mapper00::Mapper::new(),
+            1 => mapper01::Mapper::new(),
+            _ => {
+                return Err(CartridgeError::IncompatibleMapper(mapper as u16));
+            }
+        };
+
+        Ok(Self {
+            trainer: trainer,
+            prg_rom: prg_rom,
+            chr_rom: chr_rom,
+            inst_rom: inst_rom,
+            prom: None,
+            mapper: mapper,
+        })
+    }
+
+    fn load_ines2(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+        unimplemented!()
+    }
+
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
         let rom_contents = std::fs::read(name);
-        Ok(Self {
-            trainer: None,
-            prg_rom: Vec::new(),
-            chr_rom: Vec::new(),
-            inst_rom: None,
-            prom: None,
-        })
+        if let Err(e) = rom_contents {
+            return Err(CartridgeError::FsError(e));
+        }
+        let rom_contents = rom_contents.unwrap();
+        if rom_contents[0] != 'N' as u8
+            || rom_contents[1] != 'E' as u8
+            || rom_contents[2] != 'S' as u8
+            || rom_contents[3] != 0x1a
+        {
+            return Err(CartridgeError::InvalidRom);
+        }
+        if (rom_contents[7] & 0xC) == 8 {
+            return Self::load_ines2(&rom_contents);
+        } else if (rom_contents[7] & 0xC) == 4 {
+            return Self::load_obsolete_ines(&rom_contents);
+        } else if (rom_contents[7] & 0xC) == 0
+            && rom_contents[12] == 0
+            && rom_contents[13] == 0
+            && rom_contents[14] == 0
+            && rom_contents[15] == 0
+        {
+            return Self::load_ines1(&rom_contents);
+        } else {
+            //or ines 0.7
+            return Self::load_obsolete_ines(&rom_contents);
+        }
     }
 }

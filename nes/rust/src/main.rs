@@ -52,9 +52,12 @@ fn check_nes_roms() {
     for r in roms {
         println!("Testing rom {}", r.display());
         let nc = NesCartridge::load_cartridge(r.into_os_string().into_string().unwrap());
-        assert!(nc.is_ok(), "Unable to load rom because {:?}", nc.err().unwrap());
+        assert!(
+            nc.is_ok(),
+            "Unable to load rom because {:?}",
+            nc.err().unwrap()
+        );
     }
-    
 }
 
 #[test]
@@ -78,6 +81,7 @@ fn main() {
         *i = rand::random();
     }
     let mut mb: NesMotherboard = NesMotherboard::new();
+    let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string());
 
     loop {
         cpu.cycle(&mut mb);
