@@ -5,17 +5,32 @@ use crate::cartridge::NesCartridge;
 use crate::cpu::NesCpu;
 use crate::cpu::NesMemoryBus;
 
-struct NesMotherboard {}
+struct NesMotherboard {
+    cart: Option<NesCartridge>,
+}
 
 impl NesMotherboard {
     fn new() -> Self {
-        Self {}
+        Self { cart: None }
+    }
+
+    fn insert_cartridge(&mut self, c: NesCartridge) {
+        if let None = self.cart {
+            self.cart = Some(c);
+        }
     }
 }
 
 impl NesMemoryBus for NesMotherboard {
     fn memory_cycle_read(&mut self, addr: u16, out: [bool; 3], controllers: [bool; 2]) -> u8 {
-        0xff
+        let mut response: u8 = 0;
+        if let Some(cart) = &mut self.cart {
+            let resp = cart.memory_read(addr);
+            if let Some(v) = resp {
+                response = v;
+            }
+        }
+        response
     }
     fn memory_cycle_write(&mut self, addr: u16, data: u8, out: [bool; 3], controllers: [bool; 2]) {}
 }
@@ -82,6 +97,7 @@ fn main() {
     }
     let mut mb: NesMotherboard = NesMotherboard::new();
     let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string());
+    mb.insert_cartridge(nc.unwrap());
 
     loop {
         cpu.cycle(&mut mb);

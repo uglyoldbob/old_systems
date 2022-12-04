@@ -4,7 +4,12 @@ use std::io::Seek;
 mod mapper00;
 mod mapper01;
 
-pub trait NesMapper {}
+pub trait NesMapper {
+    fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
+    fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+    fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
+    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+}
 
 pub trait NesMemoryBusDevice {
     fn memory_cycle_read(
@@ -13,15 +18,20 @@ pub trait NesMemoryBusDevice {
         out: [bool; 3],
         controllers: [bool; 2],
     ) -> Option<u8>;
-    fn memory_cycle_write(&mut self, addr: u16, data: u8, out: [bool; 3], controllers: [bool; 2]);
+    fn memory_cycle_write(&mut self, addr: u16, data: u8);
 }
 
-pub struct NesCartridge {
+pub struct NesCartridgeData {
     trainer: Option<Vec<u8>>,
     prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
     inst_rom: Option<Vec<u8>>,
     prom: Option<(Vec<u8>, Vec<u8>)>,
+    prg_ram: Vec<u8>,
+}
+
+pub struct NesCartridge {
+    data: NesCartridgeData,
     mapper: Box<dyn NesMapper>,
 }
 
@@ -84,6 +94,13 @@ impl NesCartridge {
             None
         };
 
+        let ram_size = rom_contents[8] as usize * 8192;
+        let mut prg_ram = Vec::with_capacity(ram_size);
+        for i in 0..ram_size {
+            let v = rand::random();
+            prg_ram.push(v);
+        }
+
         let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
         let mapper = match mapper {
             0 => mapper00::Mapper::new(),
@@ -93,12 +110,17 @@ impl NesCartridge {
             }
         };
 
-        Ok(Self {
+        let rom_data = NesCartridgeData {
             trainer: trainer,
             prg_rom: prg_rom,
             chr_rom: chr_rom,
             inst_rom: inst_rom,
             prom: None,
+            prg_ram: prg_ram,
+        };
+
+        Ok(Self {
+            data: rom_data,
             mapper: mapper,
         })
     }
@@ -135,5 +157,11 @@ impl NesCartridge {
             //or ines 0.7
             return Self::load_obsolete_ines(&rom_contents);
         }
+    }
+}
+
+impl NesCartridge {
+    pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
+        self.mapper.memory_cycle_read(&mut self.data, addr)
     }
 }
