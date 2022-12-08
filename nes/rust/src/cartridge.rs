@@ -9,6 +9,7 @@ pub trait NesMapper {
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+    fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
 }
 
 pub trait NesMemoryBusDevice {
@@ -163,5 +164,9 @@ impl NesCartridge {
 impl NesCartridge {
     pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_read(&mut self.data, addr)
+    }
+
+    pub fn rom_byte_hack(&mut self, addr: u32, new_byte: u8) {
+        self.mapper.rom_byte_hack(&mut self.data, addr, new_byte);
     }
 }

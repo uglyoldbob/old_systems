@@ -84,6 +84,10 @@ fn basic_cpu_test() {
         *i = rand::random();
     }
     let mut mb: NesMotherboard = NesMotherboard::new();
+    let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
+    let mut nc = nc.unwrap();
+    nc.rom_byte_hack(0xfffc, 0x00);
+    mb.insert_cartridge(nc);
 }
 
 fn main() {
@@ -97,7 +101,9 @@ fn main() {
     }
     let mut mb: NesMotherboard = NesMotherboard::new();
     let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string());
-    mb.insert_cartridge(nc.unwrap());
+    let mut nc = nc.unwrap();
+    nc.rom_byte_hack(0xfffc, 0x00);
+    mb.insert_cartridge(nc);
 
     loop {
         cpu.cycle(&mut mb);
