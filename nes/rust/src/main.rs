@@ -1,6 +1,8 @@
 mod cartridge;
 mod cpu;
 
+use std::io::BufRead;
+
 use crate::cartridge::NesCartridge;
 use crate::cpu::NesCpu;
 use crate::cpu::NesMemoryBus;
@@ -85,9 +87,24 @@ fn basic_cpu_test() {
     }
     let mut mb: NesMotherboard = NesMotherboard::new();
     let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
+    let goldenlog = std::fs::File::open("./nestest.log").unwrap();
+    let mut goldenlog = std::io::BufReader::new(goldenlog).lines();
+
     let mut nc = nc.unwrap();
     nc.rom_byte_hack(0xfffc, 0x00);
     mb.insert_cartridge(nc);
+
+    let mut t: String = "".to_string();
+    for i in 0..26554 {
+        if cpu.instruction_start() {
+            t = goldenlog.next().unwrap().unwrap();
+        }
+        cpu.cycle(&mut mb);
+        if cpu.instruction_start() {
+            println!("Instruction end at cycle {}", i + 1);
+            println!("NESTEST LOG LINE: {}", t);
+        }
+    }
 }
 
 fn main() {
