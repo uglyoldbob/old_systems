@@ -234,27 +234,24 @@ impl NesCpu {
                     0xf0 => match self.subcycle {
                         1 => {
                             self.temp = bus.memory_cycle_read(self.pc + 1, [false; 3], [true; 2]);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             if (self.p & CPU_FLAG_ZERO) != 0 {
                                 self.pc = self.pc.wrapping_add(2);
                                 let mut pc = self.pc.to_le_bytes();
                                 pc[0] = pc[0].wrapping_add(self.temp);
                                 self.pc = u16::from_le_bytes(pc);
-                                self.subcycle = 3;
+                                self.subcycle = 2;
                             } else {
                                 self.pc = self.pc.wrapping_add(2);
                                 self.subcycle = 0;
                                 self.opcode = None;
                             }
                         }
-                        3 => {
+                        2 => {
+                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             let pc = self.pc.to_le_bytes();
                             if pc[0] < self.temp {
                                 self.pc = self.pc.wrapping_add(256);
-                                self.subcycle = 4;
+                                self.subcycle = 3;
                             } else {
                                 self.subcycle = 0;
                                 self.opcode = None;
@@ -270,27 +267,24 @@ impl NesCpu {
                     0xd0 => match self.subcycle {
                         1 => {
                             self.temp = bus.memory_cycle_read(self.pc + 1, [false; 3], [true; 2]);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             if (self.p & CPU_FLAG_ZERO) == 0 {
                                 self.pc = self.pc.wrapping_add(2);
                                 let mut pc = self.pc.to_le_bytes();
                                 pc[0] = pc[0].wrapping_add(self.temp);
                                 self.pc = u16::from_le_bytes(pc);
-                                self.subcycle = 3;
+                                self.subcycle = 2;
                             } else {
                                 self.pc = self.pc.wrapping_add(2);
                                 self.subcycle = 0;
                                 self.opcode = None;
                             }
                         }
-                        3 => {
+                        2 => {
+                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             let pc = self.pc.to_le_bytes();
                             if pc[0] < self.temp {
                                 self.pc = self.pc.wrapping_add(256);
-                                self.subcycle = 4;
+                                self.subcycle = 3;
                             } else {
                                 self.subcycle = 0;
                                 self.opcode = None;
@@ -306,27 +300,24 @@ impl NesCpu {
                     0xb0 => match self.subcycle {
                         1 => {
                             self.temp = bus.memory_cycle_read(self.pc + 1, [false; 3], [true; 2]);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             if (self.p & CPU_FLAG_CARRY) != 0 {
                                 self.pc = self.pc.wrapping_add(2);
                                 let mut pc = self.pc.to_le_bytes();
                                 pc[0] = pc[0].wrapping_add(self.temp);
                                 self.pc = u16::from_le_bytes(pc);
-                                self.subcycle = 3;
+                                self.subcycle = 2;
                             } else {
                                 self.pc = self.pc.wrapping_add(2);
                                 self.subcycle = 0;
                                 self.opcode = None;
                             }
                         }
-                        3 => {
+                        2 => {
+                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             let pc = self.pc.to_le_bytes();
                             if pc[0] < self.temp {
                                 self.pc = self.pc.wrapping_add(256);
-                                self.subcycle = 4;
+                                self.subcycle = 3;
                             } else {
                                 self.subcycle = 0;
                                 self.opcode = None;
@@ -342,27 +333,24 @@ impl NesCpu {
                     0x90 => match self.subcycle {
                         1 => {
                             self.temp = bus.memory_cycle_read(self.pc + 1, [false; 3], [true; 2]);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             if (self.p & CPU_FLAG_CARRY) == 0 {
                                 self.pc = self.pc.wrapping_add(2);
                                 let mut pc = self.pc.to_le_bytes();
                                 pc[0] = pc[0].wrapping_add(self.temp);
                                 self.pc = u16::from_le_bytes(pc);
-                                self.subcycle = 3;
+                                self.subcycle = 2;
                             } else {
                                 self.pc = self.pc.wrapping_add(2);
                                 self.subcycle = 0;
                                 self.opcode = None;
                             }
                         }
-                        3 => {
+                        2 => {
+                            bus.memory_cycle_read(self.pc + 2, [false; 3], [true; 2]);
                             let pc = self.pc.to_le_bytes();
                             if pc[0] < self.temp {
                                 self.pc = self.pc.wrapping_add(256);
-                                self.subcycle = 4;
+                                self.subcycle = 3;
                             } else {
                                 self.subcycle = 0;
                                 self.opcode = None;
