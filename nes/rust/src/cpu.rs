@@ -33,7 +33,7 @@ impl NesCpu {
             x: 0,
             y: 0,
             s: 0xfd,
-            p: CPU_FLAG_DECIMAL | CPU_FLAG_B1,
+            p: CPU_FLAG_B2 | CPU_FLAG_INT_DISABLE,
             subcycle: 0,
             pc: 0xfffc,
             interrupts: [false, true, false],
@@ -44,6 +44,30 @@ impl NesCpu {
 
     pub fn instruction_start(&self) -> bool {
         self.subcycle == 0
+    }
+
+    pub fn get_pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn get_a(&self) -> u8 {
+        self.a
+    }
+
+    pub fn get_x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn get_y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn get_p(&self) -> u8 {
+        self.p
+    }
+
+    pub fn get_sp(&self) -> u8 {
+        self.s
     }
 
     pub fn reset(&mut self) {
@@ -184,6 +208,7 @@ impl NesCpu {
                     0xea => match self.subcycle {
                         _ => {
                             self.pc = self.pc.wrapping_add(1);
+                            self.subcycle = 0;
                             self.opcode = None;
                         }
                     },
