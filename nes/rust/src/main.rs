@@ -9,7 +9,7 @@ use crate::cpu::NesMemoryBus;
 
 struct NesMotherboard {
     cart: Option<NesCartridge>,
-    ram: [u8;2048]
+    ram: [u8; 2048],
 }
 
 impl NesMotherboard {
@@ -19,8 +19,9 @@ impl NesMotherboard {
         for i in main_ram.iter_mut() {
             *i = rand::random();
         }
-        Self { cart: None,
-            ram: main_ram
+        Self {
+            cart: None,
+            ram: main_ram,
         }
     }
 
