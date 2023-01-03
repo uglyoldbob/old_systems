@@ -4041,7 +4041,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -5668,6 +5667,534 @@ impl NesCpu {
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.subcycle = 6;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre, shift right, then xor with accumulator, undocumented
+                    //indirect x
+                    0x43 => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3], [true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = self.temp.wrapping_add(self.x);
+                            self.temp = bus.memory_cycle_read(self.temp as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.temp2 = bus.memory_cycle_read(self.temp as u16, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.temp = bus.memory_cycle_read(self.temp.wrapping_add(1) as u16, [false;3], [true;2]);
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.tempaddr = (self.temp as u16)<<8 | (self.temp2 as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 6;
+                        }
+                        6 => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.subcycle = 7;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre zero page, undocumented
+                    0x47 => match self.subcycle {
+                        1 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = bus.memory_cycle_read(self.temp2 as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.temp2 as u16, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.subcycle = 7;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre absolute, undocumented
+                    0x4f => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+2, [false;3],[true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.subcycle = 5;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre indirect y, undocumented
+                    0x53 => match self.subcycle {
+                        1 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+1, [false;3], [true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = bus.memory_cycle_read(self.temp2 as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.temp2 = bus.memory_cycle_read(self.temp2.wrapping_add(1) as u16, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.subcycle = 6;
+                        }
+                        6 => {
+                            self.subcycle = 7;
+                        }
+                        _ => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre zero page x, undocumented
+                    0x57 => match self.subcycle {
+                        1 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]).wrapping_add(self.x);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = bus.memory_cycle_read(self.temp2 as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.temp2 as u16, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.subcycle = 5;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre absolute y, undocumented
+                    0x5b => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+2, [false;3],[true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.subcycle = 6;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        }
+                    },
+                    //sre absolute x, undocumented
+                    0x5f => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+2, [false;3],[true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.a = self.a ^ self.temp;
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.subcycle = 6;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra, rotate right, then and with accumulator, undocumented
+                    //indirect x
+                    0x63 => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3], [true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = self.temp.wrapping_add(self.x);
+                            self.temp = bus.memory_cycle_read(self.temp as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.temp2 = bus.memory_cycle_read(self.temp as u16, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.temp = bus.memory_cycle_read(self.temp.wrapping_add(1) as u16, [false;3], [true;2]);
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.tempaddr = (self.temp as u16)<<8 | (self.temp2 as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 6;
+                        }
+                        6 => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
+                            self.subcycle = 7;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra zero page, undocumented
+                    0x67 => match self.subcycle {
+                        1 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = bus.memory_cycle_read(self.temp2 as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.temp2 as u16, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
+                            self.subcycle = 4;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra absolute, undocumented
+                    0x6f => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+2, [false;3],[true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
+                            self.subcycle = 5;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra indirect y
+                    0x73 => match self.subcycle {
+                        1 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+1, [false;3], [true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = bus.memory_cycle_read(self.temp2 as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.temp2 = bus.memory_cycle_read(self.temp2.wrapping_add(1) as u16, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.subcycle = 6;
+                        }
+                        6 => {
+                            self.subcycle = 7;
+                        }
+                        _ => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra zero page x, undocumented
+                    0x77 => match self.subcycle {
+                        1 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]).wrapping_add(self.x);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp = bus.memory_cycle_read(self.temp2 as u16, [false;3], [true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.temp2 as u16, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.subcycle = 5;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra absolute y, undocumented
+                    0x7b => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+2, [false;3],[true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.subcycle = 6;
+                        }
+                        _ => {
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        }
+                    },
+                    //rra absolute x, undocumented
+                    0x7f => match self.subcycle {
+                        1 => {
+                            self.temp = bus.memory_cycle_read(self.pc+1, [false;3],[true;2]);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            self.temp2 = bus.memory_cycle_read(self.pc+2, [false;3],[true;2]);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            self.tempaddr = (self.temp2 as u16)<<8 | (self.temp as u16);
+                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                            self.temp = bus.memory_cycle_read(self.tempaddr, [false;3], [true;2]);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if (self.temp & 0x1) != 0 {
+                                self.p |= CPU_FLAG_CARRY;
+                            }
+                            self.temp = self.temp >> 1;
+                            if old_carry {
+                                self.temp |= 0x80;
+                            }
+                            bus.memory_cycle_write(self.tempaddr, self.temp, [false;3], [true;2]);
+                            self.cpu_adc(self.temp);
                             self.subcycle = 5;
                         }
                         5 => {

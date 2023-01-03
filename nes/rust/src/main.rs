@@ -214,6 +214,7 @@ fn basic_cpu_test() {
             assert_eq!(i + 1, logcycle);
         }
     }
+    assert_eq!(cpu.get_pc(), 0xc66e);
 }
 
 fn main() {
