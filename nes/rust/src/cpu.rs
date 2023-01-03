@@ -414,7 +414,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.a =
@@ -688,7 +688,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.a =
@@ -1175,7 +1175,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.temp = bus.memory_cycle_read(addr, [false; 3], [true; 2]);
@@ -1374,7 +1374,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.temp = bus.memory_cycle_read(addr, [false; 3], [true; 2]);
@@ -2119,7 +2119,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.temp = bus.memory_cycle_read(addr, [false; 3], [true; 2]);
@@ -2474,7 +2474,6 @@ impl NesCpu {
                             self.subcycle = 4;
                         }
                         4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
                             self.subcycle = 5;
                         }
                         _ => {
@@ -3022,7 +3021,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.a = bus.memory_cycle_read(addr, [false; 3], [true; 2]);
@@ -4463,7 +4462,7 @@ impl NesCpu {
                         }
                         4 => {
                             let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (val, overflow) = self.temp2.overflowing_add(self.y);
+                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
                             if !overflow {
                                 addr = addr.wrapping_add(self.y as u16);
                                 self.a = bus.memory_cycle_read(addr, [false; 3], [true; 2]);

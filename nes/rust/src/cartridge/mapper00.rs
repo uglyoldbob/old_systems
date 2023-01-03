@@ -34,13 +34,13 @@ impl NesMapper for Mapper {
         }
     }
 
-    fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {}
+    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
 
-    fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
+    fn ppu_memory_cycle_read(&mut self, _cart: &mut NesCartridgeData, _addr: u16) -> Option<u8> {
         None
     }
 
-    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {}
+    fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
 
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8) {
         match addr {

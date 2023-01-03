@@ -33,7 +33,7 @@ impl NesMotherboard {
 }
 
 impl NesMemoryBus for NesMotherboard {
-    fn memory_cycle_read(&mut self, addr: u16, out: [bool; 3], controllers: [bool; 2]) -> u8 {
+    fn memory_cycle_read(&mut self, addr: u16, _out: [bool; 3], _controllers: [bool; 2]) -> u8 {
         let mut response: u8 = 0;
         match addr {
             0..=0x1fff => {
@@ -41,7 +41,7 @@ impl NesMemoryBus for NesMotherboard {
                 response = self.ram[addr as usize];
             }
             0x2000..=0x3fff => {
-                let addr = addr & 7;
+                let _addr = addr & 7;
                 //ppu registers
             }
             0x4000..=0x4017 => {
@@ -62,14 +62,14 @@ impl NesMemoryBus for NesMotherboard {
         }
         response
     }
-    fn memory_cycle_write(&mut self, addr: u16, data: u8, out: [bool; 3], controllers: [bool; 2]) {
+    fn memory_cycle_write(&mut self, addr: u16, data: u8, _out: [bool; 3], _controllers: [bool; 2]) {
         match addr {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
                 self.ram[addr as usize] = data;
             }
             0x2000..=0x3fff => {
-                let addr = addr & 7;
+                let _addr = addr & 7;
                 //ppu registers
             }
             0x4000..=0x4017 => {
@@ -80,7 +80,7 @@ impl NesMemoryBus for NesMotherboard {
                 //test mode
             }
             _ => {
-                if let Some(cart) = &mut self.cart {
+                if let Some(_cart) = &mut self.cart {
                     //TODO?
                 }
             }
@@ -164,8 +164,8 @@ fn basic_cpu_test() {
     nc.rom_byte_hack(0xfffc, 0x00);
     mb.insert_cartridge(nc);
 
-    let mut t: String = "".to_string();
-    let mut b = t.as_bytes();
+    let mut t: String;
+    let mut b;
     for i in 0..26554 {
         cpu.cycle(&mut mb);
         if cpu.instruction_start() {
@@ -231,8 +231,8 @@ fn main() {
     nc.rom_byte_hack(0xfffc, 0x00);
     mb.insert_cartridge(nc);
 
-    let mut t: String = "".to_string();
-    let mut b = t.as_bytes();
+    let mut t: String;
+    let mut b;
     for i in 0..26554 {
         cpu.cycle(&mut mb);
         if cpu.instruction_start() {

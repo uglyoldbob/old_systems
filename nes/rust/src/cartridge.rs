@@ -1,6 +1,3 @@
-use std::io::Read;
-use std::io::Seek;
-
 mod mapper00;
 mod mapper01;
 
@@ -40,13 +37,12 @@ pub struct NesCartridge {
 pub enum CartridgeError {
     FsError(std::io::Error),
     InvalidRom,
-    WrongInes2RomSize,
     IncompatibleRom,
     IncompatibleMapper(u16),
 }
 
 impl NesCartridge {
-    fn load_obsolete_ines(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_obsolete_ines(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
     }
 
@@ -64,7 +60,7 @@ impl NesCartridge {
         let chr_rom_size = rom_contents[5] as usize * 8192;
         let mut chr_rom = Vec::with_capacity(chr_rom_size);
         let mut file_offset: usize = 16;
-        let mut trainer = if (rom_contents[6] & 8) != 0 {
+        let trainer = if (rom_contents[6] & 8) != 0 {
             let mut trainer = Vec::with_capacity(512);
             for i in 0..512 {
                 trainer.push(rom_contents[file_offset + i]);
@@ -89,7 +85,7 @@ impl NesCartridge {
             for i in 0..8192 {
                 irom.push(rom_contents[file_offset + i]);
             }
-            file_offset += 8192;
+            //file_offset += 8192;
             Some(irom)
         } else {
             None
@@ -97,7 +93,7 @@ impl NesCartridge {
 
         let ram_size = rom_contents[8] as usize * 8192;
         let mut prg_ram = Vec::with_capacity(ram_size);
-        for i in 0..ram_size {
+        for _i in 0..ram_size {
             let v = rand::random();
             prg_ram.push(v);
         }
@@ -126,7 +122,7 @@ impl NesCartridge {
         })
     }
 
-    fn load_ines2(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_ines2(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         unimplemented!()
     }
 
