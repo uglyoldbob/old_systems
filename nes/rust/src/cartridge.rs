@@ -4,8 +4,9 @@ mod mapper01;
 pub trait NesMapper {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
-    fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
-    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+    fn ppu_memory_cycle_address(&mut self, addr: u16);
+    fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8>;
+    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
 }
 
@@ -160,6 +161,22 @@ impl NesCartridge {
 impl NesCartridge {
     pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_read(&mut self.data, addr)
+    }
+
+    pub fn ppu_cycle_1(&mut self, addr: u16) {
+        self.mapper.ppu_memory_cycle_address(addr);
+    }
+
+    pub fn ppu_cycle_write(&mut self, data: u8) {
+        self.mapper.ppu_memory_cycle_write(&mut self.data, data);
+    }
+
+    pub fn ppu_cycle_read(&mut self) -> u8 {
+        if let Some(a) = self.mapper.ppu_memory_cycle_read(&mut self.data) {
+            a
+        } else {
+            42
+        }
     }
 
     pub fn rom_byte_hack(&mut self, addr: u32, new_byte: u8) {

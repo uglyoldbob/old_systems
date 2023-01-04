@@ -1,11 +1,15 @@
 mod cartridge;
 mod cpu;
+mod ppu;
 
+#[cfg(test)]
 use std::io::BufRead;
 
 use crate::cartridge::NesCartridge;
 use crate::cpu::NesCpu;
+use crate::cpu::NesCpuPeripherals;
 use crate::cpu::NesMemoryBus;
+use crate::ppu::NesPpu;
 
 struct NesMotherboard {
     cart: Option<NesCartridge>,
@@ -33,7 +37,13 @@ impl NesMotherboard {
 }
 
 impl NesMemoryBus for NesMotherboard {
-    fn memory_cycle_read(&mut self, addr: u16, _out: [bool; 3], _controllers: [bool; 2]) -> u8 {
+    fn memory_cycle_read(
+        &mut self,
+        addr: u16,
+        _out: [bool; 3],
+        _controllers: [bool; 2],
+        per: &mut NesCpuPeripherals,
+    ) -> u8 {
         let mut response: u8 = 0;
         match addr {
             0..=0x1fff => {
@@ -41,8 +51,8 @@ impl NesMemoryBus for NesMotherboard {
                 response = self.ram[addr as usize];
             }
             0x2000..=0x3fff => {
-                let _addr = addr & 7;
-                //ppu registers
+                let addr = addr & 7;
+                response = per.ppu_read(addr);
             }
             0x4000..=0x4017 => {
                 //apu and io
@@ -62,15 +72,23 @@ impl NesMemoryBus for NesMotherboard {
         }
         response
     }
-    fn memory_cycle_write(&mut self, addr: u16, data: u8, _out: [bool; 3], _controllers: [bool; 2]) {
+    fn memory_cycle_write(
+        &mut self,
+        addr: u16,
+        data: u8,
+        _out: [bool; 3],
+        _controllers: [bool; 2],
+        per: &mut NesCpuPeripherals,
+    ) {
         match addr {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
                 self.ram[addr as usize] = data;
             }
             0x2000..=0x3fff => {
-                let _addr = addr & 7;
+                let addr = addr & 7;
                 //ppu registers
+                per.ppu_write(addr, data);
             }
             0x4000..=0x4017 => {
                 //apu and io
@@ -84,6 +102,24 @@ impl NesMemoryBus for NesMotherboard {
                     //TODO?
                 }
             }
+        }
+    }
+
+    fn ppu_cycle_1(&mut self, addr: u16) {
+        if let Some(cart) = &mut self.cart {
+            cart.ppu_cycle_1(addr);
+        }
+    }
+    fn ppu_cycle_2_write(&mut self, data: u8) {
+        if let Some(cart) = &mut self.cart {
+            cart.ppu_cycle_write(data);
+        }
+    }
+    fn ppu_cycle_2_read(&mut self) -> u8 {
+        if let Some(cart) = &mut self.cart {
+            cart.ppu_cycle_read()
+        } else {
+            42
         }
     }
 }
@@ -128,6 +164,7 @@ fn check_nes_roms() {
     }
 }
 
+#[cfg(test)]
 fn convert_hex_to_decimal(d: char) -> u8 {
     match d {
         '0' => 0,
@@ -153,7 +190,8 @@ fn convert_hex_to_decimal(d: char) -> u8 {
 #[test]
 fn basic_cpu_test() {
     let mut cpu: NesCpu = NesCpu::new();
-
+    let ppu: NesPpu = NesPpu::new();
+    let mut cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu);
     let mut mb: NesMotherboard = NesMotherboard::new();
     let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
     let goldenlog = std::fs::File::open("./nestest.log").unwrap();
@@ -167,7 +205,7 @@ fn basic_cpu_test() {
     let mut t: String;
     let mut b;
     for i in 0..26554 {
-        cpu.cycle(&mut mb);
+        cpu.cycle(&mut mb, &mut cpu_peripherals);
         if cpu.instruction_start() {
             log_line += 1;
             t = goldenlog.next().unwrap().unwrap();
@@ -221,64 +259,19 @@ fn main() {
     println!("I am groot!");
 
     let mut cpu: NesCpu = NesCpu::new();
+    let ppu: NesPpu = NesPpu::new();
+    let mut cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu);
     let mut mb: NesMotherboard = NesMotherboard::new();
-    let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string());
-    let goldenlog = std::fs::File::open("./nes/rust/nestest.log").unwrap();
-    let mut goldenlog = std::io::BufReader::new(goldenlog).lines();
-    let mut log_line = 0;
+    let nc = NesCartridge::load_cartridge("./nes/rust/1.frame_basics.nes".to_string());
 
-    let mut nc = nc.unwrap();
-    nc.rom_byte_hack(0xfffc, 0x00);
+    let nc = nc.unwrap();
     mb.insert_cartridge(nc);
 
-    let mut t: String;
-    let mut b;
-    for i in 0..26554 {
-        cpu.cycle(&mut mb);
-        if cpu.instruction_start() {
-            log_line += 1;
-            t = goldenlog.next().unwrap().unwrap();
-            println!("Instruction end at cycle {}", i + 1);
-            println!("NESTEST LOG LINE {}: {}", log_line, t);
-            b = t.as_bytes();
-            let d = convert_hex_to_decimal(b[0] as char) as u16;
-            let d2 = convert_hex_to_decimal(b[1] as char) as u16;
-            let d3 = convert_hex_to_decimal(b[2] as char) as u16;
-            let d4 = convert_hex_to_decimal(b[3] as char) as u16;
-            let address = d << 12 | d2 << 8 | d3 << 4 | d4;
-
-            let reg_a: u8 = (convert_hex_to_decimal(b[50] as char) as u8) << 4
-                | convert_hex_to_decimal(b[51] as char) as u8;
-            assert_eq!(cpu.get_a(), reg_a);
-
-            let reg_x: u8 = (convert_hex_to_decimal(b[55] as char) as u8) << 4
-                | convert_hex_to_decimal(b[56] as char) as u8;
-            assert_eq!(cpu.get_x(), reg_x);
-
-            let reg_y: u8 = (convert_hex_to_decimal(b[60] as char) as u8) << 4
-                | convert_hex_to_decimal(b[61] as char) as u8;
-            assert_eq!(cpu.get_y(), reg_y);
-
-            let reg_p: u8 = (convert_hex_to_decimal(b[65] as char) as u8) << 4
-                | convert_hex_to_decimal(b[66] as char) as u8;
-            assert_eq!(cpu.get_p(), reg_p);
-
-            let reg_sp: u8 = (convert_hex_to_decimal(b[71] as char) as u8) << 4
-                | convert_hex_to_decimal(b[72] as char) as u8;
-            assert_eq!(cpu.get_sp(), reg_sp);
-
-            println!("Address is {:x} {:x}", address, cpu.get_pc());
-            assert_eq!(cpu.get_pc(), address);
-            println!("");
-
-            let mut logcycle: u32 = 0;
-            for i in 90..95 {
-                if i < b.len() {
-                    logcycle *= 10;
-                    logcycle += convert_hex_to_decimal(b[i] as char) as u32;
-                }
-            }
-            assert_eq!(i + 1, logcycle);
-        }
+    for _i in 0..26554 {
+        cpu.cycle(&mut mb, &mut cpu_peripherals);
+        cpu_peripherals.ppu_cycle(&mut mb);
+        cpu_peripherals.ppu_cycle(&mut mb);
+        cpu_peripherals.ppu_cycle(&mut mb);
     }
+    cpu_peripherals.ppu_cycle(&mut mb);
 }
