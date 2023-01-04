@@ -56,6 +56,10 @@ pub struct NesCpu {
     temp: u8,
     temp2: u8,
     tempaddr: u16,
+    #[cfg(debug_assertions)]
+    breakpoints: [Option<u16>; 10],
+    #[cfg(debug_assertions)]
+    old_pc: [u16; 2],
 }
 
 const CPU_FLAG_CARRY: u8 = 1;
@@ -83,6 +87,10 @@ impl NesCpu {
             temp: 0,
             temp2: 0,
             tempaddr: 0,
+            #[cfg(debug_assertions)]
+            breakpoints: [None; 10],
+            #[cfg(debug_assertions)]
+            old_pc: [0; 2],
         }
     }
 
@@ -215,6 +223,22 @@ impl NesCpu {
         );
     }
 
+    #[cfg(debug_assertions)]
+    fn check_breakpoints(&mut self) {
+        self.old_pc[1] = self.old_pc[0];
+        self.old_pc[0] = self.pc;
+        for b in self.breakpoints {
+            if let Some(br) = b {
+                if self.pc == br || self.pc == 0xffff {
+                    self.subcycle = 1;
+                }
+            }
+        }
+        if self.pc == 58552 {
+            self.pc = self.pc;
+        }
+    }
+
     pub fn cycle(&mut self, bus: &mut dyn NesMemoryBus, cpu_peripherals: &mut NesCpuPeripherals) {
         if self.interrupts[1] {
             match self.subcycle {
@@ -257,6 +281,8 @@ impl NesCpu {
         } else {
             if let None = self.opcode {
                 self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
+                #[cfg(debug_assertions)]
+                self.check_breakpoints();
                 self.subcycle = 1;
             } else if let Some(o) = self.opcode {
                 match o {
@@ -4153,7 +4179,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -4183,7 +4208,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -4213,7 +4237,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -4243,7 +4266,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -4273,7 +4295,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -4303,7 +4324,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },
@@ -4333,7 +4353,6 @@ impl NesCpu {
                             }
                         }
                         _ => {
-                            self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }
                     },

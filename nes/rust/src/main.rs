@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+
 mod cartridge;
 mod cpu;
 mod ppu;
@@ -10,6 +12,13 @@ use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
 use crate::cpu::NesMemoryBus;
 use crate::ppu::NesPpu;
+
+use egui_glow::EguiGlow;
+use egui_multiwin::multi_window::MultiWindow;
+use egui_multiwin::{
+    multi_window::NewWindowRequest,
+    tracked_window::{RedrawResponse, TrackedWindow},
+};
 
 struct NesMotherboard {
     cart: Option<NesCartridge>,
@@ -255,23 +264,179 @@ fn basic_cpu_test() {
     assert_eq!(cpu.get_pc(), 0xc66e);
 }
 
-fn main() {
-    println!("I am groot!");
+struct NesEmulatorData {
+    cpu: NesCpu,
+    cpu_peripherals: NesCpuPeripherals,
+    mb: NesMotherboard,
+    cpu_clock_counter: u8,
+    ppu_clock_counter: u8,
+    #[cfg(debug_assertions)]
+    paused: bool,
+    #[cfg(debug_assertions)]
+    single_step: bool,
+}
 
-    let mut cpu: NesCpu = NesCpu::new();
-    let ppu: NesPpu = NesPpu::new();
-    let mut cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu);
-    let mut mb: NesMotherboard = NesMotherboard::new();
-    let nc = NesCartridge::load_cartridge("./nes/rust/1.frame_basics.nes".to_string());
+impl NesEmulatorData {
+    fn new() -> Self {
+        let mut mb: NesMotherboard = NesMotherboard::new();
+        let nc = NesCartridge::load_cartridge("./nes/rust/cpu.nes".to_string());
 
-    let nc = nc.unwrap();
-    mb.insert_cartridge(nc);
-
-    for _i in 0..26554 {
-        cpu.cycle(&mut mb, &mut cpu_peripherals);
-        cpu_peripherals.ppu_cycle(&mut mb);
-        cpu_peripherals.ppu_cycle(&mut mb);
-        cpu_peripherals.ppu_cycle(&mut mb);
+        let nc = nc.unwrap();
+        mb.insert_cartridge(nc);
+        let ppu = NesPpu::new();
+        Self {
+            cpu: NesCpu::new(),
+            cpu_peripherals: NesCpuPeripherals::new(ppu),
+            mb: mb,
+            #[cfg(debug_assertions)]
+            paused: true,
+            #[cfg(debug_assertions)]
+            single_step: false,
+            cpu_clock_counter: rand::random::<u8>() % 16,
+            ppu_clock_counter: rand::random::<u8>() % 4,
+        }
     }
-    cpu_peripherals.ppu_cycle(&mut mb);
+
+    pub fn cycle_step(&mut self) {
+        self.cpu_clock_counter += 1;
+        if self.cpu_clock_counter >= 12 {
+            self.cpu_clock_counter = 0;
+            self.cpu.cycle(&mut self.mb, &mut self.cpu_peripherals);
+        }
+
+        self.ppu_clock_counter += 1;
+        if self.ppu_clock_counter >= 4 {
+            self.ppu_clock_counter = 0;
+            self.cpu_peripherals.ppu_cycle(&mut self.mb);
+        }
+    }
+}
+
+struct MainNesWindow {}
+
+impl MainNesWindow {
+    fn new() -> NewWindowRequest<NesEmulatorData> {
+        NewWindowRequest {
+            window_state: Box::new(MainNesWindow {}),
+            builder: glutin::window::WindowBuilder::new()
+                .with_resizable(true)
+                .with_inner_size(glutin::dpi::LogicalSize {
+                    width: 320.0,
+                    height: 240.0,
+                })
+                .with_title("UglyOldBob NES Emulator"),
+        }
+    }
+}
+
+impl TrackedWindow for MainNesWindow {
+    type Data = NesEmulatorData;
+
+    fn is_root(&self) -> bool {
+        true
+    }
+
+    fn set_root(&mut self, _root: bool) {}
+
+    fn redraw(
+        &mut self,
+        c: &mut NesEmulatorData,
+        egui: &mut EguiGlow,
+    ) -> RedrawResponse<Self::Data> {
+        egui.egui_ctx.request_repaint();
+        let mut quit = false;
+        let mut windows_to_create = vec![];
+
+        #[cfg(debug_assertions)]
+        {
+            if !c.paused {
+                c.cycle_step();
+            }
+        }
+        #[cfg(not(debug_assertions))] 
+        {
+            c.cycle_step();
+        }
+
+        egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
+            egui::menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    let button = egui::Button::new("Open rom?");
+                    if ui.add_enabled(true, button).clicked() {}
+                });
+            });
+        });
+
+        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {});
+        RedrawResponse {
+            quit: quit,
+            new_windows: windows_to_create,
+        }
+    }
+}
+
+struct DebugNesWindow {}
+
+impl DebugNesWindow {
+    fn new() -> NewWindowRequest<NesEmulatorData> {
+        NewWindowRequest {
+            window_state: Box::new(DebugNesWindow {}),
+            builder: glutin::window::WindowBuilder::new()
+                .with_resizable(true)
+                .with_inner_size(glutin::dpi::LogicalSize {
+                    width: 320.0,
+                    height: 240.0,
+                })
+                .with_title("UglyOldBob NES Debug"),
+        }
+    }
+}
+
+impl TrackedWindow for DebugNesWindow {
+    type Data = NesEmulatorData;
+
+    fn is_root(&self) -> bool {
+        false
+    }
+
+    fn set_root(&mut self, _root: bool) {}
+
+    fn redraw(
+        &mut self,
+        c: &mut NesEmulatorData,
+        egui: &mut EguiGlow,
+    ) -> RedrawResponse<Self::Data> {
+        egui.egui_ctx.request_repaint();
+        let mut quit = false;
+        let mut windows_to_create = vec![];
+
+        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            ui.label("Debug window");
+            #[cfg(debug_assertions)]
+            {
+                if c.paused {
+                    if ui.button("Unpause").clicked() {
+                        c.paused = false;
+                    }
+                }
+            }
+        });
+        RedrawResponse {
+            quit: quit,
+            new_windows: windows_to_create,
+        }
+    }
+}
+
+fn main() {
+    let event_loop = glutin::event_loop::EventLoopBuilder::with_user_event().build();
+    let mut multi_window = MultiWindow::new();
+    let root_window = MainNesWindow::new();
+    let nes_data = NesEmulatorData::new();
+    let _e = multi_window.add(root_window, &event_loop);
+    if cfg!(debug_assertions) {
+        let debug_win = DebugNesWindow::new();
+        let _e = multi_window.add(debug_win, &event_loop);
+    }
+    multi_window.run(event_loop, nes_data);
 }
