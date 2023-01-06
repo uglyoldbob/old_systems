@@ -382,8 +382,7 @@ impl TrackedWindow for MainNesWindow {
                         c.paused = true;
                         break 'emulator_loop;
                     }
-                }
-                else {
+                } else {
                     break 'emulator_loop;
                 }
                 if counter == 1000 {

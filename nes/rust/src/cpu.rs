@@ -94,7 +94,7 @@ impl NesCpu {
         }
     }
 
-    #[cfg(any(test, debug_assertions))]
+    #[cfg(test)]
     pub fn instruction_start(&self) -> bool {
         self.subcycle == 0
     }
@@ -356,6 +356,41 @@ impl NesCpu {
                 self.subcycle = 1;
             } else if let Some(o) = self.opcode {
                 match o {
+                    //brk instruction
+                    0 => match self.subcycle {
+                        1 => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                            self.subcycle = 2;
+                        }
+                        2 => {
+                            let mut pc = self.pc.to_le_bytes();
+                            self.memory_cycle_write(0x100 + self.s as u16, pc[1], bus, cpu_peripherals);
+                            self.s = self.s.wrapping_sub(1);
+                            self.subcycle = 3;
+                        }
+                        3 => {
+                            let mut pc = self.pc.to_le_bytes();
+                            self.memory_cycle_write(0x100 + self.s as u16, pc[0], bus, cpu_peripherals);
+                            self.s = self.s.wrapping_sub(1);
+                            self.subcycle = 4;
+                        }
+                        4 => {
+                            self.p |= CPU_FLAG_B1;
+                            self.memory_cycle_write(0x100 + self.s as u16, self.p, bus, cpu_peripherals);
+                            self.s = self.s.wrapping_sub(1);
+                            self.subcycle = 5;
+                        }
+                        5 => {
+                            self.temp = self.memory_cycle_read(0xfffe, bus, cpu_peripherals);
+                            self.subcycle = 6;
+                        }
+                        _ => {
+                            self.temp2 = self.memory_cycle_read(0xffff, bus, cpu_peripherals);
+                            let addr : u16 = (self.temp as u16) | (self.temp2 as u16)<<8;
+                            self.pc = addr;
+                            self.end_instruction();
+                        }
+                    },
                     //and immediate
                     0x29 => match self.subcycle {
                         _ => {

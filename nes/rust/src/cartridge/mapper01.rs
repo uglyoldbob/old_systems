@@ -35,8 +35,7 @@ impl NesMapper for Mapper {
                     addr2 = addr2 % cart.prg_ram.len() as u16;
                     println!("Read address {:x} {:x} from cart mapper 1", addr, addr2);
                     Some(cart.prg_ram[addr2 as usize])
-                }
-                else {
+                } else {
                     None
                 }
             }
