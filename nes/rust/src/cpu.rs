@@ -94,12 +94,17 @@ impl NesCpu {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, debug_assertions))]
     pub fn instruction_start(&self) -> bool {
         self.subcycle == 0
     }
 
-    #[cfg(test)]
+    #[cfg(debug_assertions)]
+    pub fn breakpoint_option(&self) -> bool {
+        self.subcycle == 1
+    }
+
+    #[cfg(any(test, debug_assertions))]
     pub fn get_pc(&self) -> u16 {
         self.pc
     }
@@ -236,6 +241,71 @@ impl NesCpu {
         }
         if self.pc == 58552 {
             self.pc = self.pc;
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn disassemble(&self) -> Option<String> {
+        if let Some(o) = self.opcode {
+            match o {
+                0x01 | 0x05 | 0x09 | 0x0d | 0x11 | 0x15 | 0x19 | 0x1d => Some("ORA".to_string()),
+                0x21 | 0x25 | 0x29 | 0x2d | 0x31 | 0x35 | 0x39 | 0x3d => Some("AND".to_string()),
+                0x41 | 0x45 | 0x49 | 0x4d | 0x51 | 0x55 | 0x59 | 0x5d => Some("EOR".to_string()),
+                0x61 | 0x65 | 0x69 | 0x6d | 0x71 | 0x75 | 0x79 | 0x7d => Some("ADC".to_string()),
+                0x81 | 0x85 | 0x89 | 0x8d | 0x91 | 0x95 | 0x99 | 0x9d => Some("STA".to_string()),
+                0xa1 | 0xa5 | 0xa9 | 0xad | 0xb1 | 0xb5 | 0xb9 | 0xbd => Some("LDA".to_string()),
+                0xc1 | 0xc5 | 0xc9 | 0xcd | 0xd1 | 0xd5 | 0xd9 | 0xdd => Some("CMP".to_string()),
+                0xe1 | 0xe5 | 0xe9 | 0xed | 0xf1 | 0xf5 | 0xf9 | 0xfd => Some("SBC".to_string()),
+                0xa0 | 0xa4 | 0xac | 0xb4 | 0xbc => Some("LDY".to_string()),
+                0xa2 | 0xa6 | 0xae | 0xb6 | 0xbe => Some("LDX".to_string()),
+                0x06 | 0x0a | 0x0e | 0x16 | 0x1e => Some("ASL".to_string()),
+                0x26 | 0x2a | 0x2e | 0x36 | 0x3e => Some("ROL".to_string()),
+                0x46 | 0x4a | 0x4e | 0x56 | 0x5e => Some("LSR".to_string()),
+                0x66 | 0x6a | 0x6e | 0x76 | 0x7e => Some("ROR".to_string()),
+                0xc6 | 0xce | 0xd6 | 0xde => Some("DEC".to_string()),
+                0xe6 | 0xee | 0xf6 | 0xfe => Some("INC".to_string()),
+                0x86 | 0x8e | 0x96 => Some("STX".to_string()),
+                0x84 | 0x8c | 0x94 => Some("STY".to_string()),
+                0xc0 | 0xc4 | 0xcc => Some("CPY".to_string()),
+                0xe0 | 0xe4 | 0xec => Some("CPX".to_string()),
+                0x4c | 0x6c => Some("JMP".to_string()),
+                0x24 | 0x2c => Some("BIT".to_string()),
+                0x00 => Some("BRK".to_string()),
+                0x20 => Some("JSR".to_string()),
+                0x40 => Some("RTI".to_string()),
+                0x60 => Some("RTS".to_string()),
+                0x08 => Some("PHP".to_string()),
+                0x28 => Some("PLP".to_string()),
+                0x48 => Some("PHA".to_string()),
+                0x68 => Some("PLA".to_string()),
+                0x88 => Some("DEY".to_string()),
+                0xa8 => Some("TAY".to_string()),
+                0xc8 => Some("INY".to_string()),
+                0xe8 => Some("INX".to_string()),
+                0x8a => Some("TXA".to_string()),
+                0xaa => Some("TAX".to_string()),
+                0xca => Some("DEX".to_string()),
+                0xea => Some("NOP".to_string()),
+                0x10 => Some("BPL".to_string()),
+                0x30 => Some("BMI".to_string()),
+                0x50 => Some("BVC".to_string()),
+                0x70 => Some("BVS".to_string()),
+                0x90 => Some("BCC".to_string()),
+                0xb0 => Some("BCS".to_string()),
+                0xd0 => Some("BNE".to_string()),
+                0xf0 => Some("BEQ".to_string()),
+                0x18 => Some("CLC".to_string()),
+                0x38 => Some("SEC".to_string()),
+                0x58 => Some("CLI".to_string()),
+                0x78 => Some("SEI".to_string()),
+                0x98 => Some("TYA".to_string()),
+                0xb8 => Some("CLV".to_string()),
+                0xd8 => Some("CLD".to_string()),
+                0xf8 => Some("SED".to_string()),
+                _ => Some(format!("Invalid {:x}", o)),
+            }
+        } else {
+            None
         }
     }
 
@@ -6477,6 +6547,7 @@ impl NesCpu {
                         }
                     },
                     _ => {
+                        println!("{}", format!("CPU OPCODE {:x} not implemented", o));
                         unimplemented!();
                     }
                 }

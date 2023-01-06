@@ -58,17 +58,29 @@ impl NesMemoryBus for NesMotherboard {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
                 response = self.ram[addr as usize];
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             0x2000..=0x3fff => {
                 let addr = addr & 7;
                 response = per.ppu_read(addr);
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             0x4000..=0x4017 => {
                 //apu and io
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             0x4018..=0x401f => {
                 //disabled apu and oi functionality
                 //test mode
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             _ => {
                 if let Some(cart) = &mut self.cart {
@@ -93,22 +105,34 @@ impl NesMemoryBus for NesMotherboard {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
                 self.ram[addr as usize] = data;
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             0x2000..=0x3fff => {
                 let addr = addr & 7;
                 //ppu registers
                 per.ppu_write(addr, data);
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             0x4000..=0x4017 => {
                 //apu and io
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             0x4018..=0x401f => {
                 //disabled apu and oi functionality
                 //test mode
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_nop();
+                }
             }
             _ => {
-                if let Some(_cart) = &mut self.cart {
-                    //TODO?
+                if let Some(cart) = &mut self.cart {
+                    cart.memory_write(addr, data);
                 }
             }
         }
@@ -347,15 +371,31 @@ impl TrackedWindow for MainNesWindow {
         let mut quit = false;
         let mut windows_to_create = vec![];
 
-        #[cfg(debug_assertions)]
-        {
-            if !c.paused {
-                c.cycle_step();
+        let mut counter = 0;
+        'emulator_loop: loop {
+            #[cfg(debug_assertions)]
+            {
+                counter += 1;
+                if !c.paused {
+                    c.cycle_step();
+                    if c.single_step && c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
+                        c.paused = true;
+                        break 'emulator_loop;
+                    }
+                }
+                else {
+                    break 'emulator_loop;
+                }
+                if counter == 1000 {
+                    counter = 0;
+                    break 'emulator_loop;
+                }
             }
-        }
-        #[cfg(not(debug_assertions))] 
-        {
-            c.cycle_step();
+            #[cfg(not(debug_assertions))]
+            {
+                c.cycle_step();
+                break 'emulator_loop;
+            }
         }
 
         egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
@@ -417,8 +457,19 @@ impl TrackedWindow for DebugNesWindow {
                 if c.paused {
                     if ui.button("Unpause").clicked() {
                         c.paused = false;
+                        c.single_step = false;
+                    }
+                    if ui.button("Single step").clicked() {
+                        c.single_step = true;
+                        c.paused = false;
                     }
                 }
+                ui.horizontal(|ui| {
+                    ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
+                    if let Some(t) = c.cpu.disassemble() {
+                        ui.label(t);
+                    }
+                });
             }
         });
         RedrawResponse {

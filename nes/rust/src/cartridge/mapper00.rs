@@ -36,6 +36,8 @@ impl NesMapper for Mapper {
 
     fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
 
+    fn memory_cycle_nop(&mut self) {}
+
     fn ppu_memory_cycle_address(&mut self, addr: u16) {}
 
     fn ppu_memory_cycle_read(&mut self, _cart: &mut NesCartridgeData) -> Option<u8> {

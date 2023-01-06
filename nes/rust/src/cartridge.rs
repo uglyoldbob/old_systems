@@ -4,6 +4,7 @@ mod mapper01;
 pub trait NesMapper {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+    fn memory_cycle_nop(&mut self);
     fn ppu_memory_cycle_address(&mut self, addr: u16);
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8>;
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
@@ -99,15 +100,6 @@ impl NesCartridge {
             prg_ram.push(v);
         }
 
-        let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
-        let mapper = match mapper {
-            0 => mapper00::Mapper::new(),
-            1 => mapper01::Mapper::new(),
-            _ => {
-                return Err(CartridgeError::IncompatibleMapper(mapper as u16));
-            }
-        };
-
         let rom_data = NesCartridgeData {
             trainer: trainer,
             prg_rom: prg_rom,
@@ -115,6 +107,15 @@ impl NesCartridge {
             inst_rom: inst_rom,
             prom: None,
             prg_ram: prg_ram,
+        };
+
+        let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
+        let mapper = match mapper {
+            0 => mapper00::Mapper::new(),
+            1 => mapper01::Mapper::new(&rom_data),
+            _ => {
+                return Err(CartridgeError::IncompatibleMapper(mapper as u16));
+            }
         };
 
         Ok(Self {
@@ -161,6 +162,14 @@ impl NesCartridge {
 impl NesCartridge {
     pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_read(&mut self.data, addr)
+    }
+
+    pub fn memory_write(&mut self, addr: u16, data: u8) {
+        self.mapper.memory_cycle_write(&mut self.data, addr, data);
+    }
+
+    pub fn memory_nop(&mut self) {
+        self.mapper.memory_cycle_nop();
     }
 
     pub fn ppu_cycle_1(&mut self, addr: u16) {
