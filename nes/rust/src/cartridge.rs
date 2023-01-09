@@ -5,7 +5,11 @@ pub trait NesMapper {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
     fn memory_cycle_nop(&mut self);
-    fn ppu_memory_cycle_address(&mut self, addr: u16);
+    #[must_use]
+    //performs the first half of a ppu memory cycle
+    //returns A10 for internal VRAM and the motherboard CS line (for internal VRAM)
+    //A10 is straight forward, CS line is active low like the electronics would be
+    fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool);
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8>;
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
@@ -28,6 +32,7 @@ pub struct NesCartridgeData {
     inst_rom: Option<Vec<u8>>,
     prom: Option<(Vec<u8>, Vec<u8>)>,
     prg_ram: Vec<u8>,
+    mirroring: bool,
 }
 
 pub struct NesCartridge {
@@ -107,11 +112,12 @@ impl NesCartridge {
             inst_rom: inst_rom,
             prom: None,
             prg_ram: prg_ram,
+            mirroring: (rom_contents[6] & 1) != 0,
         };
 
         let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
         let mapper = match mapper {
-            0 => mapper00::Mapper::new(),
+            0 => mapper00::Mapper::new(&rom_data),
             1 => mapper01::Mapper::new(&rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper as u16));
@@ -172,8 +178,9 @@ impl NesCartridge {
         self.mapper.memory_cycle_nop();
     }
 
-    pub fn ppu_cycle_1(&mut self, addr: u16) {
-        self.mapper.ppu_memory_cycle_address(addr);
+    #[must_use]
+    pub fn ppu_cycle_1(&mut self, addr: u16) -> (bool, bool) {
+        self.mapper.ppu_memory_cycle_address(addr)
     }
 
     pub fn ppu_cycle_write(&mut self, data: u8) {
@@ -184,10 +191,12 @@ impl NesCartridge {
         if let Some(a) = self.mapper.ppu_memory_cycle_read(&mut self.data) {
             a
         } else {
+            //TODO implement open bus behavior
             42
         }
     }
 
+    #[cfg(test)]
     pub fn rom_byte_hack(&mut self, addr: u32, new_byte: u8) {
         self.mapper.rom_byte_hack(&mut self.data, addr, new_byte);
     }

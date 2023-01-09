@@ -7,6 +7,7 @@ pub struct Mapper {
     shift_locked: bool,
     /// Control, chr bank 0, chr bank 1, prg bank
     registers: [u8; 4],
+    ppu_address: u16,
 }
 
 impl Mapper {
@@ -16,11 +17,11 @@ impl Mapper {
             shift_counter: 0,
             shift_locked: false,
             registers: [0x0c0, 0, 0, 0],
+            ppu_address: 0,
         })
     }
 
     fn update_register(&mut self, adr: u8, data: u8) {
-        println!("Update mmc1 register {} to {:x}", adr, data);
         self.registers[adr as usize] = data;
     }
 }
@@ -33,7 +34,6 @@ impl NesMapper for Mapper {
                 let mut addr2 = addr & 0x1fff;
                 if cart.prg_ram.len() != 0 {
                     addr2 = addr2 % cart.prg_ram.len() as u16;
-                    println!("Read address {:x} {:x} from cart mapper 1", addr, addr2);
                     Some(cart.prg_ram[addr2 as usize])
                 } else {
                     None
@@ -46,7 +46,6 @@ impl NesMapper for Mapper {
                         let addr2 = addr & 0x7fff;
                         let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
                         addr3 |= (self.registers[3] as u32 & 0xE) << 16;
-                        println!("Read address {:x} {:x} from cart mapper 1", addr, addr3);
                         Some(cart.prg_rom[addr3 as usize])
                     }
                     2 => {
@@ -55,14 +54,12 @@ impl NesMapper for Mapper {
                             //fixed to first bank
                             let addr2 = addr & 0x3fff;
                             let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            println!("Read address {:x} {:x} from cart mapper 1", addr, addr3);
                             Some(cart.prg_rom[addr3 as usize])
                         } else {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
                             addr3 |= (self.registers[3] as u32 & 0xF) << 15;
-                            println!("Read address {:x} {:x} from cart mapper 1", addr, addr3);
                             Some(cart.prg_rom[addr3 as usize])
                         }
                     }
@@ -73,14 +70,12 @@ impl NesMapper for Mapper {
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
                             addr3 |= (self.registers[3] as u32 & 0xF) << 15;
-                            println!("Read address {:x} {:x} from cart mapper 1", addr, addr3);
                             Some(cart.prg_rom[addr3 as usize])
                         } else {
                             //fixed to last bank
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32;
                             addr3 |= ((cart.prg_rom.len() - 1) & !0x3fff) as u32;
-                            println!("Read address {:x} {:x} from cart mapper 1", addr, addr3);
                             Some(cart.prg_rom[addr3 as usize])
                         }
                     }
@@ -95,7 +90,6 @@ impl NesMapper for Mapper {
     }
 
     fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {
-        println!("Writing to address {:x} with {:x}", addr, data);
         if addr >= 0x8000 {
             if !self.shift_locked {
                 self.shift_locked = true;
@@ -121,10 +115,50 @@ impl NesMapper for Mapper {
         }
     }
 
-    fn ppu_memory_cycle_address(&mut self, addr: u16) {}
+    fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool) {
+        self.ppu_address = addr;
+        let control = self.registers[0];
+        let a10 = match control & 3 {
+            0 | 1 => (control & 1) != 0,
+            2 => (addr & 1 << 10) != 0,
+            _ => (addr & 1 << 11) != 0,
+        };
+        (a10, false)
+    }
 
-    fn ppu_memory_cycle_read(&mut self, _cart: &mut NesCartridgeData) -> Option<u8> {
-        None
+    fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
+        if cart.chr_rom.len() == 0 {
+            return None;
+        }
+        if (self.registers[0] & 0x10) != 0 {
+            //two separate 4kb banks
+            match self.ppu_address {
+                0..=0x0fff => {
+                    let addr2 = self.ppu_address & 0x0fff;
+                    let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
+                    addr3 |= (self.registers[1] as u32 & 0x1F) << 12;
+                    Some(cart.chr_rom[addr3 as usize])
+                }
+                0x1000..=0x1fff => {
+                    let addr2 = self.ppu_address & 0x0fff;
+                    let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
+                    addr3 |= (self.registers[2] as u32 & 0x1F) << 12;
+                    Some(cart.chr_rom[addr3 as usize])
+                }
+                _ => None,
+            }
+        } else {
+            //one 8kb bank
+            match self.ppu_address {
+                0..=0x1fff => {
+                    let addr2 = self.ppu_address & 0x1fff;
+                    let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
+                    addr3 |= (self.registers[1] as u32 & 0x1E) << 12;
+                    Some(cart.chr_rom[addr3 as usize])
+                }
+                _ => None,
+            }
+        }
     }
 
     fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {}

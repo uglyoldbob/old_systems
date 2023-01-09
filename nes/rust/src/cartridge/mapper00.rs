@@ -1,11 +1,17 @@
 use crate::cartridge::NesCartridgeData;
 use crate::cartridge::NesMapper;
 
-pub struct Mapper {}
+pub struct Mapper {
+    ppu_address: u16,
+    mirroring: bool,
+}
 
 impl Mapper {
-    pub fn new() -> Box<dyn NesMapper> {
-        Box::new(Self {})
+    pub fn new(d: &NesCartridgeData) -> Box<dyn NesMapper> {
+        Box::new(Self {
+            ppu_address: 0,
+            mirroring: d.mirroring,
+        })
     }
 }
 
@@ -38,10 +44,24 @@ impl NesMapper for Mapper {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn ppu_memory_cycle_address(&mut self, addr: u16) {}
+    fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool) {
+        self.ppu_address = addr;
+        let a10 = if !self.mirroring {
+            (addr & 0x400) != 0
+        } else {
+            (addr & 0x200) != 0
+        };
+        (a10, false)
+    }
 
-    fn ppu_memory_cycle_read(&mut self, _cart: &mut NesCartridgeData) -> Option<u8> {
-        None
+    fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
+        if cart.chr_rom.len() > 0 {
+            let mask = cart.chr_rom.len() - 1;
+            let adr = self.ppu_address as usize & mask;
+            Some(cart.chr_rom[adr])
+        } else {
+            None
+        }
     }
 
     fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {}

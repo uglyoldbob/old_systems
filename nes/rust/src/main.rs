@@ -13,16 +13,11 @@ use crate::cpu::NesCpuPeripherals;
 use crate::cpu::NesMemoryBus;
 use crate::ppu::NesPpu;
 
-use egui_glow::EguiGlow;
-use egui_multiwin::multi_window::MultiWindow;
-use egui_multiwin::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
-
 struct NesMotherboard {
     cart: Option<NesCartridge>,
     ram: [u8; 2048],
+    vram: [u8; 2048],
+    vram_address: Option<u16>,
 }
 
 impl NesMotherboard {
@@ -32,9 +27,16 @@ impl NesMotherboard {
         for i in main_ram.iter_mut() {
             *i = rand::random();
         }
+
+        let mut vram: [u8; 2048] = [0; 2048];
+        for i in vram.iter_mut() {
+            *i = rand::random();
+        }
         Self {
             cart: None,
             ram: main_ram,
+            vram: vram,
+            vram_address: None,
         }
     }
 
@@ -64,7 +66,11 @@ impl NesMemoryBus for NesMotherboard {
             }
             0x2000..=0x3fff => {
                 let addr = addr & 7;
-                response = per.ppu_read(addr);
+                if let Some(r) = per.ppu_read(addr) {
+                    response = r;
+                } else {
+                    //TODO open bus implementation
+                }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -140,16 +146,33 @@ impl NesMemoryBus for NesMotherboard {
 
     fn ppu_cycle_1(&mut self, addr: u16) {
         if let Some(cart) = &mut self.cart {
-            cart.ppu_cycle_1(addr);
+            let (a10, vram_enable) = cart.ppu_cycle_1(addr);
+            self.vram_address = if vram_enable {
+                if addr >= 0x2000 && addr <= 0x2fff {
+                    Some(addr | (a10 as u16) << 10)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
         }
     }
     fn ppu_cycle_2_write(&mut self, data: u8) {
-        if let Some(cart) = &mut self.cart {
-            cart.ppu_cycle_write(data);
+        if let Some(addr) = self.vram_address {
+            let addr2 = addr & 0x7ff;
+            self.vram[addr2 as usize] = data;
+        } else {
+            if let Some(cart) = &mut self.cart {
+                cart.ppu_cycle_write(data);
+            }
         }
     }
     fn ppu_cycle_2_read(&mut self) -> u8 {
-        if let Some(cart) = &mut self.cart {
+        if let Some(addr) = self.vram_address {
+            let addr2 = addr & 0x7ff;
+            self.vram[addr2 as usize]
+        } else if let Some(cart) = &mut self.cart {
             cart.ppu_cycle_read()
         } else {
             42
@@ -298,6 +321,7 @@ struct NesEmulatorData {
     paused: bool,
     #[cfg(debug_assertions)]
     single_step: bool,
+    last_frame_time: u128,
 }
 
 impl NesEmulatorData {
@@ -308,16 +332,21 @@ impl NesEmulatorData {
         let nc = nc.unwrap();
         mb.insert_cartridge(nc);
         let ppu = NesPpu::new();
+
         Self {
             cpu: NesCpu::new(),
             cpu_peripherals: NesCpuPeripherals::new(ppu),
             mb: mb,
             #[cfg(debug_assertions)]
-            paused: true,
+            paused: false,
             #[cfg(debug_assertions)]
             single_step: false,
             cpu_clock_counter: rand::random::<u8>() % 16,
             ppu_clock_counter: rand::random::<u8>() % 4,
+            last_frame_time: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
         }
     }
 
@@ -336,157 +365,103 @@ impl NesEmulatorData {
     }
 }
 
-struct MainNesWindow {}
-
-impl MainNesWindow {
-    fn new() -> NewWindowRequest<NesEmulatorData> {
-        NewWindowRequest {
-            window_state: Box::new(MainNesWindow {}),
-            builder: glutin::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(glutin::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
-                })
-                .with_title("UglyOldBob NES Emulator"),
-        }
-    }
+fn make_dummy_texture<'a, T>(tc: &'a sdl2::render::TextureCreator<T>) -> sdl2::render::Texture<'a> {
+    let mut data: Vec<u8> = vec![0; (4 * 4 * 2) as usize];
+    let mut surf = sdl2::surface::Surface::from_data(
+        data.as_mut_slice(),
+        4,
+        4,
+        (2 * 4) as u32,
+        sdl2::pixels::PixelFormatEnum::RGB555,
+    )
+    .unwrap();
+    let _e = surf.set_color_key(true, sdl2::pixels::Color::BLACK);
+    sdl2::render::Texture::from_surface(&surf, tc).unwrap()
 }
 
-impl TrackedWindow for MainNesWindow {
-    type Data = NesEmulatorData;
+fn main() {
+    let sdl_context = sdl2::init().unwrap();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
 
-    fn is_root(&self) -> bool {
-        true
-    }
+    let mut vid_win = video_subsystem.window("UglyOldBob NES Emulator", 256 * 3, 240 * 3);
+    let mut windowb = vid_win.position_centered();
+    let window = windowb.opengl().build().unwrap();
+    let mut canvas = window.into_canvas().build().unwrap();
+    let texture_creator = canvas.texture_creator();
 
-    fn set_root(&mut self, _root: bool) {}
+    canvas.set_scale(3.0, 3.0).unwrap();
+    canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
+    canvas.clear();
+    canvas.present();
 
-    fn redraw(
-        &mut self,
-        c: &mut NesEmulatorData,
-        egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
-        egui.egui_ctx.request_repaint();
-        let mut quit = false;
-        let mut windows_to_create = vec![];
+    let dummy_texture = make_dummy_texture(&texture_creator);
 
-        let mut counter = 0;
+    let mut texture = texture_creator
+        .create_texture_target(sdl2::pixels::PixelFormatEnum::RGB24, 256, 240)
+        .unwrap();
+
+    let mut nes_data = NesEmulatorData::new();
+    let mut prev_time = std::time::SystemTime::now();
+
+    'app_loop: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                sdl2::event::Event::Quit { .. } => {
+                    break 'app_loop;
+                }
+                _ => {}
+            }
+        }
         'emulator_loop: loop {
             #[cfg(debug_assertions)]
             {
-                counter += 1;
-                if !c.paused {
-                    c.cycle_step();
-                    if c.single_step && c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
-                        c.paused = true;
+                if !nes_data.paused {
+                    nes_data.cycle_step();
+                    if nes_data.single_step
+                        && nes_data.cpu_clock_counter == 0
+                        && nes_data.cpu.breakpoint_option()
+                    {
+                        nes_data.paused = true;
                         break 'emulator_loop;
                     }
                 } else {
                     break 'emulator_loop;
                 }
-                if counter == 1000 {
-                    counter = 0;
+                if nes_data.cpu_peripherals.ppu_frame_end() {
+                    let data = nes_data.cpu_peripherals.ppu_get_frame();
                     break 'emulator_loop;
                 }
             }
             #[cfg(not(debug_assertions))]
             {
-                c.cycle_step();
-                break 'emulator_loop;
-            }
-        }
-
-        egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    let button = egui::Button::new("Open rom?");
-                    if ui.add_enabled(true, button).clicked() {}
-                });
-            });
-        });
-
-        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {});
-        RedrawResponse {
-            quit: quit,
-            new_windows: windows_to_create,
-        }
-    }
-}
-
-struct DebugNesWindow {}
-
-impl DebugNesWindow {
-    fn new() -> NewWindowRequest<NesEmulatorData> {
-        NewWindowRequest {
-            window_state: Box::new(DebugNesWindow {}),
-            builder: glutin::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(glutin::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
-                })
-                .with_title("UglyOldBob NES Debug"),
-        }
-    }
-}
-
-impl TrackedWindow for DebugNesWindow {
-    type Data = NesEmulatorData;
-
-    fn is_root(&self) -> bool {
-        false
-    }
-
-    fn set_root(&mut self, _root: bool) {}
-
-    fn redraw(
-        &mut self,
-        c: &mut NesEmulatorData,
-        egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
-        egui.egui_ctx.request_repaint();
-        let mut quit = false;
-        let mut windows_to_create = vec![];
-
-        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            ui.label("Debug window");
-            #[cfg(debug_assertions)]
-            {
-                if c.paused {
-                    if ui.button("Unpause").clicked() {
-                        c.paused = false;
-                        c.single_step = false;
-                    }
-                    if ui.button("Single step").clicked() {
-                        c.single_step = true;
-                        c.paused = false;
-                    }
+                nes_data.cycle_step();
+                if nes_data.cpu_peripherals.ppu_frame_end() {
+                    break 'emulator_loop;
                 }
-                ui.horizontal(|ui| {
-                    ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
-                    if let Some(t) = c.cpu.disassemble() {
-                        ui.label(t);
-                    }
-                });
             }
-        });
-        RedrawResponse {
-            quit: quit,
-            new_windows: windows_to_create,
         }
-    }
-}
 
-fn main() {
-    let event_loop = glutin::event_loop::EventLoopBuilder::with_user_event().build();
-    let mut multi_window = MultiWindow::new();
-    let root_window = MainNesWindow::new();
-    let nes_data = NesEmulatorData::new();
-    let _e = multi_window.add(root_window, &event_loop);
-    if cfg!(debug_assertions) {
-        let debug_win = DebugNesWindow::new();
-        let _e = multi_window.add(debug_win, &event_loop);
+        let frame_data = nes_data.cpu_peripherals.ppu_get_frame();
+        texture.update(None, frame_data, 512).unwrap();
+
+        canvas.clear();
+        let _e = canvas.copy(&dummy_texture, None, None);
+        canvas.copy(&texture, None, None).unwrap();
+        canvas.present();
+        let framerate = 60;
+        
+        let elapsed_time = std::time::SystemTime::now()
+            .duration_since(prev_time)
+            .unwrap()
+            .as_nanos();
+
+        let wait = if elapsed_time < 1_000_000_000u128 / 60 {
+            1_000_000_000u32 / 60 - (elapsed_time as u32)
+        } else {
+            0
+        };
+        ::std::thread::sleep(std::time::Duration::new(0, wait));
+        prev_time = std::time::SystemTime::now();
     }
-    multi_window.run(event_loop, nes_data);
 }
