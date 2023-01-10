@@ -307,7 +307,7 @@ impl NesPpu {
             self.increment_scanline_cycle();
         } else if self.scanline_number <= 260 {
             //vblank lines
-            if self.scanline_cycle == 1 {
+            if self.scanline_cycle == 1 && self.scanline_number == 241 {
                 self.vblank = true;
                 self.frame_end = true;
                 self.frame_number = self.frame_number.wrapping_add(1);
