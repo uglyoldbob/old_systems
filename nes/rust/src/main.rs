@@ -1,8 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod cartridge;
-mod cpu;
-mod ppu;
+pub mod cartridge;
+pub mod cpu;
+pub mod emulator_data;
+pub mod motherboard;
+pub mod ppu;
+pub mod utility;
+use emulator_data::NesEmulatorData;
+use motherboard::NesMotherboard;
 
 #[cfg(test)]
 use std::io::BufRead;
@@ -12,173 +17,7 @@ use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
 use crate::cpu::NesMemoryBus;
 use crate::ppu::NesPpu;
-
-struct NesMotherboard {
-    cart: Option<NesCartridge>,
-    ram: [u8; 2048],
-    vram: [u8; 2048],
-    vram_address: Option<u16>,
-}
-
-impl NesMotherboard {
-    fn new() -> Self {
-        //board ram is random on startup
-        let mut main_ram: [u8; 2048] = [0; 2048];
-        for i in main_ram.iter_mut() {
-            *i = rand::random();
-        }
-
-        let mut vram: [u8; 2048] = [0; 2048];
-        for i in vram.iter_mut() {
-            *i = rand::random();
-        }
-        Self {
-            cart: None,
-            ram: main_ram,
-            vram: vram,
-            vram_address: None,
-        }
-    }
-
-    fn insert_cartridge(&mut self, c: NesCartridge) {
-        if let None = self.cart {
-            self.cart = Some(c);
-        }
-    }
-}
-
-impl NesMemoryBus for NesMotherboard {
-    fn memory_cycle_read(
-        &mut self,
-        addr: u16,
-        _out: [bool; 3],
-        _controllers: [bool; 2],
-        per: &mut NesCpuPeripherals,
-    ) -> u8 {
-        let mut response: u8 = 0;
-        match addr {
-            0..=0x1fff => {
-                let addr = addr & 0x7ff;
-                response = self.ram[addr as usize];
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x2000..=0x3fff => {
-                let addr = addr & 7;
-                if let Some(r) = per.ppu_read(addr) {
-                    response = r;
-                } else {
-                    //TODO open bus implementation
-                }
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4000..=0x4017 => {
-                //apu and io
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4018..=0x401f => {
-                //disabled apu and oi functionality
-                //test mode
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            _ => {
-                if let Some(cart) = &mut self.cart {
-                    let resp = cart.memory_read(addr);
-                    if let Some(v) = resp {
-                        response = v;
-                    }
-                }
-            }
-        }
-        response
-    }
-    fn memory_cycle_write(
-        &mut self,
-        addr: u16,
-        data: u8,
-        _out: [bool; 3],
-        _controllers: [bool; 2],
-        per: &mut NesCpuPeripherals,
-    ) {
-        match addr {
-            0..=0x1fff => {
-                let addr = addr & 0x7ff;
-                self.ram[addr as usize] = data;
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x2000..=0x3fff => {
-                let addr = addr & 7;
-                //ppu registers
-                per.ppu_write(addr, data);
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4000..=0x4017 => {
-                //apu and io
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4018..=0x401f => {
-                //disabled apu and oi functionality
-                //test mode
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            _ => {
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_write(addr, data);
-                }
-            }
-        }
-    }
-
-    fn ppu_cycle_1(&mut self, addr: u16) {
-        if let Some(cart) = &mut self.cart {
-            let (a10, vram_enable) = cart.ppu_cycle_1(addr);
-            self.vram_address = if vram_enable {
-                if addr >= 0x2000 && addr <= 0x2fff {
-                    Some(addr | (a10 as u16) << 10)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-        }
-    }
-    fn ppu_cycle_2_write(&mut self, data: u8) {
-        if let Some(addr) = self.vram_address {
-            let addr2 = addr & 0x7ff;
-            self.vram[addr2 as usize] = data;
-        } else {
-            if let Some(cart) = &mut self.cart {
-                cart.ppu_cycle_write(data);
-            }
-        }
-    }
-    fn ppu_cycle_2_read(&mut self) -> u8 {
-        if let Some(addr) = self.vram_address {
-            let addr2 = addr & 0x7ff;
-            self.vram[addr2 as usize]
-        } else if let Some(cart) = &mut self.cart {
-            cart.ppu_cycle_read()
-        } else {
-            42
-        }
-    }
-}
+use crate::utility::convert_hex_to_decimal;
 
 #[test]
 fn it_works() {
@@ -217,29 +56,6 @@ fn check_nes_roms() {
             "Unable to load rom because {:?}",
             nc.err().unwrap()
         );
-    }
-}
-
-#[cfg(test)]
-fn convert_hex_to_decimal(d: char) -> u8 {
-    match d {
-        '0' => 0,
-        '1' => 1,
-        '2' => 2,
-        '3' => 3,
-        '4' => 4,
-        '5' => 5,
-        '6' => 6,
-        '7' => 7,
-        '8' => 8,
-        '9' => 9,
-        'A' | 'a' => 10,
-        'B' | 'b' => 11,
-        'C' | 'c' => 12,
-        'D' | 'd' => 13,
-        'E' | 'e' => 14,
-        'F' | 'f' => 15,
-        _ => 0,
     }
 }
 
@@ -311,60 +127,6 @@ fn basic_cpu_test() {
     assert_eq!(cpu.get_pc(), 0xc66e);
 }
 
-struct NesEmulatorData {
-    cpu: NesCpu,
-    cpu_peripherals: NesCpuPeripherals,
-    mb: NesMotherboard,
-    cpu_clock_counter: u8,
-    ppu_clock_counter: u8,
-    #[cfg(debug_assertions)]
-    paused: bool,
-    #[cfg(debug_assertions)]
-    single_step: bool,
-    last_frame_time: u128,
-}
-
-impl NesEmulatorData {
-    fn new() -> Self {
-        let mut mb: NesMotherboard = NesMotherboard::new();
-        let nc = NesCartridge::load_cartridge("./nes/rust/cpu.nes".to_string());
-
-        let nc = nc.unwrap();
-        mb.insert_cartridge(nc);
-        let ppu = NesPpu::new();
-
-        Self {
-            cpu: NesCpu::new(),
-            cpu_peripherals: NesCpuPeripherals::new(ppu),
-            mb: mb,
-            #[cfg(debug_assertions)]
-            paused: false,
-            #[cfg(debug_assertions)]
-            single_step: false,
-            cpu_clock_counter: rand::random::<u8>() % 16,
-            ppu_clock_counter: rand::random::<u8>() % 4,
-            last_frame_time: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis(),
-        }
-    }
-
-    pub fn cycle_step(&mut self) {
-        self.cpu_clock_counter += 1;
-        if self.cpu_clock_counter >= 12 {
-            self.cpu_clock_counter = 0;
-            self.cpu.cycle(&mut self.mb, &mut self.cpu_peripherals);
-        }
-
-        self.ppu_clock_counter += 1;
-        if self.ppu_clock_counter >= 4 {
-            self.ppu_clock_counter = 0;
-            self.cpu_peripherals.ppu_cycle(&mut self.mb);
-        }
-    }
-}
-
 fn make_dummy_texture<'a, T>(tc: &'a sdl2::render::TextureCreator<T>) -> sdl2::render::Texture<'a> {
     let mut data: Vec<u8> = vec![0; (4 * 4 * 2) as usize];
     let mut surf = sdl2::surface::Surface::from_data(
@@ -402,6 +164,12 @@ fn main() {
         .unwrap();
 
     let mut nes_data = NesEmulatorData::new();
+
+    let nc = NesCartridge::load_cartridge("./nes/rust/cpu.nes".to_string());
+
+    let nc = nc.unwrap();
+    nes_data.insert_cartridge(nc);
+
     let mut prev_time = std::time::SystemTime::now();
 
     'app_loop: loop {
@@ -450,7 +218,7 @@ fn main() {
         canvas.copy(&texture, None, None).unwrap();
         canvas.present();
         let framerate = 60;
-        
+
         let elapsed_time = std::time::SystemTime::now()
             .duration_since(prev_time)
             .unwrap()

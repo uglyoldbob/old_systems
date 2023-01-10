@@ -16,6 +16,6 @@ features=["use_mac_framework", "image", "ttf", "mixer"]
 criterion = "0.3.6"
 
 [[bench]]
-name="map_bench"
+name="nes_bench"
 path="src/benchmark.rs"
 harness = false

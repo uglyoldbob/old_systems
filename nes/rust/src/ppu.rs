@@ -1,4 +1,4 @@
-use crate::NesMemoryBus;
+use crate::cpu::NesMemoryBus;
 
 pub struct NesPpu {
     registers: [u8; 8],

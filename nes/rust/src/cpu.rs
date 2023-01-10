@@ -1,4 +1,4 @@
-use crate::NesPpu;
+use crate::ppu::NesPpu;
 
 pub struct NesCpuPeripherals {
     ppu: NesPpu,
