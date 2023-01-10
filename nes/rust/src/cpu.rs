@@ -28,6 +28,10 @@ impl NesCpuPeripherals {
     pub fn ppu_get_frame(&mut self) -> &[u8] {
         self.ppu.get_frame()
     }
+
+    pub fn ppu_frame_number(&self) -> u64 {
+        self.ppu.frame_number()
+    }
 }
 
 pub trait NesMemoryBus {

@@ -146,13 +146,13 @@ fn main() {
     let mut event_pump = sdl_context.event_pump().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
-    let mut vid_win = video_subsystem.window("UglyOldBob NES Emulator", 256 * 3, 240 * 3);
+    let mut vid_win = video_subsystem.window("UglyOldBob NES Emulator", 256 * 1, 240 * 1);
     let mut windowb = vid_win.position_centered();
     let window = windowb.opengl().build().unwrap();
     let mut canvas = window.into_canvas().build().unwrap();
     let texture_creator = canvas.texture_creator();
 
-    canvas.set_scale(3.0, 3.0).unwrap();
+    canvas.set_scale(1.0, 1.0).unwrap();
     canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 0, 0));
     canvas.clear();
     canvas.present();
@@ -175,12 +175,25 @@ fn main() {
     'app_loop: loop {
         for event in event_pump.poll_iter() {
             match event {
+                sdl2::event::Event::KeyDown { timestamp, window_id, keycode, scancode, keymod, repeat } => {
+                    if let Some(k) = keycode {
+                        match k {
+                            sdl2::keyboard::Keycode::Escape => {
+                                break 'app_loop;
+                            }
+                            _ => {
+
+                            }
+                        }
+                    }
+                }
                 sdl2::event::Event::Quit { .. } => {
                     break 'app_loop;
                 }
                 _ => {}
             }
         }
+      
         'emulator_loop: loop {
             #[cfg(debug_assertions)]
             {
@@ -197,7 +210,6 @@ fn main() {
                     break 'emulator_loop;
                 }
                 if nes_data.cpu_peripherals.ppu_frame_end() {
-                    let data = nes_data.cpu_peripherals.ppu_get_frame();
                     break 'emulator_loop;
                 }
             }
@@ -211,10 +223,10 @@ fn main() {
         }
 
         let frame_data = nes_data.cpu_peripherals.ppu_get_frame();
-        texture.update(None, frame_data, 512).unwrap();
+        texture.update(None, frame_data, 768).unwrap();
 
         canvas.clear();
-        let _e = canvas.copy(&dummy_texture, None, None);
+        canvas.copy(&dummy_texture, None, None).unwrap();
         canvas.copy(&texture, None, None).unwrap();
         canvas.present();
         let framerate = 60;
@@ -223,13 +235,12 @@ fn main() {
             .duration_since(prev_time)
             .unwrap()
             .as_nanos();
-
-        let wait = if elapsed_time < 1_000_000_000u128 / 60 {
-            1_000_000_000u32 / 60 - (elapsed_time as u32)
+        prev_time = std::time::SystemTime::now();
+        let wait = if elapsed_time < 1_000_000_000u128 / framerate {
+            1_000_000_000u32 / framerate as u32 - (elapsed_time as u32)
         } else {
             0
         };
         ::std::thread::sleep(std::time::Duration::new(0, wait));
-        prev_time = std::time::SystemTime::now();
     }
 }

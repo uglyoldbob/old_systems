@@ -137,6 +137,9 @@ pub fn bench1(c: &mut Criterion) {
                     nes_data.ppu_step();
                     if nes_data.cpu_peripherals.ppu_frame_end() {
                         let data = nes_data.cpu_peripherals.ppu_get_frame();
+                        if data[0] == 0 {
+                            nes_data.ppu_step();
+                        }
                         break 'emulator_loop;
                     }
                 }

@@ -16,8 +16,8 @@ pub struct NesPpu {
     nametable_data: u8,
     attributetable_data: u8,
     patterntable_tile: u16,
-    frame_data: [u16; 256 * 240],
-    frame_vec: Vec<u8>,
+    frame_data: [u8; 3*256 * 240],
+    frame_number: u64,
 }
 
 const PPU_STARTUP_CYCLE_COUNT: u16 = 29658;
@@ -43,13 +43,13 @@ impl NesPpu {
             nametable_data: 0,
             attributetable_data: 0,
             patterntable_tile: 0,
-            frame_data: [0; 256 * 240],
-            frame_vec: vec![],
+            frame_data: [0; 3 * 256 * 240],
+            frame_number: 0,
         }
     }
 
     pub fn read(&mut self, addr: u16) -> Option<u8> {
-        println!("Read ppu register {:x}", addr);
+        //println!("Read ppu register {:x}", addr);
         if addr == 2 {
             self.address_bit = false;
             self.data_bit = false;
@@ -58,7 +58,7 @@ impl NesPpu {
     }
 
     pub fn write(&mut self, addr: u16, data: u8) {
-        println!("Write ppu register {:x} with {:x}", addr, data);
+        //println!("Write ppu register {:x} with {:x}", addr, data);
         match addr {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
@@ -120,8 +120,9 @@ impl NesPpu {
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
                 let cycle = self.scanline_cycle - 1;
-                self.frame_data[(self.scanline_number * 256 + cycle) as usize] =
-                    rand::random::<u16>();
+                self.frame_data[((self.scanline_number * 256 + cycle) as u32 *3) as usize] = rand::random::<u8>();//(self.scanline_number & 0xFF) as u8;
+                self.frame_data[((self.scanline_number * 256 + cycle) as u32 *3+1) as usize] = (cycle & 0xFF) as u8;
+                self.frame_data[((self.scanline_number * 256 + cycle) as u32 *3+2) as usize] = (self.frame_number & 0xFF) as u8;
                 match (cycle / 2) % 4 {
                     0 => {
                         if (cycle & 1) == 0 {
@@ -309,6 +310,7 @@ impl NesPpu {
             if self.scanline_cycle == 1 {
                 self.vblank = true;
                 self.frame_end = true;
+                self.frame_number = self.frame_number.wrapping_add(1);
             }
             self.increment_scanline_cycle();
         } else {
@@ -323,11 +325,10 @@ impl NesPpu {
     }
 
     pub fn get_frame(&mut self) -> &[u8] {
-        self.frame_vec = self
-            .frame_data
-            .iter()
-            .flat_map(|u| u.to_le_bytes())
-            .collect();
-        &self.frame_vec[..]
+        &self.frame_data
+    }
+
+    pub fn frame_number(&self) -> u64 {
+        self.frame_number
     }
 }
