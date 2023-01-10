@@ -1,4 +1,4 @@
-use crate::NesPpu;
+use crate::ppu::NesPpu;
 
 pub struct NesCpuPeripherals {
     ppu: NesPpu,
@@ -13,12 +13,24 @@ impl NesCpuPeripherals {
         self.ppu.cycle(bus);
     }
 
-    pub fn ppu_read(&mut self, addr: u16) -> u8 {
+    pub fn ppu_read(&mut self, addr: u16) -> Option<u8> {
         self.ppu.read(addr)
     }
 
     pub fn ppu_write(&mut self, addr: u16, data: u8) {
         self.ppu.write(addr, data);
+    }
+
+    pub fn ppu_frame_end(&mut self) -> bool {
+        self.ppu.get_frame_end()
+    }
+
+    pub fn ppu_get_frame(&mut self) -> &Box<[u8; 256 * 240 * 3]> {
+        self.ppu.get_frame()
+    }
+
+    pub fn ppu_frame_number(&self) -> u64 {
+        self.ppu.frame_number()
     }
 }
 
@@ -364,19 +376,34 @@ impl NesCpu {
                         }
                         2 => {
                             let mut pc = self.pc.to_le_bytes();
-                            self.memory_cycle_write(0x100 + self.s as u16, pc[1], bus, cpu_peripherals);
+                            self.memory_cycle_write(
+                                0x100 + self.s as u16,
+                                pc[1],
+                                bus,
+                                cpu_peripherals,
+                            );
                             self.s = self.s.wrapping_sub(1);
                             self.subcycle = 3;
                         }
                         3 => {
                             let mut pc = self.pc.to_le_bytes();
-                            self.memory_cycle_write(0x100 + self.s as u16, pc[0], bus, cpu_peripherals);
+                            self.memory_cycle_write(
+                                0x100 + self.s as u16,
+                                pc[0],
+                                bus,
+                                cpu_peripherals,
+                            );
                             self.s = self.s.wrapping_sub(1);
                             self.subcycle = 4;
                         }
                         4 => {
                             self.p |= CPU_FLAG_B1;
-                            self.memory_cycle_write(0x100 + self.s as u16, self.p, bus, cpu_peripherals);
+                            self.memory_cycle_write(
+                                0x100 + self.s as u16,
+                                self.p,
+                                bus,
+                                cpu_peripherals,
+                            );
                             self.s = self.s.wrapping_sub(1);
                             self.subcycle = 5;
                         }
@@ -386,7 +413,7 @@ impl NesCpu {
                         }
                         _ => {
                             self.temp2 = self.memory_cycle_read(0xffff, bus, cpu_peripherals);
-                            let addr : u16 = (self.temp as u16) | (self.temp2 as u16)<<8;
+                            let addr: u16 = (self.temp as u16) | (self.temp2 as u16) << 8;
                             self.pc = addr;
                             self.end_instruction();
                         }

@@ -1,8 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-mod cartridge;
-mod cpu;
-mod ppu;
+pub mod cartridge;
+pub mod cpu;
+pub mod emulator_data;
+pub mod motherboard;
+pub mod ppu;
+pub mod utility;
+use emulator_data::NesEmulatorData;
+use motherboard::NesMotherboard;
 
 #[cfg(test)]
 use std::io::BufRead;
@@ -12,150 +17,13 @@ use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
 use crate::cpu::NesMemoryBus;
 use crate::ppu::NesPpu;
+use crate::utility::convert_hex_to_decimal;
 
 use egui_glow::EguiGlow;
-use egui_multiwin::multi_window::MultiWindow;
 use egui_multiwin::{
-    multi_window::NewWindowRequest,
+    multi_window::{MultiWindow, NewWindowRequest},
     tracked_window::{RedrawResponse, TrackedWindow},
 };
-
-struct NesMotherboard {
-    cart: Option<NesCartridge>,
-    ram: [u8; 2048],
-}
-
-impl NesMotherboard {
-    fn new() -> Self {
-        //board ram is random on startup
-        let mut main_ram: [u8; 2048] = [0; 2048];
-        for i in main_ram.iter_mut() {
-            *i = rand::random();
-        }
-        Self {
-            cart: None,
-            ram: main_ram,
-        }
-    }
-
-    fn insert_cartridge(&mut self, c: NesCartridge) {
-        if let None = self.cart {
-            self.cart = Some(c);
-        }
-    }
-}
-
-impl NesMemoryBus for NesMotherboard {
-    fn memory_cycle_read(
-        &mut self,
-        addr: u16,
-        _out: [bool; 3],
-        _controllers: [bool; 2],
-        per: &mut NesCpuPeripherals,
-    ) -> u8 {
-        let mut response: u8 = 0;
-        match addr {
-            0..=0x1fff => {
-                let addr = addr & 0x7ff;
-                response = self.ram[addr as usize];
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x2000..=0x3fff => {
-                let addr = addr & 7;
-                response = per.ppu_read(addr);
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4000..=0x4017 => {
-                //apu and io
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4018..=0x401f => {
-                //disabled apu and oi functionality
-                //test mode
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            _ => {
-                if let Some(cart) = &mut self.cart {
-                    let resp = cart.memory_read(addr);
-                    if let Some(v) = resp {
-                        response = v;
-                    }
-                }
-            }
-        }
-        response
-    }
-    fn memory_cycle_write(
-        &mut self,
-        addr: u16,
-        data: u8,
-        _out: [bool; 3],
-        _controllers: [bool; 2],
-        per: &mut NesCpuPeripherals,
-    ) {
-        match addr {
-            0..=0x1fff => {
-                let addr = addr & 0x7ff;
-                self.ram[addr as usize] = data;
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x2000..=0x3fff => {
-                let addr = addr & 7;
-                //ppu registers
-                per.ppu_write(addr, data);
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4000..=0x4017 => {
-                //apu and io
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            0x4018..=0x401f => {
-                //disabled apu and oi functionality
-                //test mode
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_nop();
-                }
-            }
-            _ => {
-                if let Some(cart) = &mut self.cart {
-                    cart.memory_write(addr, data);
-                }
-            }
-        }
-    }
-
-    fn ppu_cycle_1(&mut self, addr: u16) {
-        if let Some(cart) = &mut self.cart {
-            cart.ppu_cycle_1(addr);
-        }
-    }
-    fn ppu_cycle_2_write(&mut self, data: u8) {
-        if let Some(cart) = &mut self.cart {
-            cart.ppu_cycle_write(data);
-        }
-    }
-    fn ppu_cycle_2_read(&mut self) -> u8 {
-        if let Some(cart) = &mut self.cart {
-            cart.ppu_cycle_read()
-        } else {
-            42
-        }
-    }
-}
 
 #[test]
 fn it_works() {
@@ -194,29 +62,6 @@ fn check_nes_roms() {
             "Unable to load rom because {:?}",
             nc.err().unwrap()
         );
-    }
-}
-
-#[cfg(test)]
-fn convert_hex_to_decimal(d: char) -> u8 {
-    match d {
-        '0' => 0,
-        '1' => 1,
-        '2' => 2,
-        '3' => 3,
-        '4' => 4,
-        '5' => 5,
-        '6' => 6,
-        '7' => 7,
-        '8' => 8,
-        '9' => 9,
-        'A' | 'a' => 10,
-        'B' | 'b' => 11,
-        'C' | 'c' => 12,
-        'D' | 'd' => 13,
-        'E' | 'e' => 14,
-        'F' | 'f' => 15,
-        _ => 0,
     }
 }
 
@@ -287,55 +132,6 @@ fn basic_cpu_test() {
     }
     assert_eq!(cpu.get_pc(), 0xc66e);
 }
-
-struct NesEmulatorData {
-    cpu: NesCpu,
-    cpu_peripherals: NesCpuPeripherals,
-    mb: NesMotherboard,
-    cpu_clock_counter: u8,
-    ppu_clock_counter: u8,
-    #[cfg(debug_assertions)]
-    paused: bool,
-    #[cfg(debug_assertions)]
-    single_step: bool,
-}
-
-impl NesEmulatorData {
-    fn new() -> Self {
-        let mut mb: NesMotherboard = NesMotherboard::new();
-        let nc = NesCartridge::load_cartridge("./nes/rust/cpu.nes".to_string());
-
-        let nc = nc.unwrap();
-        mb.insert_cartridge(nc);
-        let ppu = NesPpu::new();
-        Self {
-            cpu: NesCpu::new(),
-            cpu_peripherals: NesCpuPeripherals::new(ppu),
-            mb: mb,
-            #[cfg(debug_assertions)]
-            paused: true,
-            #[cfg(debug_assertions)]
-            single_step: false,
-            cpu_clock_counter: rand::random::<u8>() % 16,
-            ppu_clock_counter: rand::random::<u8>() % 4,
-        }
-    }
-
-    pub fn cycle_step(&mut self) {
-        self.cpu_clock_counter += 1;
-        if self.cpu_clock_counter >= 12 {
-            self.cpu_clock_counter = 0;
-            self.cpu.cycle(&mut self.mb, &mut self.cpu_peripherals);
-        }
-
-        self.ppu_clock_counter += 1;
-        if self.ppu_clock_counter >= 4 {
-            self.ppu_clock_counter = 0;
-            self.cpu_peripherals.ppu_cycle(&mut self.mb);
-        }
-    }
-}
-
 struct MainNesWindow {}
 
 impl MainNesWindow {
@@ -371,11 +167,9 @@ impl TrackedWindow for MainNesWindow {
         let mut quit = false;
         let mut windows_to_create = vec![];
 
-        let mut counter = 0;
         'emulator_loop: loop {
             #[cfg(debug_assertions)]
             {
-                counter += 1;
                 if !c.paused {
                     c.cycle_step();
                     if c.single_step && c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
@@ -385,16 +179,30 @@ impl TrackedWindow for MainNesWindow {
                 } else {
                     break 'emulator_loop;
                 }
-                if counter == 1000 {
-                    counter = 0;
+                if c.cpu_peripherals.ppu_frame_end() {
                     break 'emulator_loop;
                 }
             }
             #[cfg(not(debug_assertions))]
             {
                 c.cycle_step();
-                break 'emulator_loop;
+                if c.cpu_peripherals.ppu_frame_end() {
+                    break 'emulator_loop;
+                }
             }
+        }
+
+        let image = NesPpu::convert_to_egui(c.cpu_peripherals.ppu_get_frame());
+
+        if let None = c.texture {
+            c.texture = Some(egui.egui_ctx.load_texture(
+                "NES_PPU",
+                image,
+                egui::TextureFilter::Nearest,
+            ));
+        }
+        else if let Some(t) = &mut c.texture {
+            t.set_partial([0, 0], image, egui::TextureFilter::Nearest);
         }
 
         egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
@@ -406,7 +214,11 @@ impl TrackedWindow for MainNesWindow {
             });
         });
 
-        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {});
+        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            if let Some(t) = &c.texture {
+                ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
+            }
+        });
         RedrawResponse {
             quit: quit,
             new_windows: windows_to_create,
