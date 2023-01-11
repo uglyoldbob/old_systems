@@ -304,9 +304,5 @@ fn main() {
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);
-    if cfg!(debug_assertions) {
-        let debug_win = DebugNesWindow::new();
-        let _e = multi_window.add(debug_win, &event_loop);
-    }
     multi_window.run(event_loop, nes_data);
 }

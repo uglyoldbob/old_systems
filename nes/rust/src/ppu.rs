@@ -10,12 +10,13 @@ pub struct NesPpu {
     data_bit: bool,
     vblank_nmi: bool,
     frame_odd: bool,
-    cycle: u32,
     nametable_counter: u16,
     write_ignore_counter: u16,
     nametable_data: u8,
     attributetable_data: u8,
+    attributetable_shift: [u8;2],
     patterntable_tile: u16,
+    patterntable_shift: [u16; 2],
     frame_data: Box<[u8; 3 * 256 * 240]>,
     frame_number: u64,
     pend_vram_write: Option<u8>,
@@ -111,12 +112,13 @@ impl NesPpu {
             vblank_nmi: false,
             frame_end: false,
             frame_odd: false,
-            cycle: 0,
             nametable_counter: 0,
             write_ignore_counter: 0,
             nametable_data: 0,
             attributetable_data: 0,
+            attributetable_shift: [0,0],
             patterntable_tile: 0,
+            patterntable_shift: [0, 0],
             frame_data: Box::new([0; 3 * 256 * 240]),
             frame_number: 0,
             pend_vram_write: None,
@@ -193,15 +195,27 @@ impl NesPpu {
         }
     }
 
+    fn compute_xy(&self, cycle: u16, offset: u8) -> (u16, u16) {
+        let mut cycle2 = cycle + offset as u16;
+        let mut scanline = self.scanline_number;
+        if cycle2 >= 256 {
+            cycle2 -= 256;
+            scanline += 1;
+            if scanline >= 240 {
+                scanline -= 240;
+            }
+        }
+        (cycle2, scanline)
+    }
+
     fn background_fetch(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
+        let (x,y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
             0 => {
                 if (cycle & 1) == 0 {
                     //nametable byte
                     let base = self.nametable_base();
-                    let x = cycle / 8;
-                    let y = self.scanline_number / 8;
-                    let offset = y << 5 | x;
+                    let offset = (y/8) << 5 | (x/8);
                     bus.ppu_cycle_1(base + offset);
                 } else {
                     self.nametable_data = bus.ppu_cycle_2_read();
@@ -211,9 +225,7 @@ impl NesPpu {
                 //attribute table byte
                 if (cycle & 1) == 0 {
                     let base = self.attributetable_base();
-                    let x = cycle / 32;
-                    let y = self.scanline_number / 32;
-                    let offset = y << 5 | x;
+                    let offset = (y/32) << 5 | (x/32);
                     bus.ppu_cycle_1(base + offset);
                 } else {
                     self.attributetable_data = bus.ppu_cycle_2_read();
@@ -224,15 +236,12 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.patterntable_base();
                     let offset = (self.nametable_data as u16) << 3;
-                    let x = cycle / 8;
-                    let y = self.scanline_number / 8;
-                    let offset = y << 8 | x<<4;
+                    let offset = (y/8) << 8 | (x/8) << 4;
                     let calc = base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
                 } else {
                     let mut pt = self.patterntable_tile.to_le_bytes();
                     pt[0] = bus.ppu_cycle_2_read();
-                    self.patterntable_tile = u16::from_le_bytes(pt);
                 }
             }
             3 => {
@@ -240,15 +249,17 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.patterntable_base();
                     let offset = (self.nametable_data as u16) << 3;
-                    let x = cycle / 8;
-                    let y = self.scanline_number / 8;
-                    let offset = y << 8 | x<<4;
+                    let offset = (y/8) << 8 | (x/8) << 4;
                     let calc = 8 + base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
                 } else {
                     let mut pt = self.patterntable_tile.to_le_bytes();
                     pt[1] = bus.ppu_cycle_2_read();
                     self.patterntable_tile = u16::from_le_bytes(pt);
+                    self.attributetable_shift[0] = self.attributetable_shift[1];
+                    self.attributetable_shift[1] = self.attributetable_data;
+                    self.patterntable_shift[0] = self.patterntable_shift[1];
+                    self.patterntable_shift[1] = self.patterntable_tile;
                 }
             }
             _ => {}
@@ -280,14 +291,17 @@ impl NesPpu {
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
                 let cycle = self.scanline_cycle - 1;
-                self.background_fetch(bus, cycle);
-
                 let index = 7 - cycle % 8;
-                let pt = self.patterntable_tile.to_le_bytes();
+                let pt = self.patterntable_shift[0].to_le_bytes();
                 let upper_bit = (pt[1] >> index) & 1;
                 let lower_bit = (pt[0] >> index) & 1;
 
-                let palette_entry = ((upper_bit << 5 | lower_bit<<4) as usize) | 8;
+                let modx = (cycle / 16) & 1;
+                let mody = (self.scanline_number / 16) & 1;
+                let combined = mody<<1 | modx;
+                let extra_palette_bits = (self.attributetable_shift[0]>>(2*combined)) & 3;
+
+                let palette_entry = ((extra_palette_bits<<2 | upper_bit << 1 | lower_bit) as usize);
                 let pixel = PPU_PALETTE[palette_entry];
                 self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
                     pixel[0];
@@ -295,6 +309,7 @@ impl NesPpu {
                     pixel[1];
                 self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] =
                     pixel[2];
+                self.background_fetch(bus, cycle);
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 320 {
                 //sprite rendering data to be fetched
