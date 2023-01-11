@@ -142,7 +142,7 @@ impl MainNesWindow {
                 .with_resizable(true)
                 .with_inner_size(glutin::dpi::LogicalSize {
                     width: 320.0,
-                    height: 240.0,
+                    height: 300.0,
                 })
                 .with_title("UglyOldBob NES Emulator"),
         }
@@ -200,8 +200,7 @@ impl TrackedWindow for MainNesWindow {
                 image,
                 egui::TextureFilter::Nearest,
             ));
-        }
-        else if let Some(t) = &mut c.texture {
+        } else if let Some(t) = &mut c.texture {
             t.set_partial([0, 0], image, egui::TextureFilter::Nearest);
         }
 
@@ -274,6 +273,10 @@ impl TrackedWindow for DebugNesWindow {
                         c.single_step = true;
                         c.paused = false;
                     }
+                } else {
+                    if ui.button("Pause").clicked() {
+                        c.single_step = true;
+                    }
                 }
                 ui.horizontal(|ui| {
                     ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
@@ -294,7 +297,12 @@ fn main() {
     let event_loop = glutin::event_loop::EventLoopBuilder::with_user_event().build();
     let mut multi_window = MultiWindow::new();
     let root_window = MainNesWindow::new();
-    let nes_data = NesEmulatorData::new();
+    let mut nes_data = NesEmulatorData::new();
+    let wdir = std::env::current_dir().unwrap();
+    println!("Current dir is {}", wdir.display());
+    let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
     let _e = multi_window.add(root_window, &event_loop);
     if cfg!(debug_assertions) {
         let debug_win = DebugNesWindow::new();

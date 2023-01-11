@@ -137,7 +137,7 @@ impl NesMemoryBus for NesMotherboard {
     fn ppu_cycle_1(&mut self, addr: u16) {
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
-            self.vram_address = if vram_enable {
+            self.vram_address = if !vram_enable {
                 if addr >= 0x2000 && addr <= 0x2fff {
                     Some(addr | (a10 as u16) << 10)
                 } else {

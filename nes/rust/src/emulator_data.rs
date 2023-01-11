@@ -21,7 +21,7 @@ pub struct NesEmulatorData {
 
 impl NesEmulatorData {
     pub fn new() -> Self {
-        let mut mb: NesMotherboard = NesMotherboard::new();
+        let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
 
         Self {
