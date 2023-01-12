@@ -15,6 +15,8 @@ pub struct NesEmulatorData {
     pub paused: bool,
     #[cfg(debug_assertions)]
     pub single_step: bool,
+    #[cfg(debug_assertions)]
+    pub wait_for_frame_end: bool,
     pub last_frame_time: u128,
     pub texture: Option<egui::TextureHandle>,
 }
@@ -32,6 +34,8 @@ impl NesEmulatorData {
             paused: false,
             #[cfg(debug_assertions)]
             single_step: false,
+            #[cfg(debug_assertions)]
+            wait_for_frame_end: false,
             cpu_clock_counter: rand::random::<u8>() % 16,
             ppu_clock_counter: rand::random::<u8>() % 4,
             last_frame_time: std::time::SystemTime::now()

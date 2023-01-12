@@ -14,7 +14,7 @@ pub struct NesPpu {
     write_ignore_counter: u16,
     nametable_data: u8,
     attributetable_data: u8,
-    attributetable_shift: [u8;2],
+    attributetable_shift: [u8; 2],
     patterntable_tile: u16,
     patterntable_shift: [u16; 2],
     frame_data: Box<[u8; 3 * 256 * 240]>,
@@ -116,7 +116,7 @@ impl NesPpu {
             write_ignore_counter: 0,
             nametable_data: 0,
             attributetable_data: 0,
-            attributetable_shift: [0,0],
+            attributetable_shift: [0, 0],
             patterntable_tile: 0,
             patterntable_shift: [0, 0],
             frame_data: Box::new([0; 3 * 256 * 240]),
@@ -142,12 +142,25 @@ impl NesPpu {
         match addr {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
-                    self.registers[addr as usize] = data;
-                } else {
-                    println!("Write ppu register {:x} with {:x}", addr, data);
+                    match addr {
+                        6 => {
+                            if !self.address_bit {
+                                self.registers[addr as usize] = data;
+                                self.address_bit = !self.address_bit;
+                            } else {
+                                self.vram_address = (self.registers[6] as u16) << 8 | data as u16;
+                                self.address_bit = !self.address_bit;
+                            }
+                        }
+                        _ => {
+                            self.registers[addr as usize] = data;
+                            println!("Write ppu register {:x} with {:x}", addr, data);
+                        }
+                    }
                 }
             }
             7 => {
+                //println!("Write vram address {:x} with {:x}", self.vram_address, data);
                 self.pend_vram_write = Some(data);
             }
             _ => {
@@ -209,13 +222,13 @@ impl NesPpu {
     }
 
     fn background_fetch(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
-        let (x,y) = self.compute_xy(cycle, 16);
+        let (x, y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
             0 => {
                 if (cycle & 1) == 0 {
                     //nametable byte
                     let base = self.nametable_base();
-                    let offset = (y/8) << 5 | (x/8);
+                    let offset = (y / 8) << 5 | (x / 8);
                     bus.ppu_cycle_1(base + offset);
                 } else {
                     self.nametable_data = bus.ppu_cycle_2_read();
@@ -225,7 +238,7 @@ impl NesPpu {
                 //attribute table byte
                 if (cycle & 1) == 0 {
                     let base = self.attributetable_base();
-                    let offset = (y/32) << 5 | (x/32);
+                    let offset = (y / 32) << 5 | (x / 32);
                     bus.ppu_cycle_1(base + offset);
                 } else {
                     self.attributetable_data = bus.ppu_cycle_2_read();
@@ -236,7 +249,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.patterntable_base();
                     let offset = (self.nametable_data as u16) << 3;
-                    let offset = (y/8) << 8 | (x/8) << 4;
+                    let offset = (y / 8) << 8 | (x / 8) << 4;
                     let calc = base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
                 } else {
@@ -249,7 +262,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.patterntable_base();
                     let offset = (self.nametable_data as u16) << 3;
-                    let offset = (y/8) << 8 | (x/8) << 4;
+                    let offset = (y / 8) << 8 | (x / 8) << 4;
                     let calc = 8 + base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
                 } else {
@@ -298,10 +311,11 @@ impl NesPpu {
 
                 let modx = (cycle / 16) & 1;
                 let mody = (self.scanline_number / 16) & 1;
-                let combined = mody<<1 | modx;
-                let extra_palette_bits = (self.attributetable_shift[0]>>(2*combined)) & 3;
+                let combined = mody << 1 | modx;
+                let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
 
-                let palette_entry = ((extra_palette_bits<<2 | upper_bit << 1 | lower_bit) as usize);
+                let palette_entry =
+                    ((extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as usize);
                 let pixel = PPU_PALETTE[palette_entry];
                 self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
                     pixel[0];

@@ -172,14 +172,21 @@ impl TrackedWindow for MainNesWindow {
             {
                 if !c.paused {
                     c.cycle_step();
-                    if c.single_step && c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
-                        c.paused = true;
-                        break 'emulator_loop;
+                    if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
+                        if c.single_step {
+                            c.paused = true;
+                            c.single_step = false;
+                            break 'emulator_loop;
+                        }
                     }
                 } else {
                     break 'emulator_loop;
                 }
                 if c.cpu_peripherals.ppu_frame_end() {
+                    if c.wait_for_frame_end {
+                        c.paused = true;
+                        c.wait_for_frame_end = false;
+                    }
                     break 'emulator_loop;
                 }
             }
@@ -208,8 +215,19 @@ impl TrackedWindow for MainNesWindow {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     let button = egui::Button::new("Open rom?");
-                    if ui.add_enabled(true, button).clicked() {}
+                    if ui.add_enabled(true, button).clicked() {
+                        ui.close_menu();
+                    }
                 });
+                #[cfg(debug_assertions)]
+                {
+                    ui.menu_button("Debug", |ui| {
+                        if ui.button("Debugger").clicked() {
+                            ui.close_menu();
+                            windows_to_create.push(DebugNesWindow::new());
+                        }
+                    });
+                }
             });
         });
 
@@ -273,6 +291,10 @@ impl TrackedWindow for DebugNesWindow {
                         c.single_step = true;
                         c.paused = false;
                     }
+                    if ui.button("Advance frame").clicked() {
+                        c.wait_for_frame_end = true;
+                        c.paused = false;
+                    }
                 } else {
                     if ui.button("Pause").clicked() {
                         c.single_step = true;
@@ -283,6 +305,13 @@ impl TrackedWindow for DebugNesWindow {
                     if let Some(t) = c.cpu.disassemble() {
                         ui.label(t);
                     }
+                    ui.label(format!("A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}", 
+                        c.cpu.get_a(),
+                        c.cpu.get_x(),
+                        c.cpu.get_y(),
+                        c.cpu.get_p(),
+                        c.cpu.get_sp(),
+                    ));
                 });
             }
         });
