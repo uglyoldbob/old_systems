@@ -115,6 +115,7 @@ impl NesMemoryBus for NesMotherboard {
             }
             0x4000..=0x4017 => {
                 //apu and io
+                println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -122,6 +123,7 @@ impl NesMemoryBus for NesMotherboard {
             0x4018..=0x401f => {
                 //disabled apu and oi functionality
                 //test mode
+                println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -139,7 +141,7 @@ impl NesMemoryBus for NesMotherboard {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
             self.vram_address = if !vram_enable {
                 if addr >= 0x2000 && addr <= 0x2fff {
-                    Some(addr | (a10 as u16) << 10)
+                    Some(addr | ((a10 as u16) << 10))
                 } else {
                     None
                 }
@@ -151,6 +153,10 @@ impl NesMemoryBus for NesMotherboard {
     fn ppu_cycle_2_write(&mut self, data: u8) {
         if let Some(addr) = self.vram_address {
             let addr2 = addr & 0x7ff;
+            if addr >= 0x23c0 && addr < 0x2400 {
+                println!("Write vram address {:x}", addr);
+                self.vram[addr2 as usize] = data;
+            }
             self.vram[addr2 as usize] = data;
         } else {
             if let Some(cart) = &mut self.cart {

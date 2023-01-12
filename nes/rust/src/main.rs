@@ -305,7 +305,8 @@ impl TrackedWindow for DebugNesWindow {
                     if let Some(t) = c.cpu.disassemble() {
                         ui.label(t);
                     }
-                    ui.label(format!("A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}", 
+                    ui.label(format!(
+                        "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
                         c.cpu.get_a(),
                         c.cpu.get_x(),
                         c.cpu.get_y(),
@@ -329,9 +330,13 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string()).unwrap();
+    let nc = NesCartridge::load_cartridge("./nes/rust/1.frame_basics.nes".to_string()).unwrap();
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);
+    if cfg!(debug_assertions) {
+        let debug_win = DebugNesWindow::new();
+        let _e = multi_window.add(debug_win, &event_loop);
+    }
     multi_window.run(event_loop, nes_data);
 }

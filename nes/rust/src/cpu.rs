@@ -32,6 +32,10 @@ impl NesCpuPeripherals {
     pub fn ppu_frame_number(&self) -> u64 {
         self.ppu.frame_number()
     }
+
+    pub fn ppu_irq(&self) -> bool {
+        self.ppu.irq()
+    }
 }
 
 pub trait NesMemoryBus {
@@ -63,7 +67,7 @@ pub struct NesCpu {
     p: u8,
     pc: u16,
     subcycle: u8,
-    interrupts: [bool; 3],
+    reset: bool,
     opcode: Option<u8>,
     temp: u8,
     temp2: u8,
@@ -72,6 +76,11 @@ pub struct NesCpu {
     breakpoints: [Option<u16>; 10],
     #[cfg(debug_assertions)]
     old_pc: [u16; 2],
+    prev_nmi: bool,
+    nmi_detected: bool,
+    interrupt_shift: [(bool, bool); 2],
+    interrupt_type: bool,
+    interrupting: bool,
 }
 
 const CPU_FLAG_CARRY: u8 = 1;
@@ -94,7 +103,7 @@ impl NesCpu {
             p: CPU_FLAG_B2 | CPU_FLAG_INT_DISABLE,
             subcycle: 0,
             pc: 0xfffc,
-            interrupts: [false, true, false],
+            reset: true,
             opcode: None,
             temp: 0,
             temp2: 0,
@@ -103,6 +112,11 @@ impl NesCpu {
             breakpoints: [None; 10],
             #[cfg(debug_assertions)]
             old_pc: [0; 2],
+            prev_nmi: false,
+            nmi_detected: false,
+            interrupt_shift: [(false, false); 2],
+            interrupt_type: false,
+            interrupting: false,
         }
     }
 
@@ -319,8 +333,19 @@ impl NesCpu {
         }
     }
 
-    pub fn cycle(&mut self, bus: &mut dyn NesMemoryBus, cpu_peripherals: &mut NesCpuPeripherals) {
-        if self.interrupts[1] {
+    pub fn cycle(
+        &mut self,
+        bus: &mut dyn NesMemoryBus,
+        cpu_peripherals: &mut NesCpuPeripherals,
+        nmi: bool,
+    ) {
+        if !self.prev_nmi && nmi {
+            self.nmi_detected = true;
+        }
+        self.prev_nmi = nmi;
+        self.interrupt_shift[0] = self.interrupt_shift[1];
+        self.interrupt_shift[1] = (false, self.nmi_detected);
+        if self.reset {
             match self.subcycle {
                 0 => {
                     self.memory_cycle_read(self.pc, bus, cpu_peripherals);
@@ -355,15 +380,94 @@ impl NesCpu {
                     pc[1] = pch;
                     self.pc = u16::from_le_bytes(pc);
                     self.subcycle = 0;
-                    self.interrupts[1] = false;
+                    self.reset = false;
                 }
             }
         } else {
             if let None = self.opcode {
-                self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
-                #[cfg(debug_assertions)]
-                self.check_breakpoints();
-                self.subcycle = 1;
+                if (self.interrupt_shift[0].0 && ((self.p & CPU_FLAG_INT_DISABLE) == 0))
+                    || self.interrupt_shift[0].1 || self.interrupting
+                {
+                    match self.subcycle {
+                        0 => {
+                            self.interrupting = true;
+                            self.memory_cycle_read(self.pc, bus, cpu_peripherals);
+                            self.subcycle += 1;
+                        }
+                        1 => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                            self.subcycle += 1;
+                        }
+                        2 => {
+                            self.memory_cycle_write(
+                                self.s as u16 + 0x100,
+                                self.pc.to_le_bytes()[1],
+                                bus,
+                                cpu_peripherals,
+                            );
+                            self.s = self.s.wrapping_sub(1);
+                            self.subcycle += 1;
+                        }
+                        3 => {
+                            self.memory_cycle_write(
+                                self.s as u16 + 0x100,
+                                self.pc.to_le_bytes()[0],
+                                bus,
+                                cpu_peripherals,
+                            );
+                            self.s = self.s.wrapping_sub(1);
+                            self.interrupt_type = self.nmi_detected;
+                            self.nmi_detected = false;
+                            self.subcycle += 1;
+                        }
+                        4 => {
+                            self.p &= !(CPU_FLAG_B1 | CPU_FLAG_B2);
+                            self.memory_cycle_write(
+                                self.s as u16 + 0x100,
+                                self.p,
+                                bus,
+                                cpu_peripherals,
+                            );
+                            self.s = self.s.wrapping_sub(1);
+                            self.subcycle += 1;
+                        }
+                        5 => {
+                            let addr = if !self.interrupt_type {
+                                //IRQ
+                                0xfffe
+                            } else {
+                                //NMI
+                                0xfffa
+                            };
+                            let pcl = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            let mut pc = self.pc.to_le_bytes();
+                            pc[0] = pcl;
+                            self.pc = u16::from_le_bytes(pc);
+                            self.p |= CPU_FLAG_INT_DISABLE;
+                            self.subcycle += 1;
+                        }
+                        _ => {
+                            let addr = if !self.interrupt_type {
+                                //IRQ
+                                0xffff
+                            } else {
+                                //NMI
+                                0xfffb
+                            };
+                            let pch = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            let mut pc = self.pc.to_le_bytes();
+                            pc[1] = pch;
+                            self.pc = u16::from_le_bytes(pc);
+                            self.subcycle = 0;
+                            self.interrupting = false;
+                        }
+                    }
+                } else {
+                    self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
+                    #[cfg(debug_assertions)]
+                    self.check_breakpoints();
+                    self.subcycle = 1;
+                }
             } else if let Some(o) = self.opcode {
                 match o {
                     //brk instruction
@@ -407,6 +511,7 @@ impl NesCpu {
                         }
                         5 => {
                             self.temp = self.memory_cycle_read(0xfffe, bus, cpu_peripherals);
+                            self.p |= CPU_FLAG_INT_DISABLE;
                             self.subcycle = 6;
                         }
                         _ => {
@@ -4250,6 +4355,14 @@ impl NesCpu {
                     0x18 => match self.subcycle {
                         _ => {
                             self.p &= !CPU_FLAG_CARRY;
+                            self.pc = self.pc.wrapping_add(1);
+                            self.end_instruction();
+                        }
+                    },
+                    //cli clear interrupt disable
+                    0x58 => match self.subcycle {
+                        _ => {
+                            self.p &= !CPU_FLAG_INT_DISABLE;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
                         }

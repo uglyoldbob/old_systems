@@ -20,6 +20,7 @@ pub struct NesPpu {
     frame_data: Box<[u8; 3 * 256 * 240]>,
     frame_number: u64,
     pend_vram_write: Option<u8>,
+    pend_vram_data: Option<u8>,
     vram_address: u16,
 }
 
@@ -122,12 +123,18 @@ impl NesPpu {
             frame_data: Box::new([0; 3 * 256 * 240]),
             frame_number: 0,
             pend_vram_write: None,
+            pend_vram_data: None,
             vram_address: 0,
         }
     }
 
     pub fn read(&mut self, addr: u16) -> Option<u8> {
-        //println!("Read ppu register {:x}", addr);
+        match addr {
+            4 => {
+                println!("Read ppu register {:x}", addr);
+            }
+            _ => {}
+        }
         let val = self.registers[addr as usize];
         if addr == 2 {
             self.address_bit = false;
@@ -160,7 +167,6 @@ impl NesPpu {
                 }
             }
             7 => {
-                //println!("Write vram address {:x} with {:x}", self.vram_address, data);
                 self.pend_vram_write = Some(data);
             }
             _ => {
@@ -176,9 +182,9 @@ impl NesPpu {
             self.frame_odd = !self.frame_odd;
             self.scanline_cycle = 0;
             self.scanline_number += 1;
-        }
-        if self.scanline_number == 262 {
-            self.scanline_number = 0;
+            if self.scanline_number == 262 {
+                self.scanline_number = 0;
+            }
         }
     }
 
@@ -205,6 +211,22 @@ impl NesPpu {
             0
         } else {
             0x1000
+        }
+    }
+
+    fn should_render_background(&self, cycle: u16) -> bool {
+        if cycle == 0 {
+            (self.registers[1] & 0x02) != 0
+        } else {
+            (self.registers[1] & 0x08) != 0
+        }
+    }
+
+    fn should_render_sprites(&self, cycle: u16) -> bool {
+        if cycle == 0 {
+            (self.registers[1] & 0x04) != 0
+        } else {
+            (self.registers[1] & 0x10) != 0
         }
     }
 
@@ -238,7 +260,7 @@ impl NesPpu {
                 //attribute table byte
                 if (cycle & 1) == 0 {
                     let base = self.attributetable_base();
-                    let offset = (y / 32) << 5 | (x / 32);
+                    let offset = (y / 32) << 3 | (x / 32);
                     bus.ppu_cycle_1(base + offset);
                 } else {
                     self.attributetable_data = bus.ppu_cycle_2_read();
@@ -248,8 +270,7 @@ impl NesPpu {
                 //pattern table tile low
                 if (cycle & 1) == 0 {
                     let base = self.patterntable_base();
-                    let offset = (self.nametable_data as u16) << 3;
-                    let offset = (y / 8) << 8 | (x / 8) << 4;
+                    let offset = (self.nametable_data as u16) << 4;
                     let calc = base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
                 } else {
@@ -261,8 +282,7 @@ impl NesPpu {
                 //pattern table tile high
                 if (cycle & 1) == 0 {
                     let base = self.patterntable_base();
-                    let offset = (self.nametable_data as u16) << 3;
-                    let offset = (y / 8) << 8 | (x / 8) << 4;
+                    let offset = (self.nametable_data as u16) << 4;
                     let calc = 8 + base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
                 } else {
@@ -279,6 +299,26 @@ impl NesPpu {
         }
     }
 
+    fn idle_operation(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
+        if (cycle & 1) == 0 {
+            if let Some(a) = self.pend_vram_write {
+                bus.ppu_cycle_1(self.vram_address);
+                self.pend_vram_data = Some(a);
+                self.pend_vram_write = None;
+            }
+        } else {
+            if let Some(a) = self.pend_vram_data {
+                bus.ppu_cycle_2_write(a);
+                if (self.registers[0] & 1 << 2) == 0 {
+                    self.vram_address = self.vram_address.wrapping_add(1);
+                } else {
+                    self.vram_address = self.vram_address.wrapping_add(32);
+                }
+                self.pend_vram_data = None;
+            }
+        }
+    }
+
     pub fn cycle(&mut self, bus: &mut dyn NesMemoryBus) {
         if self.write_ignore_counter < PPU_STARTUP_CYCLE_COUNT {
             self.write_ignore_counter += 1;
@@ -290,11 +330,6 @@ impl NesPpu {
             if self.scanline_cycle == 0 {
                 //idle cycle
                 let cycle = self.scanline_cycle;
-                if cycle == 1 {
-                    self.vblank = false;
-                    self.vblank_nmi = false;
-                    self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
-                }
                 if (cycle & 1) == 0 {
                     bus.ppu_cycle_1(0); //TODO put in proper address here
                 } else {
@@ -302,88 +337,110 @@ impl NesPpu {
                 }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 256 {
+                if self.scanline_cycle == 1 {
+                    self.vblank = false;
+                    self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
+                }
                 //each cycle here renders a single pixel
                 let cycle = self.scanline_cycle - 1;
-                let index = 7 - cycle % 8;
-                let pt = self.patterntable_shift[0].to_le_bytes();
-                let upper_bit = (pt[1] >> index) & 1;
-                let lower_bit = (pt[0] >> index) & 1;
+                if self.should_render_background(cycle) {
+                    let index = 7 - cycle % 8;
+                    let pt = self.patterntable_shift[0].to_le_bytes();
+                    let upper_bit = (pt[1] >> index) & 1;
+                    let lower_bit = (pt[0] >> index) & 1;
 
-                let modx = (cycle / 16) & 1;
-                let mody = (self.scanline_number / 16) & 1;
-                let combined = mody << 1 | modx;
-                let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
+                    let modx = (cycle / 16) & 1;
+                    let mody = (self.scanline_number / 16) & 1;
+                    let combined = mody << 1 | modx;
+                    let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
 
-                let palette_entry =
-                    ((extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as usize);
-                let pixel = PPU_PALETTE[palette_entry];
-                self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
-                    pixel[0];
-                self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3 + 1) as usize] =
-                    pixel[1];
-                self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] =
-                    pixel[2];
-                self.background_fetch(bus, cycle);
+                    let palette_entry =
+                        ((extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as usize);
+                    let pixel = PPU_PALETTE[palette_entry];
+                    self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
+                        pixel[0];
+                    self.frame_data
+                        [((self.scanline_number * 256 + cycle) as u32 * 3 + 1) as usize] = pixel[1];
+                    self.frame_data
+                        [((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] = pixel[2];
+                    self.background_fetch(bus, cycle);
+                } else {
+                    self.idle_operation(bus, cycle);
+                    let palette_entry = 13;
+                    let pixel = PPU_PALETTE[palette_entry];
+                    self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
+                        pixel[0];
+                    self.frame_data
+                        [((self.scanline_number * 256 + cycle) as u32 * 3 + 1) as usize] = pixel[1];
+                    self.frame_data
+                        [((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] = pixel[2];
+                }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 320 {
                 //sprite rendering data to be fetched
                 let cycle = self.scanline_cycle - 257;
-                match (cycle / 2) % 4 {
-                    0 => {
-                        if (cycle & 1) == 0 {
-                            //nametable byte
-                            let base = self.nametable_base();
-                            let x = cycle / 8;
-                            let y = self.scanline_number / 8;
-                            let offset = y << 5 | x;
-                            bus.ppu_cycle_1(base + offset); //TODO verify this calculation
-                        } else {
-                            bus.ppu_cycle_2_read();
+                if self.should_render_sprites(cycle) {
+                    match (cycle / 2) % 4 {
+                        0 => {
+                            if (cycle & 1) == 0 {
+                                //nametable byte
+                                let base = self.nametable_base();
+                                let x = cycle / 8;
+                                let y = self.scanline_number / 8;
+                                let offset = y << 5 | x;
+                                bus.ppu_cycle_1(base + offset); //TODO verify this calculation
+                            } else {
+                                bus.ppu_cycle_2_read();
+                            }
                         }
-                    }
-                    1 => {
-                        if (cycle & 1) == 0 {
-                            //nametable byte
-                            let base = self.nametable_base();
-                            let x = cycle / 8;
-                            let y = self.scanline_number / 8;
-                            let offset = y << 5 | x;
-                            bus.ppu_cycle_1(base + offset); //TODO verify this calculation
-                        } else {
-                            bus.ppu_cycle_2_read();
+                        1 => {
+                            if (cycle & 1) == 0 {
+                                //nametable byte
+                                let base = self.nametable_base();
+                                let x = cycle / 8;
+                                let y = self.scanline_number / 8;
+                                let offset = y << 5 | x;
+                                bus.ppu_cycle_1(base + offset); //TODO verify this calculation
+                            } else {
+                                bus.ppu_cycle_2_read();
+                            }
                         }
-                    }
-                    2 => {
-                        //pattern table tile low
-                        if (cycle & 1) == 0 {
-                            let base = 0; //TODO calculate this correctly
-                            let offset = cycle % 8; //TODO calculate this value correctly
-                            bus.ppu_cycle_1(base + offset);
-                        } else {
-                            let mut pt = self.patterntable_tile.to_le_bytes();
-                            pt[0] = bus.ppu_cycle_2_read();
-                            self.patterntable_tile = u16::from_le_bytes(pt);
+                        2 => {
+                            //pattern table tile low
+                            if (cycle & 1) == 0 {
+                                let base = 0; //TODO calculate this correctly
+                                let offset = cycle % 8; //TODO calculate this value correctly
+                                bus.ppu_cycle_1(base + offset);
+                            } else {
+                                let mut pt = self.patterntable_tile.to_le_bytes();
+                                pt[0] = bus.ppu_cycle_2_read();
+                                self.patterntable_tile = u16::from_le_bytes(pt);
+                            }
                         }
-                    }
-                    3 => {
-                        //pattern table tile high
-                        if (cycle & 1) == 0 {
-                            let base = 0; //TODO calculate this correctly
-                            let offset = cycle % 8; //TODO calculate this value correctly
-                            bus.ppu_cycle_1(base + offset);
-                        } else {
-                            let mut pt = self.patterntable_tile.to_le_bytes();
-                            pt[1] = bus.ppu_cycle_2_read();
-                            self.patterntable_tile = u16::from_le_bytes(pt);
+                        3 => {
+                            //pattern table tile high
+                            if (cycle & 1) == 0 {
+                                let base = 0; //TODO calculate this correctly
+                                let offset = cycle % 8; //TODO calculate this value correctly
+                                bus.ppu_cycle_1(base + offset);
+                            } else {
+                                let mut pt = self.patterntable_tile.to_le_bytes();
+                                pt[1] = bus.ppu_cycle_2_read();
+                                self.patterntable_tile = u16::from_le_bytes(pt);
+                            }
                         }
+                        _ => {}
                     }
-                    _ => {}
+                }
+                else {
+                    self.idle_operation(bus, self.scanline_cycle);
                 }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
                 //self.background_fetch(bus, cycle);
+                self.idle_operation(bus, self.scanline_cycle);
                 self.increment_scanline_cycle();
             } else {
                 //do nothing
@@ -411,6 +468,7 @@ impl NesPpu {
                 self.increment_scanline_cycle();
             }
         } else if self.scanline_number == 240 {
+            self.idle_operation(bus, self.scanline_cycle);
             self.increment_scanline_cycle();
         } else if self.scanline_number <= 260 {
             //vblank lines
@@ -420,10 +478,14 @@ impl NesPpu {
                 self.frame_end = true;
                 self.frame_number = self.frame_number.wrapping_add(1);
             }
+            self.idle_operation(bus, self.scanline_cycle);
             self.increment_scanline_cycle();
         } else {
+            //TODO make memory accesses here
+            self.idle_operation(bus, self.scanline_cycle);
             self.increment_scanline_cycle();
         }
+        self.vblank_nmi = self.vblank & ((self.registers[0] & 0x80) != 0);
     }
 
     pub fn get_frame_end(&mut self) -> bool {
@@ -438,6 +500,10 @@ impl NesPpu {
 
     pub fn frame_number(&self) -> u64 {
         self.frame_number
+    }
+
+    pub fn irq(&self) -> bool {
+        self.vblank_nmi
     }
 
     pub fn convert_to_egui(f: &Box<[u8; 256 * 240 * 3]>) -> egui::ColorImage {

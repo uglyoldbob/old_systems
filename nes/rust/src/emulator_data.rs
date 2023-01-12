@@ -58,7 +58,8 @@ impl NesEmulatorData {
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
-            self.cpu.cycle(&mut self.mb, &mut self.cpu_peripherals);
+            let nmi = self.cpu_peripherals.ppu_irq();
+            self.cpu.cycle(&mut self.mb, &mut self.cpu_peripherals, nmi);
         }
 
         self.ppu_clock_counter += 1;
