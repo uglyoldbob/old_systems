@@ -20,10 +20,15 @@ pub struct NesPpu {
     pend_vram_write: Option<u8>,
     pend_vram_data: Option<u8>,
     vram_address: u16,
-    #[cfg(any(test,debug_assertions))]
+    #[cfg(any(test, debug_assertions))]
     frame_number: u64,
     last_nmi: bool,
     nmi_length: u32,
+    ppudata_buffer: u8,
+    last_cpu_data: u8,
+    last_cpu_counter: [u32; 2],
+    oam: [u8; 256],
+    oamaddress: u8,
 }
 
 const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
@@ -121,6 +126,10 @@ const fn palette_generator() -> [[u8; 3]; 64] {
 impl NesPpu {
     pub fn new() -> Self {
         let reg2: u8 = rand::random::<u8>() & !0x40;
+        let mut oam = [0; 256];
+        for i in &mut oam {
+            *i = rand::random();
+        }
         Self {
             scanline_number: 0,
             scanline_cycle: 0,
@@ -141,35 +150,63 @@ impl NesPpu {
             pend_vram_write: None,
             pend_vram_data: None,
             vram_address: 0,
-            #[cfg(any(test,debug_assertions))]
+            #[cfg(any(test, debug_assertions))]
             frame_number: 0,
             last_nmi: false,
             nmi_length: 0,
+            ppudata_buffer: 0,
+            last_cpu_data: 0,
+            last_cpu_counter: [0, 0],
+            oam: oam,
+            oamaddress: 0,
         }
     }
 
-    #[cfg(any(test,debug_assertions))]
+    #[cfg(any(test, debug_assertions))]
     pub fn frame_number(&self) -> u64 {
         self.frame_number
     }
 
     pub fn read(&mut self, addr: u16) -> Option<u8> {
         match addr {
+            0 | 1 | 3 | 5 | 6 => Some(self.last_cpu_data),
             4 => {
-                println!("Read ppu register {:x}", addr);
+                let mut data = self.oam[self.oamaddress as usize];
+                match self.oamaddress & 3 {
+                    2 => {
+                        data &= 0xe3;
+                        self.last_cpu_data = data;
+                        self.last_cpu_counter[0] = 893420;
+                        self.last_cpu_counter[1] = 893420;
+                    }
+                    _ => {}
+                }
+                println!("Read ppu register {:x} {:x}", addr, data);
+                Some(data)
             }
-            _ => {}
+            7 => match self.vram_address {
+                0..=0x3eff => Some(self.ppudata_buffer),
+                _ => Some(42 | (self.last_cpu_data & 0xC0)),
+            },
+            _ => {
+                let mut val = self.registers[addr as usize];
+                if addr == 2 {
+                    self.address_bit = false;
+                    self.data_bit = false;
+                    self.vblank_clear = true;
+                    val = (val & 0xE0) | self.last_cpu_data & 0x1f;
+                    self.last_cpu_data = (self.last_cpu_data & 0x1f) | (val & 0xE0);
+                    self.last_cpu_counter[1] = 893420;
+                }
+                Some(val)
+            }
         }
-        let val = self.registers[addr as usize];
-        if addr == 2 {
-            self.address_bit = false;
-            self.data_bit = false;
-            self.vblank_clear = true;
-        }
-        Some(val)
     }
 
     pub fn write(&mut self, addr: u16, data: u8) {
+        self.last_cpu_data = data;
+        self.last_cpu_counter[0] = 893420;
+        self.last_cpu_counter[1] = 893420;
         match addr {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
@@ -189,6 +226,13 @@ impl NesPpu {
                         }
                     }
                 }
+            }
+            3 => {
+                self.oamaddress = data;
+            }
+            4 => {
+                self.oam[self.oamaddress as usize] = data;
+                self.oamaddress = self.oamaddress.wrapping_add(1);
             }
             7 => {
                 self.pend_vram_write = Some(data);
@@ -358,6 +402,18 @@ impl NesPpu {
             self.write_ignore_counter += 1;
         }
 
+        for c in &mut self.last_cpu_counter {
+            if *c > 0 {
+                *c -= 1;
+            }
+        }
+        if self.last_cpu_counter[0] == 0 {
+            self.last_cpu_data &= 0xe0;
+        }
+        if self.last_cpu_counter[1] == 0 {
+            self.last_cpu_data &= 0x1f;
+        }
+
         let vblank_flag = (self.registers[2] & 0x80) != 0;
 
         //if else chain allows the constants to be changed later to variables
@@ -523,7 +579,7 @@ impl NesPpu {
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
                 self.registers[2] |= 0x80;
                 self.frame_end = true;
-                #[cfg(any(test,debug_assertions))]
+                #[cfg(any(test, debug_assertions))]
                 {
                     self.frame_number = self.frame_number.wrapping_add(1);
                 }
@@ -547,8 +603,7 @@ impl NesPpu {
             & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
         if self.vblank_nmi {
             self.nmi_length += 1;
-        }
-        else {
+        } else {
             if self.nmi_length != 0 {
                 println!("NMI LENGTH {}", self.nmi_length);
             }

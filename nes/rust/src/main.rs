@@ -11,7 +11,6 @@ use emulator_data::NesEmulatorData;
 #[cfg(test)]
 mod tests;
 
-
 use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
@@ -202,7 +201,10 @@ impl TrackedWindow for DebugNesWindow {
                     c.cpu.get_p(),
                     c.cpu.get_sp(),
                 ));
-                ui.label(format!("Frame number {}", c.cpu_peripherals.ppu_frame_number()));
+                ui.label(format!(
+                    "Frame number {}",
+                    c.cpu_peripherals.ppu_frame_number()
+                ));
             }
         });
         RedrawResponse {
@@ -219,7 +221,7 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge("./nes/rust/5.nmi_suppression.nes".to_string()).unwrap();
+    let nc = NesCartridge::load_cartridge("./nes/rust/ppu_open_bus.nes".to_string()).unwrap();
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);

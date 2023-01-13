@@ -19,7 +19,7 @@ pub struct NesEmulatorData {
     pub wait_for_frame_end: bool,
     pub last_frame_time: u128,
     pub texture: Option<egui::TextureHandle>,
-    nmi: [bool;3],
+    nmi: [bool; 3],
 }
 
 impl NesEmulatorData {
@@ -44,7 +44,7 @@ impl NesEmulatorData {
                 .unwrap()
                 .as_millis(),
             texture: None,
-            nmi: [false;3],
+            nmi: [false; 3],
         }
     }
 

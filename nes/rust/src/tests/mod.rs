@@ -1,6 +1,5 @@
 use std::io::BufRead;
 
-use crate::NesEmulatorData;
 use crate::cartridge::NesCartridge;
 use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
@@ -8,6 +7,7 @@ use crate::cpu::NesMemoryBus;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 use crate::utility::convert_hex_to_decimal;
+use crate::NesEmulatorData;
 
 #[test]
 fn check_nes_roms() {
@@ -205,7 +205,7 @@ fn vbl_nmi_test6() {
     loop {
         nes_data.cycle_step();
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 110 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 111 {
                 break;
             }
         }
@@ -247,7 +247,6 @@ fn cpu_branch_timing1() {
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
 }
 
-
 #[test]
 fn cpu_branch_timing2() {
     let mut nes_data = NesEmulatorData::new();
@@ -280,4 +279,21 @@ fn cpu_branch_timing3() {
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
+}
+
+#[test]
+fn ppu_open_bus() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./ppu_open_bus.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 251 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
 }
