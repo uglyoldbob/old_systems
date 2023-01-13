@@ -137,7 +137,7 @@ fn vbl_nmi_test2() {
     loop {
         nes_data.cycle_step();
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 155 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 156 {
                 break;
             }
         }
@@ -205,7 +205,7 @@ fn vbl_nmi_test6() {
     loop {
         nes_data.cycle_step();
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 109 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 110 {
                 break;
             }
         }
@@ -222,7 +222,59 @@ fn vbl_nmi_test7() {
     loop {
         nes_data.cycle_step();
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 110 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 111 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
+}
+
+#[test]
+fn cpu_branch_timing1() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./1.Branch_Basics.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 14 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
+}
+
+
+#[test]
+fn cpu_branch_timing2() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./2.Backward_Branch.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 16 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
+}
+
+#[test]
+fn cpu_branch_timing3() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./3.Forward_Branch.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 16 {
                 break;
             }
         }

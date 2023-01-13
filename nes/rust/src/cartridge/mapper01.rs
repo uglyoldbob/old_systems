@@ -44,9 +44,10 @@ impl NesMapper for Mapper {
                     0 | 1 => {
                         //32kb bankswitch
                         let addr2 = addr & 0x7fff;
-                        let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                        addr3 |= (self.registers[3] as u32 & 0xE) << 16;
-                        Some(cart.prg_rom[addr3 as usize])
+                        let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                        let addr4 = ((self.registers[3] as u32 & 0xE) as u32) << 14;
+                        let addr5 = addr3 | addr4;
+                        Some(cart.prg_rom[addr5 as usize])
                     }
                     2 => {
                         //first half fixed, second half switched
@@ -59,7 +60,7 @@ impl NesMapper for Mapper {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xF) << 15;
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
                             Some(cart.prg_rom[addr3 as usize])
                         }
                     }
@@ -69,7 +70,7 @@ impl NesMapper for Mapper {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xF) << 15;
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
                             Some(cart.prg_rom[addr3 as usize])
                         } else {
                             //fixed to last bank
@@ -98,7 +99,7 @@ impl NesMapper for Mapper {
                     self.shift_register = 0;
                     self.registers[0] |= 0xC0;
                 } else {
-                    if self.shift_counter < 4 {
+                    if self.shift_counter < 5 {
                         self.shift_counter += 1;
                         self.shift_register >>= 1;
                         if (data & 1) != 0 {
