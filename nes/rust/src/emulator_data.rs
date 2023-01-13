@@ -8,7 +8,7 @@ use crate::{
 pub struct NesEmulatorData {
     pub cpu: NesCpu,
     pub cpu_peripherals: NesCpuPeripherals,
-    mb: NesMotherboard,
+    pub mb: NesMotherboard,
     pub cpu_clock_counter: u8,
     ppu_clock_counter: u8,
     #[cfg(debug_assertions)]
@@ -19,6 +19,7 @@ pub struct NesEmulatorData {
     pub wait_for_frame_end: bool,
     pub last_frame_time: u128,
     pub texture: Option<egui::TextureHandle>,
+    nmi: [bool;3],
 }
 
 impl NesEmulatorData {
@@ -43,6 +44,7 @@ impl NesEmulatorData {
                 .unwrap()
                 .as_millis(),
             texture: None,
+            nmi: [false;3],
         }
     }
 
@@ -58,7 +60,7 @@ impl NesEmulatorData {
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
-            let nmi = self.cpu_peripherals.ppu_irq();
+            let nmi = self.nmi[0] && self.nmi[1] && self.nmi[2];
             self.cpu.cycle(&mut self.mb, &mut self.cpu_peripherals, nmi);
         }
 
@@ -66,6 +68,9 @@ impl NesEmulatorData {
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
+            self.nmi[0] = self.nmi[1];
+            self.nmi[1] = self.nmi[2];
+            self.nmi[2] = self.cpu_peripherals.ppu_irq();
         }
     }
 }

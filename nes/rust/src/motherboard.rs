@@ -42,6 +42,16 @@ impl NesMotherboard {
             self.cart = Some(c);
         }
     }
+
+    #[cfg(test)]
+    pub fn check_vram(&self, addr: u16, check: &[u8]) -> bool {
+        for (i, data) in check.iter().enumerate() {
+            if self.vram[(addr + i as u16) as usize] != *data {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 impl NesMemoryBus for NesMotherboard {

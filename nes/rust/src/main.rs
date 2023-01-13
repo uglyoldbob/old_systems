@@ -7,131 +7,19 @@ pub mod motherboard;
 pub mod ppu;
 pub mod utility;
 use emulator_data::NesEmulatorData;
-use motherboard::NesMotherboard;
 
 #[cfg(test)]
-use std::io::BufRead;
+mod tests;
+
 
 use crate::cartridge::NesCartridge;
-use crate::cpu::NesCpu;
-use crate::cpu::NesCpuPeripherals;
-use crate::cpu::NesMemoryBus;
 use crate::ppu::NesPpu;
-use crate::utility::convert_hex_to_decimal;
 
 use egui_glow::EguiGlow;
 use egui_multiwin::{
     multi_window::{MultiWindow, NewWindowRequest},
     tracked_window::{RedrawResponse, TrackedWindow},
 };
-
-#[test]
-fn it_works() {
-    let result = 2 + 2;
-    assert_eq!(result, 4);
-}
-
-#[test]
-fn check_nes_roms() {
-    let mut roms = Vec::new();
-    let pb = std::path::PathBuf::from("./");
-    let entries = std::fs::read_dir(&pb).unwrap();
-    for e in entries.into_iter() {
-        if let Ok(e) = e {
-            let path = e.path();
-            let meta = std::fs::metadata(&path).unwrap();
-            if meta.is_file() {
-                println!("Element {}", path.display());
-                if path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .ends_with(".nes")
-                {
-                    roms.push(path);
-                }
-            }
-        }
-    }
-    println!("Checking roms in {}", pb.display());
-    for r in roms {
-        println!("Testing rom {}", r.display());
-        let nc = NesCartridge::load_cartridge(r.into_os_string().into_string().unwrap());
-        assert!(
-            nc.is_ok(),
-            "Unable to load rom because {:?}",
-            nc.err().unwrap()
-        );
-    }
-}
-
-#[test]
-fn basic_cpu_test() {
-    let mut cpu: NesCpu = NesCpu::new();
-    let ppu: NesPpu = NesPpu::new();
-    let mut cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu);
-    let mut mb: NesMotherboard = NesMotherboard::new();
-    let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
-    let goldenlog = std::fs::File::open("./nestest.log").unwrap();
-    let mut goldenlog = std::io::BufReader::new(goldenlog).lines();
-    let mut log_line = 0;
-
-    let mut nc = nc.unwrap();
-    nc.rom_byte_hack(0xfffc, 0x00);
-    mb.insert_cartridge(nc);
-
-    let mut t: String;
-    let mut b;
-    for i in 0..26554 {
-        cpu.cycle(&mut mb, &mut cpu_peripherals, false);
-        if cpu.instruction_start() {
-            log_line += 1;
-            t = goldenlog.next().unwrap().unwrap();
-            println!("Instruction end at cycle {}", i + 1);
-            println!("NESTEST LOG LINE {}: {}", log_line, t);
-            b = t.as_bytes();
-            let d = convert_hex_to_decimal(b[0] as char) as u16;
-            let d2 = convert_hex_to_decimal(b[1] as char) as u16;
-            let d3 = convert_hex_to_decimal(b[2] as char) as u16;
-            let d4 = convert_hex_to_decimal(b[3] as char) as u16;
-            let address = d << 12 | d2 << 8 | d3 << 4 | d4;
-
-            let reg_a: u8 = (convert_hex_to_decimal(b[50] as char) as u8) << 4
-                | convert_hex_to_decimal(b[51] as char) as u8;
-            assert_eq!(cpu.get_a(), reg_a);
-
-            let reg_x: u8 = (convert_hex_to_decimal(b[55] as char) as u8) << 4
-                | convert_hex_to_decimal(b[56] as char) as u8;
-            assert_eq!(cpu.get_x(), reg_x);
-
-            let reg_y: u8 = (convert_hex_to_decimal(b[60] as char) as u8) << 4
-                | convert_hex_to_decimal(b[61] as char) as u8;
-            assert_eq!(cpu.get_y(), reg_y);
-
-            let reg_p: u8 = (convert_hex_to_decimal(b[65] as char) as u8) << 4
-                | convert_hex_to_decimal(b[66] as char) as u8;
-            assert_eq!(cpu.get_p(), reg_p);
-
-            let reg_sp: u8 = (convert_hex_to_decimal(b[71] as char) as u8) << 4
-                | convert_hex_to_decimal(b[72] as char) as u8;
-            assert_eq!(cpu.get_sp(), reg_sp);
-
-            println!("Address is {:x} {:x}", address, cpu.get_pc());
-            assert_eq!(cpu.get_pc(), address);
-            println!("");
-
-            let mut logcycle: u32 = 0;
-            for i in 90..95 {
-                if i < b.len() {
-                    logcycle *= 10;
-                    logcycle += convert_hex_to_decimal(b[i] as char) as u32;
-                }
-            }
-            assert_eq!(i + 1, logcycle);
-        }
-    }
-    assert_eq!(cpu.get_pc(), 0xc66e);
-}
 struct MainNesWindow {}
 
 impl MainNesWindow {
@@ -305,15 +193,16 @@ impl TrackedWindow for DebugNesWindow {
                     if let Some(t) = c.cpu.disassemble() {
                         ui.label(t);
                     }
-                    ui.label(format!(
-                        "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
-                        c.cpu.get_a(),
-                        c.cpu.get_x(),
-                        c.cpu.get_y(),
-                        c.cpu.get_p(),
-                        c.cpu.get_sp(),
-                    ));
                 });
+                ui.label(format!(
+                    "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
+                    c.cpu.get_a(),
+                    c.cpu.get_x(),
+                    c.cpu.get_y(),
+                    c.cpu.get_p(),
+                    c.cpu.get_sp(),
+                ));
+                ui.label(format!("Frame number {}", c.cpu_peripherals.ppu_frame_number()));
             }
         });
         RedrawResponse {
@@ -330,13 +219,16 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge("./nes/rust/1.frame_basics.nes".to_string()).unwrap();
+    let nc = NesCartridge::load_cartridge("./nes/rust/5.nmi_suppression.nes".to_string()).unwrap();
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);
-    if cfg!(debug_assertions) {
-        let debug_win = DebugNesWindow::new();
-        let _e = multi_window.add(debug_win, &event_loop);
+    #[cfg(debug_assertions)]
+    {
+        if nes_data.paused {
+            let debug_win = DebugNesWindow::new();
+            let _e = multi_window.add(debug_win, &event_loop);
+        }
     }
     multi_window.run(event_loop, nes_data);
 }

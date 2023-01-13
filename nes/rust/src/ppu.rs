@@ -5,12 +5,11 @@ pub struct NesPpu {
     scanline_number: u16,
     scanline_cycle: u16,
     frame_end: bool,
-    vblank: bool,
     address_bit: bool,
     data_bit: bool,
+    vblank_clear: bool,
     vblank_nmi: bool,
     frame_odd: bool,
-    nametable_counter: u16,
     write_ignore_counter: u16,
     nametable_data: u8,
     attributetable_data: u8,
@@ -18,10 +17,13 @@ pub struct NesPpu {
     patterntable_tile: u16,
     patterntable_shift: [u16; 2],
     frame_data: Box<[u8; 3 * 256 * 240]>,
-    frame_number: u64,
     pend_vram_write: Option<u8>,
     pend_vram_data: Option<u8>,
     vram_address: u16,
+    #[cfg(any(test,debug_assertions))]
+    frame_number: u64,
+    last_nmi: bool,
+    nmi_length: u32,
 }
 
 const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
@@ -125,11 +127,10 @@ impl NesPpu {
             registers: [0, 0, reg2, 0, 0, 0, 0, 0],
             address_bit: false,
             data_bit: false,
-            vblank: false,
             vblank_nmi: false,
+            vblank_clear: false,
             frame_end: false,
             frame_odd: false,
-            nametable_counter: 0,
             write_ignore_counter: 0,
             nametable_data: 0,
             attributetable_data: 0,
@@ -137,11 +138,19 @@ impl NesPpu {
             patterntable_tile: 0,
             patterntable_shift: [0, 0],
             frame_data: Box::new([0; 3 * 256 * 240]),
-            frame_number: 0,
             pend_vram_write: None,
             pend_vram_data: None,
             vram_address: 0,
+            #[cfg(any(test,debug_assertions))]
+            frame_number: 0,
+            last_nmi: false,
+            nmi_length: 0,
         }
+    }
+
+    #[cfg(any(test,debug_assertions))]
+    pub fn frame_number(&self) -> u64 {
+        self.frame_number
     }
 
     pub fn read(&mut self, addr: u16) -> Option<u8> {
@@ -155,8 +164,7 @@ impl NesPpu {
         if addr == 2 {
             self.address_bit = false;
             self.data_bit = false;
-            self.registers[2] &= !0x80; //clear vblank flag
-                                        //TODO maybe clear the other vblank flags here?
+            self.vblank_clear = true;
         }
         Some(val)
     }
@@ -350,6 +358,8 @@ impl NesPpu {
             self.write_ignore_counter += 1;
         }
 
+        let vblank_flag = (self.registers[2] & 0x80) != 0;
+
         //if else chain allows the constants to be changed later to variables
         //to allow for ntsc/pal to be emulated
         if self.scanline_number < 240 {
@@ -363,10 +373,6 @@ impl NesPpu {
                 }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 256 {
-                if self.scanline_cycle == 1 {
-                    self.vblank = false;
-                    self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
-                }
                 //each cycle here renders a single pixel
                 let cycle = self.scanline_cycle - 1;
                 if self.should_render_background(cycle) {
@@ -380,8 +386,7 @@ impl NesPpu {
                     let combined = mody << 1 | modx;
                     let extra_palette_bits = if combined != 0 {
                         (self.attributetable_shift[0] >> (2 * combined)) & 3
-                    }
-                    else {
+                    } else {
                         0
                     };
 
@@ -516,19 +521,39 @@ impl NesPpu {
         } else if self.scanline_number <= 260 {
             //vblank lines
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
-                self.vblank = true;
                 self.registers[2] |= 0x80;
                 self.frame_end = true;
-                self.frame_number = self.frame_number.wrapping_add(1);
+                #[cfg(any(test,debug_assertions))]
+                {
+                    self.frame_number = self.frame_number.wrapping_add(1);
+                }
             }
             self.idle_operation(bus, self.scanline_cycle);
             self.increment_scanline_cycle();
         } else {
+            if self.scanline_number == 261 && self.scanline_cycle == 1 {
+                self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
+            }
             //TODO make memory accesses here
             self.idle_operation(bus, self.scanline_cycle);
             self.increment_scanline_cycle();
         }
-        self.vblank_nmi = self.vblank & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
+        if self.vblank_clear {
+            self.vblank_clear = false;
+            self.registers[2] &= !0x80; //clear vblank flag
+        }
+        self.last_nmi = self.vblank_nmi;
+        self.vblank_nmi = ((self.registers[2] & 0x80) != 0)
+            & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
+        if self.vblank_nmi {
+            self.nmi_length += 1;
+        }
+        else {
+            if self.nmi_length != 0 {
+                println!("NMI LENGTH {}", self.nmi_length);
+            }
+            self.nmi_length = 0;
+        }
     }
 
     pub fn get_frame_end(&mut self) -> bool {
@@ -539,10 +564,6 @@ impl NesPpu {
 
     pub fn get_frame(&mut self) -> &Box<[u8; 256 * 240 * 3]> {
         &self.frame_data
-    }
-
-    pub fn frame_number(&self) -> u64 {
-        self.frame_number
     }
 
     pub fn irq(&self) -> bool {

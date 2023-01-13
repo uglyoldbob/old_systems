@@ -29,6 +29,7 @@ impl NesCpuPeripherals {
         self.ppu.get_frame()
     }
 
+    #[cfg(any(test, debug_assertions))]
     pub fn ppu_frame_number(&self) -> u64 {
         self.ppu.frame_number()
     }
