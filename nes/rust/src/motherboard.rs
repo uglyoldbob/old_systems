@@ -153,10 +153,6 @@ impl NesMemoryBus for NesMotherboard {
     fn ppu_cycle_2_write(&mut self, data: u8) {
         if let Some(addr) = self.vram_address {
             let addr2 = addr & 0x7ff;
-            if addr >= 0x23c0 && addr < 0x2400 {
-                println!("Write vram address {:x}", addr);
-                self.vram[addr2 as usize] = data;
-            }
             self.vram[addr2 as usize] = data;
         } else {
             if let Some(cart) = &mut self.cart {

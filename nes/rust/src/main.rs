@@ -83,7 +83,7 @@ fn basic_cpu_test() {
     let mut t: String;
     let mut b;
     for i in 0..26554 {
-        cpu.cycle(&mut mb, &mut cpu_peripherals);
+        cpu.cycle(&mut mb, &mut cpu_peripherals, false);
         if cpu.instruction_start() {
             log_line += 1;
             t = goldenlog.next().unwrap().unwrap();

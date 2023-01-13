@@ -386,7 +386,8 @@ impl NesCpu {
         } else {
             if let None = self.opcode {
                 if (self.interrupt_shift[0].0 && ((self.p & CPU_FLAG_INT_DISABLE) == 0))
-                    || self.interrupt_shift[0].1 || self.interrupting
+                    || self.interrupt_shift[0].1
+                    || self.interrupting
                 {
                     match self.subcycle {
                         0 => {

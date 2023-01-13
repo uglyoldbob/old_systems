@@ -29,10 +29,12 @@ pub struct NesCartridgeData {
     trainer: Option<Vec<u8>>,
     prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
+    chr_ram: bool,
     inst_rom: Option<Vec<u8>>,
     prom: Option<(Vec<u8>, Vec<u8>)>,
     prg_ram: Vec<u8>,
     mirroring: bool,
+    mapper: u32,
 }
 
 pub struct NesCartridge {
@@ -64,7 +66,12 @@ impl NesCartridge {
         let prg_rom_size = rom_contents[4] as usize * 16384;
         let mut prg_rom = Vec::with_capacity(prg_rom_size);
 
-        let chr_rom_size = rom_contents[5] as usize * 8192;
+        let mut chr_rom_size = rom_contents[5] as usize * 8192;
+        let chr_ram = chr_rom_size == 0;
+        if chr_ram {
+            //TODO determine correct size for chr-ram
+            chr_rom_size = 8192 * 1;
+        }
         let mut chr_rom = Vec::with_capacity(chr_rom_size);
         let mut file_offset: usize = 16;
         let trainer = if (rom_contents[6] & 8) != 0 {
@@ -83,7 +90,12 @@ impl NesCartridge {
         file_offset += prg_rom_size;
         if chr_rom_size != 0 {
             for i in 0..chr_rom_size {
-                chr_rom.push(rom_contents[file_offset + i]);
+                let data = if !chr_ram {
+                    rom_contents[file_offset + i]
+                } else {
+                    rand::random()
+                };
+                chr_rom.push(data);
             }
             file_offset += chr_rom_size;
         }
@@ -105,17 +117,18 @@ impl NesCartridge {
             prg_ram.push(v);
         }
 
+        let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
         let rom_data = NesCartridgeData {
             trainer: trainer,
             prg_rom: prg_rom,
             chr_rom: chr_rom,
+            chr_ram: chr_ram,
             inst_rom: inst_rom,
             prom: None,
             prg_ram: prg_ram,
             mirroring: (rom_contents[6] & 1) != 0,
+            mapper: mapper as u32,
         };
-
-        let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
         let mapper = match mapper {
             0 => mapper00::Mapper::new(&rom_data),
             1 => mapper01::Mapper::new(&rom_data),

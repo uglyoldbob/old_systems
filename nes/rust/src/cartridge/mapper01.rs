@@ -161,7 +161,11 @@ impl NesMapper for Mapper {
         }
     }
 
-    fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {}
+    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, _data: u8) {
+        if cart.chr_ram {
+            unimplemented!();
+        }
+    }
 
     fn rom_byte_hack(&mut self, _cart: &mut NesCartridgeData, _addr: u32, _new_byte: u8) {}
 }

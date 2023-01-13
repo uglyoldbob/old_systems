@@ -24,6 +24,22 @@ pub struct NesPpu {
     vram_address: u16,
 }
 
+const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
+const PPU_REGISTER0_VRAM_ADDRESS_INCREMENT: u8 = 0x04;
+const PPU_REGISTER0_SPRITETABLE_BASE: u8 = 0x08;
+const PPU_REGISTER0_BACKGROUND_PATTERNTABLE_BASE: u8 = 0x10;
+const PPU_REGISTER0_SPRITE_SIZE: u8 = 0x20;
+const PPU_REGISTER0_GENERATE_NMI: u8 = 0x80;
+
+const PPU_REGISTER1_GREYSCALE: u8 = 0x01;
+const PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN: u8 = 0x02;
+const PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN: u8 = 0x04;
+const PPU_REGISTER1_DRAW_BACKGROUND: u8 = 0x08;
+const PPU_REGISTER1_DRAW_SPRITES: u8 = 0x10;
+const PPU_REGISTER1_EMPHASIZE_RED: u8 = 0x20;
+const PPU_REGISTER1_EMPHASIZE_GREEN: u8 = 0x40;
+const PPU_REGISTER1_EMPHASIZE_BLUE: u8 = 0x80;
+
 const PPU_STARTUP_CYCLE_COUNT: u16 = 29658;
 
 const PPU_PALETTE: [[u8; 3]; 64] = palette_generator(); //TODO put in correct colors into the palette
@@ -178,18 +194,27 @@ impl NesPpu {
 
     fn increment_scanline_cycle(&mut self) {
         self.scanline_cycle += 1;
-        if self.scanline_cycle == 340 || (self.frame_odd && self.scanline_cycle == 339) {
-            self.frame_odd = !self.frame_odd;
+        if self.scanline_cycle == 341 {
             self.scanline_cycle = 0;
             self.scanline_number += 1;
             if self.scanline_number == 262 {
+                self.frame_odd = !self.frame_odd;
                 self.scanline_number = 0;
+            }
+            if self.scanline_cycle == 0
+                && self.scanline_number == 0
+                && self.frame_odd
+                && ((self.registers[1]
+                    & (PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN | PPU_REGISTER1_DRAW_BACKGROUND))
+                    != 0)
+            {
+                self.scanline_cycle += 1;
             }
         }
     }
 
     fn nametable_base(&self) -> u16 {
-        match self.registers[0] & 3 {
+        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
             0 => 0x2000,
             1 => 0x2400,
             2 => 0x2800,
@@ -198,7 +223,7 @@ impl NesPpu {
     }
 
     fn attributetable_base(&self) -> u16 {
-        match self.registers[0] & 3 {
+        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
             0 => 0x23c0,
             1 => 0x27c0,
             2 => 0x2bc0,
@@ -207,7 +232,7 @@ impl NesPpu {
     }
 
     fn patterntable_base(&self) -> u16 {
-        if (self.registers[0] & 0x10) == 0 {
+        if (self.registers[0] & PPU_REGISTER0_BACKGROUND_PATTERNTABLE_BASE) == 0 {
             0
         } else {
             0x1000
@@ -216,17 +241,17 @@ impl NesPpu {
 
     fn should_render_background(&self, cycle: u16) -> bool {
         if cycle == 0 {
-            (self.registers[1] & 0x02) != 0
+            (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
         } else {
-            (self.registers[1] & 0x08) != 0
+            (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
         }
     }
 
     fn should_render_sprites(&self, cycle: u16) -> bool {
         if cycle == 0 {
-            (self.registers[1] & 0x04) != 0
+            (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN) != 0
         } else {
-            (self.registers[1] & 0x10) != 0
+            (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0
         }
     }
 
@@ -309,7 +334,7 @@ impl NesPpu {
         } else {
             if let Some(a) = self.pend_vram_data {
                 bus.ppu_cycle_2_write(a);
-                if (self.registers[0] & 1 << 2) == 0 {
+                if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
                     self.vram_address = self.vram_address.wrapping_add(1);
                 } else {
                     self.vram_address = self.vram_address.wrapping_add(32);
@@ -354,8 +379,20 @@ impl NesPpu {
                     let combined = mody << 1 | modx;
                     let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
 
-                    let palette_entry =
-                        ((extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as usize);
+                    let mut palette_entry =
+                        (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as usize;
+                    if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                        palette_entry &= 0x30;
+                    }
+                    if (self.registers[1]
+                        & (PPU_REGISTER1_EMPHASIZE_BLUE
+                            | PPU_REGISTER1_EMPHASIZE_GREEN
+                            | PPU_REGISTER1_EMPHASIZE_RED))
+                        != 0
+                    {
+                        //TODO implement color emphasis
+                        println!("TODO: implement color emphasis");
+                    }
                     let pixel = PPU_PALETTE[palette_entry];
                     self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
                         pixel[0];
@@ -431,8 +468,7 @@ impl NesPpu {
                         }
                         _ => {}
                     }
-                }
-                else {
+                } else {
                     self.idle_operation(bus, self.scanline_cycle);
                 }
                 self.increment_scanline_cycle();
@@ -485,7 +521,7 @@ impl NesPpu {
             self.idle_operation(bus, self.scanline_cycle);
             self.increment_scanline_cycle();
         }
-        self.vblank_nmi = self.vblank & ((self.registers[0] & 0x80) != 0);
+        self.vblank_nmi = self.vblank & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
     }
 
     pub fn get_frame_end(&mut self) -> bool {
