@@ -7,6 +7,7 @@ pub struct NesMotherboard {
     cart: Option<NesCartridge>,
     ram: [u8; 2048],
     vram: [u8; 2048],
+    ppu_palette_ram: [u8; 32],
     vram_address: Option<u16>,
 }
 
@@ -22,10 +23,16 @@ impl NesMotherboard {
         for i in vram.iter_mut() {
             *i = rand::random();
         }
+
+        let mut pram: [u8; 32] = [0; 32];
+        for i in vram.iter_mut() {
+            *i = rand::random();
+        }
         Self {
             cart: None,
             ram: main_ram,
             vram: vram,
+            ppu_palette_ram: pram,
             vram_address: None,
         }
     }
@@ -140,7 +147,7 @@ impl NesMemoryBus for NesMotherboard {
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
             self.vram_address = if !vram_enable {
-                if addr >= 0x2000 && addr <= 0x2fff {
+                if addr >= 0x2000 && addr <= 0x3fff {
                     Some(addr | ((a10 as u16) << 10))
                 } else {
                     None
@@ -152,8 +159,24 @@ impl NesMemoryBus for NesMotherboard {
     }
     fn ppu_cycle_2_write(&mut self, data: u8) {
         if let Some(addr) = self.vram_address {
-            let addr2 = addr & 0x7ff;
-            self.vram[addr2 as usize] = data;
+            match addr {
+                0..=0x3eff => {
+                    let addr2 = addr & 0x7ff;
+                    self.vram[addr2 as usize] = data;
+                }
+                0x3f00..=0x3fff => {
+                    let mut addr2 = addr & 0x1F;
+                    addr2 = match addr2 {
+                        0x10 => 0,
+                        0x14 => 4,
+                        0x18 => 8,
+                        0x1c => 0xc,
+                        _ => addr2,
+                    };
+                    self.ppu_palette_ram[addr2 as usize] = data;
+                }
+                _ => {}
+            }
         } else {
             if let Some(cart) = &mut self.cart {
                 cart.ppu_cycle_write(data);
@@ -162,12 +185,33 @@ impl NesMemoryBus for NesMotherboard {
     }
     fn ppu_cycle_2_read(&mut self) -> u8 {
         if let Some(addr) = self.vram_address {
-            let addr2 = addr & 0x7ff;
-            self.vram[addr2 as usize]
+            match addr {
+                0..=0x3eff => {
+                    let addr2 = addr & 0x7ff;
+                    self.vram[addr2 as usize]
+                }
+                0x3f00..=0x3fff => {
+                    let mut addr2 = addr & 0x1F;
+                    addr2 = match addr2 {
+                        0x10 => 0,
+                        0x14 => 4,
+                        0x18 => 8,
+                        0x1c => 0xc,
+                        _ => addr2,
+                    };
+                    self.ppu_palette_ram[addr2 as usize]
+                }
+                _ => 42,
+            }
         } else if let Some(cart) = &mut self.cart {
             cart.ppu_cycle_read()
         } else {
             42
         }
+    }
+
+    fn ppu_palette_read(&self, addr: u16) -> u8 {
+        let addr2: usize = (addr as usize) & 0x1f;
+        self.ppu_palette_ram[addr2]
     }
 }

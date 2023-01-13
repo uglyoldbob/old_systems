@@ -301,6 +301,7 @@ impl NesPpu {
                 } else {
                     let mut pt = self.patterntable_tile.to_le_bytes();
                     pt[0] = bus.ppu_cycle_2_read();
+                    self.patterntable_tile = u16::from_le_bytes(pt);
                 }
             }
             3 => {
@@ -377,13 +378,19 @@ impl NesPpu {
                     let modx = (cycle / 16) & 1;
                     let mody = (self.scanline_number / 16) & 1;
                     let combined = mody << 1 | modx;
-                    let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
+                    let extra_palette_bits = if combined != 0 {
+                        (self.attributetable_shift[0] >> (2 * combined)) & 3
+                    }
+                    else {
+                        0
+                    };
 
                     let mut palette_entry =
-                        (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as usize;
+                        (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as u16;
                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                         palette_entry &= 0x30;
                     }
+                    let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry);
                     if (self.registers[1]
                         & (PPU_REGISTER1_EMPHASIZE_BLUE
                             | PPU_REGISTER1_EMPHASIZE_GREEN
@@ -393,7 +400,7 @@ impl NesPpu {
                         //TODO implement color emphasis
                         println!("TODO: implement color emphasis");
                     }
-                    let pixel = PPU_PALETTE[palette_entry];
+                    let pixel = PPU_PALETTE[pixel_entry as usize];
                     self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
                         pixel[0];
                     self.frame_data

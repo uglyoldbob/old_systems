@@ -57,6 +57,7 @@ pub trait NesMemoryBus {
     fn ppu_cycle_1(&mut self, addr: u16);
     fn ppu_cycle_2_write(&mut self, data: u8);
     fn ppu_cycle_2_read(&mut self) -> u8;
+    fn ppu_palette_read(&self, addr: u16) -> u8;
 }
 
 pub struct NesCpu {
