@@ -1,7 +1,7 @@
 use crate::ppu::NesPpu;
 
 pub struct NesCpuPeripherals {
-    ppu: NesPpu,
+    pub ppu: NesPpu,
 }
 
 impl NesCpuPeripherals {

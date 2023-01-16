@@ -1,0 +1,3 @@
+blargg_nes_cpu_test5/cpu
+ - does not seem to make progress after printing Running tests
+ - maybe uses sprites?

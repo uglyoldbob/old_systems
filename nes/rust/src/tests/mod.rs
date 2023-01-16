@@ -297,3 +297,20 @@ fn ppu_open_bus() {
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
 }
+
+#[test]
+fn ppu_test1() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./palette_ram.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
+}

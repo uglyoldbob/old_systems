@@ -170,6 +170,15 @@ impl NesPpu {
     pub fn reset(&mut self) {
         self.registers[0] = 0;
         self.registers[1] = 0;
+        self.frame_number = 0;
+    }
+
+    pub fn vram_address(&self) -> u16 {
+        self.vram_address
+    }
+
+    pub fn increment_vram(&mut self) {
+        self.vram_address = self.vram_address.wrapping_add(1);
     }
 
     pub fn read(&mut self, addr: u16) -> Option<u8> {
@@ -191,7 +200,9 @@ impl NesPpu {
             }
             7 => match self.vram_address {
                 0..=0x3eff => Some(self.ppudata_buffer),
-                _ => Some(42 | (self.last_cpu_data & 0xC0)),
+                _ => {
+                    Some(self.last_cpu_data & 0xC0)
+                }
             },
             _ => {
                 let mut val = self.registers[addr as usize];
@@ -222,12 +233,14 @@ impl NesPpu {
                                 self.address_bit = !self.address_bit;
                             } else {
                                 self.vram_address = (self.registers[6] as u16) << 8 | data as u16;
+                                if self.vram_address >= 0x3f00 {
+                                    println!("Set vram to palette {:x}", self.vram_address);
+                                }
                                 self.address_bit = !self.address_bit;
                             }
                         }
                         _ => {
                             self.registers[addr as usize] = data;
-                            println!("Write ppu register {:x} with {:x}", addr, data);
                         }
                     }
                 }
@@ -243,7 +256,6 @@ impl NesPpu {
                 self.pend_vram_write = Some(data);
             }
             _ => {
-                println!("Write ppu register {:x} with {:x}", addr, data);
                 self.registers[addr as usize] = data;
             }
         }
@@ -604,7 +616,6 @@ impl NesPpu {
             if self.scanline_number == 261 && self.scanline_cycle == 1 {
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
-            //TODO make memory accesses here
             if self.scanline_cycle > 0 {
                 self.idle_operation(bus, self.scanline_cycle-1);
             }
