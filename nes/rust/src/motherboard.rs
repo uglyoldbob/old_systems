@@ -150,7 +150,13 @@ impl NesMemoryBus for NesMotherboard {
             }
             0x4000..=0x4017 => {
                 //apu and io
-                println!("TODO implement functionality {:x}", addr);
+                match addr {
+                    0x4014 => {
+                    }
+                    _ => {
+                        println!("TODO implement functionality {:x}", addr);
+                    }
+                }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }

@@ -87,6 +87,8 @@ pub struct NesCpu {
     interrupt_shift: [(bool, bool); 2],
     interrupt_type: bool,
     interrupting: bool,
+    oamdma: Option<u8>,
+    dma_counter: u16,
 }
 
 const CPU_FLAG_CARRY: u8 = 1;
@@ -123,6 +125,8 @@ impl NesCpu {
             interrupt_shift: [(false, false); 2],
             interrupt_type: false,
             interrupting: false,
+            oamdma: None,
+            dma_counter: 0,
         }
     }
 
@@ -252,6 +256,9 @@ impl NesCpu {
         bus: &mut dyn NesMemoryBus,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
+        if addr == 0x4014 {
+            self.oamdma = Some(data);
+        }
         bus.memory_cycle_write(
             addr,
             data,
@@ -469,6 +476,19 @@ impl NesCpu {
                             self.subcycle = 0;
                             self.interrupting = false;
                         }
+                    }
+                } else if let Some(addr) = self.oamdma {
+                    if self.dma_counter == 512 {
+                        self.oamdma = None;
+                        self.dma_counter = 0;
+                    }
+                    else if (self.dma_counter & 1) == 0 {
+                        let addr = (addr as u16)<<8 | (self.dma_counter>>1);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.dma_counter += 1;
+                    } else {
+                        self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
+                        self.dma_counter += 1;
                     }
                 } else {
                     self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));

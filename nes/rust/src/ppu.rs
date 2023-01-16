@@ -195,7 +195,6 @@ impl NesPpu {
                     }
                     _ => {}
                 }
-                println!("Read ppu register {:x} {:x}", addr, data);
                 Some(data)
             }
             7 => match self.vram_address {
