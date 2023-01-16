@@ -18,7 +18,7 @@ pub struct NesPpu {
     patterntable_shift: [u16; 2],
     frame_data: Box<[u8; 3 * 256 * 240]>,
     pend_vram_write: Option<u8>,
-    pend_vram_data: Option<u8>,
+    pend_vram_read: Option<u16>,
     vram_address: u16,
     #[cfg(any(test, debug_assertions))]
     frame_number: u64,
@@ -148,7 +148,7 @@ impl NesPpu {
             patterntable_shift: [0, 0],
             frame_data: Box::new([0; 3 * 256 * 240]),
             pend_vram_write: None,
-            pend_vram_data: None,
+            pend_vram_read: None,
             vram_address: 0,
             #[cfg(any(test, debug_assertions))]
             frame_number: 0,
@@ -181,6 +181,12 @@ impl NesPpu {
         self.vram_address = self.vram_address.wrapping_add(1);
     }
 
+    pub fn provide_palette_data(&mut self, data: u8) {
+        let data2 = data & 0x3f;
+        self.last_cpu_data = data2;
+        self.last_cpu_counter[1] = 893420;
+    }
+
     pub fn read(&mut self, addr: u16) -> Option<u8> {
         match addr {
             0 | 1 | 3 | 5 | 6 => Some(self.last_cpu_data),
@@ -198,8 +204,12 @@ impl NesPpu {
                 Some(data)
             }
             7 => match self.vram_address {
-                0..=0x3eff => Some(self.ppudata_buffer),
+                0..=0x3eff => {
+                    self.pend_vram_read = Some(self.vram_address);
+                    Some(self.ppudata_buffer)
+                }
                 _ => {
+                    self.pend_vram_read = Some(self.vram_address);
                     Some(self.last_cpu_data & 0xC0)
                 }
             },
@@ -232,9 +242,6 @@ impl NesPpu {
                                 self.address_bit = !self.address_bit;
                             } else {
                                 self.vram_address = (self.registers[6] as u16) << 8 | data as u16;
-                                if self.vram_address >= 0x3f00 {
-                                    println!("Set vram to palette {:x}", self.vram_address);
-                                }
                                 self.address_bit = !self.address_bit;
                             }
                         }
@@ -252,7 +259,12 @@ impl NesPpu {
                 self.oamaddress = self.oamaddress.wrapping_add(1);
             }
             7 => {
-                self.pend_vram_write = Some(data);
+                match self.vram_address {
+                    0 ..= 0x3eff => {
+                        self.pend_vram_write = Some(data);
+                    }
+                    _ => {}
+                }
             }
             _ => {
                 self.registers[addr as usize] = data;
@@ -403,14 +415,16 @@ impl NesPpu {
 
     fn idle_operation(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
         if (cycle & 1) == 0 {
-            if let Some(a) = self.pend_vram_write {
-                    bus.ppu_cycle_1(self.vram_address);
-                    self.cycle1_done = true;
-                    self.pend_vram_data = Some(a);
-                    self.pend_vram_write = None;
+            if let Some(_a) = self.pend_vram_write {
+                bus.ppu_cycle_1(self.vram_address);
+                self.cycle1_done = true;
+            }
+            else if let Some(a) = self.pend_vram_read {
+                bus.ppu_cycle_1(a & 0x2fff);
+                self.cycle1_done = true;
             }
         } else if self.cycle1_done {
-            if let Some(a) = self.pend_vram_data {
+            if let Some(a) = self.pend_vram_write {
                 bus.ppu_cycle_2_write(a);
                 self.cycle1_done = false;
                 if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
@@ -418,7 +432,18 @@ impl NesPpu {
                 } else {
                     self.vram_address = self.vram_address.wrapping_add(32);
                 }
-                self.pend_vram_data = None;
+                self.pend_vram_write = None;
+            }
+            else if let Some(a) = self.pend_vram_read {
+                self.ppudata_buffer = bus.ppu_cycle_2_read();
+                match a {
+                    0x2000..=0x3eff => {
+                        self.last_cpu_data = self.ppudata_buffer;
+                    }
+                    _ => {}
+                }
+                self.cycle1_done = false;
+                self.pend_vram_read = None;
             }
         }
     }

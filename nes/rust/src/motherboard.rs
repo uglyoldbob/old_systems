@@ -88,8 +88,9 @@ impl NesMemoryBus for NesMotherboard {
                                 0x1c => 0xc,
                                 _ => addr,
                             };
-                            println!("READ PALETTE {:x} as {:x}", addr2, self.ppu_palette_ram[addr2 as usize]);
-                            response |= self.ppu_palette_ram[addr2 as usize];
+                            let palette_data = self.ppu_palette_ram[addr2 as usize];
+                            per.ppu.provide_palette_data(palette_data);
+                            response |= palette_data;
                             per.ppu.increment_vram();
                         }
                     }
@@ -144,6 +145,21 @@ impl NesMemoryBus for NesMotherboard {
                 let addr = addr & 7;
                 //ppu registers
                 per.ppu_write(addr, data);
+                if addr == 7 {
+                    let a = per.ppu.vram_address();
+                    if a >= 0x3f00 {
+                        let addr = a & 0x1f;
+                        let addr2 = match addr {
+                            0x10 => 0,
+                            0x14 => 4,
+                            0x18 => 8,
+                            0x1c => 0xc,
+                            _ => addr,
+                        };
+                        self.ppu_palette_ram[addr2 as usize] = data;
+                        per.ppu.increment_vram();
+                    }
+                }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -215,7 +231,6 @@ impl NesMemoryBus for NesMotherboard {
                         0x1c => 0xc,
                         _ => addr2,
                     };
-                    println!("SET PALETTE {:x} to {:x}", addr2, data);
                     self.ppu_palette_ram[addr2 as usize] = data;
                 }
                 _ => {}

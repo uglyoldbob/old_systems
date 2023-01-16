@@ -324,7 +324,41 @@ fn ppu_test2() {
     loop {
         nes_data.cycle_step();
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
+}
+
+#[test]
+fn ppu_test3() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./vbl_clear_time.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
+}
+
+#[test]
+fn ppu_test4() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./vram_access.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
                 break;
             }
         }
