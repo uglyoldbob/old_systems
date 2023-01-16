@@ -48,6 +48,11 @@ impl NesEmulatorData {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.cpu.reset();
+        self.cpu_peripherals.ppu_reset();
+    }
+
     pub fn insert_cartridge(&mut self, cart: NesCartridge) {
         self.mb.insert_cartridge(cart);
     }

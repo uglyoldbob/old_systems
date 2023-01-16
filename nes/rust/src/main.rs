@@ -113,6 +113,10 @@ impl TrackedWindow for MainNesWindow {
                             ui.close_menu();
                             windows_to_create.push(DebugNesWindow::new());
                         }
+                        if ui.button("Reset").clicked() {
+                            ui.close_menu();
+                            c.reset();
+                        }
                     });
                 }
             });
@@ -221,7 +225,7 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge("./nes/rust/ppu_open_bus.nes".to_string()).unwrap();
+    let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string()).unwrap();
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);

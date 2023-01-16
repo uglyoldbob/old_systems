@@ -37,6 +37,10 @@ impl NesCpuPeripherals {
     pub fn ppu_irq(&self) -> bool {
         self.ppu.irq()
     }
+
+    pub fn ppu_reset(&mut self) {
+        self.ppu.reset();
+    }
 }
 
 pub trait NesMemoryBus {
@@ -165,6 +169,7 @@ impl NesCpu {
     pub fn reset(&mut self) {
         self.s -= 3;
         self.p |= 4; //set IRQ disable flag
+        self.reset = true;
     }
 
     fn end_instruction(&mut self) {

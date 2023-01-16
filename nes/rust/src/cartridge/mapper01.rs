@@ -162,9 +162,41 @@ impl NesMapper for Mapper {
         }
     }
 
-    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, _data: u8) {
-        if cart.chr_ram {
-            unimplemented!();
+    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
+        if !cart.chr_ram {
+            return;
+        }
+        if cart.chr_rom.len() == 0 {
+            return;
+        }
+        if (self.registers[0] & 0x10) != 0 {
+            //two separate 4kb banks
+            match self.ppu_address {
+                0..=0x0fff => {
+                    let addr2 = self.ppu_address & 0x0fff;
+                    let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
+                    addr3 |= (self.registers[1] as u32 & 0x1F) << 12;
+                    cart.chr_rom[addr3 as usize] = data;
+                }
+                0x1000..=0x1fff => {
+                    let addr2 = self.ppu_address & 0x0fff;
+                    let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
+                    addr3 |= (self.registers[2] as u32 & 0x1F) << 12;
+                    cart.chr_rom[addr3 as usize] = data;
+                }
+                _ => {}
+            }
+        } else {
+            //one 8kb bank
+            match self.ppu_address {
+                0..=0x1fff => {
+                    let addr2 = self.ppu_address & 0x1fff;
+                    let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
+                    addr3 |= (self.registers[1] as u32 & 0x1E) << 12;
+                    cart.chr_rom[addr3 as usize] = data;
+                }
+                _ => {}
+            }
         }
     }
 

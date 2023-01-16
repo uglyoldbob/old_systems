@@ -9,6 +9,9 @@ pub struct NesMotherboard {
     vram: [u8; 2048],
     ppu_palette_ram: [u8; 32],
     vram_address: Option<u16>,
+    last_write: [u8; 4],
+    last_write_address: [u16; 4],
+    last_ppu_cycle: u8,
 }
 
 impl NesMotherboard {
@@ -34,6 +37,9 @@ impl NesMotherboard {
             vram: vram,
             ppu_palette_ram: pram,
             vram_address: None,
+            last_write: [0; 4],
+            last_write_address: [0; 4],
+            last_ppu_cycle: 2,
         }
     }
 
@@ -125,6 +131,13 @@ impl NesMemoryBus for NesMotherboard {
             0x2000..=0x3fff => {
                 let addr = addr & 7;
                 //ppu registers
+                if addr == 7 {
+                    if self.last_write[0] != self.last_write[1] {
+                        self.last_write[2] = self.last_write[0];
+                        println!("mismatch previous write");
+                    }
+                    self.last_write[0] = data;
+                }
                 per.ppu_write(addr, data);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
@@ -132,7 +145,7 @@ impl NesMemoryBus for NesMotherboard {
             }
             0x4000..=0x4017 => {
                 //apu and io
-                println!("TODO implement functionality {:x}", addr);
+                //println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -140,7 +153,7 @@ impl NesMemoryBus for NesMotherboard {
             0x4018..=0x401f => {
                 //disabled apu and oi functionality
                 //test mode
-                println!("TODO implement functionality {:x}", addr);
+                //println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -154,6 +167,10 @@ impl NesMemoryBus for NesMotherboard {
     }
 
     fn ppu_cycle_1(&mut self, addr: u16) {
+        if self.last_ppu_cycle != 2 {
+            println!("ERROR PPU CYCLING a");
+        }
+        self.last_ppu_cycle = 1;
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
             self.vram_address = if !vram_enable {
@@ -168,13 +185,26 @@ impl NesMemoryBus for NesMotherboard {
         }
     }
     fn ppu_cycle_2_write(&mut self, data: u8) {
+        if self.last_ppu_cycle != 1 {
+            println!("ERROR PPU CYCLING b");
+        }
+        self.last_ppu_cycle = 2;
         if let Some(addr) = self.vram_address {
             match addr {
                 0..=0x3eff => {
                     let addr2 = addr & 0x7ff;
+                    self.last_write[1] = data;
+                    self.last_write_address[1] = addr2;
+                    if self.last_write[0] != self.last_write[1] {
+                        println!("mismatch write");
+                    }
+                    if data != 0 && data != '$' as u8 {
+                        self.last_write[2] = data;
+                    }
                     self.vram[addr2 as usize] = data;
                 }
                 0x3f00..=0x3fff => {
+                    self.last_write[1] = data;
                     let mut addr2 = addr & 0x1F;
                     addr2 = match addr2 {
                         0x10 => 0,
@@ -194,6 +224,10 @@ impl NesMemoryBus for NesMotherboard {
         }
     }
     fn ppu_cycle_2_read(&mut self) -> u8 {
+        if self.last_ppu_cycle != 1 {
+            println!("ERROR PPU CYCLING c");
+        }
+        self.last_ppu_cycle = 2;
         if let Some(addr) = self.vram_address {
             match addr {
                 0..=0x3eff => {

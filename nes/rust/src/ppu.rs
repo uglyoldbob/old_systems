@@ -23,12 +23,12 @@ pub struct NesPpu {
     #[cfg(any(test, debug_assertions))]
     frame_number: u64,
     last_nmi: bool,
-    nmi_length: u32,
     ppudata_buffer: u8,
     last_cpu_data: u8,
     last_cpu_counter: [u32; 2],
     oam: [u8; 256],
     oamaddress: u8,
+    cycle1_done: bool,
 }
 
 const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
@@ -153,18 +153,23 @@ impl NesPpu {
             #[cfg(any(test, debug_assertions))]
             frame_number: 0,
             last_nmi: false,
-            nmi_length: 0,
             ppudata_buffer: 0,
             last_cpu_data: 0,
             last_cpu_counter: [0, 0],
             oam: oam,
             oamaddress: 0,
+            cycle1_done: false,
         }
     }
 
     #[cfg(any(test, debug_assertions))]
     pub fn frame_number(&self) -> u64 {
         self.frame_number
+    }
+
+    pub fn reset(&mut self) {
+        self.registers[0] = 0;
+        self.registers[1] = 0;
     }
 
     pub fn read(&mut self, addr: u16) -> Option<u8> {
@@ -292,7 +297,7 @@ impl NesPpu {
     }
 
     fn should_render_background(&self, cycle: u16) -> bool {
-        if cycle == 0 {
+        if cycle < 8 {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
         } else {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
@@ -325,12 +330,14 @@ impl NesPpu {
         match (cycle / 2) % 4 {
             0 => {
                 if (cycle & 1) == 0 {
-                    //nametable byte
-                    let base = self.nametable_base();
-                    let offset = (y / 8) << 5 | (x / 8);
-                    bus.ppu_cycle_1(base + offset);
-                } else {
+                        //nametable byte
+                        let base = self.nametable_base();
+                        let offset = (y / 8) << 5 | (x / 8);
+                        bus.ppu_cycle_1(base + offset);
+                        self.cycle1_done = true;
+                } else if self.cycle1_done {
                     self.nametable_data = bus.ppu_cycle_2_read();
+                    self.cycle1_done = false;
                 }
             }
             1 => {
@@ -339,8 +346,10 @@ impl NesPpu {
                     let base = self.attributetable_base();
                     let offset = (y / 32) << 3 | (x / 32);
                     bus.ppu_cycle_1(base + offset);
-                } else {
+                    self.cycle1_done = true;
+                } else if self.cycle1_done {
                     self.attributetable_data = bus.ppu_cycle_2_read();
+                    self.cycle1_done = false;
                 }
             }
             2 => {
@@ -350,22 +359,26 @@ impl NesPpu {
                     let offset = (self.nametable_data as u16) << 4;
                     let calc = base + offset + self.scanline_number % 8;
                     bus.ppu_cycle_1(calc);
-                } else {
+                    self.cycle1_done = true;
+                } else if self.cycle1_done {
                     let mut pt = self.patterntable_tile.to_le_bytes();
                     pt[0] = bus.ppu_cycle_2_read();
                     self.patterntable_tile = u16::from_le_bytes(pt);
+                    self.cycle1_done = false;
                 }
             }
             3 => {
                 //pattern table tile high
                 if (cycle & 1) == 0 {
-                    let base = self.patterntable_base();
-                    let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + self.scanline_number % 8;
-                    bus.ppu_cycle_1(calc);
-                } else {
+                        let base = self.patterntable_base();
+                        let offset = (self.nametable_data as u16) << 4;
+                        let calc = 8 + base + offset + self.scanline_number % 8;
+                        bus.ppu_cycle_1(calc);
+                        self.cycle1_done = true;
+                } else if self.cycle1_done {
                     let mut pt = self.patterntable_tile.to_le_bytes();
                     pt[1] = bus.ppu_cycle_2_read();
+                    self.cycle1_done = false;
                     self.patterntable_tile = u16::from_le_bytes(pt);
                     self.attributetable_shift[0] = self.attributetable_shift[1];
                     self.attributetable_shift[1] = self.attributetable_data;
@@ -380,13 +393,15 @@ impl NesPpu {
     fn idle_operation(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
         if (cycle & 1) == 0 {
             if let Some(a) = self.pend_vram_write {
-                bus.ppu_cycle_1(self.vram_address);
-                self.pend_vram_data = Some(a);
-                self.pend_vram_write = None;
+                    bus.ppu_cycle_1(self.vram_address);
+                    self.cycle1_done = true;
+                    self.pend_vram_data = Some(a);
+                    self.pend_vram_write = None;
             }
-        } else {
+        } else if self.cycle1_done {
             if let Some(a) = self.pend_vram_data {
                 bus.ppu_cycle_2_write(a);
+                self.cycle1_done = false;
                 if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
                     self.vram_address = self.vram_address.wrapping_add(1);
                 } else {
@@ -421,12 +436,6 @@ impl NesPpu {
         if self.scanline_number < 240 {
             if self.scanline_cycle == 0 {
                 //idle cycle
-                let cycle = self.scanline_cycle;
-                if (cycle & 1) == 0 {
-                    bus.ppu_cycle_1(0); //TODO put in proper address here
-                } else {
-                    bus.ppu_cycle_2_read();
-                }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
@@ -484,95 +493,98 @@ impl NesPpu {
             } else if self.scanline_cycle <= 320 {
                 //sprite rendering data to be fetched
                 let cycle = self.scanline_cycle - 257;
-                if self.should_render_sprites(cycle) {
-                    match (cycle / 2) % 4 {
-                        0 => {
-                            if (cycle & 1) == 0 {
-                                //nametable byte
-                                let base = self.nametable_base();
-                                let x = cycle / 8;
-                                let y = self.scanline_number / 8;
-                                let offset = y << 5 | x;
-                                bus.ppu_cycle_1(base + offset); //TODO verify this calculation
-                            } else {
-                                bus.ppu_cycle_2_read();
+                if cycle > 0 {
+                    if self.should_render_sprites(cycle) {
+                        match (cycle / 2) % 4 {
+                            0 => {
+                                if (cycle & 1) == 0 {
+                                    //nametable byte
+                                    let base = self.nametable_base();
+                                    let x = cycle / 8;
+                                    let y = self.scanline_number / 8;
+                                    let offset = y << 5 | x;
+                                    bus.ppu_cycle_1(base + offset); //TODO verify this calculation
+                                    self.cycle1_done = true;
+                                } else if self.cycle1_done {
+                                    bus.ppu_cycle_2_read();
+                                    self.cycle1_done = false;
+                                }
                             }
-                        }
-                        1 => {
-                            if (cycle & 1) == 0 {
-                                //nametable byte
-                                let base = self.nametable_base();
-                                let x = cycle / 8;
-                                let y = self.scanline_number / 8;
-                                let offset = y << 5 | x;
-                                bus.ppu_cycle_1(base + offset); //TODO verify this calculation
-                            } else {
-                                bus.ppu_cycle_2_read();
+                            1 => {
+                                if (cycle & 1) == 0 {
+                                    //nametable byte
+                                    let base = self.nametable_base();
+                                    let x = cycle / 8;
+                                    let y = self.scanline_number / 8;
+                                    let offset = y << 5 | x;
+                                    bus.ppu_cycle_1(base + offset); //TODO verify this calculation
+                                    self.cycle1_done = true;
+                                } else if self.cycle1_done {
+                                    bus.ppu_cycle_2_read();
+                                    self.cycle1_done = false;
+                                }
                             }
-                        }
-                        2 => {
-                            //pattern table tile low
-                            if (cycle & 1) == 0 {
-                                let base = 0; //TODO calculate this correctly
-                                let offset = cycle % 8; //TODO calculate this value correctly
-                                bus.ppu_cycle_1(base + offset);
-                            } else {
-                                let mut pt = self.patterntable_tile.to_le_bytes();
-                                pt[0] = bus.ppu_cycle_2_read();
-                                self.patterntable_tile = u16::from_le_bytes(pt);
+                            2 => {
+                                //pattern table tile low
+                                if (cycle & 1) == 0 {
+                                    let base = 0; //TODO calculate this correctly
+                                    let offset = cycle % 8; //TODO calculate this value correctly
+                                    bus.ppu_cycle_1(base + offset);
+                                    self.cycle1_done = true;
+                                } else if self.cycle1_done {
+                                    let mut pt = self.patterntable_tile.to_le_bytes();
+                                    pt[0] = bus.ppu_cycle_2_read();
+                                    self.patterntable_tile = u16::from_le_bytes(pt);
+                                    self.cycle1_done = false;
+                                }
                             }
-                        }
-                        3 => {
-                            //pattern table tile high
-                            if (cycle & 1) == 0 {
-                                let base = 0; //TODO calculate this correctly
-                                let offset = cycle % 8; //TODO calculate this value correctly
-                                bus.ppu_cycle_1(base + offset);
-                            } else {
-                                let mut pt = self.patterntable_tile.to_le_bytes();
-                                pt[1] = bus.ppu_cycle_2_read();
-                                self.patterntable_tile = u16::from_le_bytes(pt);
+                            3 => {
+                                //pattern table tile high
+                                if (cycle & 1) == 0 {
+                                    let base = 0; //TODO calculate this correctly
+                                    let offset = cycle % 8; //TODO calculate this value correctly
+                                    bus.ppu_cycle_1(base + offset);
+                                    self.cycle1_done = true;
+                                } else if self.cycle1_done {
+                                    let mut pt = self.patterntable_tile.to_le_bytes();
+                                    pt[1] = bus.ppu_cycle_2_read();
+                                    self.patterntable_tile = u16::from_le_bytes(pt);
+                                    self.cycle1_done = false
+                                }
                             }
+                            _ => {}
                         }
-                        _ => {}
+                    } else {
+                        self.idle_operation(bus, self.scanline_cycle-1);
                     }
-                } else {
-                    self.idle_operation(bus, self.scanline_cycle);
                 }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
-                //self.background_fetch(bus, cycle);
-                self.idle_operation(bus, self.scanline_cycle);
+                if cycle > 0 {
+                    //self.background_fetch(bus, cycle);
+                    self.idle_operation(bus, self.scanline_cycle-1);
+                }
                 self.increment_scanline_cycle();
             } else {
                 //do nothing
                 let cycle = self.scanline_cycle - 337;
-                match (cycle / 2) % 2 {
-                    0 => {
-                        if (cycle & 1) == 0 {
-                            let base = 0; //TODO calculate this correctly
-                            let offset = cycle % 8; //TODO calculate this value correctly
-                            bus.ppu_cycle_1(base + offset);
-                        } else {
-                            bus.ppu_cycle_2_read();
-                        }
-                    }
-                    _ => {
-                        if (cycle & 1) == 0 {
-                            let base = 0; //TODO calculate this correctly
-                            let offset = cycle % 8; //TODO calculate this value correctly
-                            bus.ppu_cycle_1(base + offset);
-                        } else {
-                            bus.ppu_cycle_2_read();
-                        }
-                    }
+                if (cycle & 1) == 0 {
+                    let base = 0; //TODO calculate this correctly
+                    let offset = cycle % 8; //TODO calculate this value correctly
+                    bus.ppu_cycle_1(base + offset);
+                    self.cycle1_done = true;
+                } else if self.cycle1_done {
+                    bus.ppu_cycle_2_read();
+                    self.cycle1_done = false;
                 }
                 self.increment_scanline_cycle();
             }
         } else if self.scanline_number == 240 {
-            self.idle_operation(bus, self.scanline_cycle);
+            if self.scanline_cycle > 0 {
+                self.idle_operation(bus, self.scanline_cycle-1);
+            }
             self.increment_scanline_cycle();
         } else if self.scanline_number <= 260 {
             //vblank lines
@@ -584,14 +596,18 @@ impl NesPpu {
                     self.frame_number = self.frame_number.wrapping_add(1);
                 }
             }
-            self.idle_operation(bus, self.scanline_cycle);
+            if self.scanline_cycle > 0 {
+                self.idle_operation(bus, self.scanline_cycle-1);
+            }
             self.increment_scanline_cycle();
         } else {
             if self.scanline_number == 261 && self.scanline_cycle == 1 {
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
             //TODO make memory accesses here
-            self.idle_operation(bus, self.scanline_cycle);
+            if self.scanline_cycle > 0 {
+                self.idle_operation(bus, self.scanline_cycle-1);
+            }
             self.increment_scanline_cycle();
         }
         if self.vblank_clear {
@@ -601,14 +617,6 @@ impl NesPpu {
         self.last_nmi = self.vblank_nmi;
         self.vblank_nmi = ((self.registers[2] & 0x80) != 0)
             & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
-        if self.vblank_nmi {
-            self.nmi_length += 1;
-        } else {
-            if self.nmi_length != 0 {
-                println!("NMI LENGTH {}", self.nmi_length);
-            }
-            self.nmi_length = 0;
-        }
     }
 
     pub fn get_frame_end(&mut self) -> bool {
