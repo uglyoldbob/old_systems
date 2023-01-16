@@ -29,6 +29,7 @@ pub struct NesPpu {
     oam: [u8; 256],
     oamaddress: u8,
     cycle1_done: bool,
+    debug_special: bool,
 }
 
 const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
@@ -159,6 +160,7 @@ impl NesPpu {
             oam: oam,
             oamaddress: 0,
             cycle1_done: false,
+            debug_special: false,
         }
     }
 
@@ -206,6 +208,14 @@ impl NesPpu {
             7 => match self.vram_address {
                 0..=0x3eff => {
                     self.pend_vram_read = Some(self.vram_address);
+                    if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
+                        self.vram_address = self.vram_address.wrapping_add(1);
+                    } else {
+                        self.vram_address = self.vram_address.wrapping_add(32);
+                    }
+                    self.last_cpu_data = self.ppudata_buffer;
+                    self.last_cpu_counter[0] = 893420;
+                    self.last_cpu_counter[1] = 893420;
                     Some(self.ppudata_buffer)
                 }
                 _ => {
@@ -236,6 +246,9 @@ impl NesPpu {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
                     match addr {
+                        5 => {
+                            self.address_bit = !self.address_bit;
+                        }
                         6 => {
                             if !self.address_bit {
                                 self.registers[addr as usize] = data;
@@ -265,6 +278,8 @@ impl NesPpu {
                     }
                     _ => {}
                 }
+            }
+            2 => {
             }
             _ => {
                 self.registers[addr as usize] = data;
@@ -434,14 +449,8 @@ impl NesPpu {
                 }
                 self.pend_vram_write = None;
             }
-            else if let Some(a) = self.pend_vram_read {
+            else if let Some(_a) = self.pend_vram_read {
                 self.ppudata_buffer = bus.ppu_cycle_2_read();
-                match a {
-                    0x2000..=0x3eff => {
-                        self.last_cpu_data = self.ppudata_buffer;
-                    }
-                    _ => {}
-                }
                 self.cycle1_done = false;
                 self.pend_vram_read = None;
             }
