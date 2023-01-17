@@ -365,3 +365,37 @@ fn ppu_test4() {
     }
     assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
 }
+
+#[test]
+fn cpu_test_dummy_writes_oam() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./cpu_dummy_writes_oam.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 350 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(833, "0ASSED".to_string().as_bytes()));
+}
+
+#[test]
+fn cpu_test_dummy_writes_ppu() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./cpu_dummy_writes_ppumem.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(769, "0ASSED".to_string().as_bytes()));
+}
