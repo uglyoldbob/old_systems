@@ -170,7 +170,10 @@ impl NesMemoryBus for NesMotherboard {
                     0x4014 => {
                     }
                     _ => {
-                        println!("TODO implement functionality {:x}", addr);
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("TODO implement functionality {:x}", addr);
+                        }
                     }
                 }
                 if let Some(cart) = &mut self.cart {

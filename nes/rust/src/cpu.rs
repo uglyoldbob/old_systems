@@ -5562,12 +5562,10 @@ impl NesCpu {
                     0xff => match self.subcycle {
                         1 => {
                             self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            println!("opcode 0xff: {:x}", self.temp);
                             self.subcycle = 2;
                         }
                         2 => {
                             self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            println!("opcode 0xff: {:x} {:x}", self.temp, self.temp2);
                             self.subcycle = 3;
                         }
                         3 => {
@@ -5581,14 +5579,12 @@ impl NesCpu {
                         }
                         5 => {
                             self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            println!("TEST WRITE {:x} to {:x}", self.tempaddr, self.temp);
                             self.temp = self.temp.wrapping_add(1);
                             self.subcycle = 6;
                         }
                         _ => {
                             self.cpu_sbc(self.temp);
                             self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            println!("TEST WRITE2 {:x} to {:x}", self.tempaddr, self.temp);
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
                         }

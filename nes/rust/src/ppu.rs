@@ -172,7 +172,10 @@ impl NesPpu {
     pub fn reset(&mut self) {
         self.registers[0] = 0;
         self.registers[1] = 0;
-        self.frame_number = 0;
+        #[cfg(any(test, debug_assertions))]
+        {
+            self.frame_number = 0;
+        }
     }
 
     pub fn vram_address(&self) -> u16 {
