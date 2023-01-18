@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+pub mod apu;
 pub mod cartridge;
 pub mod cpu;
 pub mod emulator_data;
@@ -225,7 +226,10 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge("./nes/rust/nestest.nes".to_string()).unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "C:/Users/thoma/Documents/nes-test-roms/apu_test/apu_test.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);

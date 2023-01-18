@@ -48,7 +48,7 @@ cpu_timing_test6
 
 dmc_dma_during_read4
  - dma_2007_read - not sure how to interpret results
- - dma_2007_write - pass
+ - dma_2007_write - fail due to apu
  - dma_4016_read - appears to do nothing
  - double_2007_read - pass?
  - read_write_2007 - fail

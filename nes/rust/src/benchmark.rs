@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod apu;
 pub mod cartridge;
 pub mod cpu;
 pub mod emulator_data;
@@ -10,6 +11,7 @@ pub mod utility;
 use crate::cartridge::NesCartridge;
 use crate::cpu::{NesCpu, NesCpuPeripherals};
 use crate::motherboard::NesMotherboard;
+use crate::apu::NesApu;
 use crate::ppu::NesPpu;
 use crate::utility::convert_hex_to_decimal;
 use emulator_data::NesEmulatorData;
@@ -46,7 +48,8 @@ pub fn cpu_bench(c: &mut Criterion) {
             || {
                 let cpu: NesCpu = NesCpu::new();
                 let ppu: NesPpu = NesPpu::new();
-                let cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu);
+                let apu: NesApu = NesApu::new();
+                let cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu, apu);
                 let mut mb: NesMotherboard = NesMotherboard::new();
                 let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
                 let goldenlog = std::fs::File::open("./nestest.log").unwrap();

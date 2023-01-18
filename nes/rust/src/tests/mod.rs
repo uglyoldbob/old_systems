@@ -1,5 +1,6 @@
 use std::io::BufRead;
 
+use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
 use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
@@ -47,7 +48,8 @@ fn check_nes_roms() {
 fn basic_cpu_test() {
     let mut cpu: NesCpu = NesCpu::new();
     let ppu: NesPpu = NesPpu::new();
-    let mut cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu);
+    let apu: NesApu = NesApu::new();
+    let mut cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu, apu);
     let mut mb: NesMotherboard = NesMotherboard::new();
     let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
     let goldenlog = std::fs::File::open("./nestest.log").unwrap();

@@ -1,4 +1,5 @@
 use crate::{
+    apu::NesApu,
     cartridge::NesCartridge,
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
@@ -26,10 +27,11 @@ impl NesEmulatorData {
     pub fn new() -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
+        let apu = NesApu::new();
 
         Self {
             cpu: NesCpu::new(),
-            cpu_peripherals: NesCpuPeripherals::new(ppu),
+            cpu_peripherals: NesCpuPeripherals::new(ppu, apu),
             mb: mb,
             #[cfg(debug_assertions)]
             paused: false,
@@ -51,6 +53,7 @@ impl NesEmulatorData {
     pub fn reset(&mut self) {
         self.cpu.reset();
         self.cpu_peripherals.ppu_reset();
+        self.cpu_peripherals.apu.reset();
     }
 
     pub fn insert_cartridge(&mut self, cart: NesCartridge) {

@@ -103,6 +103,18 @@ impl NesMemoryBus for NesMotherboard {
             }
             0x4000..=0x4017 => {
                 //apu and io
+                match addr {
+                    0x4000..=0x4014 => {}
+                    0x4015 => {
+                        response = per.apu.read(addr & 0x1f);
+                    }
+                    _ => {
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("TODO implement read for {:x}", addr);
+                        }
+                    }
+                }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -169,10 +181,7 @@ impl NesMemoryBus for NesMotherboard {
                 match addr {
                     0x4014 => {}
                     _ => {
-                        #[cfg(debug_assertions)]
-                        {
-                            println!("TODO implement functionality {:x}", addr);
-                        }
+                        per.apu.write(addr & 0x1f, data);
                     }
                 }
                 if let Some(cart) = &mut self.cart {
@@ -180,7 +189,7 @@ impl NesMemoryBus for NesMotherboard {
                 }
             }
             0x4018..=0x401f => {
-                //disabled apu and oi functionality
+                //disabled apu and io functionality
                 //test mode
                 //println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
