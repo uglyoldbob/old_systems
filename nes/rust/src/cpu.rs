@@ -89,6 +89,7 @@ pub struct NesCpu {
     interrupting: bool,
     oamdma: Option<u8>,
     dma_counter: u16,
+    outs: [bool; 3],
 }
 
 const CPU_FLAG_CARRY: u8 = 1;
@@ -127,6 +128,7 @@ impl NesCpu {
             interrupting: false,
             oamdma: None,
             dma_counter: 0,
+            outs: [false; 3],
         }
     }
 
@@ -227,12 +229,8 @@ impl NesCpu {
         }
     }
 
-    fn calc_out(&mut self, _addr: u16) -> [bool; 3] {
-        [false; 3]
-    }
-
     fn calc_oe(&mut self, addr: u16) -> [bool; 2] {
-        [addr == 0x4016, addr == 0x4017]
+        [addr != 0x4016, addr != 0x4017]
     }
 
     fn memory_cycle_read(
@@ -241,12 +239,7 @@ impl NesCpu {
         bus: &mut dyn NesMemoryBus,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) -> u8 {
-        bus.memory_cycle_read(
-            addr,
-            self.calc_out(addr),
-            self.calc_oe(addr),
-            cpu_peripherals,
-        )
+        bus.memory_cycle_read(addr, self.outs, self.calc_oe(addr), cpu_peripherals)
     }
 
     fn memory_cycle_write(
@@ -258,14 +251,12 @@ impl NesCpu {
     ) {
         if addr == 0x4014 {
             self.oamdma = Some(data);
+        } else if addr == 0x4016 {
+            self.outs[0] = (data & 1) != 0;
+            self.outs[1] = (data & 2) != 0;
+            self.outs[2] = (data & 4) != 0;
         }
-        bus.memory_cycle_write(
-            addr,
-            data,
-            self.calc_out(addr),
-            self.calc_oe(addr),
-            cpu_peripherals,
-        );
+        bus.memory_cycle_write(addr, data, self.outs, [true; 2], cpu_peripherals);
     }
 
     #[cfg(debug_assertions)]
@@ -481,9 +472,8 @@ impl NesCpu {
                     if self.dma_counter == 512 {
                         self.oamdma = None;
                         self.dma_counter = 0;
-                    }
-                    else if (self.dma_counter & 1) == 0 {
-                        let addr = (addr as u16)<<8 | (self.dma_counter>>1);
+                    } else if (self.dma_counter & 1) == 0 {
+                        let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
                         self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                         self.dma_counter += 1;
                     } else {
@@ -1911,6 +1901,7 @@ impl NesCpu {
                     //iny, increment y
                     0xc8 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.y = self.y.wrapping_add(1);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.y & 0x80) != 0 {
@@ -1926,6 +1917,7 @@ impl NesCpu {
                     //inx, increment x
                     0xe8 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.x = self.x.wrapping_add(1);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.x & 0x80) != 0 {
@@ -2081,6 +2073,7 @@ impl NesCpu {
                     //dey, decrement y
                     0x88 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.y = self.y.wrapping_sub(1);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.y & 0x80) != 0 {
@@ -2096,6 +2089,7 @@ impl NesCpu {
                     //dex, decrement x
                     0xca => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.x = self.x.wrapping_sub(1);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.x & 0x80) != 0 {
@@ -2111,6 +2105,7 @@ impl NesCpu {
                     //tay, transfer accumulator to y
                     0xa8 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.y = self.a;
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.y & 0x80) != 0 {
@@ -2126,6 +2121,7 @@ impl NesCpu {
                     //tax, transfer accumulator to x
                     0xaa => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.x = self.a;
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.x & 0x80) != 0 {
@@ -2141,6 +2137,7 @@ impl NesCpu {
                     //tya, transfer y to accumulator
                     0x98 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.a = self.y;
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.a & 0x80) != 0 {
@@ -2156,6 +2153,7 @@ impl NesCpu {
                     //txa, transfer x to accumulator
                     0x8a => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.a = self.x;
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.a & 0x80) != 0 {
@@ -2171,6 +2169,7 @@ impl NesCpu {
                     //tsx, transfer stack pointer to x
                     0xba => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.x = self.s;
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.x & 0x80) != 0 {
@@ -2186,6 +2185,7 @@ impl NesCpu {
                     //txs, transfer x to stack pointer
                     0x9a => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.s = self.x;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -3480,6 +3480,7 @@ impl NesCpu {
                     //lsr logical shift right, accumulator
                     0x4a => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.a & 1) != 0 {
                                 self.p |= CPU_FLAG_CARRY;
@@ -3650,6 +3651,7 @@ impl NesCpu {
                     //asl, arithmetic shift left accumulator
                     0x0a => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_CARRY;
@@ -3820,6 +3822,7 @@ impl NesCpu {
                     //ror rotate right accumulator
                     0x6a => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
                             self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.a & 1) != 0 {
@@ -4010,6 +4013,7 @@ impl NesCpu {
                     //rol accumulator
                     0x2a => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
                             self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if (self.a & 0x80) != 0 {
@@ -4200,26 +4204,27 @@ impl NesCpu {
                     //rti, return from interrupt
                     0x40 => match self.subcycle {
                         1 => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.s = self.s.wrapping_add(1);
+                            self.subcycle = 2;
+                        }
+                        2 => {
                             self.p =
                                 self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
                             self.p = self.p & !CPU_FLAG_B1;
                             self.p |= CPU_FLAG_B2;
-                            self.subcycle = 2;
-                        }
-                        2 => {
                             self.s = self.s.wrapping_add(1);
-                            self.temp =
-                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
                             self.subcycle = 3;
                         }
                         3 => {
-                            self.s = self.s.wrapping_add(1);
-                            self.temp2 =
+                            self.temp =
                                 self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                            self.s = self.s.wrapping_add(1);
                             self.subcycle = 4;
                         }
                         4 => {
+                            self.temp2 =
+                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
                             self.pc = (self.temp2 as u16) << 8 | self.temp as u16;
                             self.subcycle = 5;
                         }
@@ -4355,6 +4360,7 @@ impl NesCpu {
                     //clv, clear overflow flag
                     0xb8 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p &= !CPU_FLAG_OVERFLOW;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -4363,6 +4369,7 @@ impl NesCpu {
                     //sec set carry flag
                     0x38 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p |= CPU_FLAG_CARRY;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -4371,6 +4378,7 @@ impl NesCpu {
                     //sei set interrupt disable flag
                     0x78 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p |= CPU_FLAG_INT_DISABLE;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -4379,6 +4387,7 @@ impl NesCpu {
                     //sed set decimal flag
                     0xf8 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p |= CPU_FLAG_DECIMAL;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -4387,6 +4396,7 @@ impl NesCpu {
                     //cld, clear decimal flag
                     0xd8 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p &= !CPU_FLAG_DECIMAL;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -4395,6 +4405,7 @@ impl NesCpu {
                     //clc clear carry flag
                     0x18 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p &= !CPU_FLAG_CARRY;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -4403,6 +4414,7 @@ impl NesCpu {
                     //cli clear interrupt disable
                     0x58 => match self.subcycle {
                         _ => {
+                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             self.p &= !CPU_FLAG_INT_DISABLE;
                             self.pc = self.pc.wrapping_add(1);
                             self.end_instruction();
@@ -6141,7 +6153,7 @@ impl NesCpu {
                             self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
                             self.subcycle = 4;
                         }
-                        4 => {                            
+                        4 => {
                             self.subcycle = 5;
                         }
                         5 => {
@@ -6448,7 +6460,7 @@ impl NesCpu {
                             self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
                             self.subcycle = 4;
                         }
-                        4 => {                            
+                        4 => {
                             self.subcycle = 5;
                         }
                         5 => {
@@ -6499,7 +6511,7 @@ impl NesCpu {
                                 self.p |= CPU_FLAG_CARRY;
                             }
                             self.temp = self.temp >> 1;
-                            
+
                             self.a = self.a ^ self.temp;
                             if self.a == 0 {
                                 self.p |= CPU_FLAG_ZERO;

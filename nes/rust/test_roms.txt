@@ -1,3 +1,192 @@
-blargg_nes_cpu_test5/cpu
+240pee
+ - require mappers 2 and 34
+
+apu_mixer
+ - apu not implemented yet
+
+apu_reset
+ - apu not implemented yet
+
+apu_test
+ - apu not implemented yet
+
+blargg_apu_2005.07.30
+ - apu not implemented yet
+
+blargg_litewall
+ - causes a lot of ppu cycling errors
+
+blargg_nes_cpu_test5
  - does not seem to make progress after printing Running tests
  - maybe uses sprites?
+
+blargg_ppu_tests_2005.09.15b
+ - all pass
+
+branch_timing_tests
+ - all pass
+
+cpu_dummy_reads
+ - requires mapper 3
+
+cpu_dummy_writes
+ - all pass
+
+cpu_exec_space
+ - ppu passes
+ - apu not implemented
+
+cpu_interrupts_v2
+ - requires apu, not implemented
+
+cpu_reset
+ - ram_after_reset - crashes with invalid opcode after reset
+ - registers - unsure of status - does not print to screen
+
+cpu_timing_test6
+ - pass
+
+dmc_dma_during_read4
+ - dma_2007_read - not sure how to interpret results
+ - dma_2007_write - pass
+ - dma_4016_read - appears to do nothing
+ - double_2007_read - pass?
+ - read_write_2007 - fail
+
+dmc_tests
+ - they most likely require the apu to be implemented
+
+dpcmletterbox
+ - requires apu implementation
+
+exram
+ - requires mapper 5
+
+full_palette
+ - not sure how to interpret results
+
+instr_misc
+ - fails due to missing apu implementation
+
+instr_test-v3
+ - appears to not work?
+
+instr_test-v5
+ - appears to not work?
+
+instr_timing
+ - requires apu implementation
+
+m22chrbankingtest
+ - ines2 rom, not currently supported
+
+mmc1_a12
+ - crashes by accessing out of range ppu memory on the cartridge
+
+mmc3_irq_tests
+ - requires mapper 3?
+
+mmc3_test
+ - requires mapper 3?
+
+mmc3_test_2
+ - requires mapper 3?
+
+mmc5test
+ - requires mapper 5?
+
+mmc5test_v2
+ - requires mapper 5?
+
+nes_instr_test
+ - untested
+
+nes15-1.0.0
+ - not really a test rom
+
+nmi_sync
+ - ntsc versions creates ppu cycling errors
+
+nrom368
+ - unknown results
+
+ny2011
+ - not sure how to determine pass/fail
+
+oamread
+ - pass
+
+oam_stress
+ - pass
+
+other
+ - not checked
+
+paddletest3
+ - probably requires controllers to work
+
+pal_apu_tests
+ - apu not implemented
+
+ppu_open_bus
+ - pass
+
+ppu_read_buffer
+ - requires mapper 3
+
+ppu_vbl_nmi
+ - fail #3, test 1
+
+read_joy3
+ - they all require mapper 3
+
+scanline
+ - appears to fail
+
+scanline-a1
+ - appears to fail
+
+scrolltest
+ - no video output, fail
+
+soundtest
+ - apu not implemented
+
+sprdma_and_dmc_dma
+ - apu not implemented
+
+sprite_hit_tests_2005.10.05
+ - sprites not implemented
+
+sprite_overflow_tests
+ - sprites not implemented
+
+spritecans-2011
+ - requires sprites and apu
+
+stars_se
+ - not really a test
+
+stomper
+ - requires mapper 4
+
+stress
+ - requires controller controller input
+
+tutor
+ - no video output
+
+tvpassfail
+ - requires controller input
+
+vaus-test
+ - requires implementation for vaus controller
+
+vbl_nmi_timing
+ - all pass
+
+volume_tests
+ - require apu implementation
+
+window5
+ - ntsc version creates ppu cycling errors

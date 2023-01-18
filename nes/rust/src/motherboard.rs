@@ -167,8 +167,7 @@ impl NesMemoryBus for NesMotherboard {
             0x4000..=0x4017 => {
                 //apu and io
                 match addr {
-                    0x4014 => {
-                    }
+                    0x4014 => {}
                     _ => {
                         #[cfg(debug_assertions)]
                         {

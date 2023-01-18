@@ -274,16 +274,13 @@ impl NesPpu {
                 self.oam[self.oamaddress as usize] = data;
                 self.oamaddress = self.oamaddress.wrapping_add(1);
             }
-            7 => {
-                match self.vram_address {
-                    0 ..= 0x3eff => {
-                        self.pend_vram_write = Some(data);
-                    }
-                    _ => {}
+            7 => match self.vram_address {
+                0..=0x3eff => {
+                    self.pend_vram_write = Some(data);
                 }
-            }
-            2 => {
-            }
+                _ => {}
+            },
+            2 => {}
             _ => {
                 self.registers[addr as usize] = data;
             }
@@ -371,11 +368,11 @@ impl NesPpu {
         match (cycle / 2) % 4 {
             0 => {
                 if (cycle & 1) == 0 {
-                        //nametable byte
-                        let base = self.nametable_base();
-                        let offset = (y / 8) << 5 | (x / 8);
-                        bus.ppu_cycle_1(base + offset);
-                        self.cycle1_done = true;
+                    //nametable byte
+                    let base = self.nametable_base();
+                    let offset = (y / 8) << 5 | (x / 8);
+                    bus.ppu_cycle_1(base + offset);
+                    self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.nametable_data = bus.ppu_cycle_2_read();
                     self.cycle1_done = false;
@@ -411,11 +408,11 @@ impl NesPpu {
             3 => {
                 //pattern table tile high
                 if (cycle & 1) == 0 {
-                        let base = self.patterntable_base();
-                        let offset = (self.nametable_data as u16) << 4;
-                        let calc = 8 + base + offset + self.scanline_number % 8;
-                        bus.ppu_cycle_1(calc);
-                        self.cycle1_done = true;
+                    let base = self.patterntable_base();
+                    let offset = (self.nametable_data as u16) << 4;
+                    let calc = 8 + base + offset + self.scanline_number % 8;
+                    bus.ppu_cycle_1(calc);
+                    self.cycle1_done = true;
                 } else if self.cycle1_done {
                     let mut pt = self.patterntable_tile.to_le_bytes();
                     pt[1] = bus.ppu_cycle_2_read();
@@ -436,8 +433,7 @@ impl NesPpu {
             if let Some(_a) = self.pend_vram_write {
                 bus.ppu_cycle_1(self.vram_address);
                 self.cycle1_done = true;
-            }
-            else if let Some(a) = self.pend_vram_read {
+            } else if let Some(a) = self.pend_vram_read {
                 bus.ppu_cycle_1(a & 0x2fff);
                 self.cycle1_done = true;
             }
@@ -451,8 +447,7 @@ impl NesPpu {
                     self.vram_address = self.vram_address.wrapping_add(32);
                 }
                 self.pend_vram_write = None;
-            }
-            else if let Some(_a) = self.pend_vram_read {
+            } else if let Some(_a) = self.pend_vram_read {
                 self.ppudata_buffer = bus.ppu_cycle_2_read();
                 self.cycle1_done = false;
                 self.pend_vram_read = None;
@@ -508,7 +503,7 @@ impl NesPpu {
                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                         palette_entry &= 0x30;
                     }
-                    let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry);
+                    let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
                     if (self.registers[1]
                         & (PPU_REGISTER1_EMPHASIZE_BLUE
                             | PPU_REGISTER1_EMPHASIZE_GREEN
@@ -603,7 +598,7 @@ impl NesPpu {
                             _ => {}
                         }
                     } else {
-                        self.idle_operation(bus, self.scanline_cycle-1);
+                        self.idle_operation(bus, self.scanline_cycle - 1);
                     }
                 }
                 self.increment_scanline_cycle();
@@ -612,7 +607,7 @@ impl NesPpu {
                 let cycle = self.scanline_cycle - 321;
                 if cycle > 0 {
                     //self.background_fetch(bus, cycle);
-                    self.idle_operation(bus, self.scanline_cycle-1);
+                    self.idle_operation(bus, self.scanline_cycle - 1);
                 }
                 self.increment_scanline_cycle();
             } else {
@@ -631,7 +626,7 @@ impl NesPpu {
             }
         } else if self.scanline_number == 240 {
             if self.scanline_cycle > 0 {
-                self.idle_operation(bus, self.scanline_cycle-1);
+                self.idle_operation(bus, self.scanline_cycle - 1);
             }
             self.increment_scanline_cycle();
         } else if self.scanline_number <= 260 {
@@ -645,7 +640,7 @@ impl NesPpu {
                 }
             }
             if self.scanline_cycle > 0 {
-                self.idle_operation(bus, self.scanline_cycle-1);
+                self.idle_operation(bus, self.scanline_cycle - 1);
             }
             self.increment_scanline_cycle();
         } else {
@@ -653,7 +648,7 @@ impl NesPpu {
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
             if self.scanline_cycle > 0 {
-                self.idle_operation(bus, self.scanline_cycle-1);
+                self.idle_operation(bus, self.scanline_cycle - 1);
             }
             self.increment_scanline_cycle();
         }
