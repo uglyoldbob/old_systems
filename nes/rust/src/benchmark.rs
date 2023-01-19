@@ -8,10 +8,10 @@ pub mod motherboard;
 pub mod ppu;
 pub mod utility;
 
+use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
 use crate::cpu::{NesCpu, NesCpuPeripherals};
 use crate::motherboard::NesMotherboard;
-use crate::apu::NesApu;
 use crate::ppu::NesPpu;
 use crate::utility::convert_hex_to_decimal;
 use emulator_data::NesEmulatorData;

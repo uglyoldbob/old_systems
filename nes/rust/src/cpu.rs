@@ -181,6 +181,7 @@ impl NesCpu {
     pub fn reset(&mut self) {
         self.s -= 3;
         self.p |= 4; //set IRQ disable flag
+        self.pc = 0xfffc;
         self.reset = true;
         #[cfg(debug_assertions)]
         {
@@ -3653,7 +3654,7 @@ impl NesCpu {
                             self.a = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
                             #[cfg(debug_assertions)]
                             {
-                                self.disassembly = format!("LDA #${:02x}", self.temp);
+                                self.disassembly = format!("LDA #${:02x}", self.a);
                                 self.done_fetching = true;
                             }
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);

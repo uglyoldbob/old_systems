@@ -486,3 +486,122 @@ fn oam_stress() {
     }
     assert!(nes_data.mb.check_vram(673, "Passed".to_string().as_bytes()));
 }
+
+#[test]
+fn apu_test1() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./01.len_ctr.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test2() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./02.len_table.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test3() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./03.irq_flag.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test4() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./04.clock_jitter.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test5() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./05.len_timing_mode0.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test6() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./06.len_timing_mode1.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test7() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./07.irq_flag_timing.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
