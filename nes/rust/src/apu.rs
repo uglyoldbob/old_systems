@@ -75,9 +75,12 @@ impl NesApu {
 
     pub fn clock_fast(&mut self) {}
 
+    pub fn irq(&self) -> bool {
+        (self.registers[0x15] & 0xc0) != 0 && (self.registers[0x17] & 0x40) == 0
+    }
+
     fn set_interrupt_flag(&mut self) {
         if (self.registers[0x17] & 0x40) == 0 {
-            println!("Set interrupt flag at {} {}", self.frame_sequencer_clock, self.clock);
             self.registers[0x15] |= 0x40;
         }
     }
@@ -237,7 +240,6 @@ impl NesApu {
                     self.half_frame();
                 }
                 if (data & 0x40) != 0 {
-                    println!("clear interrup flag");
                     self.registers[0x15] &= !0x40;
                 }
             }
@@ -265,7 +267,7 @@ impl NesApu {
             data |= 1 << 3;
         }
 
-        println!("READ APU REGISTER AS {:x}", data);
+        //println!("READ APU REGISTER AS {:x}", data);
         self.registers[0x15] &= !0x40;
         data
     }

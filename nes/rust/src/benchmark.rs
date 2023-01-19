@@ -73,7 +73,7 @@ pub fn cpu_bench(c: &mut Criterion) {
                 let mut log_line = 0;
                 for i in 0..26554 {
                     data.cpu
-                        .cycle(&mut data.mb, &mut data.cpu_peripherals, false);
+                        .cycle(&mut data.mb, &mut data.cpu_peripherals, false, false);
                     if data.cpu.instruction_start() {
                         log_line += 1;
                         t = data.goldenlog.next().unwrap().unwrap();

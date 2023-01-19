@@ -227,7 +227,8 @@ fn main() {
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
     let nc = NesCartridge::load_cartridge(
-        "C:/Users/thoma/Documents/nes-test-roms/apu_test/apu_test.nes".to_string(),
+        "C:/Users/thoma/Documents/nes-test-roms/blargg_apu_2005.07.30/08.irq_timing.nes"
+            .to_string(),
     )
     .unwrap();
     nes_data.insert_cartridge(nc);

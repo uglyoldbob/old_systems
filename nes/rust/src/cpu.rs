@@ -291,6 +291,7 @@ impl NesCpu {
         bus: &mut dyn NesMemoryBus,
         cpu_peripherals: &mut NesCpuPeripherals,
         nmi: bool,
+        irq: bool,
     ) {
         if !self.prev_nmi && nmi {
             self.nmi_detected = true;
@@ -301,7 +302,7 @@ impl NesCpu {
         }
         self.prev_nmi = nmi;
         self.interrupt_shift[0] = self.interrupt_shift[1];
-        self.interrupt_shift[1] = (false, self.nmi_detected);
+        self.interrupt_shift[1] = (irq, self.nmi_detected);
         if self.reset {
             match self.subcycle {
                 0 => {

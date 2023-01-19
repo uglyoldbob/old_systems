@@ -63,7 +63,7 @@ fn basic_cpu_test() {
     let mut t: String;
     let mut b;
     for i in 0..26554 {
-        cpu.cycle(&mut mb, &mut cpu_peripherals, false);
+        cpu.cycle(&mut mb, &mut cpu_peripherals, false, false);
         if cpu.instruction_start() {
             log_line += 1;
             t = goldenlog.next().unwrap().unwrap();
@@ -593,6 +593,23 @@ fn apu_test6() {
 fn apu_test7() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge("./07.irq_flag_timing.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
+
+#[test]
+fn apu_test8() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./08.irq_timing.nes".to_string()).unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
