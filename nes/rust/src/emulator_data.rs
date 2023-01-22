@@ -35,7 +35,7 @@ impl NesEmulatorData {
             cpu_peripherals: NesCpuPeripherals::new(ppu, apu),
             mb: mb,
             #[cfg(debug_assertions)]
-            paused: true,
+            paused: false,
             #[cfg(debug_assertions)]
             single_step: false,
             #[cfg(debug_assertions)]
@@ -68,11 +68,12 @@ impl NesEmulatorData {
 
     pub fn cycle_step(&mut self) {
         self.cpu_clock_counter += 1;
-        self.cpu_peripherals.apu.clock_fast();
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
             let nmi = self.nmi[0] && self.nmi[1] && self.nmi[2];
+            self.cpu_peripherals.apu.clock_slow_pre();
             let irq = self.cpu_peripherals.apu.irq();
+            self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
             self.prev_irq = irq;

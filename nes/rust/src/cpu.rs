@@ -94,6 +94,8 @@ pub struct NesCpu {
     oamdma: Option<u8>,
     dma_counter: u16,
     outs: [bool; 3],
+    dmc_dma: Option<u16>,
+    dmc_dma_counter: u8,
 }
 
 const CPU_FLAG_CARRY: u8 = 1;
@@ -135,6 +137,8 @@ impl NesCpu {
             oamdma: None,
             dma_counter: 0,
             outs: [false; 3],
+            dmc_dma: None,
+            dmc_dma_counter: 0,
         }
     }
 
@@ -286,6 +290,13 @@ impl NesCpu {
         Some(self.disassembly.to_owned())
     }
 
+    pub fn set_dma_input(&mut self, data: Option<u16>) {
+        if data.is_some() && self.dmc_dma.is_none() {
+            self.dmc_dma = data;
+            self.dmc_dma_counter = 0;
+        }
+    }
+
     pub fn cycle(
         &mut self,
         bus: &mut dyn NesMemoryBus,
@@ -342,7 +353,19 @@ impl NesCpu {
                 }
             }
         } else {
-            if let None = self.opcode {
+            if let Some(a) = self.dmc_dma {
+                match self.dmc_dma_counter {
+                    0 => {
+                        self.dmc_dma_counter += 1;
+                    }
+                    _ => {
+                        let t = self.memory_cycle_read(a, bus, cpu_peripherals);
+                        cpu_peripherals.apu.provide_dma_response(t);
+                        self.dmc_dma = None;
+                        self.dmc_dma_counter = 0;
+                    }
+                }
+            } else if let None = self.opcode {
                 if (self.interrupt_shift[0].0 && ((self.p & CPU_FLAG_INT_DISABLE) == 0))
                     || self.interrupt_shift[0].1
                     || self.interrupting

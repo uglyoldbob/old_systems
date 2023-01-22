@@ -622,3 +622,20 @@ fn apu_test8() {
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
 }
+
+#[test]
+fn apu_test9() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("./09.reset_timing.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
+}
