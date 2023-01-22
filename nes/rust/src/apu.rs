@@ -82,25 +82,6 @@ impl ApuDmcChannel {
                 self.bit_counter += 1;
             } else {
                 self.sample_buffer = None;
-                if self.loop_flag {
-                    if self.length > 1 {
-                        self.length -= 1;
-                    }
-                    else {
-                        self.length = self.programmed_length;
-                        println!("Start loop length {}", self.length);
-                    }
-                }
-                else {
-                    if self.length > 0 {
-                        if self.length == 1 {
-                            if self.interrupt_enable {
-                                self.interrupt_flag = true;
-                            }
-                        }
-                        self.length -= 1;
-                    }
-                }
                 self.bit_counter = 0;
             }
         }
@@ -157,6 +138,17 @@ impl NesApu {
     pub fn provide_dma_response(&mut self, data: u8) {
         self.dmc.dma_request = None;
         self.dmc.dma_result = Some(data);
+        if self.dmc.length > 0 {
+            self.dmc.length -= 1;
+            if self.dmc.length == 0 {
+                if self.dmc.loop_flag {
+                    self.dmc.length = self.dmc.programmed_length;
+                }
+                else if self.dmc.interrupt_enable {
+                    self.dmc.interrupt_flag = true;
+                }
+            }
+        }
     }
 
     fn set_interrupt_flag(&mut self) {
