@@ -945,7 +945,7 @@ fn apu_test16_8() {
             }
         }
     }
-    assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
 }
 
 #[test]

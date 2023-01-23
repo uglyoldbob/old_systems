@@ -76,13 +76,12 @@ impl ApuDmcChannel {
     fn cycle(&mut self, timing: u32) {
         if self.sample_buffer.is_none() && self.dma_request.is_none() && self.length > 0 {
             self.dma_request = Some(self.dma_address | 0x8000);
-            println!("Issuing DMA {}", timing);
             self.length -= 1;
         }
-        if self.rate_counter < self.rate {
-            self.rate_counter += 1;
+        if self.rate_counter > 0 {
+            self.rate_counter -= 1;
         } else {
-            self.rate_counter = 0;
+            self.rate_counter = self.rate;
             if self.bit_counter < 7 {
                 self.bit_counter += 1;
             } else {
@@ -98,9 +97,6 @@ impl ApuDmcChannel {
                     self.playing = false;
                 }
                 self.bit_counter = 0;
-            }
-            if self.bit_counter == 7 && !self.silence {
-                println!("Last bit {}", timing);
             }
         }
         //println!("DMC CYCLE {} {}", self.rate_counter, self.bit_counter);
@@ -161,10 +157,8 @@ impl NesApu {
         self.dmc.dma_request = None;
         self.dmc.sample_buffer = Some(data);
         self.dmc.dma_result = Some(data);
-        println!("Received DMC byte at {}", self.timing_clock);
 
             if self.dmc.length == 0 {
-                println!("STOP DMC AT {}", self.timing_clock);
                 if self.dmc.loop_flag {
                     self.dmc.length = self.dmc.programmed_length;
                 }
@@ -255,19 +249,11 @@ impl NesApu {
         let halt = (self.registers[0] & 0x20) != 0;
         if !halt && self.squares[0].length > 0 {
             self.squares[0].length -= 1;
-            println!(
-                "Clock square 0 {} {} {}",
-                self.squares[0].length, self.frame_sequencer_clock, self.clock
-            );
         }
         //second square length counter
         let halt = (self.registers[4] & 0x20) != 0;
         if !halt && self.squares[1].length > 0 {
             self.squares[1].length -= 1;
-            println!(
-                "Clock square 1 {} {} {}",
-                self.squares[1].length, self.frame_sequencer_clock, self.clock
-            );
         }
         //triangle channel length counter
         let halt = (self.registers[8] & 0x80) != 0;
@@ -364,13 +350,11 @@ impl NesApu {
             0x10 => {
                 self.dmc.interrupt_flag = false;
                 self.dmc.rate = NesApu::DMC_RATE_TABLE[(data & 0xF) as usize] / 2 - 1;
-                println!("APU DMC next rate is {} {} {} {}", data & 0xF, self.dmc.rate, self.dmc.playing, self.timing_clock);
                 self.dmc.interrupt_enable = (data & 0x80) != 0;
                 self.dmc.loop_flag = (data & 0x40) != 0;
             }
             0x13 => {
                 self.dmc.programmed_length = (data as u16) * 16 + 1;
-                println!("Update next length to {}", self.dmc.programmed_length);
                 self.registers[addr2 as usize] = data;
             }
             0x15 => {
@@ -394,10 +378,6 @@ impl NesApu {
                         self.dmc.programmed_length = (self.registers[0x13] as u16) * 16 + 1;
                         self.dmc.length = self.dmc.programmed_length;
                         self.dmc.playing = true;
-                        println!("Start length {} {} @ {}", self.dmc.length, self.dmc.loop_flag, self.timing_clock);
-                    }
-                    else {
-                        println!("Do not start dmc");
                     }
                 }
                 self.dmc.interrupt_flag = false;
@@ -422,7 +402,6 @@ impl NesApu {
                 self.registers[addr2 as usize] = data;
             }
         }
-        //println!("WRITE APU REGISTER {:x} with {:x}", addr2, data);
     }
 
     //it is assumed that the only readable address is filtered before making it to this function
@@ -447,14 +426,6 @@ impl NesApu {
         if self.dmc.length > 0 {
             data |= 1 << 4;
         }
-
-        let looping = if self.dmc.loop_flag {
-            "LOOP"
-        }
-        else {
-            "NOLOOP"
-        };
-        println!("READ APU REGISTER AS {:x} {} {} {} {}", data, self.timing_clock, (data & 0x10) != 0, self.dmc.length, looping);
         self.registers[0x15] &= !0x40;
         self.read_count = self.read_count.wrapping_add(1);
         data
