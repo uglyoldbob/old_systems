@@ -358,6 +358,12 @@ impl NesCpu {
                     0 => {
                         self.dmc_dma_counter += 1;
                     }
+                    1 => {
+                        self.dmc_dma_counter += 1;
+                    }
+                    2 => {
+                        self.dmc_dma_counter += 1;
+                    }
                     _ => {
                         let t = self.memory_cycle_read(a, bus, cpu_peripherals);
                         cpu_peripherals.apu.provide_dma_response(t);

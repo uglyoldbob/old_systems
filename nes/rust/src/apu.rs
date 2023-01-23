@@ -43,10 +43,13 @@ struct ApuDmcChannel {
     programmed_length: u16,
     length: u16,
     sample_buffer: Option<u8>,
+    shift_register: u8,
     dma_request: Option<u16>,
     dma_result: Option<u8>,
     dma_address: u16,
     loop_flag: bool,
+    playing: bool,
+    silence: bool,
 }
 
 impl ApuDmcChannel {
@@ -60,31 +63,47 @@ impl ApuDmcChannel {
             programmed_length: 0,
             length: 0,
             sample_buffer: None,
+            shift_register: 0,
             dma_request: None,
             dma_result: None,
             dma_address: 0,
             loop_flag: false,
+            playing: false,
+            silence: true,
         }
     }
 
-    fn cycle(&mut self) {
-        if self.dma_result.is_some() {
-            self.sample_buffer = self.dma_result;
-            self.dma_result = None;
-        } else if self.sample_buffer.is_none() && self.dma_request.is_none() && self.length > 0 {
+    fn cycle(&mut self, timing: u32) {
+        if self.sample_buffer.is_none() && self.dma_request.is_none() && self.length > 0 {
             self.dma_request = Some(self.dma_address | 0x8000);
+            println!("Issuing DMA {}", timing);
+            self.length -= 1;
         }
-        if self.rate_counter <= self.rate {
+        if self.rate_counter < self.rate {
             self.rate_counter += 1;
         } else {
             self.rate_counter = 0;
-            if self.bit_counter < 6 {
+            if self.bit_counter < 7 {
                 self.bit_counter += 1;
             } else {
-                self.sample_buffer = None;
+                self.silence = self.sample_buffer.is_none();
+                if let Some(b) = self.sample_buffer {
+                    self.shift_register = b;
+                    self.sample_buffer = None;
+                }
+                else {
+                    self.playing = false;
+                }
+                if self.length == 0 {
+                    self.playing = false;
+                }
                 self.bit_counter = 0;
             }
+            if self.bit_counter == 7 && !self.silence {
+                println!("Last bit {}", timing);
+            }
         }
+        //println!("DMC CYCLE {} {}", self.rate_counter, self.bit_counter);
     }
 }
 
@@ -101,6 +120,7 @@ pub struct NesApu {
     sound_disabled_clock: u16,
     read_count: u8,
     cycles: u32,
+    timing_clock: u32,
 }
 
 impl NesApu {
@@ -118,6 +138,7 @@ impl NesApu {
             sound_disabled_clock: 0,
             read_count: 0,
             cycles: 0,
+            timing_clock: 0,
         }
     }
 
@@ -137,18 +158,21 @@ impl NesApu {
 
     pub fn provide_dma_response(&mut self, data: u8) {
         self.dmc.dma_request = None;
+        self.dmc.sample_buffer = Some(data);
         self.dmc.dma_result = Some(data);
-        if self.dmc.length > 0 {
-            self.dmc.length -= 1;
+        println!("Received DMC byte at {}", self.timing_clock);
+
             if self.dmc.length == 0 {
+                println!("STOP DMC AT {}", self.timing_clock);
                 if self.dmc.loop_flag {
                     self.dmc.length = self.dmc.programmed_length;
                 }
-                else if self.dmc.interrupt_enable {
-                    self.dmc.interrupt_flag = true;
+                else {
+                    if self.dmc.interrupt_enable {
+                        self.dmc.interrupt_flag = true;
+                    }
                 }
             }
-        }
     }
 
     fn set_interrupt_flag(&mut self) {
@@ -262,11 +286,12 @@ impl NesApu {
         self.cycles = self.cycles.wrapping_add(1);
         self.frame_sequencer_clock();
         if self.clock {
+            self.timing_clock = self.timing_clock.wrapping_add(1);
             self.squares[0].cycle();
             self.squares[1].cycle();
             self.triangle.cycle();
             self.noise.cycle();
-            self.dmc.cycle();
+            self.dmc.cycle(self.timing_clock);
         }
         self.clock ^= true;
 
@@ -337,7 +362,8 @@ impl NesApu {
             }
             0x10 => {
                 self.dmc.interrupt_flag = false;
-                self.dmc.rate = 1 + NesApu::DMC_RATE_TABLE[(data & 0xF) as usize] / 2;
+                self.dmc.rate = NesApu::DMC_RATE_TABLE[(data & 0xF) as usize] / 2 - 1;
+                println!("APU DMC next rate is {} {} {} {}", data & 0xF, self.dmc.rate, self.dmc.playing, self.timing_clock);
                 self.dmc.interrupt_enable = (data & 0x80) != 0;
                 self.dmc.loop_flag = (data & 0x40) != 0;
             }
@@ -366,7 +392,8 @@ impl NesApu {
                     if self.dmc.length == 0 {
                         self.dmc.programmed_length = (self.registers[0x13] as u16) * 16 + 1;
                         self.dmc.length = self.dmc.programmed_length;
-                        println!("Start length {} {}", self.dmc.length, self.dmc.loop_flag);
+                        self.dmc.playing = true;
+                        println!("Start length {} {} @ {}", self.dmc.length, self.dmc.loop_flag, self.timing_clock);
                     }
                     else {
                         println!("Do not start dmc");
@@ -426,7 +453,7 @@ impl NesApu {
         else {
             "NOLOOP"
         };
-        println!("READ APU REGISTER AS {:x} {} {} {} {}", data, self.frame_sequencer_clock, (data & 0x10) != 0, self.dmc.length, looping);
+        println!("READ APU REGISTER AS {:x} {} {} {} {}", data, self.timing_clock, (data & 0x10) != 0, self.dmc.length, looping);
         self.registers[0x15] &= !0x40;
         self.read_count = self.read_count.wrapping_add(1);
         data
