@@ -947,3 +947,20 @@ fn apu_test16_8() {
     }
     assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
 }
+
+#[test]
+fn cpu_test_exec_space_apu() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge("../test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string()).unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 300 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(513, "0ASSED".to_string().as_bytes()));
+}

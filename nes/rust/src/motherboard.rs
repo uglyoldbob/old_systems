@@ -10,6 +10,7 @@ pub struct NesMotherboard {
     ppu_palette_ram: [u8; 32],
     vram_address: Option<u16>,
     last_ppu_cycle: u8,
+    last_cpu_data: u8,
 }
 
 impl NesMotherboard {
@@ -36,6 +37,7 @@ impl NesMotherboard {
             ppu_palette_ram: pram,
             vram_address: None,
             last_ppu_cycle: 2,
+            last_cpu_data: 0,
         }
     }
 
@@ -64,11 +66,12 @@ impl NesMemoryBus for NesMotherboard {
         _controllers: [bool; 2],
         per: &mut NesCpuPeripherals,
     ) -> u8 {
-        let mut response: u8 = 0;
+        let mut response: u8 = self.last_cpu_data;
         match addr {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
                 response = self.ram[addr as usize];
+                self.last_cpu_data = response;
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }
@@ -91,6 +94,7 @@ impl NesMemoryBus for NesMotherboard {
                             let palette_data = self.ppu_palette_ram[addr2 as usize];
                             per.ppu.provide_palette_data(palette_data);
                             response |= palette_data;
+                            self.last_cpu_data = response;
                             per.ppu.increment_vram();
                         }
                     }
@@ -107,6 +111,7 @@ impl NesMemoryBus for NesMotherboard {
                     0x4000..=0x4014 => {}
                     0x4015 => {
                         response = per.apu.read(addr & 0x1f);
+                        self.last_cpu_data = response;
                     }
                     _ => {
                         #[cfg(debug_assertions)]
@@ -131,6 +136,7 @@ impl NesMemoryBus for NesMotherboard {
                     let resp = cart.memory_read(addr);
                     if let Some(v) = resp {
                         response = v;
+                        self.last_cpu_data = v;
                     }
                 }
             }
@@ -145,6 +151,7 @@ impl NesMemoryBus for NesMotherboard {
         _controllers: [bool; 2],
         per: &mut NesCpuPeripherals,
     ) {
+        self.last_cpu_data = data;
         match addr {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
