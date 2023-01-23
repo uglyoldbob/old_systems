@@ -146,6 +146,7 @@ impl NesApu {
         self.registers[0x15] = 0;
         self.sound_disabled = true;
         self.sound_disabled_clock = 0;
+        self.frame_sequencer_reset = 2;
     }
 
     pub fn irq(&self) -> bool {

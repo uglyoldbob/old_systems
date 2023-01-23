@@ -184,9 +184,11 @@ impl NesCpu {
 
     pub fn reset(&mut self) {
         self.s -= 3;
-        self.p |= 4; //set IRQ disable flag
+        self.p |= CPU_FLAG_INT_DISABLE; //set IRQ disable flag
         self.pc = 0xfffc;
         self.reset = true;
+        self.subcycle = 0;
+        self.opcode = None;
         #[cfg(debug_assertions)]
         {
             self.disassembly = "RESET".to_string();
