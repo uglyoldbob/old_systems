@@ -36,27 +36,26 @@ cpu_exec_space
  - all pass
 
 cpu_interrupts_v2
- - requires apu, not implemented
+ - test 5 does not pass
 
 cpu_reset
- - ram_after_reset - crashes with invalid opcode after reset
- - registers - unsure of status - does not print to screen
+ - all pass
 
 cpu_timing_test6
  - pass
 
 dmc_dma_during_read4
  - dma_2007_read - not sure how to interpret results
- - dma_2007_write - fail due to apu
- - dma_4016_read - appears to do nothing
- - double_2007_read - pass?
+ - dma_2007_write - pass
+ - dma_4016_read - appears to do nothing - likely due to controller not implemented
+ - double_2007_read - not sure how to interpret results
  - read_write_2007 - fail
 
 dmc_tests
- - they most likely require the apu to be implemented
+ - no idea how status is reported
 
 dpcmletterbox
- - requires apu implementation
+ - requires sprite implementation in ppu
 
 exram
  - requires mapper 5
@@ -65,7 +64,7 @@ full_palette
  - not sure how to interpret results
 
 instr_misc
- - fails due to missing apu implementation
+ - fails dummy_reads_apu, missing reads in cpu
 
 instr_test-v3
  - appears to not work?
@@ -74,7 +73,7 @@ instr_test-v5
  - appears to not work?
 
 instr_timing
- - requires apu implementation
+ - pass
 
 m22chrbankingtest
  - ines2 rom, not currently supported
@@ -125,7 +124,7 @@ paddletest3
  - probably requires controllers to work
 
 pal_apu_tests
- - apu not implemented
+ - pal apu not implemented
 
 ppu_open_bus
  - pass
@@ -149,10 +148,10 @@ scrolltest
  - no video output, fail
 
 soundtest
- - apu not implemented
+ - controller not implemented
 
 sprdma_and_dmc_dma
- - apu not implemented
+ - fail, unsure why
 
 sprite_hit_tests_2005.10.05
  - sprites not implemented
@@ -185,7 +184,7 @@ vbl_nmi_timing
  - all pass
 
 volume_tests
- - require apu implementation
+ - require apu implementation and controller implementation
 
 window5
  - ntsc version creates ppu cycling errors
