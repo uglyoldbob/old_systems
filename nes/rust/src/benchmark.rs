@@ -51,8 +51,8 @@ pub fn cpu_bench(c: &mut Criterion) {
                 let apu: NesApu = NesApu::new();
                 let cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu, apu);
                 let mut mb: NesMotherboard = NesMotherboard::new();
-                let nc = NesCartridge::load_cartridge("./nestest.nes".to_string());
-                let goldenlog = std::fs::File::open("./nestest.log").unwrap();
+                let nc = NesCartridge::load_cartridge("../test_roms/other/nestest.nes".to_string());
+                let goldenlog = std::fs::File::open("../test_roms/other/nestest.log").unwrap();
                 let goldenlog = std::io::BufReader::new(goldenlog).lines();
 
                 let mut nc = nc.unwrap();
