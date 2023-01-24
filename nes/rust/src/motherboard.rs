@@ -1,5 +1,6 @@
 use crate::{
     cartridge::NesCartridge,
+    controller::NesController,
     cpu::{NesCpuPeripherals, NesMemoryBus},
 };
 
@@ -11,6 +12,7 @@ pub struct NesMotherboard {
     vram_address: Option<u16>,
     last_ppu_cycle: u8,
     last_cpu_data: u8,
+    controllers: [Option<Box<dyn NesController>>; 2],
 }
 
 impl NesMotherboard {
@@ -27,7 +29,7 @@ impl NesMotherboard {
         }
 
         let mut pram: [u8; 32] = [0; 32];
-        for i in vram.iter_mut() {
+        for i in pram.iter_mut() {
             *i = rand::random();
         }
         Self {
@@ -38,6 +40,7 @@ impl NesMotherboard {
             vram_address: None,
             last_ppu_cycle: 2,
             last_cpu_data: 0,
+            controllers: [None, None],
         }
     }
 
@@ -45,6 +48,14 @@ impl NesMotherboard {
         if let None = self.cart {
             self.cart = Some(c);
         }
+    }
+
+    pub fn insert_controller1(&mut self, c: Box<dyn NesController>) {
+        self.controllers[0] = Some(c);
+    }
+
+    pub fn insert_controller2(&mut self, c: Box<dyn NesController>) {
+        self.controllers[1] = Some(c);
     }
 
     #[cfg(test)]
@@ -113,12 +124,23 @@ impl NesMemoryBus for NesMotherboard {
                         response = per.apu.read(addr & 0x1f);
                         self.last_cpu_data = response;
                     }
-                    _ => {
-                        #[cfg(debug_assertions)]
-                        {
-                            println!("TODO implement read for {:x}", addr);
+                    0x4016 => {
+                        if let Some(c) = &mut self.controllers[0] {
+                            response = (c.read_data() & 0x1F) | (self.last_cpu_data & 0xe0);
+                        } else {
+                            response = self.last_cpu_data & 0xe0;
                         }
+                        self.last_cpu_data = response;
                     }
+                    0x4017 => {
+                        if let Some(c) = &mut self.controllers[1] {
+                            response = (c.read_data() & 0x1F) | (self.last_cpu_data & 0xe0);
+                        } else {
+                            response = self.last_cpu_data & 0xe0;
+                        }
+                        self.last_cpu_data = response;
+                    }
+                    _ => {}
                 }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
@@ -147,7 +169,7 @@ impl NesMemoryBus for NesMotherboard {
         &mut self,
         addr: u16,
         data: u8,
-        _out: [bool; 3],
+        out: [bool; 3],
         _controllers: [bool; 2],
         per: &mut NesCpuPeripherals,
     ) {
@@ -185,6 +207,13 @@ impl NesMemoryBus for NesMotherboard {
             }
             0x4000..=0x4017 => {
                 //apu and io
+                if addr == 0x4016 {
+                    for mut c in &mut self.controllers {
+                        if let Some(con) = &mut c {
+                            con.update_latch_bits(out);
+                        }
+                    }
+                }
                 match addr {
                     0x4014 => {}
                     _ => {

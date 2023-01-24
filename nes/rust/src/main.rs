@@ -2,6 +2,7 @@
 
 pub mod apu;
 pub mod cartridge;
+pub mod controller;
 pub mod cpu;
 pub mod emulator_data;
 pub mod motherboard;

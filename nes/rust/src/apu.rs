@@ -89,8 +89,7 @@ impl ApuDmcChannel {
                 if let Some(b) = self.sample_buffer {
                     self.shift_register = b;
                     self.sample_buffer = None;
-                }
-                else {
+                } else {
                     self.playing = false;
                 }
                 if self.length == 0 {
@@ -158,16 +157,15 @@ impl NesApu {
         self.dmc.sample_buffer = Some(data);
         self.dmc.dma_result = Some(data);
 
-            if self.dmc.length == 0 {
-                if self.dmc.loop_flag {
-                    self.dmc.length = self.dmc.programmed_length;
-                }
-                else {
-                    if self.dmc.interrupt_enable {
-                        self.dmc.interrupt_flag = true;
-                    }
+        if self.dmc.length == 0 {
+            if self.dmc.loop_flag {
+                self.dmc.length = self.dmc.programmed_length;
+            } else {
+                if self.dmc.interrupt_enable {
+                    self.dmc.interrupt_flag = true;
                 }
             }
+        }
     }
 
     fn set_interrupt_flag(&mut self) {
@@ -393,8 +391,7 @@ impl NesApu {
                     self.registers[0x15] &= !0x40;
                 }
             }
-            _ => {
-            }
+            _ => {}
         }
         match addr {
             0x15 | 0x17 => {}
