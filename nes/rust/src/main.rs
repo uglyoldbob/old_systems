@@ -21,12 +21,16 @@ use egui_multiwin::{
     multi_window::{MultiWindow, NewWindowRequest},
     tracked_window::{RedrawResponse, TrackedWindow},
 };
-struct MainNesWindow {}
+struct MainNesWindow {
+    last_frame_time: std::time::SystemTime,
+}
 
 impl MainNesWindow {
     fn new() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
-            window_state: Box::new(MainNesWindow {}),
+            window_state: Box::new(MainNesWindow {
+                last_frame_time: std::time::SystemTime::now(),
+            }),
             builder: glutin::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(glutin::dpi::LogicalSize {
@@ -55,6 +59,10 @@ impl TrackedWindow for MainNesWindow {
         egui.egui_ctx.request_repaint();
         let mut quit = false;
         let mut windows_to_create = vec![];
+
+        let time_now = std::time::SystemTime::now();
+        let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
+        self.last_frame_time = time_now;
 
         'emulator_loop: loop {
             #[cfg(debug_assertions)]
@@ -128,6 +136,7 @@ impl TrackedWindow for MainNesWindow {
             if let Some(t) = &c.texture {
                 ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
             }
+            ui.label(format!("{:.0} FPS", 1_000_000_000.0 / frame_time.as_nanos() as f64 ));
         });
         RedrawResponse {
             quit: quit,
