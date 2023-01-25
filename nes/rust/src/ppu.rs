@@ -678,6 +678,7 @@ impl NesPpu {
         self.vblank_nmi
     }
 
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub fn convert_to_egui(f: &Box<[u8; 256 * 240 * 3]>) -> egui::ColorImage {
         let data = &**f;
         let pixels = data

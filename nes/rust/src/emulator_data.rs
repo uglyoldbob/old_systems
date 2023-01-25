@@ -22,6 +22,7 @@ pub struct NesEmulatorData {
     #[cfg(debug_assertions)]
     pub wait_for_frame_end: bool,
     pub last_frame_time: u128,
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
     nmi: [bool; 3],
     prev_irq: bool,
@@ -49,6 +50,7 @@ impl NesEmulatorData {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis(),
+            #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
             texture: None,
             nmi: [false; 3],
             prev_irq: false,

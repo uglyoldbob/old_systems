@@ -26,6 +26,26 @@ use egui_multiwin::{
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
+#[cfg(feature = "sdl2")]
+use sdl2::event::Event;
+#[cfg(feature = "sdl2")]
+use sdl2::keyboard::Keycode;
+#[cfg(feature = "sdl2")]
+use sdl2::mouse::MouseButton;
+#[cfg(feature = "sdl2")]
+use sdl2::pixels::Color;
+#[cfg(feature = "sdl2")]
+use sdl2::pixels::PixelFormatEnum;
+#[cfg(feature = "sdl2")]
+use sdl2::render::Canvas;
+#[cfg(feature = "sdl2")]
+use sdl2::render::Texture;
+#[cfg(feature = "sdl2")]
+use sdl2::render::TextureCreator;
+
+#[cfg(feature = "sdl2")]
+pub const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
+
 struct MainNesWindow {
     last_frame_time: std::time::SystemTime,
     #[cfg(feature = "eframe")]
@@ -300,6 +320,172 @@ impl TrackedWindow for DebugNesWindow {
             quit: quit,
             new_windows: windows_to_create,
         }
+    }
+}
+
+#[cfg(feature = "sdl2")]
+fn make_dummy_texture<'a, T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
+    let mut data: Vec<u8> = vec![0; (4 * 4 * 2) as usize];
+    let mut surf = sdl2::surface::Surface::from_data(
+        data.as_mut_slice(),
+        4,
+        4,
+        (2 * 4) as u32,
+        PixelFormatEnum::RGB555,
+    )
+    .unwrap();
+    let _e = surf.set_color_key(true, sdl2::pixels::Color::BLACK);
+    Texture::from_surface(&surf, tc).unwrap()
+}
+
+#[cfg(feature = "sdl2")]
+struct Text<'a> {
+    t: Texture<'a>,
+    color: sdl2::pixels::Color,
+}
+
+#[cfg(feature = "sdl2")]
+impl<'a> Text<'a> {
+    fn new<T>(
+        t: String,
+        color: sdl2::pixels::Color,
+        font: &sdl2::ttf::Font,
+        tc: &'a TextureCreator<T>,
+    ) -> Self {
+        let pr = font.render(t.as_str());
+        let ft = pr.solid(color).unwrap();
+        Self {
+            color: color,
+            t: Texture::from_surface(&ft, tc).unwrap(),
+        }
+    }
+    fn set_text<T>(
+        &mut self,
+        tc: &'a TextureCreator<T>,
+        t: String,
+        font: &sdl2::ttf::Font,
+        color: sdl2::pixels::Color,
+    ) {
+        self.color = color;
+        let pr = font.render(t.as_str());
+        let ft = pr.solid(self.color).unwrap();
+        self.t = Texture::from_surface(&ft, tc).unwrap();
+    }
+    fn draw(&self, canvas: &mut Canvas<sdl2::video::Window>) {
+        let q = self.t.query();
+        let _e = canvas.copy(
+            &self.t,
+            None,
+            sdl2::rect::Rect::new(0, 0, q.width.into(), q.height.into()),
+        );
+    }
+}
+
+#[cfg(feature = "sdl2")]
+fn main() {
+    let ttf_context = sdl2::ttf::init().unwrap();
+    let efont = sdl2::rwops::RWops::from_bytes(EMBEDDED_FONT).unwrap();
+    let font = ttf_context.load_font_from_rwops(efont, 14).unwrap();
+
+    let sdl_context = sdl2::init().unwrap();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+
+    video_subsystem.text_input().start();
+
+    let mut vid_win = video_subsystem.window("UglyOldBob NES Emulator", 640, 480);
+    let mut windowb = vid_win.position_centered();
+
+    let window = windowb.opengl().build().unwrap();
+
+    let mut canvas = window.into_canvas().build().unwrap();
+    let texture_creator = canvas.texture_creator();
+
+    let i = sdl2::mixer::InitFlag::MP3;
+    let _sdl2mixer = sdl2::mixer::init(i).unwrap();
+    let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
+
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
+    canvas.clear();
+    canvas.present();
+
+    let dummy_texture = make_dummy_texture(&texture_creator);
+
+    let flags = sdl2::image::InitFlag::all();
+    let _sdl2_image = sdl2::image::init(flags).unwrap();
+
+    let mut last_frame_time: std::time::SystemTime = std::time::SystemTime::now();
+
+    let mut t: Text = Text::new(
+        "FPS".to_string(),
+        sdl2::pixels::Color::RED,
+        &font,
+        &texture_creator,
+    );
+
+    let mut nes_data = NesEmulatorData::new();
+    let nc = NesCartridge::load_cartridge(
+        "./nes/test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string(),
+    )
+    .unwrap();
+    nes_data.insert_cartridge(nc);
+
+    let mut nes_frame = texture_creator
+        .create_texture(
+            sdl2::pixels::PixelFormatEnum::RGB24,
+            sdl2::render::TextureAccess::Static,
+            256,
+            240,
+        )
+        .unwrap();
+
+    'main_loop: loop {
+        let frame_start = std::time::SystemTime::now();
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => break 'main_loop,
+                _ => {}
+            }
+        }
+
+        'emulator_loop: loop {
+            nes_data.cycle_step();
+            if nes_data.cpu_peripherals.ppu_frame_end() {
+                break 'emulator_loop;
+            }
+        }
+
+        let framerate = 60 as u64;
+        let time_now = std::time::SystemTime::now();
+        let frame_time = time_now.duration_since(last_frame_time).unwrap();
+        last_frame_time = time_now;
+        let running_framerate = 1_000_000_000.0 / frame_time.as_nanos() as f64;
+        t.set_text(
+            &texture_creator,
+            format!("FPS: {:.0}", running_framerate),
+            &font,
+            sdl2::pixels::Color::RED,
+        );
+
+        let _e = nes_frame.update(None, &nes_data.cpu_peripherals.ppu_get_frame()[..], 256 * 3);
+
+        canvas.clear();
+        let _e = canvas.copy(&dummy_texture, None, None);
+        let _e = canvas.copy(&nes_frame, None, None);
+        t.draw(&mut canvas);
+        canvas.present();
+
+        let frame_processing_time = std::time::SystemTime::now()
+            .duration_since(frame_start)
+            .unwrap()
+            .as_nanos();
+        let mut delay = 1_000_000_000u64 / framerate;
+        if frame_processing_time > delay.into() {
+            delay = 0;
+        } else {
+            delay -= frame_processing_time as u64;
+        }
+        ::std::thread::sleep(std::time::Duration::from_nanos(delay));
     }
 }
 
