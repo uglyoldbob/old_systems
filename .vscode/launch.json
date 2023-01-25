@@ -12,7 +12,8 @@
                 "args": [
                     "build",
                     "--bin=nes",
-                    "--package=nes"
+                    "--package=nes",
+                    "--release"
                 ]
             },
             "args": [],

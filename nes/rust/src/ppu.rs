@@ -678,6 +678,19 @@ impl NesPpu {
         self.vblank_nmi
     }
 
+    #[cfg(feature = "sdl2")]
+    pub fn convert_for_sdl2(
+        f: &Box<[u8; 256 * 240 * 3]>,
+        buf: &mut Vec<egui_sdl2_gl::egui::Color32>,
+    ) {
+        let data = &**f;
+        let pixels: Vec<egui_sdl2_gl::egui::Color32> = data
+            .chunks_exact(3)
+            .map(|p| egui_sdl2_gl::egui::Color32::from_rgb(p[0], p[1], p[2]))
+            .collect();
+        *buf = pixels;
+    }
+
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub fn convert_to_egui(f: &Box<[u8; 256 * 240 * 3]>) -> egui::ColorImage {
         let data = &**f;

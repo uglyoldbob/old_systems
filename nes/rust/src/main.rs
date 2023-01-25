@@ -391,37 +391,33 @@ fn main() {
     let mut event_pump = sdl_context.event_pump().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
+    let gl_attr = video_subsystem.gl_attr();
+    gl_attr.set_context_profile(egui_sdl2_gl::sdl2::video::GLProfile::Core);
+    gl_attr.set_double_buffer(true);
+    gl_attr.set_multisample_samples(4);
+
     video_subsystem.text_input().start();
 
-    let mut vid_win = video_subsystem.window("UglyOldBob NES Emulator", 640, 480);
+    let mut vid_win = video_subsystem.window("UglyOldBob NES Emulator", 1024, 768);
     let mut windowb = vid_win.position_centered();
 
     let window = windowb.opengl().build().unwrap();
 
-    let mut canvas = window.into_canvas().build().unwrap();
-    let texture_creator = canvas.texture_creator();
+    let _ctx = window.gl_create_context().unwrap();
+
+    let shader_ver = egui_sdl2_gl::ShaderVersion::Default;
+    let (mut painter, mut egui_state) =
+        egui_sdl2_gl::with_sdl2(&window, shader_ver, egui_sdl2_gl::DpiScaling::Custom(2.0));
+    let mut egui_ctx = egui_sdl2_gl::egui::CtxRef::default();
 
     let i = sdl2::mixer::InitFlag::MP3;
     let _sdl2mixer = sdl2::mixer::init(i).unwrap();
     let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
 
-    canvas.set_draw_color(Color::RGB(0, 0, 0));
-    canvas.clear();
-    canvas.present();
-
-    let dummy_texture = make_dummy_texture(&texture_creator);
-
     let flags = sdl2::image::InitFlag::all();
     let _sdl2_image = sdl2::image::init(flags).unwrap();
 
     let mut last_frame_time: std::time::SystemTime = std::time::SystemTime::now();
-
-    let mut t: Text = Text::new(
-        "FPS".to_string(),
-        sdl2::pixels::Color::RED,
-        &font,
-        &texture_creator,
-    );
 
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge(
@@ -430,23 +426,22 @@ fn main() {
     .unwrap();
     nes_data.insert_cartridge(nc);
 
-    let mut nes_frame = texture_creator
-        .create_texture(
-            sdl2::pixels::PixelFormatEnum::RGB24,
-            sdl2::render::TextureAccess::Static,
-            256,
-            240,
-        )
-        .unwrap();
+    let mut frame: Vec<egui_sdl2_gl::egui::Color32> = Vec::with_capacity(256 * 240);
+    for _i in 0..(256 * 240) {
+        frame.push(egui_sdl2_gl::egui::Color32::BLACK);
+    }
+    let nes_frame_texture_id = painter.new_user_texture((256, 240), &frame, false);
 
+    let mut quit = false;
+
+    let mut last_framerate = 60.0;
+
+    let start_time = std::time::Instant::now();
     'main_loop: loop {
         let frame_start = std::time::SystemTime::now();
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } => break 'main_loop,
-                _ => {}
-            }
-        }
+
+        egui_state.input.time = Some(start_time.elapsed().as_secs_f64());
+        egui_ctx.begin_frame(egui_state.input.take());
 
         'emulator_loop: loop {
             nes_data.cycle_step();
@@ -455,25 +450,56 @@ fn main() {
             }
         }
 
+        let frame_data = nes_data.cpu_peripherals.ppu_get_frame();
+        NesPpu::convert_for_sdl2(frame_data, &mut frame);
+
+        //todo update buffer
+        painter.update_user_texture_data(nes_frame_texture_id, &frame);
+
+        egui_sdl2_gl::egui::Window::new("Egui with SDL2 and GL")
+            .title_bar(false)
+            .fixed_rect(egui_sdl2_gl::egui::Rect {
+                min: egui_sdl2_gl::egui::Pos2 { x: 0.0, y: 0.0 },
+                max: egui_sdl2_gl::egui::Pos2 { x: 256.0, y: 240.0 },
+            })
+            .show(&egui_ctx, |ui| {
+                ui.label(format!("FPS: {:.0}", last_framerate));
+                ui.separator();
+                ui.add(egui_sdl2_gl::egui::Image::new(
+                    nes_frame_texture_id,
+                    egui_sdl2_gl::egui::vec2(256.0, 240.0),
+                ));
+            });
+
+        let (egui_output, paint_cmds) = egui_ctx.end_frame();
+
+        egui_state.process_output(&window, &egui_output);
+
+        let paint_jobs = egui_ctx.tessellate(paint_cmds);
+
+        painter.paint_jobs(None, paint_jobs, &egui_ctx.font_image());
+
+        window.gl_swap_window();
+    
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => break 'main_loop,
+                _ => {
+                    // Process input event
+                    egui_state.process_input(&window, event, &mut painter);
+                }
+            }
+        }
+
+        if quit {
+            break;
+        }
+
         let framerate = 60 as u64;
         let time_now = std::time::SystemTime::now();
         let frame_time = time_now.duration_since(last_frame_time).unwrap();
         last_frame_time = time_now;
-        let running_framerate = 1_000_000_000.0 / frame_time.as_nanos() as f64;
-        t.set_text(
-            &texture_creator,
-            format!("FPS: {:.0}", running_framerate),
-            &font,
-            sdl2::pixels::Color::RED,
-        );
-
-        let _e = nes_frame.update(None, &nes_data.cpu_peripherals.ppu_get_frame()[..], 256 * 3);
-
-        canvas.clear();
-        let _e = canvas.copy(&dummy_texture, None, None);
-        let _e = canvas.copy(&nes_frame, None, None);
-        t.draw(&mut canvas);
-        canvas.present();
+        last_framerate = 1_000_000_000.0 / frame_time.as_nanos() as f64;
 
         let frame_processing_time = std::time::SystemTime::now()
             .duration_since(frame_start)
