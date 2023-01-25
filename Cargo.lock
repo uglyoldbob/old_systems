@@ -525,6 +525,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "eframe"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0d49426c3e72a6728b0c790d22db8bf7bbcff10d83b8b6f3a01295be982302e"
+dependencies = [
+ "bytemuck",
+ "egui",
+ "egui-winit",
+ "egui_glow",
+ "getrandom",
+ "glow",
+ "glutin",
+ "js-sys",
+ "percent-encoding",
+ "tracing",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "winit",
+]
+
+[[package]]
 name = "egui"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,8 +758,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c05aeb6a22b8f62540c194aac980f2115af067bfe15a0734d7277a768d396b31"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1146,6 +1170,7 @@ name = "nes"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "eframe",
  "egui",
  "egui-multiwin",
  "egui_glow",
@@ -1910,6 +1935,18 @@ dependencies = [
  "quote",
  "syn",
  "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-futures"
+version = "0.4.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23639446165ca5a5de86ae1d8896b737ae80319560fbaa4c2887b7da6e7ebd7d"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

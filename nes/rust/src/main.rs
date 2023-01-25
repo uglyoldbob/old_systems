@@ -16,16 +16,37 @@ mod tests;
 use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
+#[cfg(feature = "eframe")]
+use eframe::egui;
+#[cfg(feature = "egui-multiwin")]
 use egui_glow::EguiGlow;
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
     multi_window::{MultiWindow, NewWindowRequest},
     tracked_window::{RedrawResponse, TrackedWindow},
 };
+
 struct MainNesWindow {
     last_frame_time: std::time::SystemTime,
+    #[cfg(feature = "eframe")]
+    c: NesEmulatorData,
 }
 
 impl MainNesWindow {
+    #[cfg(feature = "eframe")]
+    fn new() -> Self {
+        let mut nes_data = NesEmulatorData::new();
+        let nc = NesCartridge::load_cartridge(
+            "./nes/test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string(),
+        )
+        .unwrap();
+        nes_data.insert_cartridge(nc);
+        Self {
+            last_frame_time: std::time::SystemTime::now(),
+            c: nes_data,
+        }
+    }
+    #[cfg(feature = "egui-multiwin")]
     fn new() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
@@ -42,6 +63,53 @@ impl MainNesWindow {
     }
 }
 
+#[cfg(feature = "eframe")]
+impl eframe::App for MainNesWindow {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.request_repaint();
+        let time_now = std::time::SystemTime::now();
+        let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
+        self.last_frame_time = time_now;
+
+        'emulator_loop: loop {
+            self.c.cycle_step();
+            if self.c.cpu_peripherals.ppu_frame_end() {
+                break 'emulator_loop;
+            }
+        }
+
+        let image = NesPpu::convert_to_egui(self.c.cpu_peripherals.ppu_get_frame());
+
+        if let None = self.c.texture {
+            self.c.texture = Some(ctx.load_texture("NES_PPU", image, egui::TextureFilter::Nearest));
+        } else if let Some(t) = &mut self.c.texture {
+            t.set_partial([0, 0], image, egui::TextureFilter::Nearest);
+        }
+
+        egui::TopBottomPanel::top("menu_bar").show(&ctx, |ui| {
+            egui::menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    let button = egui::Button::new("Open rom?");
+                    if ui.add_enabled(true, button).clicked() {
+                        ui.close_menu();
+                    }
+                });
+            });
+        });
+
+        egui::CentralPanel::default().show(&ctx, |ui| {
+            if let Some(t) = &self.c.texture {
+                ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
+            }
+            ui.label(format!(
+                "{:.0} FPS",
+                1_000_000_000.0 / frame_time.as_nanos() as f64
+            ));
+        });
+    }
+}
+
+#[cfg(feature = "egui-multiwin")]
 impl TrackedWindow for MainNesWindow {
     type Data = NesEmulatorData;
 
@@ -136,7 +204,10 @@ impl TrackedWindow for MainNesWindow {
             if let Some(t) = &c.texture {
                 ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
             }
-            ui.label(format!("{:.0} FPS", 1_000_000_000.0 / frame_time.as_nanos() as f64 ));
+            ui.label(format!(
+                "{:.0} FPS",
+                1_000_000_000.0 / frame_time.as_nanos() as f64
+            ));
         });
         RedrawResponse {
             quit: quit,
@@ -145,8 +216,10 @@ impl TrackedWindow for MainNesWindow {
     }
 }
 
+#[cfg(feature = "egui-multiwin")]
 struct DebugNesWindow {}
 
+#[cfg(feature = "egui-multiwin")]
 impl DebugNesWindow {
     fn new() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
@@ -162,6 +235,7 @@ impl DebugNesWindow {
     }
 }
 
+#[cfg(feature = "egui-multiwin")]
 impl TrackedWindow for DebugNesWindow {
     type Data = NesEmulatorData;
 
@@ -229,6 +303,17 @@ impl TrackedWindow for DebugNesWindow {
     }
 }
 
+#[cfg(feature = "eframe")]
+fn main() {
+    let mut options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "UglyOldBob NES Emulator",
+        options,
+        Box::new(|_cc| Box::new(MainNesWindow::new())),
+    );
+}
+
+#[cfg(feature = "egui-multiwin")]
 fn main() {
     let event_loop = glutin::event_loop::EventLoopBuilder::with_user_event().build();
     let mut multi_window = MultiWindow::new();
@@ -237,7 +322,7 @@ fn main() {
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
     let nc = NesCartridge::load_cartridge(
-        "./nes/test_roms/apu_test/rom_singles/8-dmc_rates.nes".to_string(),
+        "./nes/test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string(),
     )
     .unwrap();
     nes_data.insert_cartridge(nc);

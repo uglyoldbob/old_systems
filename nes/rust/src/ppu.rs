@@ -1,5 +1,8 @@
 use crate::cpu::NesMemoryBus;
 
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
 pub struct NesPpu {
     registers: [u8; 8],
     scanline_number: u16,

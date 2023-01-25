@@ -6,6 +6,9 @@ use crate::{
     ppu::NesPpu,
 };
 
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
 pub struct NesEmulatorData {
     pub cpu: NesCpu,
     pub cpu_peripherals: NesCpuPeripherals,
