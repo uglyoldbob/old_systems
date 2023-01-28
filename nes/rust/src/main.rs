@@ -50,6 +50,7 @@ struct MainNesWindow {
     last_frame_time: std::time::SystemTime,
     #[cfg(feature = "eframe")]
     c: NesEmulatorData,
+    fps: f64,
 }
 
 impl MainNesWindow {
@@ -64,6 +65,7 @@ impl MainNesWindow {
         Self {
             last_frame_time: std::time::SystemTime::now(),
             c: nes_data,
+            fps: 0.0,
         }
     }
     #[cfg(feature = "egui-multiwin")]
@@ -86,24 +88,34 @@ impl MainNesWindow {
 #[cfg(feature = "eframe")]
 impl eframe::App for MainNesWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint();
-        let time_now = std::time::SystemTime::now();
-        let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
-        self.last_frame_time = time_now;
-
-        'emulator_loop: loop {
-            self.c.cycle_step();
-            if self.c.cpu_peripherals.ppu_frame_end() {
-                break 'emulator_loop;
-            }
+        #[cfg(feature = "puffin")]
+        {
+            puffin::profile_function!();
+            puffin::GlobalProfiler::lock().new_frame(); // call once per frame!
+            puffin_egui::profiler_window(ctx);
         }
 
-        let image = NesPpu::convert_to_egui(self.c.cpu_peripherals.ppu_get_frame());
+        {
+            #[cfg(feature = "puffin")]
+            puffin::profile_scope!("nes frame render");
+            'emulator_loop: loop {
+                self.c.cycle_step();
+                if self.c.cpu_peripherals.ppu_frame_end() {
+                    break 'emulator_loop;
+                }
+            }
+        }
+        {
+            #[cfg(feature = "puffin")]
+            puffin::profile_scope!("nes frame convert");
+            let image = NesPpu::convert_to_egui(self.c.cpu_peripherals.ppu_get_frame());
 
-        if let None = self.c.texture {
-            self.c.texture = Some(ctx.load_texture("NES_PPU", image, egui::TextureFilter::Nearest));
-        } else if let Some(t) = &mut self.c.texture {
-            t.set_partial([0, 0], image, egui::TextureFilter::Nearest);
+            if let None = self.c.texture {
+                self.c.texture =
+                    Some(ctx.load_texture("NES_PPU", image, egui::TextureOptions::LINEAR));
+            } else if let Some(t) = &mut self.c.texture {
+                t.set_partial([0, 0], image, egui::TextureOptions::LINEAR);
+            }
         }
 
         egui::TopBottomPanel::top("menu_bar").show(&ctx, |ui| {
@@ -121,11 +133,30 @@ impl eframe::App for MainNesWindow {
             if let Some(t) = &self.c.texture {
                 ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
             }
-            ui.label(format!(
-                "{:.0} FPS",
-                1_000_000_000.0 / frame_time.as_nanos() as f64
-            ));
+            ui.label(format!("{:.0} FPS", self.fps));
         });
+
+        {
+            #[cfg(feature = "puffin")]
+            puffin::profile_scope!("sleep time");
+            let time_now = std::time::SystemTime::now();
+            let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
+            let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
+            if frame_time < desired_frame_length {
+                let st = (desired_frame_length - frame_time);
+                spin_sleep::sleep(st);
+            }
+
+            let new_frame_time = std::time::SystemTime::now();
+            let new_fps = 1_000_000_000.0
+                / new_frame_time
+                    .duration_since(self.last_frame_time)
+                    .unwrap()
+                    .as_nanos() as f64;
+            self.fps = (self.fps * 0.95) + (0.05 * new_fps);
+            self.last_frame_time = new_frame_time;
+        }
+        ctx.request_repaint();
     }
 }
 
@@ -480,7 +511,7 @@ fn main() {
         painter.paint_jobs(None, paint_jobs, &egui_ctx.font_image());
 
         window.gl_swap_window();
-    
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => break 'main_loop,
@@ -517,7 +548,11 @@ fn main() {
 
 #[cfg(feature = "eframe")]
 fn main() {
+    #[cfg(feature = "puffin")]
+    puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let mut options = eframe::NativeOptions::default();
+    //TODO only disable vsync when required
+    options.vsync = false;
     eframe::run_native(
         "UglyOldBob NES Emulator",
         options,
