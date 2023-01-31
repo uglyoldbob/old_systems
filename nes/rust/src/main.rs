@@ -19,7 +19,7 @@ use crate::ppu::NesPpu;
 #[cfg(feature = "eframe")]
 use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
-use egui_glow::EguiGlow;
+use egui_multiwin::egui_glow::EguiGlow;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
     multi_window::{MultiWindow, NewWindowRequest},
@@ -73,14 +73,19 @@ impl MainNesWindow {
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
                 last_frame_time: std::time::SystemTime::now(),
+                fps: 0.0,
             }),
-            builder: glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
                     width: 320.0,
                     height: 300.0,
                 })
                 .with_title("UglyOldBob NES Emulator"),
+            options: egui_multiwin::tracked_window::TrackedWindowOptions {
+                vsync: false,
+                shader: None,
+            },
         }
     }
 }
@@ -176,6 +181,17 @@ impl TrackedWindow for MainNesWindow {
         egui: &mut EguiGlow,
     ) -> RedrawResponse<Self::Data> {
         egui.egui_ctx.request_repaint();
+
+        #[cfg(feature = "puffin")]
+        {
+            puffin::profile_function!();
+            puffin::GlobalProfiler::lock().new_frame(); // call once per frame!
+            puffin_egui::profiler_window(&egui.egui_ctx);
+        }
+
+        #[cfg(feature = "puffin")]
+        puffin::profile_scope!("frame rendering");
+
         let mut quit = false;
         let mut windows_to_create = vec![];
 
@@ -221,16 +237,16 @@ impl TrackedWindow for MainNesWindow {
             c.texture = Some(egui.egui_ctx.load_texture(
                 "NES_PPU",
                 image,
-                egui::TextureFilter::Nearest,
+                egui_multiwin::egui::TextureOptions::NEAREST,
             ));
         } else if let Some(t) = &mut c.texture {
-            t.set_partial([0, 0], image, egui::TextureFilter::Nearest);
+            t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
         }
 
-        egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
+        egui_multiwin::egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
+            egui_multiwin::egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    let button = egui::Button::new("Open rom?");
+                    let button = egui_multiwin::egui::Button::new("Open rom?");
                     if ui.add_enabled(true, button).clicked() {
                         ui.close_menu();
                     }
@@ -251,9 +267,9 @@ impl TrackedWindow for MainNesWindow {
             });
         });
 
-        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &c.texture {
-                ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
+                ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
             }
             ui.label(format!(
                 "{:.0} FPS",
@@ -275,13 +291,17 @@ impl DebugNesWindow {
     fn new() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(DebugNesWindow {}),
-            builder: glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
                     width: 320.0,
                     height: 240.0,
                 })
                 .with_title("UglyOldBob NES Debug"),
+            options: egui_multiwin::tracked_window::TrackedWindowOptions {
+                vsync: false,
+                shader: None,
+            },
         }
     }
 }
@@ -305,7 +325,7 @@ impl TrackedWindow for DebugNesWindow {
         let mut quit = false;
         let mut windows_to_create = vec![];
 
-        egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("Debug window");
             #[cfg(debug_assertions)]
             {
@@ -562,7 +582,9 @@ fn main() {
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
-    let event_loop = glutin::event_loop::EventLoopBuilder::with_user_event().build();
+    #[cfg(feature = "puffin")]
+    puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
+    let event_loop = egui_multiwin::glutin::event_loop::EventLoopBuilder::with_user_event().build();
     let mut multi_window = MultiWindow::new();
     let root_window = MainNesWindow::new();
     let mut nes_data = NesEmulatorData::new();

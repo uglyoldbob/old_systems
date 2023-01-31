@@ -3,6 +3,9 @@ use crate::cpu::NesMemoryBus;
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
+#[cfg(feature = "egui-multiwin")]
+use egui_multiwin::egui;
+
 pub struct NesPpu {
     registers: [u8; 8],
     scanline_number: u16,

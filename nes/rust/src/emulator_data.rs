@@ -9,6 +9,9 @@ use crate::{
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
+#[cfg(feature = "egui-multiwin")]
+use egui_multiwin::egui;
+
 pub struct NesEmulatorData {
     pub cpu: NesCpu,
     pub cpu_peripherals: NesCpuPeripherals,
