@@ -126,7 +126,8 @@ impl NesMemoryBus for NesMotherboard {
                     }
                     0x4016 => {
                         if let Some(c) = &mut self.controllers[0] {
-                            response = (c.read_data() & 0x1F) | (self.last_cpu_data & 0xe0);
+                            let d = c.read_data() & 0x1f;
+                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         } else {
                             response = self.last_cpu_data & 0xe0;
                         }
@@ -134,7 +135,8 @@ impl NesMemoryBus for NesMotherboard {
                     }
                     0x4017 => {
                         if let Some(c) = &mut self.controllers[1] {
-                            response = (c.read_data() & 0x1F) | (self.last_cpu_data & 0xe0);
+                            let d = c.read_data() & 0x1f;
+                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         } else {
                             response = self.last_cpu_data & 0xe0;
                         }

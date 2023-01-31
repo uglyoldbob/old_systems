@@ -1,5 +1,6 @@
 mod mapper00;
 mod mapper01;
+mod mapper03;
 
 pub trait NesMapper {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
@@ -133,6 +134,7 @@ impl NesCartridge {
         let mapper = match mapper {
             0 => mapper00::Mapper::new(&rom_data),
             1 => mapper01::Mapper::new(&rom_data),
+            3 => mapper03::Mapper::new(&rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper as u16));
             }

@@ -57,16 +57,7 @@ impl NesMapper for Mapper {
         Some(cart.chr_rom[self.ppu_address as usize])
     }
 
-    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
-        if !cart.chr_ram || cart.chr_rom.len() == 0 {
-            return;
-        }
-        let addr2 = self.ppu_address as u32 % cart.chr_rom.len() as u32;
-        cart.chr_rom[addr2 as usize] = data;
-    }
+    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {}
 
-    fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8) {
-        let addr = addr as usize % cart.prg_rom.len();
-        cart.prg_rom[addr] = new_byte;
-    }
+    fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8) {}
 }
