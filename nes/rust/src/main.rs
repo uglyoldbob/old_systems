@@ -497,6 +497,7 @@ fn main() {
     let mut quit = false;
 
     let mut last_framerate = 60.0;
+    let mut fps = 0.0;
 
     let start_time = std::time::Instant::now();
     'main_loop: loop {
@@ -525,7 +526,7 @@ fn main() {
                 max: egui_sdl2_gl::egui::Pos2 { x: 256.0, y: 240.0 },
             })
             .show(&egui_ctx, |ui| {
-                ui.label(format!("FPS: {:.0}", last_framerate));
+                ui.label(format!("FPS: {:.0}", fps));
                 ui.separator();
                 ui.add(egui_sdl2_gl::egui::Image::new(
                     nes_frame_texture_id,
@@ -557,23 +558,22 @@ fn main() {
             break;
         }
 
-        let framerate = 60 as u64;
         let time_now = std::time::SystemTime::now();
         let frame_time = time_now.duration_since(last_frame_time).unwrap();
-        last_frame_time = time_now;
-        last_framerate = 1_000_000_000.0 / frame_time.as_nanos() as f64;
-
-        let frame_processing_time = std::time::SystemTime::now()
-            .duration_since(frame_start)
-            .unwrap()
-            .as_nanos();
-        let mut delay = 1_000_000_000u64 / framerate;
-        if frame_processing_time > delay.into() {
-            delay = 0;
-        } else {
-            delay -= frame_processing_time as u64;
+        let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
+        if frame_time < desired_frame_length {
+            let st = (desired_frame_length - frame_time);
+            spin_sleep::sleep(st);
         }
-        ::std::thread::sleep(std::time::Duration::from_nanos(delay));
+
+        let new_frame_time = std::time::SystemTime::now();
+        let new_fps = 1_000_000_000.0
+            / new_frame_time
+                .duration_since(last_frame_time)
+                .unwrap()
+                .as_nanos() as f64;
+        fps = (fps * 0.95) + (0.05 * new_fps);
+        last_frame_time = new_frame_time;
     }
 }
 
