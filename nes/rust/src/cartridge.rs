@@ -33,6 +33,7 @@ pub struct NesCartridgeData {
     inst_rom: Option<Vec<u8>>,
     prom: Option<(Vec<u8>, Vec<u8>)>,
     prg_ram: Vec<u8>,
+    /// True for vertical mirroring, false for horizontal mirroring
     mirroring: bool,
     mapper: u32,
 }

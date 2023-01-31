@@ -12,7 +12,7 @@ pub struct NesMotherboard {
     vram_address: Option<u16>,
     last_ppu_cycle: u8,
     last_cpu_data: u8,
-    controllers: [Option<Box<dyn NesController>>; 2],
+    pub controllers: [Option<Box<dyn NesController>>; 2],
 }
 
 impl NesMotherboard {

@@ -195,6 +195,16 @@ impl TrackedWindow for MainNesWindow {
         let mut quit = false;
         let mut windows_to_create = vec![];
 
+        {
+            let input = egui.egui_ctx.input();
+            if let Some(c) = &mut c.mb.controllers[0] {
+                c.provide_egui_ref(&input);
+            }
+            if let Some(c) = &mut c.mb.controllers[1] {
+                c.provide_egui_ref(&input);
+            }
+        }
+
         'emulator_loop: loop {
             #[cfg(debug_assertions)]
             {
@@ -605,6 +615,7 @@ fn main() {
         "./nes/test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string(),
     )
     .unwrap();
+    nes_data.mb.controllers[0] = Some(Box::new(controller::StandardController::new()));
     nes_data.insert_cartridge(nc);
 
     let _e = multi_window.add(root_window, &event_loop);
