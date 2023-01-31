@@ -195,10 +195,6 @@ impl TrackedWindow for MainNesWindow {
         let mut quit = false;
         let mut windows_to_create = vec![];
 
-        let time_now = std::time::SystemTime::now();
-        let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
-        self.last_frame_time = time_now;
-
         'emulator_loop: loop {
             #[cfg(debug_assertions)]
             {
@@ -271,11 +267,26 @@ impl TrackedWindow for MainNesWindow {
             if let Some(t) = &c.texture {
                 ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
             }
-            ui.label(format!(
-                "{:.0} FPS",
-                1_000_000_000.0 / frame_time.as_nanos() as f64
-            ));
+            ui.label(format!("{:.0} FPS", self.fps));
         });
+
+        let time_now = std::time::SystemTime::now();
+        let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
+        let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
+        if frame_time < desired_frame_length {
+            let st = (desired_frame_length - frame_time);
+            spin_sleep::sleep(st);
+        }
+
+        let new_frame_time = std::time::SystemTime::now();
+        let new_fps = 1_000_000_000.0
+            / new_frame_time
+                .duration_since(self.last_frame_time)
+                .unwrap()
+                .as_nanos() as f64;
+        self.fps = (self.fps * 0.95) + (0.05 * new_fps);
+        self.last_frame_time = new_frame_time;
+
         RedrawResponse {
             quit: quit,
             new_windows: windows_to_create,
