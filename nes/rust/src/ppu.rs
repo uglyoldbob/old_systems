@@ -6,6 +6,31 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
+enum PpuSpriteEvalMode {
+    Normal,
+    CopyCurrentSprite,
+    Sprites8,
+    Done,
+}
+
+struct PpuSprite {
+    y: u8,
+    tile: u8,
+    attribute: u8,
+    x: u8,
+}
+
+impl PpuSprite {
+    fn new() -> Self {
+        Self {
+            y: 0xff,
+            tile: 0xff,
+            attribute: 0xff,
+            x: 0xff,
+        }
+    }
+}
+
 pub struct NesPpu {
     registers: [u8; 8],
     scanline_number: u16,
@@ -33,9 +58,17 @@ pub struct NesPpu {
     last_cpu_data: u8,
     last_cpu_counter: [u32; 2],
     oam: [u8; 256],
+    secondary_oam: [u8; 32],
+    sprites: [PpuSprite; 8],
+    secondaryoamaddress: u8,
+    oamdata: u8,
     oamaddress: u8,
+    sprite_eval_mode: PpuSpriteEvalMode,
     cycle1_done: bool,
     debug_special: bool,
+    scrollx: u8,
+    scrolly: u8,
+    frame_scrolly: u8,
 }
 
 const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
@@ -137,6 +170,11 @@ impl NesPpu {
         for i in &mut oam {
             *i = rand::random();
         }
+
+        let mut oam2 = [0; 32];
+        for i in &mut oam2 {
+            *i = rand::random();
+        }
         Self {
             scanline_number: 0,
             scanline_cycle: 0,
@@ -164,9 +202,17 @@ impl NesPpu {
             last_cpu_data: 0,
             last_cpu_counter: [0, 0],
             oam: oam,
+            secondary_oam: oam2,
+            sprites: [PpuSprite::new(); 8],
+            secondaryoamaddress: 0,
+            oamdata: 0,
+            sprite_eval_mode: PpuSpriteEvalMode::Normal,
             oamaddress: 0,
             cycle1_done: false,
             debug_special: false,
+            scrollx: 0,
+            scrolly: 0,
+            frame_scrolly: 0,
         }
     }
 
@@ -256,6 +302,11 @@ impl NesPpu {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
                     match addr {
                         5 => {
+                            if !self.address_bit {
+                                self.scrollx = data;
+                            } else {
+                                self.scrolly = data;
+                            }
                             self.address_bit = !self.address_bit;
                         }
                         6 => {
@@ -461,6 +512,96 @@ impl NesPpu {
         }
     }
 
+    fn sprite_height(&self) -> u8 {
+        let big = (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0;
+        if big {
+            16
+        } else {
+            8
+        }
+    }
+
+    fn sprite_eval(&mut self) {
+        if self.scanline_number < 240 {
+            match self.scanline_cycle {
+                0 => {
+                    //TODO: trigger bug that occurs when oamaddress is nonzero
+                    //it copies 8 bytes of sprite data
+                    self.oamaddress = 0;
+                }
+                1..=64 => {
+                    if (self.scanline_cycle & 1) == 0 {
+                        self.secondary_oam[(self.scanline_cycle >> 2) as usize] = 0xff;
+                    }
+                }
+                65..=256 => {
+                    if self.scanline_cycle == 65 {}
+                    if (self.scanline_cycle & 1) == 1 {
+                        self.oamdata = self.oam[self.oamaddress as usize];
+                    } else {
+                        match self.sprite_eval_mode {
+                            PpuSpriteEvalMode::Normal => {
+                                //range check
+                                if self.scanline_number >= self.oamdata as u16
+                                    && self.scanline_number
+                                        < (self.oamdata + self.sprite_height()) as u16
+                                {
+                                    self.secondary_oam[self.secondaryoamaddress as usize] =
+                                        self.oamdata;
+                                    self.oamaddress = self.oamaddress.wrapping_add(1);
+                                    self.secondaryoamaddress = self.secondaryoamaddress + 1;
+                                    self.sprite_eval_mode = PpuSpriteEvalMode::CopyCurrentSprite;
+                                } else {
+                                    self.oamaddress = self.oamaddress.wrapping_add(4);
+                                    if self.oamaddress == 0 {
+                                        self.sprite_eval_mode = PpuSpriteEvalMode::Done;
+                                    }
+                                }
+                            }
+                            PpuSpriteEvalMode::Sprites8 => {
+                                if self.scanline_number >= self.oamdata as u16
+                                    && self.scanline_number
+                                        < (self.oamdata + self.sprite_height()) as u16
+                                {
+                                    self.sprite_eval_mode = PpuSpriteEvalMode::Done;
+                                    self.registers[2] |= 0x20; //the sprite overflow flag
+                                    self.oamaddress = self.oamaddress.wrapping_add(1);
+                                } else {
+                                    self.oamaddress = self.oamaddress.wrapping_add(5);
+                                    if self.oamaddress < 4 {
+                                        self.sprite_eval_mode = PpuSpriteEvalMode::Done;
+                                    }
+                                }
+                            }
+                            PpuSpriteEvalMode::CopyCurrentSprite => {
+                                self.secondary_oam[self.secondaryoamaddress as usize] =
+                                    self.oamdata;
+                                self.oamaddress = self.oamaddress.wrapping_add(1);
+                                self.secondaryoamaddress = self.secondaryoamaddress + 1;
+                                if (self.secondaryoamaddress & 3) == 0 {
+                                    //done copying the sprite
+                                    if self.oamaddress == 0 {
+                                        //done checking all 64 sprites
+                                        self.sprite_eval_mode = PpuSpriteEvalMode::Done;
+                                    } else if self.secondaryoamaddress == 0 {
+                                        //found 8 sprites already
+                                        self.sprite_eval_mode = PpuSpriteEvalMode::Sprites8;
+                                    } else {
+                                        self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+                                    }
+                                }
+                            }
+                            PpuSpriteEvalMode::Done => {
+                                self.oamaddress = self.oamaddress.wrapping_add(4);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn cycle(&mut self, bus: &mut dyn NesMemoryBus) {
         if self.write_ignore_counter < PPU_STARTUP_CYCLE_COUNT {
             self.write_ignore_counter += 1;
@@ -479,6 +620,8 @@ impl NesPpu {
         }
 
         let vblank_flag = (self.registers[2] & 0x80) != 0;
+
+        self.sprite_eval();
 
         //if else chain allows the constants to be changed later to variables
         //to allow for ntsc/pal to be emulated

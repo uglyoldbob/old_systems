@@ -16,15 +16,14 @@ pub struct StandardController {
     strobe: bool,
 }
 
-const BUTTON_A : u8 = 0x01;
-const BUTTON_B : u8 = 0x02;
-const BUTTON_SELECT : u8 = 0x04;
-const BUTTON_START : u8 = 0x08;
-const BUTTON_UP : u8 = 0x10;
-const BUTTON_DOWN : u8 = 0x20;
-const BUTTON_LEFT : u8 = 0x40;
-const BUTTON_RIGHT : u8 = 0x80;
-
+const BUTTON_A: u8 = 0x01;
+const BUTTON_B: u8 = 0x02;
+const BUTTON_SELECT: u8 = 0x04;
+const BUTTON_START: u8 = 0x08;
+const BUTTON_UP: u8 = 0x10;
+const BUTTON_DOWN: u8 = 0x20;
+const BUTTON_LEFT: u8 = 0x40;
+const BUTTON_RIGHT: u8 = 0x80;
 
 impl StandardController {
     pub fn new() -> Self {
@@ -50,12 +49,12 @@ impl NesController for StandardController {
     fn read_data(&mut self) -> u8 {
         self.check_strobe();
         let data = self.shift_register & 1;
-        self.shift_register = (self.shift_register>>1) | 0x80;
+        self.shift_register = (self.shift_register >> 1) | 0x80;
         data
     }
     fn provide_egui_ref(&mut self, data: &egui::InputState) {
         let kd = &data.keys_down;
-        let mut newkeys : u8 = 0;
+        let mut newkeys: u8 = 0;
         if kd.contains(&egui::Key::A) {
             newkeys |= BUTTON_A;
         }
@@ -64,14 +63,12 @@ impl NesController for StandardController {
         }
         if kd.contains(&egui::Key::ArrowUp) {
             newkeys |= BUTTON_UP;
-        }
-        else if kd.contains(&egui::Key::ArrowDown) {
+        } else if kd.contains(&egui::Key::ArrowDown) {
             newkeys |= BUTTON_DOWN;
         }
         if kd.contains(&egui::Key::ArrowLeft) {
             newkeys |= BUTTON_LEFT;
-        }
-        else if kd.contains(&egui::Key::ArrowRight) {
+        } else if kd.contains(&egui::Key::ArrowRight) {
             newkeys |= BUTTON_RIGHT;
         }
         if kd.contains(&egui::Key::Enter) {
@@ -82,7 +79,7 @@ impl NesController for StandardController {
         }
 
         self.controller_buttons = newkeys;
-        
+
         self.check_strobe();
     }
 }
