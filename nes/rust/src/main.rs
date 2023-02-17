@@ -8,6 +8,9 @@ pub mod emulator_data;
 pub mod motherboard;
 pub mod ppu;
 pub mod utility;
+use std::path::PathBuf;
+
+use egui_multiwin::egui::Sense;
 use emulator_data::NesEmulatorData;
 
 #[cfg(test)]
@@ -254,6 +257,7 @@ impl TrackedWindow for MainNesWindow {
                 ui.menu_button("File", |ui| {
                     let button = egui_multiwin::egui::Button::new("Open rom?");
                     if ui.add_enabled(true, button).clicked() {
+                        windows_to_create.push(RomFinder::new());
                         ui.close_menu();
                     }
                 });
@@ -388,6 +392,91 @@ impl TrackedWindow for DebugNesWindow {
                 ));
             }
         });
+        RedrawResponse {
+            quit: quit,
+            new_windows: windows_to_create,
+        }
+    }
+}
+
+#[cfg(feature = "egui-multiwin")]
+struct RomFinder {
+    roms: Vec<PathBuf>,
+}
+
+#[cfg(feature = "egui-multiwin")]
+impl RomFinder {
+    fn find_roms() -> Vec<PathBuf> {
+        let mut roms = Vec::new();
+
+        for entry in walkdir::WalkDir::new("./roms/")
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !e.file_type().is_dir())
+        {
+            let m = entry.clone().into_path();
+            let name = m.into_os_string().into_string().unwrap();
+            if NesCartridge::load_cartridge(name).is_ok() {
+                roms.push(entry.into_path());
+            }
+        }
+        roms
+    }
+
+    fn new() -> NewWindowRequest<NesEmulatorData> {
+        NewWindowRequest {
+            window_state: Box::new(RomFinder {
+                roms: RomFinder::find_roms(),
+            }),
+            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+                .with_resizable(true)
+                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                    width: 320.0,
+                    height: 240.0,
+                })
+                .with_title("UglyOldBob NES Rom Select"),
+            options: egui_multiwin::tracked_window::TrackedWindowOptions {
+                vsync: false,
+                shader: None,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "egui-multiwin")]
+impl TrackedWindow for RomFinder {
+    type Data = NesEmulatorData;
+
+    fn is_root(&self) -> bool {
+        false
+    }
+
+    fn set_root(&mut self, _root: bool) {}
+
+    fn redraw(
+        &mut self,
+        c: &mut NesEmulatorData,
+        egui: &mut EguiGlow,
+    ) -> RedrawResponse<Self::Data> {
+        let mut quit = false;
+        let mut windows_to_create = vec![];
+
+        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                for i in self.roms.iter() {
+                    if ui
+                        .add(
+                            egui_multiwin::egui::Label::new(format!("{}", i.display()))
+                                .sense(Sense::click()),
+                        )
+                        .double_clicked()
+                    {
+                        println!("You tried to open a rom. Please don't do that");
+                    }
+                }
+            });
+        });
+
         RedrawResponse {
             quit: quit,
             new_windows: windows_to_create,
@@ -611,10 +700,8 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge(
-        "./nes/test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("./nes/roms/USA/Spelunker (U) [!].nes".to_string()).unwrap();
     nes_data.mb.controllers[0] = Some(Box::new(controller::StandardController::new()));
     nes_data.insert_cartridge(nc);
 

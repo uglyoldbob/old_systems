@@ -50,6 +50,7 @@ pub enum CartridgeError {
     InvalidRom,
     IncompatibleRom,
     IncompatibleMapper(u16),
+    RomTooShort,
 }
 
 impl NesCartridge {
@@ -79,6 +80,9 @@ impl NesCartridge {
         let trainer = if (rom_contents[6] & 8) != 0 {
             let mut trainer = Vec::with_capacity(512);
             for i in 0..512 {
+                if rom_contents.len() <= (file_offset + i) {
+                    return Err(CartridgeError::RomTooShort);
+                }
                 trainer.push(rom_contents[file_offset + i]);
             }
             file_offset += 512;
@@ -87,12 +91,18 @@ impl NesCartridge {
             None
         };
         for i in 0..prg_rom_size {
+            if rom_contents.len() <= (file_offset + i) {
+                return Err(CartridgeError::RomTooShort);
+            }
             prg_rom.push(rom_contents[file_offset + i]);
         }
         file_offset += prg_rom_size;
         if chr_rom_size != 0 {
             for i in 0..chr_rom_size {
                 let data = if !chr_ram {
+                    if rom_contents.len() <= (file_offset + i) {
+                        return Err(CartridgeError::RomTooShort);
+                    }
                     rom_contents[file_offset + i]
                 } else {
                     rand::random()
@@ -104,6 +114,9 @@ impl NesCartridge {
         let inst_rom = if (rom_contents[7] & 2) != 0 {
             let mut irom = Vec::with_capacity(8192);
             for i in 0..8192 {
+                if rom_contents.len() <= (file_offset + i) {
+                    return Err(CartridgeError::RomTooShort);
+                }
                 irom.push(rom_contents[file_offset + i]);
             }
             //file_offset += 8192;
@@ -147,7 +160,7 @@ impl NesCartridge {
     }
 
     fn load_ines2(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        unimplemented!()
+        Err(CartridgeError::IncompatibleRom)
     }
 
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {

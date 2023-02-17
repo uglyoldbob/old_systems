@@ -1496,6 +1496,7 @@ dependencies = [
  "rand",
  "sdl2",
  "spin_sleep",
+ "walkdir",
 ]
 
 [[package]]
