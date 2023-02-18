@@ -8,8 +8,11 @@ pub mod emulator_data;
 pub mod motherboard;
 pub mod ppu;
 pub mod utility;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
+use cartridge::CartridgeError;
 use egui_multiwin::egui::Sense;
 use emulator_data::NesEmulatorData;
 
@@ -288,7 +291,7 @@ impl TrackedWindow for MainNesWindow {
         let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
         let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         if frame_time < desired_frame_length {
-            let st = (desired_frame_length - frame_time);
+            let st = desired_frame_length - frame_time;
             spin_sleep::sleep(st);
         }
 
@@ -399,34 +402,104 @@ impl TrackedWindow for DebugNesWindow {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct RomListEntry {
+    result: Option<Result<(), CartridgeError>>,
+    modified: Option<std::time::SystemTime>,
+}
+
+//TODO Create benchmark to determine if the caching scheme is actually beneficial
+#[derive(Serialize, Deserialize)]
+pub struct RomList {
+    elements: HashMap<PathBuf, RomListEntry>,
+}
+
+impl RomList {
+    fn new() -> Self {
+        Self {
+            elements: HashMap::new(),
+        }
+    }
+
+    pub fn load_list() -> Self {
+        let contents = std::fs::read("./roms.bin");
+        if let Err(e) = contents {
+            return RomList::new();
+        }
+        let contents = contents.unwrap();
+        let config = bincode::deserialize(&contents[..]);
+        config.ok().unwrap_or(RomList::new())
+    }
+
+    fn save_list(&self) -> std::io::Result<()> {
+        let encoded = bincode::serialize(&self).unwrap();
+        std::fs::write("./roms.bin", encoded)
+    }
+}
+
 #[cfg(feature = "egui-multiwin")]
 struct RomFinder {
-    roms: Vec<PathBuf>,
+    scan_complete: bool,
+    update_complete: bool,
 }
 
 #[cfg(feature = "egui-multiwin")]
 impl RomFinder {
-    fn find_roms() -> Vec<PathBuf> {
-        let mut roms = Vec::new();
+    fn find_roms(&mut self, rom_list: &mut RomList) {
+        if !self.scan_complete {
+            for entry in walkdir::WalkDir::new("./roms/")
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|e| !e.file_type().is_dir())
+            {
+                let meta = entry.metadata();
+                if let Ok(meta) = meta {
+                    let modified = meta.modified();
 
-        for entry in walkdir::WalkDir::new("./roms/")
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| !e.file_type().is_dir())
-        {
-            let m = entry.clone().into_path();
-            let name = m.into_os_string().into_string().unwrap();
-            if NesCartridge::load_cartridge(name).is_ok() {
-                roms.push(entry.into_path());
+                    let m = entry.clone().into_path();
+                    let name = m.clone().into_os_string().into_string().unwrap();
+                    if NesCartridge::load_cartridge(name).is_ok() {
+                        if !rom_list.elements.contains_key(&m) {
+                            let new_entry = RomListEntry {
+                                result: None,
+                                modified: None,
+                            };
+                            rom_list.elements.insert(m, new_entry);
+                        }
+                    }
+                }
             }
+            rom_list.save_list();
+            self.scan_complete = true;
         }
-        roms
+    }
+
+    fn process_roms(&mut self, rom_list: &mut RomList) {
+        if !self.update_complete {
+            for (p, entry) in rom_list.elements.iter_mut() {
+                let metadata = p.metadata();
+                if let Ok(metadata) = metadata {
+                    let modified = metadata.modified().unwrap_or(std::time::SystemTime::now());
+                    let last_modified = entry.modified.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                    if modified > last_modified {
+                        let romcheck = NesCartridge::load_cartridge(
+                            p.as_os_str().to_str().unwrap().to_string(),
+                        );
+                        entry.result = Some(romcheck.map(|_i| ()));
+                        entry.modified = Some(modified);
+                    }
+                }
+            }
+            rom_list.save_list();
+            self.update_complete = true;
+        }
     }
 
     fn new() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(RomFinder {
-                roms: RomFinder::find_roms(),
+                scan_complete: false,
+                update_complete: false,
             }),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -461,22 +534,37 @@ impl TrackedWindow for RomFinder {
         let mut quit = false;
         let mut windows_to_create = vec![];
 
+        //scan for roms if needed
+        self.find_roms(&mut c.roms);
+        //process to see if any new roms need to be checked
+        self.process_roms(&mut c.roms);
+
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
-                for i in self.roms.iter() {
-                    if ui
-                        .add(
-                            egui_multiwin::egui::Label::new(format!("{}", i.display()))
-                                .sense(Sense::click()),
-                        )
-                        .double_clicked()
-                    {
-                        let nc = NesCartridge::load_cartridge(i.to_str().unwrap().into()).unwrap();
-                        c.remove_cartridge();
-                        c.insert_cartridge(nc);
-                        c.reset();
-                        quit = true;
+                let mut new_rom = None;
+                for (p, entry) in c.roms.elements.iter() {
+                    if let Some(r) = &entry.result {
+                        if r.is_ok() {
+                            if ui
+                                .add(
+                                    egui_multiwin::egui::Label::new(format!("{}", p.display()))
+                                        .sense(Sense::click()),
+                                )
+                                .double_clicked()
+                            {
+                                new_rom = Some(
+                                    NesCartridge::load_cartridge(p.to_str().unwrap().into())
+                                        .unwrap(),
+                                );
+                                quit = true;
+                            }
+                        }
                     }
+                }
+                if let Some(nc) = new_rom {
+                    c.remove_cartridge();
+                    c.insert_cartridge(nc);
+                    c.reset();
                 }
             });
         });

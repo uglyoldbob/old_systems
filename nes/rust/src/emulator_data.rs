@@ -4,6 +4,7 @@ use crate::{
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
+    RomList,
 };
 
 #[cfg(feature = "eframe")]
@@ -29,6 +30,7 @@ pub struct NesEmulatorData {
     pub texture: Option<egui::TextureHandle>,
     nmi: [bool; 3],
     prev_irq: bool,
+    pub roms: RomList,
 }
 
 impl NesEmulatorData {
@@ -57,6 +59,7 @@ impl NesEmulatorData {
             texture: None,
             nmi: [false; 3],
             prev_irq: false,
+            roms: RomList::load_list(),
         }
     }
 

@@ -2,6 +2,8 @@ mod mapper00;
 mod mapper01;
 mod mapper03;
 
+use serde::{Deserialize, Serialize};
+
 pub trait NesMapper {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
@@ -44,9 +46,9 @@ pub struct NesCartridge {
     mapper: Box<dyn NesMapper>,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum CartridgeError {
-    FsError(std::io::Error),
+    FsError(String),
     InvalidRom,
     IncompatibleRom,
     IncompatibleMapper(u16),
@@ -166,7 +168,7 @@ impl NesCartridge {
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
         let rom_contents = std::fs::read(name);
         if let Err(e) = rom_contents {
-            return Err(CartridgeError::FsError(e));
+            return Err(CartridgeError::FsError(e.kind().to_string()));
         }
         let rom_contents = rom_contents.unwrap();
         if rom_contents[0] != 'N' as u8
