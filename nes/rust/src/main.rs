@@ -471,7 +471,11 @@ impl TrackedWindow for RomFinder {
                         )
                         .double_clicked()
                     {
-                        println!("You tried to open a rom. Please don't do that");
+                        let nc = NesCartridge::load_cartridge(i.to_str().unwrap().into()).unwrap();
+                        c.remove_cartridge();
+                        c.insert_cartridge(nc);
+                        c.reset();
+                        quit = true;
                     }
                 }
             });

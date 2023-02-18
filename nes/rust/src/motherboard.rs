@@ -44,6 +44,10 @@ impl NesMotherboard {
         }
     }
 
+    pub fn remove_cartridge(&mut self) {
+        self.cart = None;
+    }
+
     pub fn insert_cartridge(&mut self, c: NesCartridge) {
         if let None = self.cart {
             self.cart = Some(c);

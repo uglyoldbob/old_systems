@@ -7951,17 +7951,7 @@ impl NesCpu {
                             self.end_instruction();
                         }
                     },
-                    _ => {
-                        println!(
-                            "{}",
-                            format!(
-                                "CPU OPCODE {:x} not implemented address 0x{:x}",
-                                o,
-                                self.pc.wrapping_sub(1)
-                            )
-                        );
-                        unimplemented!();
-                    }
+                    _ => {}
                 }
             }
         }
