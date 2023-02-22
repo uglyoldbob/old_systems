@@ -9,7 +9,6 @@ pub mod motherboard;
 pub mod ppu;
 pub mod utility;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use cartridge::CartridgeError;
@@ -411,13 +410,13 @@ struct RomListEntry {
 //TODO Create benchmark to determine if the caching scheme is actually beneficial
 #[derive(Serialize, Deserialize)]
 pub struct RomList {
-    elements: HashMap<PathBuf, RomListEntry>,
+    elements: std::collections::BTreeMap<PathBuf, RomListEntry>,
 }
 
 impl RomList {
     fn new() -> Self {
         Self {
-            elements: HashMap::new(),
+            elements: std::collections::BTreeMap::new(),
         }
     }
 
@@ -792,8 +791,8 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc =
-        NesCartridge::load_cartridge("./nes/roms/USA/Spelunker (U) [!].nes".to_string()).unwrap();
+    let nc = NesCartridge::load_cartridge("./nes/test_roms/read_joy3/test_buttons.nes".to_string())
+        .unwrap();
     nes_data.mb.controllers[0] = Some(Box::new(controller::StandardController::new()));
     nes_data.insert_cartridge(nc);
 

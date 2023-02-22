@@ -730,36 +730,37 @@ impl NesPpu {
                 };
                 let spr_pixel = if self.should_render_sprites(cycle) {
                     let index = 7 - cycle % 8;
-                    let sprite_pixels = self.sprites.map(|e| {
-                        if self.scanline_cycle >= e.y as u16
-                            && (self.scanline_cycle < (e.y as u16 + 8))
-                        {
-                            let pt = e.patterntable_data.to_le_bytes();
-                            let upper_bit = (pt[1] >> index) & 1;
-                            let lower_bit = (pt[0] >> index) & 1;
+                    let mut sprite_pixels =
+                        self.sprites.iter().enumerate().filter_map(|(index, e)| {
+                            if cycle >= e.y as u16 && (cycle < (e.y as u16 + 8)) {
+                                let pt = e.patterntable_data.to_le_bytes();
+                                let upper_bit = (pt[1] >> index) & 1;
+                                let lower_bit = (pt[0] >> index) & 1;
 
-                            let modx = (cycle / 16) & 1;
-                            let mody = (self.scanline_number / 16) & 1;
-                            let combined = mody << 1 | modx;
-                            let extra_palette_bits = (e.attribute & 3) << 2 | 1;
-                            let mut palette_entry =
-                                (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as u16;
-                            if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
-                                palette_entry &= 0x30;
+                                let modx = (cycle / 16) & 1;
+                                let mody = (self.scanline_number / 16) & 1;
+                                let combined = mody << 1 | modx;
+                                let extra_palette_bits = (e.attribute & 3) << 2 | 1;
+                                let mut palette_entry =
+                                    (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as u16;
+                                if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                                    palette_entry &= 0x30;
+                                }
+                                let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
+                                Some((index, pixel_entry))
+                            } else {
+                                None
                             }
-                            let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
-                            Some(pixel_entry)
-                        } else {
-                            None
-                        }
-                    });
-                    let mut thing = sprite_pixels.iter().rev().filter_map(|e| *e);
-                    thing.next()
+                        });
+                    sprite_pixels.next()
                 } else {
                     None
                 };
 
-                let pixel_entry = if let Some(spr) = spr_pixel {
+                let pixel_entry = if let Some((index, spr)) = spr_pixel {
+                    if bg_pixel.is_some() && index == 0 {
+                        self.registers[2] |= 0x40; //sprite 0 hit
+                    }
                     spr
                 } else if let Some(bg) = bg_pixel {
                     bg

@@ -171,6 +171,9 @@ impl NesCartridge {
             return Err(CartridgeError::FsError(e.kind().to_string()));
         }
         let rom_contents = rom_contents.unwrap();
+        if rom_contents.len() < 16 {
+            return Err(CartridgeError::InvalidRom);
+        }
         if rom_contents[0] != 'N' as u8
             || rom_contents[1] != 'E' as u8
             || rom_contents[2] != 'S' as u8
