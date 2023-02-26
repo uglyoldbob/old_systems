@@ -569,6 +569,7 @@ impl NesPpu {
     }
 
     fn sprite_eval(&mut self) {
+        let mut num_sprites = 0;
         if self.scanline_number < 240 {
             match self.scanline_cycle {
                 0 => {
@@ -582,7 +583,10 @@ impl NesPpu {
                     }
                 }
                 65..=256 => {
-                    if self.scanline_cycle == 65 {}
+                    if self.scanline_cycle == 65 {
+                        self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+                        self.secondaryoamaddress = 0;
+                    }
                     if (self.scanline_cycle & 1) == 1 {
                         self.oamdata = self.oam[self.oamaddress as usize];
                     } else {
@@ -591,8 +595,9 @@ impl NesPpu {
                                 //range check
                                 if self.scanline_number >= self.oamdata as u16
                                     && self.scanline_number
-                                        < (self.oamdata + self.sprite_height()) as u16
+                                        < (self.oamdata as u16 + self.sprite_height() as u16)
                                 {
+                                    num_sprites += 1;
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
@@ -630,7 +635,7 @@ impl NesPpu {
                                     if self.oamaddress == 0 {
                                         //done checking all 64 sprites
                                         self.sprite_eval_mode = PpuSpriteEvalMode::Done;
-                                    } else if self.secondaryoamaddress == 0 {
+                                    } else if self.secondaryoamaddress == 32 {
                                         //found 8 sprites already
                                         self.sprite_eval_mode = PpuSpriteEvalMode::Sprites8;
                                     } else {
@@ -673,7 +678,10 @@ impl NesPpu {
 
         let vblank_flag = (self.registers[2] & 0x80) != 0;
 
-        self.sprite_eval();
+        if self.should_render_sprites(0) || self.should_render_sprites(8) 
+        || self.should_render_background(0) || self.should_render_background(8) {
+            self.sprite_eval();
+        }
 
         //if else chain allows the constants to be changed later to variables
         //to allow for ntsc/pal to be emulated
