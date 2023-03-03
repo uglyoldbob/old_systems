@@ -1195,10 +1195,9 @@ fn cpu_timing_test2() {
 #[test]
 fn ppu_sprite_test_1() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/sprite_overflow_tests/1.Basics.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/sprite_overflow_tests/1.Basics.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {

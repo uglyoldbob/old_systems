@@ -51,13 +51,28 @@ pub enum CartridgeError {
     FsError(String),
     InvalidRom,
     IncompatibleRom,
-    IncompatibleMapper(u16),
+    IncompatibleMapper(u32),
     RomTooShort,
 }
 
 impl NesCartridge {
     fn load_obsolete_ines(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
+    }
+
+    fn get_mapper(
+        mapper: u32,
+        rom_data: &NesCartridgeData,
+    ) -> Result<Box<dyn NesMapper>, CartridgeError> {
+        let mapper = match mapper {
+            0 => mapper00::Mapper::new(&rom_data),
+            1 => mapper01::Mapper::new(&rom_data),
+            3 => mapper03::Mapper::new(&rom_data),
+            _ => {
+                return Err(CartridgeError::IncompatibleMapper(mapper));
+            }
+        };
+        Ok(mapper)
     }
 
     fn load_ines1(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
@@ -69,7 +84,6 @@ impl NesCartridge {
             return Err(CartridgeError::InvalidRom);
         }
         let prg_rom_size = rom_contents[4] as usize * 16384;
-        let mut prg_rom = Vec::with_capacity(prg_rom_size);
 
         let mut chr_rom_size = rom_contents[5] as usize * 8192;
         let chr_ram = chr_rom_size == 0;
@@ -77,7 +91,6 @@ impl NesCartridge {
             //TODO determine correct size for chr-ram
             chr_rom_size = 8192 * 1;
         }
-        let mut chr_rom = Vec::with_capacity(chr_rom_size);
         let mut file_offset: usize = 16;
         let trainer = if (rom_contents[6] & 8) != 0 {
             let mut trainer = Vec::with_capacity(512);
@@ -92,6 +105,8 @@ impl NesCartridge {
         } else {
             None
         };
+
+        let mut prg_rom = Vec::with_capacity(prg_rom_size);
         for i in 0..prg_rom_size {
             if rom_contents.len() <= (file_offset + i) {
                 return Err(CartridgeError::RomTooShort);
@@ -99,6 +114,8 @@ impl NesCartridge {
             prg_rom.push(rom_contents[file_offset + i]);
         }
         file_offset += prg_rom_size;
+
+        let mut chr_rom = Vec::with_capacity(chr_rom_size);
         if chr_rom_size != 0 {
             for i in 0..chr_rom_size {
                 let data = if !chr_ram {
@@ -146,14 +163,7 @@ impl NesCartridge {
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mapper as u32,
         };
-        let mapper = match mapper {
-            0 => mapper00::Mapper::new(&rom_data),
-            1 => mapper01::Mapper::new(&rom_data),
-            3 => mapper03::Mapper::new(&rom_data),
-            _ => {
-                return Err(CartridgeError::IncompatibleMapper(mapper as u16));
-            }
-        };
+        let mapper = Self::get_mapper(mapper as u32, &rom_data)?;
 
         Ok(Self {
             data: rom_data,
@@ -161,8 +171,87 @@ impl NesCartridge {
         })
     }
 
-    fn load_ines2(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        Err(CartridgeError::IncompatibleRom)
+    fn load_ines2(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+        if rom_contents[0] != 'N' as u8
+            || rom_contents[1] != 'E' as u8
+            || rom_contents[2] != 'S' as u8
+            || rom_contents[3] != 0x1a
+        {
+            return Err(CartridgeError::InvalidRom);
+        }
+        let prg_rom_size = if (rom_contents[9] & 0xF) < 0xF {
+            (rom_contents[4] as usize | ((rom_contents[9] & 0xF) as usize) << 8) * 16384
+        } else {
+            let mult = (rom_contents[4] & 3) as usize * 2 + 1;
+            let exp = 2 << ((rom_contents[4] >> 2) as usize);
+            exp * mult
+        };
+
+        let mut file_offset: usize = 16;
+        let trainer = if (rom_contents[6] & (1 << 2)) != 0 {
+            let mut trainer = Vec::with_capacity(512);
+            for i in 0..512 {
+                if rom_contents.len() <= (file_offset + i) {
+                    return Err(CartridgeError::RomTooShort);
+                }
+                trainer.push(rom_contents[file_offset + i]);
+            }
+            file_offset += 512;
+            Some(trainer)
+        } else {
+            None
+        };
+
+        let mut prg_rom = Vec::with_capacity(prg_rom_size);
+        for i in 0..prg_rom_size {
+            if rom_contents.len() <= (file_offset + i) {
+                return Err(CartridgeError::RomTooShort);
+            }
+            prg_rom.push(rom_contents[file_offset + i]);
+        }
+        file_offset += prg_rom_size;
+
+        let chr_rom_size = if (rom_contents[9] & 0xF) < 0xF {
+            (rom_contents[4] as usize | ((rom_contents[9] & 0xF0) as usize) << 4) * 8192
+        } else {
+            let mult = (rom_contents[4] & 3) as usize * 2 + 1;
+            let exp = 2 << ((rom_contents[4] >> 2) as usize);
+            exp * mult
+        };
+
+        let mut chr_rom = Vec::with_capacity(chr_rom_size);
+
+        if chr_rom_size != 0 {
+            for i in 0..chr_rom_size {
+                if rom_contents.len() <= (file_offset + i) {
+                    return Err(CartridgeError::RomTooShort);
+                }
+                chr_rom.push(rom_contents[file_offset + i]);
+            }
+            file_offset += chr_rom_size;
+        }
+
+        let mapper = (rom_contents[6] >> 4) as u16
+            | (rom_contents[7] & 0xf0) as u16
+            | (rom_contents[8] as u16) << 8;
+        let rom_data = NesCartridgeData {
+            trainer: trainer,
+            prg_rom: prg_rom,
+            chr_rom: chr_rom,
+            chr_ram: false,
+            inst_rom: None,
+            prom: None,
+            prg_ram: Vec::new(),
+            mirroring: (rom_contents[6] & 1) != 0,
+            mapper: mapper as u32,
+        };
+
+        let mapper = NesCartridge::get_mapper(mapper as u32, &rom_data)?;
+
+        Ok(Self {
+            data: rom_data,
+            mapper: mapper,
+        })
     }
 
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {

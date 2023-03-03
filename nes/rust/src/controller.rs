@@ -28,8 +28,8 @@ const BUTTON_RIGHT: u8 = 0x80;
 impl StandardController {
     pub fn new() -> Self {
         Self {
-            controller_buttons: 0,
-            shift_register: 0,
+            controller_buttons: 0xff,
+            shift_register: 0xff,
             strobe: false,
         }
     }
@@ -49,33 +49,33 @@ impl NesController for StandardController {
     fn read_data(&mut self) -> u8 {
         self.check_strobe();
         let data = self.shift_register & 1;
-        self.shift_register = (self.shift_register >> 1) | 0x80;
+        self.shift_register = (self.shift_register >> 1) | 0x00;
         data
     }
     fn provide_egui_ref(&mut self, data: &egui::InputState) {
         let kd = &data.keys_down;
-        let mut newkeys: u8 = 0;
-        if kd.contains(&egui::Key::A) {
-            newkeys |= BUTTON_A;
+        let mut newkeys: u8 = 0xff;
+        if kd.contains(&egui::Key::F) {
+            newkeys &= !BUTTON_A;
         }
-        if kd.contains(&egui::Key::B) {
-            newkeys |= BUTTON_B;
+        if kd.contains(&egui::Key::D) {
+            newkeys &= !BUTTON_B;
         }
         if kd.contains(&egui::Key::ArrowUp) {
-            newkeys |= BUTTON_UP;
+            newkeys &= !BUTTON_UP;
         } else if kd.contains(&egui::Key::ArrowDown) {
-            newkeys |= BUTTON_DOWN;
+            newkeys &= !BUTTON_DOWN;
         }
         if kd.contains(&egui::Key::ArrowLeft) {
-            newkeys |= BUTTON_LEFT;
+            newkeys &= !BUTTON_LEFT;
         } else if kd.contains(&egui::Key::ArrowRight) {
-            newkeys |= BUTTON_RIGHT;
+            newkeys &= !BUTTON_RIGHT;
         }
-        if kd.contains(&egui::Key::Enter) {
-            newkeys |= BUTTON_START;
+        if kd.contains(&egui::Key::A) {
+            newkeys &= !BUTTON_START;
         }
-        if kd.contains(&egui::Key::Tab) {
-            newkeys |= BUTTON_SELECT;
+        if kd.contains(&egui::Key::S) {
+            newkeys &= !BUTTON_SELECT;
         }
 
         self.controller_buttons = newkeys;
