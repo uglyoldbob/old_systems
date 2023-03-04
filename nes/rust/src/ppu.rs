@@ -64,6 +64,7 @@ pub struct NesPpu {
     secondary_oam: [u8; 32],
     sprites: [PpuSprite; 8],
     secondaryoamaddress: u8,
+    numsprites: u8,
     oamdata: u8,
     oamaddress: u8,
     sprite_eval_mode: PpuSpriteEvalMode,
@@ -208,6 +209,7 @@ impl NesPpu {
             secondary_oam: oam2,
             sprites: [PpuSprite::new(); 8],
             secondaryoamaddress: 0,
+            numsprites: 0,
             oamdata: 0,
             sprite_eval_mode: PpuSpriteEvalMode::Normal,
             oamaddress: 0,
@@ -411,22 +413,26 @@ impl NesPpu {
         } else {
             let calc = (sprite.tile & 0xfe) as u16;
             let adder: u16 = if (sprite.tile & 1) == 0 { 0 } else { 0x1000 };
-            let sprite_line = scanline - sprite.y;
-            let tile2 = if (sprite.attribute & 0x80) == 0 {
-                if sprite_line >= 8 {
-                    0
+            if scanline >= sprite.y {
+                let sprite_line = scanline - sprite.y;
+                let tile2 = if (sprite.attribute & 0x80) == 0 {
+                    if sprite_line >= 8 {
+                        0
+                    } else {
+                        32
+                    }
                 } else {
-                    32
-                }
+                    //vertical sprite mirroring enabled
+                    if sprite_line >= 8 {
+                        32
+                    } else {
+                        0
+                    }
+                };
+                adder + calc * 0x10 + tile2
             } else {
-                //vertical sprite mirroring enabled
-                if sprite_line >= 8 {
-                    32
-                } else {
-                    0
-                }
-            };
-            adder + calc * 0x10 + tile2
+                0
+            }
         }
     }
 
@@ -569,13 +575,15 @@ impl NesPpu {
     }
 
     fn sprite_eval(&mut self) {
-        let mut num_sprites = 0;
         if self.scanline_number < 240 {
             match self.scanline_cycle {
                 0 => {
                     //TODO: trigger bug that occurs when oamaddress is nonzero
                     //it copies 8 bytes of sprite data
                     self.oamaddress = 0;
+                    self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+                    self.secondaryoamaddress = 0;
+                    self.numsprites = 0;
                 }
                 1..=64 => {
                     if (self.scanline_cycle & 1) == 0 {
@@ -583,10 +591,6 @@ impl NesPpu {
                     }
                 }
                 65..=256 => {
-                    if self.scanline_cycle == 65 {
-                        self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
-                        self.secondaryoamaddress = 0;
-                    }
                     if (self.scanline_cycle & 1) == 1 {
                         self.oamdata = self.oam[self.oamaddress as usize];
                     } else {
@@ -597,7 +601,7 @@ impl NesPpu {
                                     && self.scanline_number
                                         < (self.oamdata as u16 + self.sprite_height() as u16)
                                 {
-                                    num_sprites += 1;
+                                    self.numsprites += 1;
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
@@ -615,11 +619,12 @@ impl NesPpu {
                                     && self.scanline_number
                                         < (self.oamdata + self.sprite_height()) as u16
                                 {
+                                    self.numsprites += 1;
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     self.registers[2] |= 0x20; //the sprite overflow flag
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
                                 } else {
-                                    self.oamaddress = self.oamaddress.wrapping_add(5);
+                                    self.oamaddress = self.oamaddress.wrapping_add(4);
                                     if self.oamaddress < 4 {
                                         self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     }
@@ -645,6 +650,9 @@ impl NesPpu {
                             }
                             PpuSpriteEvalMode::Done => {
                                 self.oamaddress = self.oamaddress.wrapping_add(4);
+                                if self.numsprites > 0 {
+                                    self.numsprites = 0;
+                                }
                             }
                         }
                     }
@@ -678,8 +686,11 @@ impl NesPpu {
 
         let vblank_flag = (self.registers[2] & 0x80) != 0;
 
-        if self.should_render_sprites(0) || self.should_render_sprites(8) 
-        || self.should_render_background(0) || self.should_render_background(8) {
+        if self.should_render_sprites(0)
+            || self.should_render_sprites(8)
+            || self.should_render_background(0)
+            || self.should_render_background(8)
+        {
             self.sprite_eval();
         }
 
@@ -736,7 +747,7 @@ impl NesPpu {
                         [((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] = pixel[2];
                     None
                 };
-                let spr_pixel = if self.should_render_sprites(cycle) {
+                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) {
                     let index = 7 - cycle % 8;
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
@@ -760,7 +771,7 @@ impl NesPpu {
                                 None
                             }
                         });
-                    sprite_pixels.next()
+                    None //sprite_pixels.next()
                 } else {
                     None
                 };

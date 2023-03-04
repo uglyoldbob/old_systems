@@ -1210,3 +1210,22 @@ fn ppu_sprite_test_1() {
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
 }
+
+#[test]
+fn ppu_sprite_test_2() {
+    let mut nes_data = NesEmulatorData::new();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/sprite_overflow_tests/2.Details.nes".to_string())
+            .unwrap();
+    nes_data.insert_cartridge(nc);
+
+    loop {
+        nes_data.cycle_step();
+        if nes_data.cpu_peripherals.ppu_frame_end() {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
+                break;
+            }
+        }
+    }
+    assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
+}
