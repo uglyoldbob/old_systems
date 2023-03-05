@@ -21,6 +21,11 @@ mod tests;
 use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
+//const INITIAL_ROM : Option<&str> = None;
+const INITIAL_ROM : Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/3.Timing.nes");
+//const INITIAL_ROM : Option<&str> = Some("./nes/test_roms/controller/raw.nes");
+//const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
+
 #[cfg(feature = "eframe")]
 use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
@@ -791,10 +796,12 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    let nc = NesCartridge::load_cartridge("./nes/test_roms/read_joy3/test_buttons.nes".to_string())
-        .unwrap();
-    nes_data.mb.controllers[0] = Some(Box::new(controller::StandardController::new()));
-    nes_data.insert_cartridge(nc);
+    nes_data.mb.controllers[1] = Some(Box::new(controller::StandardController::new()));
+
+    if let Some(c) = INITIAL_ROM {
+        let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();
+        nes_data.insert_cartridge(nc);
+    }
 
     let _e = multi_window.add(root_window, &event_loop);
     #[cfg(debug_assertions)]

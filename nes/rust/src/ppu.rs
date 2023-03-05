@@ -399,11 +399,15 @@ impl NesPpu {
     }
 
     fn sprite_line_number(&self, sprite: &PpuSprite, scanline: u8) -> u8 {
-        let sprite_line = (sprite.y - scanline) & 7;
-        if (sprite.attribute & 0x80) == 0 {
-            sprite_line
+        if sprite.y > scanline {
+            let sprite_line = (sprite.y - scanline) & 7;
+            if (sprite.attribute & 0x80) == 0 {
+                sprite_line
+            } else {
+                7 - sprite_line
+            }
         } else {
-            7 - sprite_line
+            0
         }
     }
 
@@ -661,6 +665,27 @@ impl NesPpu {
                     //TODO load sprite units with data
                     //y, tile, attribute, then x for each sprite of the secondary oam
                     let cycle = self.scanline_cycle - 257;
+                    let sprite = cycle / 4;
+                    let index = cycle % 4;
+                    if sprite < 8 {
+                        match index {
+                            0 => {
+                                self.sprites[sprite as usize].y = self.secondary_oam[cycle as usize]
+                            }
+                            1 => {
+                                self.sprites[sprite as usize].tile =
+                                    self.secondary_oam[cycle as usize]
+                            }
+                            2 => {
+                                self.sprites[sprite as usize].attribute =
+                                    self.secondary_oam[cycle as usize]
+                            }
+                            3 => {
+                                self.sprites[sprite as usize].x = self.secondary_oam[cycle as usize]
+                            }
+                            _ => {}
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -751,7 +776,7 @@ impl NesPpu {
                     let index = 7 - cycle % 8;
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
-                            if cycle >= e.y as u16 && (cycle < (e.y as u16 + 8)) {
+                            if cycle >= e.x as u16 && (cycle < (e.x as u16 + 8)) && e.y < 240 {
                                 let pt = e.patterntable_data.to_le_bytes();
                                 let upper_bit = (pt[1] >> index) & 1;
                                 let lower_bit = (pt[0] >> index) & 1;
@@ -771,7 +796,7 @@ impl NesPpu {
                                 None
                             }
                         });
-                    None //sprite_pixels.next()
+                    sprite_pixels.next()
                 } else {
                     None
                 };
