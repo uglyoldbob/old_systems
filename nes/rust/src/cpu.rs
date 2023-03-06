@@ -1,4 +1,5 @@
 use crate::apu::NesApu;
+use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 
 pub struct NesCpuPeripherals {
@@ -11,7 +12,7 @@ impl NesCpuPeripherals {
         Self { ppu: ppu, apu: apu }
     }
 
-    pub fn ppu_cycle(&mut self, bus: &mut dyn NesMemoryBus) {
+    pub fn ppu_cycle(&mut self, bus: &mut NesMotherboard) {
         self.ppu.cycle(bus);
     }
 
@@ -43,28 +44,6 @@ impl NesCpuPeripherals {
     pub fn ppu_reset(&mut self) {
         self.ppu.reset();
     }
-}
-
-pub trait NesMemoryBus {
-    fn memory_cycle_read(
-        &mut self,
-        addr: u16,
-        out: [bool; 3],
-        controllers: [bool; 2],
-        per: &mut NesCpuPeripherals,
-    ) -> u8;
-    fn memory_cycle_write(
-        &mut self,
-        addr: u16,
-        data: u8,
-        out: [bool; 3],
-        controllers: [bool; 2],
-        per: &mut NesCpuPeripherals,
-    );
-    fn ppu_cycle_1(&mut self, addr: u16);
-    fn ppu_cycle_2_write(&mut self, data: u8);
-    fn ppu_cycle_2_read(&mut self) -> u8;
-    fn ppu_palette_read(&self, addr: u16) -> u8;
 }
 
 pub struct NesCpu {
@@ -253,7 +232,7 @@ impl NesCpu {
     fn memory_cycle_read(
         &mut self,
         addr: u16,
-        bus: &mut dyn NesMemoryBus,
+        bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) -> u8 {
         bus.memory_cycle_read(addr, self.outs, self.calc_oe(addr), cpu_peripherals)
@@ -263,7 +242,7 @@ impl NesCpu {
         &mut self,
         addr: u16,
         data: u8,
-        bus: &mut dyn NesMemoryBus,
+        bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
         if addr == 0x4014 {
@@ -301,7 +280,7 @@ impl NesCpu {
 
     pub fn cycle(
         &mut self,
-        bus: &mut dyn NesMemoryBus,
+        bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
         nmi: bool,
         irq: bool,

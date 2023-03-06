@@ -1,7 +1,7 @@
 use crate::{
     cartridge::NesCartridge,
     controller::NesController,
-    cpu::{NesCpuPeripherals, NesMemoryBus},
+    cpu::NesCpuPeripherals,
 };
 
 pub struct NesMotherboard {
@@ -71,10 +71,8 @@ impl NesMotherboard {
         }
         return true;
     }
-}
 
-impl NesMemoryBus for NesMotherboard {
-    fn memory_cycle_read(
+    pub fn memory_cycle_read(
         &mut self,
         addr: u16,
         _out: [bool; 3],
@@ -171,7 +169,8 @@ impl NesMemoryBus for NesMotherboard {
         }
         response
     }
-    fn memory_cycle_write(
+
+    pub fn memory_cycle_write(
         &mut self,
         addr: u16,
         data: u8,
@@ -246,7 +245,7 @@ impl NesMemoryBus for NesMotherboard {
         }
     }
 
-    fn ppu_cycle_1(&mut self, addr: u16) {
+    pub fn ppu_cycle_1(&mut self, addr: u16) {
         if self.last_ppu_cycle != 2 {
             println!("ERROR PPU CYCLING a");
         }
@@ -264,7 +263,8 @@ impl NesMemoryBus for NesMotherboard {
             };
         }
     }
-    fn ppu_cycle_2_write(&mut self, data: u8) {
+
+    pub fn ppu_cycle_2_write(&mut self, data: u8) {
         if self.last_ppu_cycle != 1 {
             println!("ERROR PPU CYCLING b");
         }
@@ -294,7 +294,8 @@ impl NesMemoryBus for NesMotherboard {
             }
         }
     }
-    fn ppu_cycle_2_read(&mut self) -> u8 {
+
+    pub fn ppu_cycle_2_read(&mut self) -> u8 {
         if self.last_ppu_cycle != 1 {
             println!("ERROR PPU CYCLING c");
         }
@@ -325,7 +326,7 @@ impl NesMemoryBus for NesMotherboard {
         }
     }
 
-    fn ppu_palette_read(&self, addr: u16) -> u8 {
+    pub fn ppu_palette_read(&self, addr: u16) -> u8 {
         let addr2: usize = (addr as usize) & 0x1f;
         self.ppu_palette_ram[addr2]
     }

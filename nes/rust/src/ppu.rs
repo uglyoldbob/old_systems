@@ -1,4 +1,4 @@
-use crate::cpu::NesMemoryBus;
+use crate::motherboard::NesMotherboard;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -477,7 +477,7 @@ impl NesPpu {
         (cycle2, scanline)
     }
 
-    fn background_fetch(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
+    fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u16) {
         let (x, y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
             0 => {
@@ -542,7 +542,7 @@ impl NesPpu {
         }
     }
 
-    fn idle_operation(&mut self, bus: &mut dyn NesMemoryBus, cycle: u16) {
+    fn idle_operation(&mut self, bus: &mut NesMotherboard, cycle: u16) {
         if (cycle & 1) == 0 {
             if let Some(_a) = self.pend_vram_write {
                 bus.ppu_cycle_1(self.vram_address);
@@ -694,7 +694,7 @@ impl NesPpu {
         }
     }
 
-    pub fn cycle(&mut self, bus: &mut dyn NesMemoryBus) {
+    pub fn cycle(&mut self, bus: &mut NesMotherboard) {
         if self.write_ignore_counter < PPU_STARTUP_CYCLE_COUNT {
             self.write_ignore_counter += 1;
         }
