@@ -2,9 +2,14 @@ mod mapper00;
 mod mapper01;
 mod mapper03;
 
+use mapper00::Mapper00;
+use mapper01::Mapper01;
+use mapper03::Mapper03;
+
 use serde::{Deserialize, Serialize};
 
-pub trait NesMapper {
+#[enum_dispatch::enum_dispatch]
+trait NesMapperTrait {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
     fn memory_cycle_nop(&mut self);
@@ -18,6 +23,13 @@ pub trait NesMapper {
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
 }
 
+#[non_exhaustive]
+#[enum_dispatch::enum_dispatch(NesMapperTrait)]
+pub enum NesMapper {
+    Mapper00,
+    Mapper01,
+    Mapper03,
+}
 pub trait NesMemoryBusDevice {
     fn memory_cycle_read(
         &mut self,
@@ -43,7 +55,7 @@ pub struct NesCartridgeData {
 
 pub struct NesCartridge {
     data: NesCartridgeData,
-    mapper: Box<dyn NesMapper>,
+    mapper: NesMapper,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,14 +72,11 @@ impl NesCartridge {
         Err(CartridgeError::IncompatibleRom)
     }
 
-    fn get_mapper(
-        mapper: u32,
-        rom_data: &NesCartridgeData,
-    ) -> Result<Box<dyn NesMapper>, CartridgeError> {
+    fn get_mapper(mapper: u32, rom_data: &NesCartridgeData) -> Result<NesMapper, CartridgeError> {
         let mapper = match mapper {
-            0 => mapper00::Mapper::new(&rom_data),
-            1 => mapper01::Mapper::new(&rom_data),
-            3 => mapper03::Mapper::new(&rom_data),
+            0 => mapper00::Mapper00::new(&rom_data),
+            1 => mapper01::Mapper01::new(&rom_data),
+            3 => mapper03::Mapper03::new(&rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper));
             }

@@ -1,7 +1,7 @@
 use crate::cartridge::NesCartridgeData;
-use crate::cartridge::NesMapper;
+use crate::cartridge::{NesMapper, NesMapperTrait};
 
-pub struct Mapper {
+pub struct Mapper01 {
     shift_register: u8,
     shift_counter: u8,
     shift_locked: bool,
@@ -10,9 +10,9 @@ pub struct Mapper {
     ppu_address: u16,
 }
 
-impl Mapper {
-    pub fn new(d: &NesCartridgeData) -> Box<dyn NesMapper> {
-        Box::new(Self {
+impl Mapper01 {
+    pub fn new(d: &NesCartridgeData) -> NesMapper {
+        NesMapper::from(Self {
             shift_register: 0,
             shift_counter: 0,
             shift_locked: false,
@@ -26,7 +26,7 @@ impl Mapper {
     }
 }
 
-impl NesMapper for Mapper {
+impl NesMapperTrait for Mapper01 {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         self.shift_locked = false;
         match addr {

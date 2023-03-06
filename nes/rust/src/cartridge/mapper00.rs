@@ -1,21 +1,21 @@
 use crate::cartridge::NesCartridgeData;
-use crate::cartridge::NesMapper;
+use crate::cartridge::{NesMapper, NesMapperTrait};
 
-pub struct Mapper {
+pub struct Mapper00 {
     mirror_vertical: bool,
     ppu_address: u16,
 }
 
-impl Mapper {
-    pub fn new(d: &NesCartridgeData) -> Box<dyn NesMapper> {
-        Box::new(Self {
+impl Mapper00 {
+    pub fn new(d: &NesCartridgeData) -> NesMapper {
+        NesMapper::from(Self {
             mirror_vertical: d.mirroring,
             ppu_address: 0,
         })
     }
 }
 
-impl NesMapper for Mapper {
+impl NesMapperTrait for Mapper00 {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {

@@ -1234,10 +1234,9 @@ fn ppu_sprite_test_2() {
 #[test]
 fn ppu_sprite_test_3() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/sprite_overflow_tests/3.Timing.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/sprite_overflow_tests/3.Timing.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
