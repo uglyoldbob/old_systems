@@ -50,7 +50,7 @@ impl NesController for StandardController {
         self.check_strobe();
         let data = self.shift_register & 1;
         self.shift_register = (self.shift_register >> 1) | 0x00;
-        data
+        data | 0x1e
     }
     fn provide_egui_ref(&mut self, data: &egui::InputState) {
         let kd = &data.keys_down;

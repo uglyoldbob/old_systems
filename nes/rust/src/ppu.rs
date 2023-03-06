@@ -580,6 +580,7 @@ impl NesPpu {
 
     fn sprite_eval(&mut self) {
         if self.scanline_number < 240 {
+            let row = self.scanline_number + 1;
             match self.scanline_cycle {
                 0 => {
                     //TODO: trigger bug that occurs when oamaddress is nonzero
@@ -601,9 +602,9 @@ impl NesPpu {
                         match self.sprite_eval_mode {
                             PpuSpriteEvalMode::Normal => {
                                 //range check
-                                if self.scanline_number >= self.oamdata as u16
-                                    && self.scanline_number
-                                        < (self.oamdata as u16 + self.sprite_height() as u16)
+                                if row < 240
+                                    && row >= self.oamdata as u16
+                                    && row < (self.oamdata as u16 + self.sprite_height() as u16)
                                 {
                                     self.numsprites += 1;
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
@@ -619,12 +620,13 @@ impl NesPpu {
                                 }
                             }
                             PpuSpriteEvalMode::Sprites8 => {
-                                if self.scanline_number >= self.oamdata as u16
-                                    && self.scanline_number
-                                        < (self.oamdata + self.sprite_height()) as u16
+                                if row < 240
+                                    && row >= self.oamdata as u16
+                                    && row < (self.oamdata + self.sprite_height()) as u16
                                 {
                                     self.numsprites += 1;
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
+                                    println!("Sprite overflow at line {} cycle {}", self.scanline_number, self.scanline_cycle);
                                     self.registers[2] |= 0x20; //the sprite overflow flag
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
                                 } else {
