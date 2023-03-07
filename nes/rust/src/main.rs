@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use cartridge::CartridgeError;
+use controller::NesControllerTrait;
 use egui_multiwin::egui::Sense;
 use emulator_data::NesEmulatorData;
 
@@ -798,7 +799,7 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    nes_data.mb.controllers[0] = Some(Box::new(controller::StandardController::new()));
+    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
 
     if let Some(c) = INITIAL_ROM {
         let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();

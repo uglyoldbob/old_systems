@@ -1,8 +1,6 @@
-use crate::{
-    cartridge::NesCartridge,
-    controller::NesController,
-    cpu::NesCpuPeripherals,
-};
+use crate::controller::NesController;
+use crate::controller::NesControllerTrait;
+use crate::{cartridge::NesCartridge, cpu::NesCpuPeripherals};
 
 pub struct NesMotherboard {
     cart: Option<NesCartridge>,
@@ -12,7 +10,7 @@ pub struct NesMotherboard {
     vram_address: Option<u16>,
     last_ppu_cycle: u8,
     last_cpu_data: u8,
-    pub controllers: [Option<Box<dyn NesController>>; 2],
+    pub controllers: [Option<NesController>; 2],
 }
 
 impl NesMotherboard {
@@ -54,11 +52,11 @@ impl NesMotherboard {
         }
     }
 
-    pub fn insert_controller1(&mut self, c: Box<dyn NesController>) {
+    pub fn insert_controller1(&mut self, c: NesController) {
         self.controllers[0] = Some(c);
     }
 
-    pub fn insert_controller2(&mut self, c: Box<dyn NesController>) {
+    pub fn insert_controller2(&mut self, c: NesController) {
         self.controllers[1] = Some(c);
     }
 

@@ -4,7 +4,6 @@ use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
 use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
-use crate::cpu::NesMemoryBus;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 use crate::utility::convert_hex_to_decimal;

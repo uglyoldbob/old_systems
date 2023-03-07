@@ -4,10 +4,18 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
-pub trait NesController {
+#[enum_dispatch::enum_dispatch]
+pub trait NesControllerTrait {
     fn update_latch_bits(&mut self, data: [bool; 3]);
     fn read_data(&mut self) -> u8;
     fn provide_egui_ref(&mut self, data: &egui::InputState);
+}
+
+#[non_exhaustive]
+#[enum_dispatch::enum_dispatch(NesControllerTrait)]
+pub enum NesController {
+    StandardController,
+    DummyController,
 }
 
 pub struct StandardController {
@@ -26,12 +34,13 @@ const BUTTON_LEFT: u8 = 0x40;
 const BUTTON_RIGHT: u8 = 0x80;
 
 impl StandardController {
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> NesController {
+        (Self {
             controller_buttons: 0xff,
             shift_register: 0xff,
             strobe: false,
-        }
+        })
+        .into()
     }
 
     fn check_strobe(&mut self) {
@@ -41,7 +50,7 @@ impl StandardController {
     }
 }
 
-impl NesController for StandardController {
+impl NesControllerTrait for StandardController {
     fn update_latch_bits(&mut self, data: [bool; 3]) {
         self.strobe = data[0];
         self.check_strobe();
@@ -82,4 +91,20 @@ impl NesController for StandardController {
 
         self.check_strobe();
     }
+}
+
+pub struct DummyController {}
+
+impl DummyController {
+    pub fn new() -> NesController {
+        NesController::from(Self {})
+    }
+}
+
+impl NesControllerTrait for DummyController {
+    fn update_latch_bits(&mut self, _data: [bool; 3]) {}
+    fn read_data(&mut self) -> u8 {
+        0x1f
+    }
+    fn provide_egui_ref(&mut self, _data: &egui::InputState) {}
 }
