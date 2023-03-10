@@ -56,6 +56,7 @@ pub struct NesCartridgeData {
 pub struct NesCartridge {
     data: NesCartridgeData,
     mapper: NesMapper,
+    mappernum: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -160,7 +161,7 @@ impl NesCartridge {
             prg_ram.push(v);
         }
 
-        let mapper = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
+        let mappernum = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
         let rom_data = NesCartridgeData {
             trainer: trainer,
             prg_rom: prg_rom,
@@ -170,13 +171,14 @@ impl NesCartridge {
             prom: None,
             prg_ram: prg_ram,
             mirroring: (rom_contents[6] & 1) != 0,
-            mapper: mapper as u32,
+            mapper: mappernum as u32,
         };
-        let mapper = Self::get_mapper(mapper as u32, &rom_data)?;
+        let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
         Ok(Self {
             data: rom_data,
             mapper: mapper,
+            mappernum: mappernum as u32,
         })
     }
 
@@ -240,7 +242,7 @@ impl NesCartridge {
             file_offset += chr_rom_size;
         }
 
-        let mapper = (rom_contents[6] >> 4) as u16
+        let mappernum = (rom_contents[6] >> 4) as u16
             | (rom_contents[7] & 0xf0) as u16
             | (rom_contents[8] as u16) << 8;
         let rom_data = NesCartridgeData {
@@ -252,14 +254,15 @@ impl NesCartridge {
             prom: None,
             prg_ram: Vec::new(),
             mirroring: (rom_contents[6] & 1) != 0,
-            mapper: mapper as u32,
+            mapper: mappernum as u32,
         };
 
-        let mapper = NesCartridge::get_mapper(mapper as u32, &rom_data)?;
+        let mapper = NesCartridge::get_mapper(mappernum as u32, &rom_data)?;
 
         Ok(Self {
             data: rom_data,
             mapper: mapper,
+            mappernum: mappernum as u32,
         })
     }
 

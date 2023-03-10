@@ -13,8 +13,8 @@ enum PpuSpriteEvalMode {
     Done,
 }
 
-#[derive(Copy, Clone)]
-struct PpuSprite {
+#[derive(Copy, Clone, Debug)]
+pub struct PpuSprite {
     y: u8,
     tile: u8,
     attribute: u8,
@@ -30,6 +30,29 @@ impl PpuSprite {
             attribute: 0xff,
             x: 0xff,
             patterntable_data: 0,
+        }
+    }
+
+    pub fn pallete(&self) -> u16 {
+        ((self.attribute & 3) as u16)<<2
+    }
+
+    pub fn tile_num(&self, scanline: u8) -> u16 {
+        let calc = (self.tile & 0xff) as u16;
+        let adder: u16 = 0;
+        adder + calc * 0x10
+    }
+
+    pub fn line_number(&self, scanline: u8) -> u8 {
+        if self.y <= scanline {
+            let sprite_line = (scanline - self.y) % 8;
+            if (self.attribute & 0x80) == 0 {
+                sprite_line
+            } else {
+                7 - sprite_line
+            }
+        } else {
+            0
         }
     }
 }
@@ -249,6 +272,18 @@ impl NesPpu {
         self.last_cpu_counter[1] = 893420;
     }
 
+    #[cfg(any(test, debug_assertions))]
+    pub fn get_64_sprites(&self) -> [PpuSprite; 64] {
+        let mut s: [PpuSprite; 64] = [PpuSprite::new(); 64];
+        for i in 0..64 {
+            s[i].y = self.oam[i * 4];
+            s[i].tile = self.oam[1 + i * 4];
+            s[i].attribute = self.oam[2 + i * 4];
+            s[i].x = self.oam[3 + i * 4];
+        }
+        s
+    }
+
     pub fn read(&mut self, addr: u16) -> Option<u8> {
         match addr {
             0 | 1 | 3 | 5 | 6 => Some(self.last_cpu_data),
@@ -395,48 +430,6 @@ impl NesPpu {
             0
         } else {
             0x1000
-        }
-    }
-
-    fn sprite_line_number(&self, sprite: &PpuSprite, scanline: u8) -> u8 {
-        if sprite.y > scanline {
-            let sprite_line = (sprite.y - scanline) & 7;
-            if (sprite.attribute & 0x80) == 0 {
-                sprite_line
-            } else {
-                7 - sprite_line
-            }
-        } else {
-            0
-        }
-    }
-
-    fn sprite_tile_calc(&self, sprite: &PpuSprite, scanline: u8) -> u16 {
-        if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) == 0 {
-            sprite.tile as u16
-        } else {
-            let calc = (sprite.tile & 0xfe) as u16;
-            let adder: u16 = if (sprite.tile & 1) == 0 { 0 } else { 0x1000 };
-            if scanline >= sprite.y {
-                let sprite_line = scanline - sprite.y;
-                let tile2 = if (sprite.attribute & 0x80) == 0 {
-                    if sprite_line >= 8 {
-                        0
-                    } else {
-                        32
-                    }
-                } else {
-                    //vertical sprite mirroring enabled
-                    if sprite_line >= 8 {
-                        32
-                    } else {
-                        0
-                    }
-                };
-                adder + calc * 0x10 + tile2
-            } else {
-                0
-            }
         }
     }
 
@@ -592,7 +585,7 @@ impl NesPpu {
                 }
                 1..=64 => {
                     if (self.scanline_cycle & 1) == 0 {
-                        self.secondary_oam[(self.scanline_cycle >> 2) as usize] = 0xff;
+                        self.secondary_oam[((self.scanline_cycle >> 1)-1)  as usize] = 0xff;
                     }
                 }
                 65..=256 => {
@@ -626,7 +619,6 @@ impl NesPpu {
                                 {
                                     self.numsprites += 1;
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
-                                    println!("Sprite overflow at line {} cycle {}", self.scanline_number, self.scanline_cycle);
                                     self.registers[2] |= 0x20; //the sprite overflow flag
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
                                 } else {
@@ -746,7 +738,7 @@ impl NesPpu {
                     };
 
                     let mut palette_entry =
-                        (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as u16;
+                        ((extra_palette_bits << 2) | (upper_bit << 1) | lower_bit) as u16;
                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                         palette_entry &= 0x30;
                     }
@@ -775,24 +767,25 @@ impl NesPpu {
                     None
                 };
                 let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) {
-                    let index = 7 - cycle % 8;
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
                             if cycle >= e.x as u16 && (cycle < (e.x as u16 + 8)) && e.y < 240 {
+                                let index2 = if (e.attribute & 0x40) == 0 {
+                                    7 - (cycle - e.x as u16)
+                                }
+                                else {
+                                    cycle - e.x as u16
+                                };
                                 let pt = e.patterntable_data.to_le_bytes();
-                                let upper_bit = (pt[1] >> index) & 1;
-                                let lower_bit = (pt[0] >> index) & 1;
+                                let upper_bit = (pt[1] >> index2) & 1;
+                                let lower_bit = (pt[0] >> index2) & 1;
 
-                                let modx = (cycle / 16) & 1;
-                                let mody = (self.scanline_number / 16) & 1;
-                                let combined = mody << 1 | modx;
-                                let extra_palette_bits = (e.attribute & 3) << 2 | 1;
-                                let mut palette_entry =
-                                    (extra_palette_bits << 2 | upper_bit << 1 | lower_bit) as u16;
+                                let mut palette_entry = e.pallete() | ((upper_bit << 1) | lower_bit)
+                                        as u16;
                                 if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                                     palette_entry &= 0x30;
                                 }
-                                let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
+                                let pixel_entry = bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
                                 Some((index, pixel_entry))
                             } else {
                                 None
@@ -862,16 +855,10 @@ impl NesPpu {
                                 //pattern table tile low
                                 if (cycle & 1) == 0 {
                                     let base = self.sprite_patterntable_base();
-                                    let offset = self.sprite_tile_calc(
-                                        &self.sprites[sprite_num as usize],
-                                        self.scanline_number as u8,
-                                    );
-                                    let calc = base
-                                        + offset
-                                        + self.sprite_line_number(
-                                            &self.sprites[sprite_num as usize],
-                                            self.scanline_number as u8,
-                                        ) as u16;
+                                    let offset = self.sprites[sprite_num as usize]
+                                        .tile_num(self.scanline_number as u8);
+                                    let o2 = self.sprites[sprite_num as usize].line_number(self.scanline_number as u8) as u16;
+                                    let calc = base + offset + o2;
                                     bus.ppu_cycle_1(calc);
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
@@ -885,17 +872,10 @@ impl NesPpu {
                                 //pattern table tile high
                                 if (cycle & 1) == 0 {
                                     let base = self.sprite_patterntable_base();
-                                    let offset = self.sprite_tile_calc(
-                                        &self.sprites[sprite_num as usize],
-                                        self.scanline_number as u8,
-                                    );
-                                    let calc = 8
-                                        + base
-                                        + offset
-                                        + self.sprite_line_number(
-                                            &self.sprites[sprite_num as usize],
-                                            self.scanline_number as u8,
-                                        ) as u16;
+                                    let offset = self.sprites[sprite_num as usize]
+                                        .tile_num(self.scanline_number as u8);
+                                    let o2 = self.sprites[sprite_num as usize].line_number(self.scanline_number as u8) as u16;
+                                    let calc = 8 + base + offset + o2;
                                     bus.ppu_cycle_1(calc);
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
