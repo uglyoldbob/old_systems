@@ -34,7 +34,7 @@ impl PpuSprite {
     }
 
     pub fn pallete(&self) -> u16 {
-        ((self.attribute & 3) as u16)<<2
+        ((self.attribute & 3) as u16) << 2
     }
 
     pub fn tile_num(&self, scanline: u8) -> u16 {
@@ -585,7 +585,7 @@ impl NesPpu {
                 }
                 1..=64 => {
                     if (self.scanline_cycle & 1) == 0 {
-                        self.secondary_oam[((self.scanline_cycle >> 1)-1)  as usize] = 0xff;
+                        self.secondary_oam[((self.scanline_cycle >> 1) - 1) as usize] = 0xff;
                     }
                 }
                 65..=256 => {
@@ -772,21 +772,25 @@ impl NesPpu {
                             if cycle >= e.x as u16 && (cycle < (e.x as u16 + 8)) && e.y < 240 {
                                 let index2 = if (e.attribute & 0x40) == 0 {
                                     7 - (cycle - e.x as u16)
-                                }
-                                else {
+                                } else {
                                     cycle - e.x as u16
                                 };
                                 let pt = e.patterntable_data.to_le_bytes();
                                 let upper_bit = (pt[1] >> index2) & 1;
                                 let lower_bit = (pt[0] >> index2) & 1;
 
-                                let mut palette_entry = e.pallete() | ((upper_bit << 1) | lower_bit)
-                                        as u16;
-                                if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
-                                    palette_entry &= 0x30;
+                                if upper_bit != 0 || lower_bit != 0 {
+                                    let mut palette_entry =
+                                        e.pallete() | ((upper_bit << 1) | lower_bit) as u16;
+                                    if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                                        palette_entry &= 0x30;
+                                    }
+                                    let pixel_entry =
+                                        bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
+                                    Some((index, pixel_entry))
+                                } else {
+                                    None
                                 }
-                                let pixel_entry = bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
-                                Some((index, pixel_entry))
                             } else {
                                 None
                             }
@@ -857,7 +861,9 @@ impl NesPpu {
                                     let base = self.sprite_patterntable_base();
                                     let offset = self.sprites[sprite_num as usize]
                                         .tile_num(self.scanline_number as u8);
-                                    let o2 = self.sprites[sprite_num as usize].line_number(self.scanline_number as u8) as u16;
+                                    let o2 = self.sprites[sprite_num as usize]
+                                        .line_number(self.scanline_number as u8)
+                                        as u16;
                                     let calc = base + offset + o2;
                                     bus.ppu_cycle_1(calc);
                                     self.cycle1_done = true;
@@ -874,7 +880,9 @@ impl NesPpu {
                                     let base = self.sprite_patterntable_base();
                                     let offset = self.sprites[sprite_num as usize]
                                         .tile_num(self.scanline_number as u8);
-                                    let o2 = self.sprites[sprite_num as usize].line_number(self.scanline_number as u8) as u16;
+                                    let o2 = self.sprites[sprite_num as usize]
+                                        .line_number(self.scanline_number as u8)
+                                        as u16;
                                     let calc = 8 + base + offset + o2;
                                     bus.ppu_cycle_1(calc);
                                     self.cycle1_done = true;
