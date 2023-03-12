@@ -54,7 +54,7 @@ impl NesMapperTrait for Mapper00 {
         if cart.chr_rom.len() == 0 {
             return None;
         }
-        Some(cart.chr_rom[self.ppu_address as usize])
+        Some(cart.chr_rom[(self.ppu_address as usize) % cart.chr_rom.len()])
     }
 
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {

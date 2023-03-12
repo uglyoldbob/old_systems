@@ -467,7 +467,42 @@ impl NesPpu {
                 scanline -= 240;
             }
         }
+
         (cycle2, scanline)
+    }
+
+    fn calc_nametable_xy(&self, x: u16, y: u16) -> (u16, u16) {
+        let mut x2 = x;
+        let mut y2 = y;
+        x2 += self.scrollx as u16;
+        if x2 > 255 {
+            x2 = x2 % 256;
+            x2 += 0x200;
+        }
+        y2 += self.scrolly as u16;
+        if y2 > 239 {
+            y2 = y2 % 240;
+            y2 += 0x400;
+        }
+
+        (x2, y2)
+    }
+
+    fn calc_attributetable_xy(&self, x: u16, y: u16) -> (u16, u16) {
+        let mut x2 = x;
+        let mut y2 = y;
+        x2 += self.scrollx as u16;
+        if x2 > 255 {
+            x2 = x2 % 256;
+            x2 += 0x200;
+        }
+        y2 += self.scrolly as u16;
+        if y2 > 239 {
+            y2 = y2 % 240;
+            y2 += 0x400;
+        }
+
+        (x2, y2)
     }
 
     fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u16) {
@@ -477,6 +512,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     //nametable byte
                     let base = self.nametable_base();
+                    let (x, y) = self.calc_nametable_xy(x, y);
                     let offset = (y / 8) << 5 | (x / 8);
                     bus.ppu_cycle_1(base + offset);
                     self.cycle1_done = true;
@@ -489,6 +525,7 @@ impl NesPpu {
                 //attribute table byte
                 if (cycle & 1) == 0 {
                     let base = self.attributetable_base();
+                    let (x, y) = self.calc_attributetable_xy(x, y);
                     let offset = (y / 32) << 3 | (x / 32);
                     bus.ppu_cycle_1(base + offset);
                     self.cycle1_done = true;
@@ -502,7 +539,8 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = base + offset + self.scanline_number % 8;
+                    let calc =
+                        base + offset + (self.scanline_number % 8) + (self.scrolly as u16 % 8);
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -517,7 +555,8 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + self.scanline_number % 8;
+                    let calc =
+                        8 + base + offset + (self.scanline_number % 8) + (self.scrolly as u16 % 8);
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -729,7 +768,7 @@ impl NesPpu {
                     let lower_bit = (pt[0] >> index) & 1;
 
                     let modx = (cycle / 16) & 1;
-                    let mody = (self.scanline_number / 16) & 1;
+                    let mody = (((self.scanline_number + self.scrolly as u16) / 16) & 1);
                     let combined = mody << 1 | modx;
                     let extra_palette_bits = if combined != 0 {
                         (self.attributetable_shift[0] >> (2 * combined)) & 3
