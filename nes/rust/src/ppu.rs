@@ -540,7 +540,7 @@ impl NesPpu {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
                     let calc =
-                        base + offset + (self.scanline_number % 8) + (self.scrolly as u16 % 8);
+                        base + offset + (self.scanline_number + self.scrolly as u16) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -556,7 +556,7 @@ impl NesPpu {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
                     let calc =
-                        8 + base + offset + (self.scanline_number % 8) + (self.scrolly as u16 % 8);
+                        8 + base + offset + (self.scanline_number + self.scrolly as u16) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
