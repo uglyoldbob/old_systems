@@ -406,21 +406,49 @@ impl NesPpu {
     }
 
     fn nametable_base(&self) -> u16 {
-        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
+        let base = match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
             0 => 0x2000,
             1 => 0x2400,
             2 => 0x2800,
             _ => 0x2c00,
+        };
+        base
+    }
+
+    fn nametable_coordinates(&self, x: u8, y: u8) -> (u16, u8, u8) {
+        let mut base = self.nametable_base();
+        let (x, ox) = x.overflowing_add(self.scrollx);
+        if ox {
+            base += 0x400;
         }
+        let (y, oy) = y.overflowing_add(self.scrolly);
+        if ox || y > 240 {
+            base += 0x400;
+        }
+        (base, x, y % 240)
     }
 
     fn attributetable_base(&self) -> u16 {
-        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
+        let base = match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
             0 => 0x23c0,
             1 => 0x27c0,
             2 => 0x2bc0,
             _ => 0x2fc0,
+        };
+        base
+    }
+
+    fn attributetable_coordinates(&self, x: u8, y: u8) -> (u16, u8, u8) {
+        let mut base = self.attributetable_base();
+        let (x, ox) = x.overflowing_add(self.scrollx);
+        if ox {
+            base += 0x400;
         }
+        let (y, oy) = y.overflowing_add(self.scrolly);
+        if ox || y > 240 {
+            base += 0x400;
+        }
+        (base, x, y % 240)
     }
 
     fn sprite_patterntable_base(&self) -> u16 {
@@ -441,7 +469,7 @@ impl NesPpu {
         }
     }
 
-    fn should_render_background(&self, cycle: u16) -> bool {
+    fn should_render_background(&self, cycle: u8) -> bool {
         if cycle < 8 {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
         } else {
@@ -449,7 +477,7 @@ impl NesPpu {
         }
     }
 
-    fn should_render_sprites(&self, cycle: u16) -> bool {
+    fn should_render_sprites(&self, cycle: u8) -> bool {
         if cycle == 0 {
             (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN) != 0
         } else {
@@ -457,63 +485,24 @@ impl NesPpu {
         }
     }
 
-    fn compute_xy(&self, cycle: u16, offset: u8) -> (u16, u16) {
-        let mut cycle2 = cycle + offset as u16;
+    fn compute_xy(&self, cycle: u8, offset: u8) -> (u8, u8) {
+        let (cycle2, ox) = cycle.overflowing_add(offset);
         let mut scanline = self.scanline_number;
-        if cycle2 >= 256 {
-            cycle2 -= 256;
-            scanline += 1;
-            if scanline >= 240 {
-                scanline -= 240;
-            }
+        if ox {
+            scanline = (scanline + 1) % 240;
         }
 
-        (cycle2, scanline)
+        (cycle2, scanline as u8)
     }
 
-    fn calc_nametable_xy(&self, x: u16, y: u16) -> (u16, u16) {
-        let mut x2 = x;
-        let mut y2 = y;
-        x2 += self.scrollx as u16;
-        if x2 > 255 {
-            x2 = x2 % 256;
-            x2 += 0x200;
-        }
-        y2 += self.scrolly as u16;
-        if y2 > 239 {
-            y2 = y2 % 240;
-            y2 += 0x400;
-        }
-
-        (x2, y2)
-    }
-
-    fn calc_attributetable_xy(&self, x: u16, y: u16) -> (u16, u16) {
-        let mut x2 = x;
-        let mut y2 = y;
-        x2 += self.scrollx as u16;
-        if x2 > 255 {
-            x2 = x2 % 256;
-            x2 += 0x200;
-        }
-        y2 += self.scrolly as u16;
-        if y2 > 239 {
-            y2 = y2 % 240;
-            y2 += 0x400;
-        }
-
-        (x2, y2)
-    }
-
-    fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u16) {
+    fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u8) {
         let (x, y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
             0 => {
                 if (cycle & 1) == 0 {
                     //nametable byte
-                    let base = self.nametable_base();
-                    let (x, y) = self.calc_nametable_xy(x, y);
-                    let offset = (y / 8) << 5 | (x / 8);
+                    let (base, x, y) = self.nametable_coordinates(x, y);
+                    let offset = (y as u16 / 8) << 5 | (x as u16 / 8);
                     bus.ppu_cycle_1(base + offset);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -524,9 +513,8 @@ impl NesPpu {
             1 => {
                 //attribute table byte
                 if (cycle & 1) == 0 {
-                    let base = self.attributetable_base();
-                    let (x, y) = self.calc_attributetable_xy(x, y);
-                    let offset = (y / 32) << 3 | (x / 32);
+                    let (base, x, y) = self.attributetable_coordinates(x, y);
+                    let offset = (y as u16 / 32) << 3 | (x as u16 / 32);
                     bus.ppu_cycle_1(base + offset);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -540,7 +528,7 @@ impl NesPpu {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
                     let calc =
-                        base + offset + (self.scanline_number + self.scrolly as u16) % 8;
+                        base + offset + ((self.scanline_number + self.scrolly as u16) % 8) as u16;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -555,8 +543,10 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc =
-                        8 + base + offset + (self.scanline_number + self.scrolly as u16) % 8;
+                    let calc = 8
+                        + base
+                        + offset
+                        + ((self.scanline_number + self.scrolly as u16) % 8) as u16;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -612,7 +602,7 @@ impl NesPpu {
 
     fn sprite_eval(&mut self) {
         if self.scanline_number < 240 {
-            let row = self.scanline_number + 1;
+            let row = (self.scanline_number + 1) as u8;
             match self.scanline_cycle {
                 0 => {
                     //TODO: trigger bug that occurs when oamaddress is nonzero
@@ -635,8 +625,8 @@ impl NesPpu {
                             PpuSpriteEvalMode::Normal => {
                                 //range check
                                 if row < 240
-                                    && row >= self.oamdata as u16
-                                    && row < (self.oamdata as u16 + self.sprite_height() as u16)
+                                    && row >= self.oamdata
+                                    && row < (self.oamdata + self.sprite_height())
                                 {
                                     self.numsprites += 1;
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
@@ -653,8 +643,8 @@ impl NesPpu {
                             }
                             PpuSpriteEvalMode::Sprites8 => {
                                 if row < 240
-                                    && row >= self.oamdata as u16
-                                    && row < (self.oamdata + self.sprite_height()) as u16
+                                    && row >= self.oamdata
+                                    && row < (self.oamdata + self.sprite_height())
                                 {
                                     self.numsprites += 1;
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
@@ -760,21 +750,18 @@ impl NesPpu {
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
-                let cycle = self.scanline_cycle - 1;
-                let bg_pixel = if self.should_render_background(cycle) {
-                    let index = 7 - cycle % 8;
+                let cycle = (self.scanline_cycle - 1) as u8;
+                let bg_pixel = if self.should_render_background(cycle as u8) {
+                    let index = 7 - ((cycle) % 8);
                     let pt = self.patterntable_shift[0].to_le_bytes();
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
 
-                    let modx = (cycle / 16) & 1;
-                    let mody = (((self.scanline_number + self.scrolly as u16) / 16) & 1);
-                    let combined = mody << 1 | modx;
-                    let extra_palette_bits = if combined != 0 {
-                        (self.attributetable_shift[0] >> (2 * combined)) & 3
-                    } else {
-                        0
-                    };
+                    let modx = ((cycle) / 16) & 1;
+                    let mody =
+                        (((self.scanline_number as u16 + self.scrolly as u16) / 16) & 1) as u8;
+                    let combined = (mody << 1) | modx;
+                    let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
 
                     let mut palette_entry =
                         ((extra_palette_bits << 2) | (upper_bit << 1) | lower_bit) as u16;
@@ -791,28 +778,23 @@ impl NesPpu {
                         //TODO implement color emphasis
                         println!("TODO: implement color emphasis");
                     }
-                    self.background_fetch(bus, cycle);
                     Some(pixel_entry)
                 } else {
-                    self.idle_operation(bus, cycle);
-                    let palette_entry = 13;
-                    let pixel = PPU_PALETTE[palette_entry];
-                    self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
-                        pixel[0];
-                    self.frame_data
-                        [((self.scanline_number * 256 + cycle) as u32 * 3 + 1) as usize] = pixel[1];
-                    self.frame_data
-                        [((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] = pixel[2];
                     None
                 };
-                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) {
+                if self.should_render_background(cycle) || self.should_render_background(8) {
+                    self.background_fetch(bus, cycle);
+                } else {
+                    self.idle_operation(bus, cycle as u16);
+                }
+                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle as u8) {
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
-                            if cycle >= e.x as u16 && (cycle < (e.x as u16 + 8)) && e.y < 240 {
+                            if cycle >= e.x && (cycle < (e.x.wrapping_add(8))) && e.y < 240 {
                                 let index2 = if (e.attribute & 0x40) == 0 {
-                                    7 - (cycle - e.x as u16)
+                                    7 - (cycle - e.x)
                                 } else {
-                                    cycle - e.x as u16
+                                    cycle - e.x
                                 };
                                 let pt = e.patterntable_data.to_le_bytes();
                                 let upper_bit = (pt[1] >> index2) & 1;
@@ -851,12 +833,13 @@ impl NesPpu {
                 };
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];
-                self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3) as usize] =
+                self.frame_data
+                    [((self.scanline_number as u16 * 256 + cycle as u16) as u32 * 3) as usize] =
                     pixel[0];
-                self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3 + 1) as usize] =
-                    pixel[1];
-                self.frame_data[((self.scanline_number * 256 + cycle) as u32 * 3 + 2) as usize] =
-                    pixel[2];
+                self.frame_data[((self.scanline_number as u16 * 256 + cycle as u16) as u32 * 3 + 1)
+                    as usize] = pixel[1];
+                self.frame_data[((self.scanline_number as u16 * 256 + cycle as u16) as u32 * 3 + 2)
+                    as usize] = pixel[2];
 
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 320 {
@@ -864,16 +847,16 @@ impl NesPpu {
                 let cycle = self.scanline_cycle - 257;
                 let sprite_num = cycle / 8;
                 if cycle > 0 {
-                    if self.should_render_sprites(cycle) {
+                    if self.should_render_sprites(cycle as u8) {
                         match (cycle / 2) % 4 {
                             0 => {
                                 if (cycle & 1) == 0 {
                                     //nametable byte
+                                    let x = cycle as u8 / 8;
+                                    let y = (self.scanline_number / 8) as u8;
                                     let base = self.nametable_base();
-                                    let x = cycle / 8;
-                                    let y = self.scanline_number / 8;
                                     let offset = y << 5 | x;
-                                    bus.ppu_cycle_1(base + offset); //TODO verify this calculation
+                                    bus.ppu_cycle_1(base + offset as u16); //TODO verify this calculation
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
                                     bus.ppu_cycle_2_read();
@@ -883,11 +866,11 @@ impl NesPpu {
                             1 => {
                                 if (cycle & 1) == 0 {
                                     //nametable byte
+                                    let x = cycle as u8 / 8;
+                                    let y = (self.scanline_number / 8) as u8;
                                     let base = self.nametable_base();
-                                    let x = cycle / 8;
-                                    let y = self.scanline_number / 8;
                                     let offset = y << 5 | x;
-                                    bus.ppu_cycle_1(base + offset); //TODO verify this calculation
+                                    bus.ppu_cycle_1(base + offset as u16); //TODO verify this calculation
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
                                     bus.ppu_cycle_2_read();
@@ -955,7 +938,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = 0; //TODO calculate this correctly
                     let offset = cycle % 8; //TODO calculate this value correctly
-                    bus.ppu_cycle_1(base + offset);
+                    bus.ppu_cycle_1(base + offset as u16);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     bus.ppu_cycle_2_read();
