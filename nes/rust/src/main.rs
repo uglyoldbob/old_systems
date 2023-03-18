@@ -7,14 +7,13 @@ pub mod cpu;
 pub mod emulator_data;
 pub mod motherboard;
 pub mod ppu;
+pub mod romlist;
 pub mod utility;
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
-use cartridge::CartridgeError;
 use controller::NesControllerTrait;
 use egui_multiwin::egui::Sense;
 use emulator_data::NesEmulatorData;
+use romlist::{RomList, RomListEntry};
 
 #[cfg(test)]
 mod tests;
@@ -406,41 +405,6 @@ impl TrackedWindow for DebugNesWindow {
             quit: quit,
             new_windows: windows_to_create,
         }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct RomListEntry {
-    result: Option<Result<(), CartridgeError>>,
-    modified: Option<std::time::SystemTime>,
-}
-
-//TODO Create benchmark to determine if the caching scheme is actually beneficial
-#[derive(Serialize, Deserialize)]
-pub struct RomList {
-    elements: std::collections::BTreeMap<PathBuf, RomListEntry>,
-}
-
-impl RomList {
-    fn new() -> Self {
-        Self {
-            elements: std::collections::BTreeMap::new(),
-        }
-    }
-
-    pub fn load_list() -> Self {
-        let contents = std::fs::read("./roms.bin");
-        if let Err(e) = contents {
-            return RomList::new();
-        }
-        let contents = contents.unwrap();
-        let config = bincode::deserialize(&contents[..]);
-        config.ok().unwrap_or(RomList::new())
-    }
-
-    fn save_list(&self) -> std::io::Result<()> {
-        let encoded = bincode::serialize(&self).unwrap();
-        std::fs::write("./roms.bin", encoded)
     }
 }
 

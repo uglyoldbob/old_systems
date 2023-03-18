@@ -7,6 +7,7 @@ pub mod cpu;
 pub mod emulator_data;
 pub mod motherboard;
 pub mod ppu;
+pub mod romlist;
 pub mod utility;
 
 use crate::apu::NesApu;
