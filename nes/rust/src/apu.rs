@@ -1,3 +1,5 @@
+use rb::RbProducer;
+
 struct ApuSquareChannel {
     length: u8,
 }
@@ -265,9 +267,13 @@ impl NesApu {
         }
     }
 
+    fn build_audio_sample(&self, rate: u32) -> Option<f32> {
+        None
+    }
+
     pub fn clock_slow_pre(&mut self) {}
 
-    pub fn clock_slow(&mut self) {
+    pub fn clock_slow(&mut self, rate: u32, sound: &mut Option<rb::Producer<f32>>) {
         self.cycles = self.cycles.wrapping_add(1);
         self.frame_sequencer_clock();
         if self.clock {
@@ -284,6 +290,12 @@ impl NesApu {
             self.sound_disabled_clock += 1;
         } else if self.sound_disabled_clock == 2048 {
             self.sound_disabled = false;
+        }
+        if let Some(sample) = self.build_audio_sample(rate) {
+            if let Some(p) = sound {
+                let data: [f32; 1] = [sample];
+                p.write(&data);
+            }
         }
     }
 

@@ -65,6 +65,8 @@ struct MainNesWindow {
     #[cfg(feature = "eframe")]
     c: NesEmulatorData,
     fps: f64,
+    rate: u32,
+    sound: Option<rb::Producer<f32>>,
 }
 
 impl MainNesWindow {
@@ -83,11 +85,13 @@ impl MainNesWindow {
         }
     }
     #[cfg(feature = "egui-multiwin")]
-    fn new() -> NewWindowRequest<NesEmulatorData> {
+    fn new(rate: u32, producer: Option<rb::Producer<f32>>) -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
                 last_frame_time: std::time::SystemTime::now(),
                 fps: 0.0,
+                rate: rate,
+                sound: producer,
             }),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -223,7 +227,7 @@ impl TrackedWindow for MainNesWindow {
             #[cfg(debug_assertions)]
             {
                 if !c.paused {
-                    c.cycle_step();
+                    c.cycle_step(self.rate, &mut self.sound);
                     if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
                         if c.single_step {
                             c.paused = true;
@@ -759,15 +763,18 @@ fn main() {
 fn main() {
     use std::f32::consts::PI;
 
+    use rb::RB;
+
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let event_loop = egui_multiwin::glutin::event_loop::EventLoopBuilder::with_user_event().build();
-    let mut multi_window = MultiWindow::new();
-    let root_window = MainNesWindow::new();
     let mut nes_data = NesEmulatorData::new();
+    let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();
     let device = host.default_output_device();
+    let mut sound_rate = 0;
+    let mut sound_producer = None;
     if let Some(d) = &device {
         let ranges = d.supported_output_configs();
         if let Ok(mut r) = ranges {
@@ -775,27 +782,29 @@ fn main() {
             let format = config.sample_format();
             println!("output format is {:?}", format);
             let config = config.config();
-            let mut index: u32 = 0;
-            nes_data.sound_output = d
+
+            let rb = rb::SpscRb::new((config.sample_rate.0 as f32 * 0.1) as usize);
+            let (producer, consumer) = (rb.producer(), rb.consumer());
+            let mut stream = d
                 .build_output_stream(
                     &config,
                     move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                        for sample in data.iter_mut() {
-                            let i = index as f32;
-                            let t = (i * 440.0 * 2.0 * PI / 48000.0).sin();
-                            *sample = t;
-                            index = (index + 1) % 48000;
-                        }
+                        let _e = rb::RbConsumer::get(&consumer, data);
                     },
                     move |_err| {},
                     None,
                 )
                 .ok();
-            if let Some(s) = &mut nes_data.sound_output {
+            if let Some(s) = &mut stream {
                 s.play().unwrap();
+                sound_rate = config.sample_rate.0;
+                sound_producer = Some(producer);
             }
         }
     }
+
+    let root_window = MainNesWindow::new(sound_rate, sound_producer);
+
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
     nes_data.mb.controllers[0] = Some(controller::StandardController::new());

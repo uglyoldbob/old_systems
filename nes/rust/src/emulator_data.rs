@@ -29,7 +29,6 @@ pub struct NesEmulatorData {
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    pub sound_output: Option<cpal::Stream>,
     nmi: [bool; 3],
     prev_irq: bool,
     pub roms: RomList,
@@ -59,8 +58,6 @@ impl NesEmulatorData {
                 .as_millis(),
             #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
             texture: None,
-            #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-            sound_output: None,
             nmi: [false; 3],
             prev_irq: false,
             roms: RomList::load_list(),
@@ -85,7 +82,7 @@ impl NesEmulatorData {
         self.cpu_peripherals.ppu_cycle(&mut self.mb);
     }
 
-    pub fn cycle_step(&mut self) {
+    pub fn cycle_step(&mut self, rate: u32, sound: &mut Option<rb::Producer<f32>>) {
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
@@ -96,7 +93,7 @@ impl NesEmulatorData {
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
             self.prev_irq = irq;
-            self.cpu_peripherals.apu.clock_slow();
+            self.cpu_peripherals.apu.clock_slow(rate, sound);
         }
 
         self.ppu_clock_counter += 1;
