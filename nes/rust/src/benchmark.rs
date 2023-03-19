@@ -149,5 +149,41 @@ pub fn bench1(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench1, cpu_bench);
-criterion_main!(benches);
+pub fn romlist_bench(c: &mut Criterion) {
+    let wdir = std::env::current_dir().unwrap();
+    println!("Current dir is {}", wdir.display());
+
+    let mut group = c.benchmark_group("romlist parse bench");
+    group.bench_function("first run", |b| {
+        b.iter(|| {
+            let _e = std::fs::remove_file("./roms.bin");
+            let mut list = romlist::RomListParser::new();
+            list.find_roms("../roms");
+            println!("There are {} roms", list.count());
+            list.process_roms();
+        });
+    });
+
+    group.bench_function("second run", |b| {
+        b.iter(|| {
+            let mut list = romlist::RomListParser::new();
+            list.find_roms("../roms");
+            println!("There are {} roms", list.count());
+            list.process_roms();
+        });
+    });
+}
+
+fn benches() {
+    let mut criterion = crate::Criterion::default().configure_from_args();
+    bench1(&mut criterion);
+    cpu_bench(&mut criterion);
+    romlist_bench(&mut criterion);
+}
+
+fn main() {
+    benches();
+    crate::Criterion::default()
+        .configure_from_args()
+        .final_summary();
+}

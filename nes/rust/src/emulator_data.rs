@@ -28,6 +28,8 @@ pub struct NesEmulatorData {
     pub last_frame_time: u128,
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
+    pub sound_output: Option<cpal::Stream>,
     nmi: [bool; 3],
     prev_irq: bool,
     pub roms: RomList,
@@ -57,6 +59,8 @@ impl NesEmulatorData {
                 .as_millis(),
             #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
             texture: None,
+            #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
+            sound_output: None,
             nmi: [false; 3],
             prev_irq: false,
             roms: RomList::load_list(),

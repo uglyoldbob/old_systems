@@ -28,6 +28,8 @@ use crate::ppu::NesPpu;
 const INITIAL_ROM : Option<&str> = Some("./nes/test_roms/read_joy3/test_buttons.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
+#[cfg(feature = "egui-multiwin")]
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[cfg(feature = "eframe")]
 use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
@@ -755,12 +757,45 @@ fn main() {
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
+    use std::f32::consts::PI;
+
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let event_loop = egui_multiwin::glutin::event_loop::EventLoopBuilder::with_user_event().build();
     let mut multi_window = MultiWindow::new();
     let root_window = MainNesWindow::new();
     let mut nes_data = NesEmulatorData::new();
+
+    let host = cpal::default_host();
+    let device = host.default_output_device();
+    if let Some(d) = &device {
+        let ranges = d.supported_output_configs();
+        if let Ok(mut r) = ranges {
+            let config = r.next().unwrap().with_max_sample_rate();
+            let format = config.sample_format();
+            println!("output format is {:?}", format);
+            let config = config.config();
+            let mut index: u32 = 0;
+            nes_data.sound_output = d
+                .build_output_stream(
+                    &config,
+                    move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                        for sample in data.iter_mut() {
+                            let i = index as f32;
+                            let t = (i * 440.0 * 2.0 * PI / 48000.0).sin();
+                            *sample = t;
+                            index = (index + 1) % 48000;
+                        }
+                    },
+                    move |_err| {},
+                    None,
+                )
+                .ok();
+            if let Some(s) = &mut nes_data.sound_output {
+                s.play().unwrap();
+            }
+        }
+    }
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
     nes_data.mb.controllers[0] = Some(controller::StandardController::new());

@@ -9,11 +9,12 @@ edition = "2021"
 default = ["egui-multiwin"]
 debugger = []
 puffin = ["dep:puffin", "dep:puffin_egui"]
-egui-multiwin = ["dep:egui-multiwin"]
+egui-multiwin = ["dep:egui-multiwin", "dep:cpal"]
 eframe = ["dep:eframe"]
 sdl2 = ["dep:sdl2", "dep:egui_sdl2_gl"]
 
 [dependencies]
+cpal = {version = "0.15.1", optional=true}
 enum_dispatch = "0.3.11"
 rand = "0.8.5"
 egui-multiwin = {version = "0.1.2", optional=true}
