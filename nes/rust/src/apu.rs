@@ -1,39 +1,64 @@
+use biquad::Biquad;
 use rb::RbProducer;
 
 struct ApuSquareChannel {
     length: u8,
+    counter: u8,
 }
 
 impl ApuSquareChannel {
     fn new() -> Self {
-        Self { length: 0 }
+        Self {
+            length: 0,
+            counter: 0,
+        }
     }
 
     fn cycle(&mut self) {}
+
+    fn audio(&self) -> f32 {
+        self.counter as f32
+    }
 }
 
 struct ApuNoiseChannel {
     length: u8,
+    counter: u8,
 }
 
 impl ApuNoiseChannel {
     fn new() -> Self {
-        Self { length: 0 }
+        Self {
+            length: 0,
+            counter: 0,
+        }
     }
 
     fn cycle(&mut self) {}
+
+    fn audio(&self) -> f32 {
+        self.counter as f32
+    }
 }
 
 struct ApuTriangleChannel {
     length: u8,
+    counter: u8,
 }
 
 impl ApuTriangleChannel {
     fn new() -> Self {
-        Self { length: 0 }
+        Self {
+            length: 0,
+            counter: 0,
+        }
     }
 
     fn cycle(&mut self) {}
+
+    fn audio(&self) -> f32 {
+        self.counter as f32
+    }
 }
 
 struct ApuDmcChannel {
@@ -52,6 +77,7 @@ struct ApuDmcChannel {
     loop_flag: bool,
     playing: bool,
     silence: bool,
+    output: u8,
 }
 
 impl ApuDmcChannel {
@@ -72,6 +98,7 @@ impl ApuDmcChannel {
             loop_flag: false,
             playing: false,
             silence: true,
+            output: 0,
         }
     }
 
@@ -102,6 +129,10 @@ impl ApuDmcChannel {
         }
         //println!("DMC CYCLE {} {}", self.rate_counter, self.bit_counter);
     }
+
+    fn audio(&self) -> f32 {
+        self.output as f32
+    }
 }
 
 pub struct NesApu {
@@ -118,6 +149,10 @@ pub struct NesApu {
     read_count: u8,
     cycles: u32,
     timing_clock: u32,
+    filter: Option<biquad::DirectForm1<f32>>,
+    last_sample_rate: f32,
+    output_index: f32,
+    sample_interval: f32,
 }
 
 impl NesApu {
@@ -136,6 +171,10 @@ impl NesApu {
             read_count: 0,
             cycles: 0,
             timing_clock: 0,
+            filter: None,
+            last_sample_rate: 0.0,
+            output_index: 0.0,
+            sample_interval: 100.0,
         }
     }
 
@@ -267,8 +306,41 @@ impl NesApu {
         }
     }
 
-    fn build_audio_sample(&self, rate: u32) -> Option<f32> {
-        None
+    fn build_audio_sample(&mut self, rate: u32) -> Option<f32> {
+        //TODO Make this a variable, depending on actual cpu speed
+        let rf = rate as f32;
+        if self.last_sample_rate != rf {
+            let sampling_frequency = 21.47727e6 / 12.0;
+            let filter_coeff = biquad::Coefficients::<f32>::from_params(
+                biquad::Type::LowPass,
+                biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
+                biquad::Hertz::<f32>::from_hz(rf / 2.2).unwrap(),
+                biquad::Q_BUTTERWORTH_F32,
+            )
+            .unwrap();
+            self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
+            self.last_sample_rate = rf;
+            self.sample_interval = sampling_frequency / rf;
+        }
+
+        let audio = self.squares[0].audio()
+            + self.squares[1].audio()
+            + self.triangle.audio()
+            + self.noise.audio()
+            + self.dmc.audio();
+        if let Some(filter) = &mut self.filter {
+            let e = filter.run(audio / 5.0);
+            self.output_index += 1.0;
+            if self.output_index >= self.sample_interval {
+                self.output_index -= self.sample_interval;
+                Some(e)
+            } else {
+                None
+            }
+        }
+        else {
+            None
+        }
     }
 
     pub fn clock_slow_pre(&mut self) {}
@@ -294,7 +366,7 @@ impl NesApu {
         if let Some(sample) = self.build_audio_sample(rate) {
             if let Some(p) = sound {
                 let data: [f32; 1] = [sample];
-                p.write(&data);
+                let _e = p.write(&data);
             }
         }
     }
