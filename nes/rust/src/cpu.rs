@@ -2,6 +2,8 @@ use crate::apu::NesApu;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCpuPeripherals {
     pub ppu: NesPpu,
     pub apu: NesApu,
@@ -46,6 +48,8 @@ impl NesCpuPeripherals {
     }
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCpu {
     a: u8,
     x: u8,
@@ -472,7 +476,7 @@ impl NesCpu {
                             self.subcycle = 2;
                         }
                         2 => {
-                            let mut pc = self.pc.to_le_bytes();
+                            let pc = self.pc.to_le_bytes();
                             self.memory_cycle_write(
                                 0x100 + self.s as u16,
                                 pc[1],
@@ -483,7 +487,7 @@ impl NesCpu {
                             self.subcycle = 3;
                         }
                         3 => {
-                            let mut pc = self.pc.to_le_bytes();
+                            let pc = self.pc.to_le_bytes();
                             self.memory_cycle_write(
                                 0x100 + self.s as u16,
                                 pc[0],

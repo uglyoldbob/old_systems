@@ -22,7 +22,7 @@ impl RomList {
 
     pub fn load_list() -> Self {
         let contents = std::fs::read("./roms.bin");
-        if let Err(e) = contents {
+        if let Err(_e) = contents {
             return RomList::new();
         }
         let contents = contents.unwrap();
@@ -51,6 +51,10 @@ impl RomListParser {
         }
     }
 
+    pub fn list(&self) -> &RomList {
+        &self.list
+    }
+
     pub fn count(&self) -> usize {
         self.list.elements.len()
     }
@@ -63,9 +67,7 @@ impl RomListParser {
                 .filter(|e| !e.file_type().is_dir())
             {
                 let meta = entry.metadata();
-                if let Ok(meta) = meta {
-                    let modified = meta.modified();
-
+                if meta.is_ok() {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
                     if NesCartridge::load_cartridge(name).is_ok() {
@@ -79,7 +81,7 @@ impl RomListParser {
                     }
                 }
             }
-            self.list.save_list();
+            let _e = self.list.save_list();
             self.scan_complete = true;
         }
     }
@@ -100,7 +102,7 @@ impl RomListParser {
                     }
                 }
             }
-            self.list.save_list();
+            let _e = self.list.save_list();
             self.update_complete = true;
         }
     }

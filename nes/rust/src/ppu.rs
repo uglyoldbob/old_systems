@@ -1,4 +1,5 @@
 use crate::motherboard::NesMotherboard;
+use serde_with::Bytes;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -6,6 +7,8 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 enum PpuSpriteEvalMode {
     Normal,
     CopyCurrentSprite,
@@ -13,7 +16,8 @@ enum PpuSpriteEvalMode {
     Done,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug)]
 pub struct PpuSprite {
     y: u8,
     tile: u8,
@@ -37,7 +41,7 @@ impl PpuSprite {
         ((self.attribute & 3) as u16) << 2
     }
 
-    pub fn tile_num(&self, scanline: u8) -> u16 {
+    pub fn tile_num(&self, _scanline: u8) -> u16 {
         let calc = (self.tile & 0xff) as u16;
         let adder: u16 = 0;
         adder + calc * 0x10
@@ -57,6 +61,9 @@ impl PpuSprite {
     }
 }
 
+#[non_exhaustive]
+#[serde_with::serde_as]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesPpu {
     registers: [u8; 8],
     scanline_number: u16,
@@ -72,7 +79,9 @@ pub struct NesPpu {
     attributetable_data: u8,
     attributetable_shift: [u8; 2],
     patterntable_tile: u16,
+    #[serde_as(as = "[_; 2]")]
     patterntable_shift: [u16; 2],
+    #[serde_as(as = "Bytes")]
     frame_data: Box<[u8; 3 * 256 * 240]>,
     pend_vram_write: Option<u8>,
     pend_vram_read: Option<u16>,
@@ -83,6 +92,7 @@ pub struct NesPpu {
     ppudata_buffer: u8,
     last_cpu_data: u8,
     last_cpu_counter: [u32; 2],
+    #[serde_as(as = "Bytes")]
     oam: [u8; 256],
     secondary_oam: [u8; 32],
     sprites: [PpuSprite; 8],
@@ -422,7 +432,7 @@ impl NesPpu {
             base += 0x400;
         }
         let (y, oy) = y.overflowing_add(self.scrolly);
-        if ox || y > 240 {
+        if ox || oy || y > 240 {
             base += 0x400;
         }
         (base, x, y % 240)
@@ -445,7 +455,7 @@ impl NesPpu {
             base += 0x400;
         }
         let (y, oy) = y.overflowing_add(self.scrolly);
-        if ox || y > 240 {
+        if ox || oy || y > 240 {
             base += 0x400;
         }
         (base, x, y % 240)
@@ -731,8 +741,6 @@ impl NesPpu {
         if self.last_cpu_counter[1] == 0 {
             self.last_cpu_data &= 0x1f;
         }
-
-        let vblank_flag = (self.registers[2] & 0x80) != 0;
 
         if self.should_render_sprites(0)
             || self.should_render_sprites(8)

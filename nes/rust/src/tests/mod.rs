@@ -121,7 +121,7 @@ fn vbl_nmi_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 176 {
                 break;
@@ -140,7 +140,7 @@ fn vbl_nmi_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 156 {
                 break;
@@ -160,7 +160,7 @@ fn vbl_nmi_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 101 {
                 break;
@@ -180,7 +180,7 @@ fn vbl_nmi_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 119 {
                 break;
@@ -200,7 +200,7 @@ fn vbl_nmi_test5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 168 {
                 break;
@@ -219,7 +219,7 @@ fn vbl_nmi_test6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 111 {
                 break;
@@ -238,7 +238,7 @@ fn vbl_nmi_test7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 111 {
                 break;
@@ -258,7 +258,7 @@ fn cpu_branch_timing1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 14 {
                 break;
@@ -278,7 +278,7 @@ fn cpu_branch_timing2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 16 {
                 break;
@@ -298,7 +298,7 @@ fn cpu_branch_timing3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 16 {
                 break;
@@ -316,7 +316,7 @@ fn ppu_open_bus() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 251 {
                 break;
@@ -336,7 +336,7 @@ fn ppu_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
                 break;
@@ -356,7 +356,7 @@ fn ppu_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
                 break;
@@ -376,7 +376,7 @@ fn ppu_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
                 break;
@@ -396,7 +396,7 @@ fn ppu_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
                 break;
@@ -416,7 +416,7 @@ fn cpu_test_dummy_writes_oam() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 350 {
                 break;
@@ -436,7 +436,7 @@ fn cpu_test_dummy_writes_ppu() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
                 break;
@@ -456,7 +456,7 @@ fn cpu_test_exec_space_ppu() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 48 {
                 break;
@@ -476,7 +476,7 @@ fn cpu_timing_test() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 645 {
                 break;
@@ -496,7 +496,7 @@ fn cpu_dma_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;
@@ -514,7 +514,7 @@ fn oam_test() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 33 {
                 break;
@@ -532,7 +532,7 @@ fn oam_stress() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 1793 {
                 break;
@@ -552,7 +552,7 @@ fn apu_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;
@@ -572,7 +572,7 @@ fn apu_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -592,7 +592,7 @@ fn apu_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -612,7 +612,7 @@ fn apu_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -632,7 +632,7 @@ fn apu_test5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
                 break;
@@ -652,7 +652,7 @@ fn apu_test6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
                 break;
@@ -672,7 +672,7 @@ fn apu_test7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -692,7 +692,7 @@ fn apu_test8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -712,7 +712,7 @@ fn apu_test9() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -730,7 +730,7 @@ fn apu_test10() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -742,7 +742,7 @@ fn apu_test10() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -760,7 +760,7 @@ fn apu_test11() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
                 break;
@@ -772,7 +772,7 @@ fn apu_test11() {
         .check_vram(193, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
                 break;
@@ -790,7 +790,7 @@ fn apu_test12() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -802,7 +802,7 @@ fn apu_test12() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -814,7 +814,7 @@ fn apu_test12() {
         .check_vram(129, "Press RESET again".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -833,7 +833,7 @@ fn apu_test13() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -845,7 +845,7 @@ fn apu_test13() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -864,7 +864,7 @@ fn apu_test14() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -876,7 +876,7 @@ fn apu_test14() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -895,7 +895,7 @@ fn apu_test15() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -907,7 +907,7 @@ fn apu_test15() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -926,7 +926,7 @@ fn apu_test16_1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -946,7 +946,7 @@ fn apu_test16_2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -966,7 +966,7 @@ fn apu_test16_3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -985,7 +985,7 @@ fn apu_test16_4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -1005,7 +1005,7 @@ fn apu_test16_5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 130 {
                 break;
@@ -1025,7 +1025,7 @@ fn apu_test16_6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
                 break;
@@ -1045,7 +1045,7 @@ fn apu_test16_7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;
@@ -1065,7 +1065,7 @@ fn apu_test16_8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;
@@ -1085,7 +1085,7 @@ fn cpu_test_exec_space_apu() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 315 {
                 break;
@@ -1103,7 +1103,7 @@ fn cpu_reset() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -1114,7 +1114,7 @@ fn cpu_reset() {
         .mb
         .check_vram(129, "Press reset AFTER".to_string().as_bytes()));
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 145 {
                 break;
@@ -1123,7 +1123,7 @@ fn cpu_reset() {
     }
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -1141,7 +1141,7 @@ fn cpu_reset2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
                 break;
@@ -1152,7 +1152,7 @@ fn cpu_reset2() {
         .mb
         .check_vram(193, "Press reset AFTER".to_string().as_bytes()));
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 150 {
                 break;
@@ -1161,7 +1161,7 @@ fn cpu_reset2() {
     }
     nes_data.reset();
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
                 break;
@@ -1179,7 +1179,7 @@ fn cpu_timing_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 300 {
                 break;
@@ -1200,7 +1200,7 @@ fn ppu_sprite_test_1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;
@@ -1220,7 +1220,7 @@ fn ppu_sprite_test_2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;
@@ -1239,7 +1239,7 @@ fn ppu_sprite_test_3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step();
+        nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
             if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
                 break;

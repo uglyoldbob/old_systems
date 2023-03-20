@@ -13,11 +13,13 @@ pub trait NesControllerTrait {
 
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(NesControllerTrait)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum NesController {
     StandardController,
     DummyController,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct StandardController {
     controller_buttons: u8,
     shift_register: u8,
@@ -93,6 +95,7 @@ impl NesControllerTrait for StandardController {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct DummyController {}
 
 impl DummyController {

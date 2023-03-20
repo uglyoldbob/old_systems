@@ -25,6 +25,7 @@ trait NesMapperTrait {
 
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(NesMapperTrait)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub enum NesMapper {
     Mapper00,
     Mapper01,
@@ -40,6 +41,8 @@ pub trait NesMemoryBusDevice {
     fn memory_cycle_write(&mut self, addr: u16, data: u8);
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridgeData {
     trainer: Option<Vec<u8>>,
     prg_rom: Vec<u8>,
@@ -53,6 +56,8 @@ pub struct NesCartridgeData {
     mapper: u32,
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridge {
     data: NesCartridgeData,
     mapper: NesMapper,
@@ -240,6 +245,10 @@ impl NesCartridge {
                 chr_rom.push(rom_contents[file_offset + i]);
             }
             file_offset += chr_rom_size;
+        }
+
+        if file_offset < rom_contents.len() {
+            println!("Didn't use the entire rom file, I should report this as a failure");
         }
 
         let mappernum = (rom_contents[6] >> 4) as u16

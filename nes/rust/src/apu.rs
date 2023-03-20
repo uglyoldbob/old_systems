@@ -1,6 +1,8 @@
 use biquad::Biquad;
 use rb::RbProducer;
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct ApuSquareChannel {
     length: u8,
     counter: u8,
@@ -21,6 +23,8 @@ impl ApuSquareChannel {
     }
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct ApuNoiseChannel {
     length: u8,
     counter: u8,
@@ -41,6 +45,8 @@ impl ApuNoiseChannel {
     }
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct ApuTriangleChannel {
     length: u8,
     counter: u8,
@@ -61,6 +67,8 @@ impl ApuTriangleChannel {
     }
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 struct ApuDmcChannel {
     interrupt_flag: bool,
     interrupt_enable: bool,
@@ -102,7 +110,7 @@ impl ApuDmcChannel {
         }
     }
 
-    fn cycle(&mut self, timing: u32) {
+    fn cycle(&mut self, _timing: u32) {
         if self.sample_buffer.is_none() && self.dma_request.is_none() && self.length > 0 {
             self.dma_request = Some(self.dma_address | 0x8000);
             self.length -= 1;
@@ -135,6 +143,8 @@ impl ApuDmcChannel {
     }
 }
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesApu {
     clock: bool,
     registers: [u8; 24],
@@ -149,7 +159,6 @@ pub struct NesApu {
     read_count: u8,
     cycles: u32,
     timing_clock: u32,
-    filter: Option<biquad::DirectForm1<f32>>,
     last_sample_rate: f32,
     output_index: f32,
     sample_interval: f32,
@@ -171,7 +180,6 @@ impl NesApu {
             read_count: 0,
             cycles: 0,
             timing_clock: 0,
-            filter: None,
             last_sample_rate: 0.0,
             output_index: 0.0,
             sample_interval: 100.0,
@@ -306,29 +314,13 @@ impl NesApu {
         }
     }
 
-    fn build_audio_sample(&mut self, rate: u32) -> Option<f32> {
-        //TODO Make this a variable, depending on actual cpu speed
-        let rf = rate as f32;
-        if self.last_sample_rate != rf {
-            let sampling_frequency = 21.47727e6 / 12.0;
-            let filter_coeff = biquad::Coefficients::<f32>::from_params(
-                biquad::Type::LowPass,
-                biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
-                biquad::Hertz::<f32>::from_hz(rf / 2.2).unwrap(),
-                biquad::Q_BUTTERWORTH_F32,
-            )
-            .unwrap();
-            self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
-            self.last_sample_rate = rf;
-            self.sample_interval = sampling_frequency / rf;
-        }
-
+    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
             + self.noise.audio()
             + self.dmc.audio();
-        if let Some(filter) = &mut self.filter {
+        if let Some(filter) = filter {
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
@@ -337,15 +329,18 @@ impl NesApu {
             } else {
                 None
             }
-        }
-        else {
+        } else {
             None
         }
     }
 
     pub fn clock_slow_pre(&mut self) {}
 
-    pub fn clock_slow(&mut self, rate: u32, sound: &mut Option<rb::Producer<f32>>) {
+    pub fn clock_slow(
+        &mut self,
+        sound: &mut Option<rb::Producer<f32>>,
+        filter: &mut Option<biquad::DirectForm1<f32>>,
+    ) {
         self.cycles = self.cycles.wrapping_add(1);
         self.frame_sequencer_clock();
         if self.clock {
@@ -363,7 +358,7 @@ impl NesApu {
         } else if self.sound_disabled_clock == 2048 {
             self.sound_disabled = false;
         }
-        if let Some(sample) = self.build_audio_sample(rate) {
+        if let Some(sample) = self.build_audio_sample(filter) {
             if let Some(p) = sound {
                 let data: [f32; 1] = [sample];
                 let _e = p.write(&data);

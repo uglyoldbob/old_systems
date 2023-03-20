@@ -18,7 +18,7 @@ use crate::ppu::NesPpu;
 use crate::utility::convert_hex_to_decimal;
 use emulator_data::NesEmulatorData;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::Criterion;
 use std::io::BufRead;
 
 struct CpuBench1 {
@@ -39,7 +39,7 @@ pub fn cpu_bench(c: &mut Criterion) {
         b.iter(|| 'emulator_loop: loop {
             nes_data.ppu_step();
             if nes_data.cpu_peripherals.ppu_frame_end() {
-                let data = nes_data.cpu_peripherals.ppu_get_frame();
+                nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;
             }
         });
@@ -72,15 +72,11 @@ pub fn cpu_bench(c: &mut Criterion) {
                 let mut data = data;
                 let mut t: String;
                 let mut b;
-                let mut log_line = 0;
                 for i in 0..26554 {
                     data.cpu
                         .cycle(&mut data.mb, &mut data.cpu_peripherals, false, false);
                     if data.cpu.instruction_start() {
-                        log_line += 1;
                         t = data.goldenlog.next().unwrap().unwrap();
-                        //            println!("Instruction end at cycle {}", i + 1);
-                        //            println!("NESTEST LOG LINE {}: {}", log_line, t);
                         b = t.as_bytes();
                         let d = convert_hex_to_decimal(b[0] as char) as u16;
                         let d2 = convert_hex_to_decimal(b[1] as char) as u16;

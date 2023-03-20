@@ -1,6 +1,8 @@
 use crate::cartridge::NesCartridgeData;
 use crate::cartridge::{NesMapper, NesMapperTrait};
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Mapper00 {
     mirror_vertical: bool,
     ppu_address: u16,
@@ -38,7 +40,7 @@ impl NesMapperTrait for Mapper00 {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {}
+    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
 
     fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool) {
         self.ppu_address = addr;

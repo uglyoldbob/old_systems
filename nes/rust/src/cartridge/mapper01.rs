@@ -1,6 +1,8 @@
 use crate::cartridge::NesCartridgeData;
 use crate::cartridge::{NesMapper, NesMapperTrait};
 
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Mapper01 {
     shift_register: u8,
     shift_counter: u8,
@@ -11,7 +13,7 @@ pub struct Mapper01 {
 }
 
 impl Mapper01 {
-    pub fn new(d: &NesCartridgeData) -> NesMapper {
+    pub fn new(_d: &NesCartridgeData) -> NesMapper {
         NesMapper::from(Self {
             shift_register: 0,
             shift_counter: 0,

@@ -10,10 +10,11 @@ pub mod ppu;
 pub mod romlist;
 pub mod utility;
 
+use std::io::Write;
+
 use controller::NesControllerTrait;
 use egui_multiwin::egui::Sense;
 use emulator_data::NesEmulatorData;
-use romlist::{RomList, RomListEntry};
 
 #[cfg(test)]
 mod tests;
@@ -36,6 +37,7 @@ use eframe::egui;
 use egui_multiwin::egui_glow::EguiGlow;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     multi_window::{MultiWindow, NewWindowRequest},
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -65,8 +67,12 @@ struct MainNesWindow {
     #[cfg(feature = "eframe")]
     c: NesEmulatorData,
     fps: f64,
-    rate: u32,
+    sound_rate: u32,
     sound: Option<rb::Producer<f32>>,
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
+    pub texture: Option<egui::TextureHandle>,
+    filter: Option<biquad::DirectForm1<f32>>,
+    sound_sample_interval: f32,
 }
 
 impl MainNesWindow {
@@ -90,8 +96,11 @@ impl MainNesWindow {
             window_state: Box::new(MainNesWindow {
                 last_frame_time: std::time::SystemTime::now(),
                 fps: 0.0,
-                rate: rate,
+                sound_rate: rate,
                 sound: producer,
+                texture: None,
+                filter: None,
+                sound_sample_interval: 0.0,
             }),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -210,7 +219,21 @@ impl TrackedWindow for MainNesWindow {
         #[cfg(feature = "puffin")]
         puffin::profile_scope!("frame rendering");
 
-        let mut quit = false;
+        if self.filter.is_none() {
+            let rf = self.sound_rate as f32;
+            let sampling_frequency = 21.47727e6 / 12.0;
+            let filter_coeff = biquad::Coefficients::<f32>::from_params(
+                biquad::Type::LowPass,
+                biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
+                biquad::Hertz::<f32>::from_hz(rf / 2.2).unwrap(),
+                biquad::Q_BUTTERWORTH_F32,
+            )
+            .unwrap();
+            self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
+            self.sound_sample_interval = sampling_frequency / rf;
+        }
+
+        let quit = false;
         let mut windows_to_create = vec![];
 
         {
@@ -227,7 +250,7 @@ impl TrackedWindow for MainNesWindow {
             #[cfg(debug_assertions)]
             {
                 if !c.paused {
-                    c.cycle_step(self.rate, &mut self.sound);
+                    c.cycle_step(&mut self.sound, &mut self.filter);
                     if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
                         if c.single_step {
                             c.paused = true;
@@ -248,7 +271,7 @@ impl TrackedWindow for MainNesWindow {
             }
             #[cfg(not(debug_assertions))]
             {
-                c.cycle_step();
+                c.cycle_step(&mut self.sound, &mut self.filter);
                 if c.cpu_peripherals.ppu_frame_end() {
                     break 'emulator_loop;
                 }
@@ -257,13 +280,13 @@ impl TrackedWindow for MainNesWindow {
 
         let image = NesPpu::convert_to_egui(c.cpu_peripherals.ppu_get_frame());
 
-        if let None = c.texture {
-            c.texture = Some(egui.egui_ctx.load_texture(
+        if let None = self.texture {
+            self.texture = Some(egui.egui_ctx.load_texture(
                 "NES_PPU",
                 image,
                 egui_multiwin::egui::TextureOptions::NEAREST,
             ));
-        } else if let Some(t) = &mut c.texture {
+        } else if let Some(t) = &mut self.texture {
             t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
         }
 
@@ -273,6 +296,38 @@ impl TrackedWindow for MainNesWindow {
                     let button = egui_multiwin::egui::Button::new("Open rom?");
                     if ui.add_enabled(true, button).clicked() {
                         windows_to_create.push(RomFinder::new());
+                        ui.close_menu();
+                    }
+
+                    let button = egui_multiwin::egui::Button::new("Save state");
+                    if ui.add_enabled(true, button).clicked()
+                        || egui
+                            .egui_ctx
+                            .input()
+                            .key_pressed(egui_multiwin::egui::Key::F5)
+                    {
+                        println!("Saving state");
+                        let state = c.serialize();
+                        let _e = std::fs::OpenOptions::new()
+                            .write(true)
+                            .create(true)
+                            .open("./state.bin")
+                            .unwrap()
+                            .write_all(&state);
+                        ui.close_menu();
+                    }
+
+                    let button = egui_multiwin::egui::Button::new("Load state");
+                    if ui.add_enabled(true, button).clicked()
+                        || egui
+                            .egui_ctx
+                            .input()
+                            .key_pressed(egui_multiwin::egui::Key::F6)
+                    {
+                        println!("Loading state");
+                        if let Ok(a) = std::fs::read("./state.bin") {
+                            c.deserialize(a);
+                        }
                         ui.close_menu();
                     }
                 });
@@ -293,7 +348,7 @@ impl TrackedWindow for MainNesWindow {
         });
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            if let Some(t) = &c.texture {
+            if let Some(t) = &self.texture {
                 ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
             }
             ui.label(format!("{:.0} FPS", self.fps));
@@ -362,8 +417,8 @@ impl TrackedWindow for DebugNesWindow {
         egui: &mut EguiGlow,
     ) -> RedrawResponse<Self::Data> {
         egui.egui_ctx.request_repaint();
-        let mut quit = false;
-        let mut windows_to_create = vec![];
+        let quit = false;
+        let windows_to_create = vec![];
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("Debug window");
@@ -416,67 +471,15 @@ impl TrackedWindow for DebugNesWindow {
 
 #[cfg(feature = "egui-multiwin")]
 struct RomFinder {
-    scan_complete: bool,
-    update_complete: bool,
+    parser: romlist::RomListParser,
 }
 
 #[cfg(feature = "egui-multiwin")]
 impl RomFinder {
-    fn find_roms(&mut self, rom_list: &mut RomList) {
-        if !self.scan_complete {
-            for entry in walkdir::WalkDir::new("./roms/")
-                .into_iter()
-                .filter_map(Result::ok)
-                .filter(|e| !e.file_type().is_dir())
-            {
-                let meta = entry.metadata();
-                if let Ok(meta) = meta {
-                    let modified = meta.modified();
-
-                    let m = entry.clone().into_path();
-                    let name = m.clone().into_os_string().into_string().unwrap();
-                    if NesCartridge::load_cartridge(name).is_ok() {
-                        if !rom_list.elements.contains_key(&m) {
-                            let new_entry = RomListEntry {
-                                result: None,
-                                modified: None,
-                            };
-                            rom_list.elements.insert(m, new_entry);
-                        }
-                    }
-                }
-            }
-            rom_list.save_list();
-            self.scan_complete = true;
-        }
-    }
-
-    fn process_roms(&mut self, rom_list: &mut RomList) {
-        if !self.update_complete {
-            for (p, entry) in rom_list.elements.iter_mut() {
-                let metadata = p.metadata();
-                if let Ok(metadata) = metadata {
-                    let modified = metadata.modified().unwrap_or(std::time::SystemTime::now());
-                    let last_modified = entry.modified.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                    if modified > last_modified {
-                        let romcheck = NesCartridge::load_cartridge(
-                            p.as_os_str().to_str().unwrap().to_string(),
-                        );
-                        entry.result = Some(romcheck.map(|_i| ()));
-                        entry.modified = Some(modified);
-                    }
-                }
-            }
-            rom_list.save_list();
-            self.update_complete = true;
-        }
-    }
-
     fn new() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(RomFinder {
-                scan_complete: false,
-                update_complete: false,
+                parser: romlist::RomListParser::new(),
             }),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -509,17 +512,17 @@ impl TrackedWindow for RomFinder {
         egui: &mut EguiGlow,
     ) -> RedrawResponse<Self::Data> {
         let mut quit = false;
-        let mut windows_to_create = vec![];
+        let windows_to_create = vec![];
 
         //scan for roms if needed
-        self.find_roms(&mut c.roms);
+        self.parser.find_roms("./roms");
         //process to see if any new roms need to be checked
-        self.process_roms(&mut c.roms);
+        self.parser.process_roms();
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 let mut new_rom = None;
-                for (p, entry) in c.roms.elements.iter() {
+                for (p, entry) in self.parser.list().elements.iter() {
                     if let Some(r) = &entry.result {
                         if r.is_ok() {
                             if ui
@@ -761,8 +764,6 @@ fn main() {
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
-    use std::f32::consts::PI;
-
     use rb::RB;
 
     #[cfg(feature = "puffin")]

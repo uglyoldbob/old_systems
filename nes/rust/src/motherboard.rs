@@ -1,10 +1,16 @@
 use crate::controller::NesController;
 use crate::controller::NesControllerTrait;
 use crate::{cartridge::NesCartridge, cpu::NesCpuPeripherals};
+use serde_with::Bytes;
 
+#[non_exhaustive]
+#[serde_with::serde_as]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesMotherboard {
     cart: Option<NesCartridge>,
+    #[serde_as(as = "Bytes")]
     ram: [u8; 2048],
+    #[serde_as(as = "Bytes")]
     vram: [u8; 2048],
     ppu_palette_ram: [u8; 32],
     vram_address: Option<u16>,

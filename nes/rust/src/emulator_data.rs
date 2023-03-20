@@ -4,15 +4,13 @@ use crate::{
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
-    romlist::RomList,
 };
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui;
-
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesEmulatorData {
     pub cpu: NesCpu,
     pub cpu_peripherals: NesCpuPeripherals,
@@ -26,12 +24,8 @@ pub struct NesEmulatorData {
     #[cfg(debug_assertions)]
     pub wait_for_frame_end: bool,
     pub last_frame_time: u128,
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    pub texture: Option<egui::TextureHandle>,
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     nmi: [bool; 3],
     prev_irq: bool,
-    pub roms: RomList,
 }
 
 impl NesEmulatorData {
@@ -56,11 +50,22 @@ impl NesEmulatorData {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis(),
-            #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-            texture: None,
             nmi: [false; 3],
             prev_irq: false,
-            roms: RomList::load_list(),
+        }
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        bincode::serialize(&self).unwrap()
+    }
+
+    pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<bincode::ErrorKind>> {
+        match bincode::deserialize::<Self>(&data) {
+            Ok(r) => {
+                *self = r;
+                Ok(())
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -82,7 +87,11 @@ impl NesEmulatorData {
         self.cpu_peripherals.ppu_cycle(&mut self.mb);
     }
 
-    pub fn cycle_step(&mut self, rate: u32, sound: &mut Option<rb::Producer<f32>>) {
+    pub fn cycle_step(
+        &mut self,
+        sound: &mut Option<rb::Producer<f32>>,
+        filter: &mut Option<biquad::DirectForm1<f32>>,
+    ) {
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
@@ -93,7 +102,7 @@ impl NesEmulatorData {
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
             self.prev_irq = irq;
-            self.cpu_peripherals.apu.clock_slow(rate, sound);
+            self.cpu_peripherals.apu.clock_slow(sound, filter); //TODO replace with filter
         }
 
         self.ppu_clock_counter += 1;
