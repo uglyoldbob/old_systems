@@ -28,7 +28,7 @@ use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
 /// The initial rom that the emulator will load. Only for developmment of the beta version (0.1.x)
-const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/read_joy3/test_buttons.nes");
+const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/spritecans-2011/spritecans.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
 #[cfg(feature = "egui-multiwin")]
@@ -837,7 +837,7 @@ fn main() {
                 .build_output_stream(
                     &config,
                     move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                        let _e = rb::RbConsumer::get(&consumer, data);
+                        let _e = rb::RbConsumer::read(&consumer, data);
                     },
                     move |_err| {},
                     None,

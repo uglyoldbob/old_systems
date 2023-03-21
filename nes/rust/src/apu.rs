@@ -3,6 +3,28 @@
 use biquad::Biquad;
 use rb::RbProducer;
 
+/// An envelope sequencer for the apu
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ApuEnvelope {}
+
+impl ApuEnvelope {
+    /// Create a new envelope
+    fn new() -> Self {
+        Self {}
+    }
+
+    /// Clock the envelope
+    fn clock(&mut self, regs: &[u8]) {
+        let cv = regs[0] & 0xF;
+        //false means use volume from envelope, otherwise use cv for volume
+        let cv_flag = (regs[0] & 0x10) != 0;
+        // True when the envelope should loop?
+        let eloop = (regs[0] & 0x20) != 0;
+
+    }
+}
+
 /// A square channel for the apu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -11,6 +33,8 @@ struct ApuSquareChannel {
     length: u8,
     /// The counter for the channel
     counter: u8,
+    /// The envelope for sound generation
+    envelope: ApuEnvelope,
 }
 
 impl ApuSquareChannel {
@@ -19,6 +43,7 @@ impl ApuSquareChannel {
         Self {
             length: 0,
             counter: 0,
+            envelope: ApuEnvelope::new(),
         }
     }
 
@@ -39,6 +64,8 @@ struct ApuNoiseChannel {
     length: u8,
     /// The counter for the channel
     counter: u8,
+    /// The envelope for sound generation
+    envelope: ApuEnvelope,
 }
 
 impl ApuNoiseChannel {
@@ -47,6 +74,7 @@ impl ApuNoiseChannel {
         Self {
             length: 0,
             counter: 0,
+            envelope: ApuEnvelope::new(),
         }
     }
 
@@ -329,6 +357,9 @@ impl NesApu {
     /// The quarter frame, as determined by the frame sequencer
     fn quarter_frame(&mut self) {
         //TODO clock the envelopes, and triangle linear counter
+        self.squares[0].envelope.clock(&self.registers[0..4]);
+        self.squares[1].envelope.clock(&self.registers[4..8]);
+        self.noise.envelope.clock(&self.registers[12..16]);
     }
 
     /// The half frame, as determined by the frame sequencer
@@ -369,6 +400,7 @@ impl NesApu {
             + self.noise.audio()
             + self.dmc.audio();
         if let Some(filter) = filter {
+            //let audio = rand::Rng::gen::<f32>(&mut rand::thread_rng());
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {

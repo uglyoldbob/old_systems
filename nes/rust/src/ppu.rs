@@ -56,11 +56,19 @@ impl PpuSprite {
         ((self.attribute & 3) as u16) << 2
     }
 
-    /// Returns the tile number to fetch for this sprite. Probably incorrect for tall sprites
-    pub fn tile_num(&self, _scanline: u8) -> u16 {
+    /// Returns the tile number to fetch for this sprite.
+    pub fn tile_num(&self, scanline: u8) -> u16 {
         let calc = self.tile as u16;
-        let adder: u16 = 0;
-        adder + calc * 0x10
+        let adder: u16 = if scanline > self.y {
+            if (scanline - self.y) < 8 {
+                0
+            } else {
+                1
+            }
+        } else {
+            0
+        };
+        (adder + calc) * 0x10
     }
 
     /// Returns the line number to render of the sprite, given the scanline being rendered
