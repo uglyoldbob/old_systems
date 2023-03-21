@@ -1,93 +1,141 @@
+//! This module is responsible for emulating the cpu of the nes.
+
 use crate::apu::NesApu;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 
+/// The peripherals for the cpu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCpuPeripherals {
+    /// The ppu for the nes system
     pub ppu: NesPpu,
+    /// The apu for the nes system
     pub apu: NesApu,
 }
 
 impl NesCpuPeripherals {
+    /// Create a new sett of cpu peripherals
     pub fn new(ppu: NesPpu, apu: NesApu) -> Self {
-        Self { ppu: ppu, apu: apu }
+        Self { ppu, apu }
     }
 
+    /// Run a ppu address cycle
     pub fn ppu_cycle(&mut self, bus: &mut NesMotherboard) {
         self.ppu.cycle(bus);
     }
 
+    /// Run a ppu read cycle
     pub fn ppu_read(&mut self, addr: u16) -> Option<u8> {
         self.ppu.read(addr)
     }
 
+    /// Run a ppu write cycle
     pub fn ppu_write(&mut self, addr: u16, data: u8) {
         self.ppu.write(addr, data);
     }
 
+    /// Returns true when the frame has ended. USed for synchronizing the emulator to the appropriate frame rate
     pub fn ppu_frame_end(&mut self) -> bool {
         self.ppu.get_frame_end()
     }
 
-    pub fn ppu_get_frame(&mut self) -> &Box<[u8; 256 * 240 * 3]> {
+    /// Returns a reference to the frame data for the ppu
+    pub fn ppu_get_frame(&mut self) -> &[u8; 256 * 240 * 3] {
         self.ppu.get_frame()
     }
 
+    /// Used for automated testing, to determine how many frames have passed.
     #[cfg(any(test, debug_assertions))]
     pub fn ppu_frame_number(&self) -> u64 {
         self.ppu.frame_number()
     }
 
+    /// Returns the ppu irq line
     pub fn ppu_irq(&self) -> bool {
         self.ppu.irq()
     }
 
+    /// Reset the ppu
     pub fn ppu_reset(&mut self) {
         self.ppu.reset();
     }
 }
 
+/// A struct for implementing the nes cpu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCpu {
+    /// The a register
     a: u8,
+    /// The x register
     x: u8,
+    /// The y register
     y: u8,
+    /// The stack register
     s: u8,
+    /// The flags register
     p: u8,
+    /// The program counter
     pc: u16,
+    /// The portion of an instruction currently being executed
     subcycle: u8,
+    /// Indicates that the reset routine of the cpu should execute
     reset: bool,
+    /// The current opcode being executed
     opcode: Option<u8>,
+    /// A temporary variable used inn proccessing instructions
     temp: u8,
+    /// A temporary variable used inn proccessing instructions
     temp2: u8,
+    /// A temporary address used in processing instructions
     tempaddr: u16,
+    /// A list of breakpoints for the cpu
     #[cfg(debug_assertions)]
     breakpoints: [Option<u16>; 10],
+    /// The string that corresponds to the disassembly for the most recently fetched instruction
     #[cfg(debug_assertions)]
     disassembly: String,
+    /// True when the last byte of an instruction has been fetched
     #[cfg(debug_assertions)]
     done_fetching: bool,
+    /// The status of nmi_detection from last cpu cycle
     prev_nmi: bool,
+    /// True when an nmi has been detected
     nmi_detected: bool,
+    /// Shift register for the interrupt detection routine
     interrupt_shift: [(bool, bool); 2],
+    /// Indicates the type of interrupt, true for nmi, false for irq
     interrupt_type: bool,
+    /// Indicates that the cpu is currently interrupting with an interrupt
     interrupting: bool,
+    /// The address to use for oam dam
     oamdma: Option<u8>,
+    /// The dma counter for oam dma
     dma_counter: u16,
+    /// The three outputs used for controller driving
     outs: [bool; 3],
+    /// The address for dmc dma
     dmc_dma: Option<u16>,
+    /// Counter for doing dmc dma operations, since it takes more than one cycle
     dmc_dma_counter: u8,
 }
 
+/// The carry flag for the cpu flags register
 const CPU_FLAG_CARRY: u8 = 1;
+/// The zero flag for the cpu flags register
 const CPU_FLAG_ZERO: u8 = 2;
+/// The interrupt disable flag for the cpu flags register
 const CPU_FLAG_INT_DISABLE: u8 = 4;
+/// The decimal flag for the cpu flags register
 const CPU_FLAG_DECIMAL: u8 = 8;
+/// The b1 flag for the cpu flags register
 const CPU_FLAG_B1: u8 = 0x10;
+/// The b2 flag for the cpu flags register
 const CPU_FLAG_B2: u8 = 0x20;
+/// The overflow flag for the cpu flags register
 const CPU_FLAG_OVERFLOW: u8 = 0x40;
+/// The negative flag for the cpu flags register
 const CPU_FLAG_NEGATIVE: u8 = 0x80;
 
 impl NesCpu {
@@ -125,46 +173,55 @@ impl NesCpu {
         }
     }
 
+    /// Returns true at the very start of an instruction
     #[cfg(test)]
     pub fn instruction_start(&self) -> bool {
         self.subcycle == 0
     }
 
+    /// Returns true when done fetching all bytes for an instruction.
     #[cfg(debug_assertions)]
     pub fn breakpoint_option(&self) -> bool {
         self.done_fetching
     }
 
+    /// Returns the pc value
     #[cfg(any(test, debug_assertions))]
     pub fn get_pc(&self) -> u16 {
         self.pc
     }
 
+    /// Returns the a value
     #[cfg(any(test, debug_assertions))]
     pub fn get_a(&self) -> u8 {
         self.a
     }
 
+    /// Returns the x value
     #[cfg(any(test, debug_assertions))]
     pub fn get_x(&self) -> u8 {
         self.x
     }
 
+    /// Returns the y value
     #[cfg(any(test, debug_assertions))]
     pub fn get_y(&self) -> u8 {
         self.y
     }
 
+    /// Returns the p value
     #[cfg(any(test, debug_assertions))]
     pub fn get_p(&self) -> u8 {
         self.p
     }
 
+    /// Returns the sp value
     #[cfg(any(test, debug_assertions))]
     pub fn get_sp(&self) -> u8 {
         self.s
     }
 
+    /// Reset the cpu
     pub fn reset(&mut self) {
         self.s -= 3;
         self.p |= CPU_FLAG_INT_DISABLE; //set IRQ disable flag
@@ -178,11 +235,13 @@ impl NesCpu {
         }
     }
 
+    /// signal the end of a cpu instruction
     fn end_instruction(&mut self) {
         self.subcycle = 0;
         self.opcode = None;
     }
 
+    /// run the sbc calculation
     fn cpu_sbc(&mut self, temp: u8) {
         let overflow;
         let olda = self.a;
@@ -206,6 +265,7 @@ impl NesCpu {
         }
     }
 
+    /// Run the adc calculation
     fn cpu_adc(&mut self, temp: u8) {
         let overflow;
         let olda = self.a;
@@ -229,10 +289,12 @@ impl NesCpu {
         }
     }
 
+    /// Calculate the two output enable outputs
     fn calc_oe(&mut self, addr: u16) -> [bool; 2] {
         [addr != 0x4016, addr != 0x4017]
     }
 
+    /// convenience function for running a read cycle on the bus
     fn memory_cycle_read(
         &mut self,
         addr: u16,
@@ -242,6 +304,7 @@ impl NesCpu {
         bus.memory_cycle_read(addr, self.outs, self.calc_oe(addr), cpu_peripherals)
     }
 
+    /// Convenience function for running a write cycle on the bus
     fn memory_cycle_write(
         &mut self,
         addr: u16,
@@ -259,22 +322,23 @@ impl NesCpu {
         bus.memory_cycle_write(addr, data, self.outs, [true; 2], cpu_peripherals);
     }
 
+    /// Check all breakpoints to see if a break needs to occur
     #[cfg(debug_assertions)]
     fn check_breakpoints(&mut self) {
-        for b in self.breakpoints {
-            if let Some(br) = b {
-                if self.pc == br {
-                    self.subcycle = 1;
-                }
+        for b in self.breakpoints.into_iter().flatten() {
+            if self.pc == b {
+                self.subcycle = 1;
             }
         }
     }
 
+    /// Show the disassembly of the current instruction
     #[cfg(debug_assertions)]
     pub fn disassemble(&self) -> Option<String> {
         Some(self.disassembly.to_owned())
     }
 
+    /// Set the dma input for dmc dma
     pub fn set_dma_input(&mut self, data: Option<u16>) {
         if data.is_some() && self.dmc_dma.is_none() {
             self.dmc_dma = data;
@@ -282,6 +346,7 @@ impl NesCpu {
         }
     }
 
+    /// Run a single cycle of the cpu
     pub fn cycle(
         &mut self,
         bus: &mut NesMotherboard,
@@ -337,339 +402,307 @@ impl NesCpu {
                     self.reset = false;
                 }
             }
-        } else {
-            if let Some(a) = self.dmc_dma {
-                match self.dmc_dma_counter {
+        } else if let Some(a) = self.dmc_dma {
+            match self.dmc_dma_counter {
+                0 => {
+                    self.dmc_dma_counter += 1;
+                }
+                1 => {
+                    self.dmc_dma_counter += 1;
+                }
+                2 => {
+                    self.dmc_dma_counter += 1;
+                }
+                _ => {
+                    let t = self.memory_cycle_read(a, bus, cpu_peripherals);
+                    cpu_peripherals.apu.provide_dma_response(t);
+                    self.dmc_dma = None;
+                    self.dmc_dma_counter = 0;
+                }
+            }
+        } else if self.opcode.is_none() {
+            if (self.interrupt_shift[0].0 && ((self.p & CPU_FLAG_INT_DISABLE) == 0))
+                || self.interrupt_shift[0].1
+                || self.interrupting
+            {
+                match self.subcycle {
                     0 => {
-                        self.dmc_dma_counter += 1;
+                        self.interrupting = true;
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
+                        self.subcycle += 1;
                     }
                     1 => {
-                        self.dmc_dma_counter += 1;
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle += 1;
                     }
                     2 => {
-                        self.dmc_dma_counter += 1;
+                        self.memory_cycle_write(
+                            self.s as u16 + 0x100,
+                            self.pc.to_le_bytes()[1],
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle += 1;
+                    }
+                    3 => {
+                        self.memory_cycle_write(
+                            self.s as u16 + 0x100,
+                            self.pc.to_le_bytes()[0],
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.s = self.s.wrapping_sub(1);
+                        self.interrupt_type = self.nmi_detected;
+                        self.nmi_detected = false;
+                        self.subcycle += 1;
+                    }
+                    4 => {
+                        self.p &= !(CPU_FLAG_B1 | CPU_FLAG_B2);
+                        self.memory_cycle_write(
+                            self.s as u16 + 0x100,
+                            self.p,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle += 1;
+                    }
+                    5 => {
+                        let addr = if !self.interrupt_type {
+                            //IRQ
+                            0xfffe
+                        } else {
+                            //NMI
+                            0xfffa
+                        };
+                        #[cfg(debug_assertions)]
+                        {
+                            if !self.interrupt_type {
+                                self.disassembly = "IRQ".to_string();
+                            } else {
+                                self.disassembly = "NMI".to_string();
+                            }
+                            self.done_fetching = true;
+                        }
+                        let pcl = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        let mut pc = self.pc.to_le_bytes();
+                        pc[0] = pcl;
+                        self.pc = u16::from_le_bytes(pc);
+                        self.p |= CPU_FLAG_INT_DISABLE;
+                        self.subcycle += 1;
                     }
                     _ => {
-                        let t = self.memory_cycle_read(a, bus, cpu_peripherals);
-                        cpu_peripherals.apu.provide_dma_response(t);
-                        self.dmc_dma = None;
-                        self.dmc_dma_counter = 0;
+                        let addr = if !self.interrupt_type {
+                            //IRQ
+                            0xffff
+                        } else {
+                            //NMI
+                            0xfffb
+                        };
+                        let pch = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        let mut pc = self.pc.to_le_bytes();
+                        pc[1] = pch;
+                        self.pc = u16::from_le_bytes(pc);
+                        self.subcycle = 0;
+                        self.interrupting = false;
                     }
                 }
-            } else if let None = self.opcode {
-                if (self.interrupt_shift[0].0 && ((self.p & CPU_FLAG_INT_DISABLE) == 0))
-                    || self.interrupt_shift[0].1
-                    || self.interrupting
-                {
-                    match self.subcycle {
-                        0 => {
-                            self.interrupting = true;
-                            self.memory_cycle_read(self.pc, bus, cpu_peripherals);
-                            self.subcycle += 1;
-                        }
-                        1 => {
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle += 1;
-                        }
-                        2 => {
-                            self.memory_cycle_write(
-                                self.s as u16 + 0x100,
-                                self.pc.to_le_bytes()[1],
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle += 1;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.s as u16 + 0x100,
-                                self.pc.to_le_bytes()[0],
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.interrupt_type = self.nmi_detected;
-                            self.nmi_detected = false;
-                            self.subcycle += 1;
-                        }
-                        4 => {
-                            self.p &= !(CPU_FLAG_B1 | CPU_FLAG_B2);
-                            self.memory_cycle_write(
-                                self.s as u16 + 0x100,
-                                self.p,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle += 1;
-                        }
-                        5 => {
-                            let addr = if !self.interrupt_type {
-                                //IRQ
-                                0xfffe
-                            } else {
-                                //NMI
-                                0xfffa
-                            };
-                            #[cfg(debug_assertions)]
-                            {
-                                if !self.interrupt_type {
-                                    self.disassembly = format!("IRQ");
-                                } else {
-                                    self.disassembly = format!("NMI");
-                                }
-                                self.done_fetching = true;
-                            }
-                            let pcl = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            let mut pc = self.pc.to_le_bytes();
-                            pc[0] = pcl;
-                            self.pc = u16::from_le_bytes(pc);
-                            self.p |= CPU_FLAG_INT_DISABLE;
-                            self.subcycle += 1;
-                        }
-                        _ => {
-                            let addr = if !self.interrupt_type {
-                                //IRQ
-                                0xffff
-                            } else {
-                                //NMI
-                                0xfffb
-                            };
-                            let pch = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            let mut pc = self.pc.to_le_bytes();
-                            pc[1] = pch;
-                            self.pc = u16::from_le_bytes(pc);
-                            self.subcycle = 0;
-                            self.interrupting = false;
-                        }
-                    }
-                } else if let Some(addr) = self.oamdma {
-                    if self.dma_counter == 512 {
-                        self.oamdma = None;
-                        self.dma_counter = 0;
-                    } else if (self.dma_counter & 1) == 0 {
-                        let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
-                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                        self.dma_counter += 1;
-                    } else {
-                        self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
-                        self.dma_counter += 1;
-                    }
+            } else if let Some(addr) = self.oamdma {
+                if self.dma_counter == 512 {
+                    self.oamdma = None;
+                    self.dma_counter = 0;
+                } else if (self.dma_counter & 1) == 0 {
+                    let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
+                    self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                    self.dma_counter += 1;
                 } else {
-                    self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
-                    #[cfg(debug_assertions)]
-                    self.check_breakpoints();
-                    self.subcycle = 1;
+                    self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
+                    self.dma_counter += 1;
                 }
-            } else if let Some(o) = self.opcode {
-                match o {
-                    //brk instruction
-                    0 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = "BRK".to_string();
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+            } else {
+                self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
+                #[cfg(debug_assertions)]
+                self.check_breakpoints();
+                self.subcycle = 1;
+            }
+        } else if let Some(o) = self.opcode {
+            match o {
+                //brk instruction
+                0 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "BRK".to_string();
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            let pc = self.pc.to_le_bytes();
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                pc[1],
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle = 3;
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        let pc = self.pc.to_le_bytes();
+                        self.memory_cycle_write(0x100 + self.s as u16, pc[1], bus, cpu_peripherals);
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let pc = self.pc.to_le_bytes();
+                        self.memory_cycle_write(0x100 + self.s as u16, pc[0], bus, cpu_peripherals);
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.p |= CPU_FLAG_B1;
+                        self.memory_cycle_write(
+                            0x100 + self.s as u16,
+                            self.p,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.temp = self.memory_cycle_read(0xfffe, bus, cpu_peripherals);
+                        self.p |= CPU_FLAG_INT_DISABLE;
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.temp2 = self.memory_cycle_read(0xffff, bus, cpu_peripherals);
+                        let addr: u16 = (self.temp as u16) | (self.temp2 as u16) << 8;
+                        self.pc = addr;
+                        self.end_instruction();
+                    }
+                },
+                //and immediate
+                0x29 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("AND #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.a &= self.temp;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & self.temp & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //and zero page
+                0x25 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("AND ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        3 => {
-                            let pc = self.pc.to_le_bytes();
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                pc[0],
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle = 4;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.a &= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        4 => {
-                            self.p |= CPU_FLAG_B1;
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                self.p,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle = 5;
+                        if (self.a & self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        5 => {
-                            self.temp = self.memory_cycle_read(0xfffe, bus, cpu_peripherals);
-                            self.p |= CPU_FLAG_INT_DISABLE;
-                            self.subcycle = 6;
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //and zero page x
+                0x35 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("AND ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.temp2 = self.memory_cycle_read(0xffff, bus, cpu_peripherals);
-                            let addr: u16 = (self.temp as u16) | (self.temp2 as u16) << 8;
-                            self.pc = addr;
-                            self.end_instruction();
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.a &= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //and immediate
-                    0x29 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("AND #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.a = self.a & self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //and zero page
-                    0x25 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("AND ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.a = self.a & self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //and zero page x
-                    0x35 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("AND ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a &= self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //and absolute
-                    0x2d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("AND ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //and absolute
+                0x2d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.a = self.a & self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("AND ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //and absolute x
-                    0x3d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.a &= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("AND ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if (self.a & self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.a =
-                                    self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //and absolute x
+                0x3d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("AND ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
-                            self.a = self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if self.a == 0 {
                                 self.p |= CPU_FLAG_ZERO;
@@ -677,316 +710,308 @@ impl NesCpu {
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //and absolute y
-                    0x39 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("AND ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a =
-                                    self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //and indirect x
-                    0x21 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("AND (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.a = self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //and absolute y
+                0x39 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("AND ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
+                        }
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //and indirect x
+                0x21 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("AND (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //and indirect y
+                0x31 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("AND (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a &= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //and indirect y
-                    0x31 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("AND (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a =
-                                    self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
 
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ora or immediate
+                0x09 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("ORA #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.a |= self.temp;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //ora zero page
+                0x05 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ORA ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.a & self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.a |= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //ora or immediate
-                    0x09 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ORA #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.a = self.a | self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //ora zero page
-                    0x05 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ORA ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ora zero page x
+                0x15 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ORA ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.a |= self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.a |= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //ora zero page x
-                    0x15 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ORA ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a |= self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //ora absolute
-                    0x0d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ORA ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ora absolute
+                0x0d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.a |= self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("ORA ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //ora absolute x
-                    0x1d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.a |= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ORA ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.a =
-                                    self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ora absolute x
+                0x1d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ORA ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
-                            self.a = self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if self.a == 0 {
                                 self.p |= CPU_FLAG_ZERO;
@@ -994,316 +1019,308 @@ impl NesCpu {
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //ora absolute y
-                    0x19 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ORA ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a =
-                                    self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //ora indirect x
-                    0x01 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ORA (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.a = self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ora absolute y
+                0x19 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ORA ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
+                        }
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ora indirect x
+                0x01 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ORA (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ora indirect y
+                0x11 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ORA (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a |= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //ora indirect y
-                    0x11 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ORA (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a =
-                                    self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
 
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //eor xor immediate
+                0x49 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("EOR #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.a ^= self.temp;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //eor zero page
+                0x45 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("EOR ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.a | self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.a ^= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //eor xor immediate
-                    0x49 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("EOR #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.a = self.a ^ self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //eor zero page
-                    0x45 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("EOR ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //eor zero page x
+                0x55 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("EOR ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.a = self.a ^ self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.a ^= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //eor zero page x
-                    0x55 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("EOR ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a ^= self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //eor absolute
-                    0x4d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("EOR ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //eor absolute
+                0x4d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.a = self.a ^ self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("EOR ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //eor absolute x
-                    0x5d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.a ^= self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("EOR ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.a =
-                                    self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //eor absolute x
+                0x5d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("EOR ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
-                            self.a = self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if self.a == 0 {
                                 self.p |= CPU_FLAG_ZERO;
@@ -1311,1391 +1328,1325 @@ impl NesCpu {
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //eor absolute y
-                    0x59 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("EOR ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a =
-                                    self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //eor xor indirect x
-                    0x41 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("EOR (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.a = self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //eor absolute y
+                0x59 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("EOR ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            self.pc = self.pc.wrapping_add(3);
+                            self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
+                        }
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //eor xor indirect x
+                0x41 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("EOR (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //eor indirect y
+                0x51 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("EOR (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if self.a == 0 {
+                                self.p |= CPU_FLAG_ZERO;
+                            }
+                            if (self.a & 0x80) != 0 {
+                                self.p |= CPU_FLAG_NEGATIVE;
+                            }
+
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a ^= self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //eor indirect y
-                    0x51 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("EOR (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a =
-                                    self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
 
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //adc immediate, add with carry
+                0x69 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("ADC #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.cpu_adc(self.temp);
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //adc zero page
+                0x65 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ADC ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.a ^ self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //adc zero page x
+                0x75 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ADC ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //adc immediate, add with carry
-                    0x69 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ADC #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //adc zero page
-                    0x65 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ADC ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //adc zero page x
-                    0x75 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ADC ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //adc absolute
-                    0x6d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ADC ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //adc absolute
+                0x6d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("ADC ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //adc absolute x
-                    0x7d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //adc absolute x
+                0x7d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ADC ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ADC ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.cpu_adc(self.temp);
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.cpu_adc(self.temp);
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
                         }
-                    },
-                    //adc absolute y
-                    0x79 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //adc absolute y
+                0x79 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ADC ${:04x},Y", temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ADC ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.cpu_adc(self.temp);
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.cpu_adc(self.temp);
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //adc adc indirect x
-                    0x61 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ADC (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //adc adc indirect x
+                0x61 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ADC (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //adc indirect y
+                0x71 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ADC (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.cpu_adc(self.temp);
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sbc immediate, subtract with carry
+                0xe9 | 0xeb => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("SBC #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.cpu_sbc(self.temp);
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //sbc zero page
+                0xe5 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("SBC ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //adc indirect y
-                    0x71 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ADC (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sbc zero page x
+                0xf5 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("SBC ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.cpu_adc(self.temp);
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sbc immediate, subtract with carry
-                    0xe9 | 0xeb => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SBC #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sbc zero page
-                    0xe5 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SBC ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sbc zero page x
-                    0xf5 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SBC ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sbc absolute
-                    0xed => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("SBC ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sbc absolute
+                0xed => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("SBC ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //sbc absolute x
-                    0xfd => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sbc absolute x
+                0xfd => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("SBC ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("SBC ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.cpu_sbc(self.temp);
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.cpu_sbc(self.temp);
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
                         }
-                    },
-                    //sbc absolute y
-                    0xf9 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sbc absolute y
+                0xf9 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("SBC ${:04x},Y", temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("SBC ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.cpu_sbc(self.temp);
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.cpu_sbc(self.temp);
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //sbc indirect x
-                    0xe1 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SBC (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.subcycle = 5;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sbc indirect x
+                0xe1 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("SBC (${:02x},X)", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sbc indirect y
+                0xf1 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("SBC (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //sbc indirect y
-                    0xf1 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SBC (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.cpu_sbc(self.temp);
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.cpu_sbc(self.temp);
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
-                        }
-                    },
-                    //inc increment zero page
-                    0xe6 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("INC ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.temp2.wrapping_add(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //inc increment zero page x
-                    0xf6 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("INC ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.temp2.wrapping_add(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //inc increment zero page
+                0xe6 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("INC ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //inc absolute
-                    0xee => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.temp2.wrapping_add(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("INC ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //inc increment zero page x
+                0xf6 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("INC ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_add(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.temp2.wrapping_add(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //inc absolute x
-                    0xfe => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("INC ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_add(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //iny, increment y
-                    0xc8 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("INY");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.y = self.y.wrapping_add(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //inx, increment x
-                    0xe8 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("INX");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.x = self.x.wrapping_add(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //dec decrement zero page
-                    0xc6 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("DEC ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.temp2.wrapping_sub(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dec decrement zero page x
-                    0xd6 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("DEC ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.temp2.wrapping_sub(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dec absolute
-                    0xce => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("DEC ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //dec absolute x
-                    0xde => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("DEC ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //dey, decrement y
-                    0x88 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("DEY");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.y = self.y.wrapping_sub(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //dex, decrement x
-                    0xca => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("DEX");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.x = self.x.wrapping_sub(1);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //tay, transfer accumulator to y
-                    0xa8 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("TAY");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.y = self.a;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //tax, transfer accumulator to x
-                    0xaa => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("TAX");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.x = self.a;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //tya, transfer y to accumulator
-                    0x98 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("TYA");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.a = self.y;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //txa, transfer x to accumulator
-                    0x8a => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("TXA");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.a = self.x;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //tsx, transfer stack pointer to x
-                    0xba => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("TSX");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.x = self.s;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //txs, transfer x to stack pointer
-                    0x9a => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("TXS");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.s = self.x;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //bit zero page
-                    0x24 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("BIT ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
-                            self.p |= self.temp & (CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
-                            self.temp = self.a & self.temp;
-                            self.p &= !CPU_FLAG_ZERO;
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //bit absolute
-                    0x2c => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("BIT ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //inc absolute
+                0xee => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
-                            self.p |= self.temp & (CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
-                            self.temp = self.a & self.temp;
-                            self.p &= !CPU_FLAG_ZERO;
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("INC ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //cmp, compare immediate
-                    0xc9 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CMP #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_add(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //cmp zero page
-                    0xc5 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CMP ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //cmp zero page x
-                    0xd5 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CMP ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //cmp absolute
-                    0xcd => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("CMP ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //inc absolute x
+                0xfe => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("INC ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //cmp absolute x
-                    0xdd => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_add(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("CMP ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                                if self.a == self.temp {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if self.a >= self.temp {
-                                    self.p |= CPU_FLAG_CARRY;
-                                }
-                                if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //iny, increment y
+                0xc8 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "INY".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.y = self.y.wrapping_add(1);
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.y & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.y == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //inx, increment x
+                0xe8 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "INX".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.x = self.x.wrapping_add(1);
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.x & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.x == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //dec decrement zero page
+                0xc6 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("DEC ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.temp2.wrapping_sub(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dec decrement zero page x
+                0xd6 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("DEC ${:02x},X", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.temp2.wrapping_sub(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dec absolute
+                0xce => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("DEC ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //dec absolute x
+                0xde => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("DEC ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //dey, decrement y
+                0x88 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "DEY".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.y = self.y.wrapping_sub(1);
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.y & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.y == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //dex, decrement x
+                0xca => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "DEX".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.x = self.x.wrapping_sub(1);
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.x & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.x == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //tay, transfer accumulator to y
+                0xa8 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "TAY".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.y = self.a;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.y & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.y == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //tax, transfer accumulator to x
+                0xaa => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "TAX".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.x = self.a;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.x & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.x == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //tya, transfer y to accumulator
+                0x98 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "TYA".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.a = self.y;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //txa, transfer x to accumulator
+                0x8a => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "TXA".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.a = self.x;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //tsx, transfer stack pointer to x
+                0xba => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "TSX".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.x = self.s;
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.x & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    if self.x == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //txs, transfer x to stack pointer
+                0x9a => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "TXS".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.s = self.x;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //bit zero page
+                0x24 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("BIT ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
+                        self.p |= self.temp & (CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
+                        self.temp &= self.a;
+                        self.p &= !CPU_FLAG_ZERO;
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //bit absolute
+                0x2c => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("BIT ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
+                        self.p |= self.temp & (CPU_FLAG_OVERFLOW | CPU_FLAG_NEGATIVE);
+                        self.temp &= self.a;
+                        self.p &= !CPU_FLAG_ZERO;
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //cmp, compare immediate
+                0xc9 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("CMP #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                    if self.a == self.temp {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if self.a >= self.temp {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //cmp zero page
+                0xc5 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("CMP ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //cmp zero page x
+                0xd5 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("CMP ${:02x},X", self.temp);
+                            self.done_fetching = true;
+                        }
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //cmp absolute
+                0xcd => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("CMP ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //cmp absolute x
+                0xdd => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("CMP ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
@@ -2711,49 +2662,49 @@ impl NesCpu {
 
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
                         }
-                    },
-                    //cmp absolute y
-                    0xd9 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("CMP ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                                if self.a == self.temp {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if self.a >= self.temp {
-                                    self.p |= CPU_FLAG_CARRY;
-                                }
-                                if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
 
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //cmp absolute y
+                0xd9 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("CMP ${:04x},Y", temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
@@ -2769,102 +2720,100 @@ impl NesCpu {
 
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //cmp indirect x
-                    0xc1 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CMP (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.subcycle = 5;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                    },
-                    //cmp indirect y
-                    0xd1 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CMP (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                                if self.a == self.temp {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if self.a >= self.temp {
-                                    self.p |= CPU_FLAG_CARRY;
-                                }
-                                if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
 
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //cmp indirect x
+                0xc1 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("CMP (${:02x},X)", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //cmp indirect y
+                0xd1 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("CMP (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
@@ -2880,553 +2829,545 @@ impl NesCpu {
 
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
-                        }
-                    },
-                    //cpy, compare y immediate
-                    0xc0 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CPY #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.y == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.y >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.y.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //cpy zero page
-                    0xc4 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CPY ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.y == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.y >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.y.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //cpy absolute
-                    0xcc => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("CPY ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.y == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.y >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.y.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //cpx, compare x immediate
-                    0xe0 => match self.subcycle {
-                        _ => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CPX #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.x == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.x >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.x.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //cpx zero page
-                    0xe4 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CPX ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.x == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.x >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.x.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //cpx absolute
-                    0xec => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("CPX ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.x == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.x >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.x.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //jmp absolute
-                    0x4c => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            let t2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let newpc: u16 = (self.temp as u16) | (t2 as u16) << 8;
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("JMP ${:04x}", newpc);
-                                self.done_fetching = true;
-                            }
-                            self.pc = newpc;
-                            self.end_instruction();
-                        }
-                    },
-                    //jmp indirect
-                    0x6c => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("jmp (${:04x})", temp);
-                                self.done_fetching = true;
-                            }
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let temp = self.temp;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.tempaddr =
-                                (self.temp2 as u16) << 8 | (temp.wrapping_add(1) as u16);
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.pc = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.end_instruction();
-                        }
-                    },
-                    //sta, store a zero page
-                    0x85 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STA ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.temp as u16, self.a, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sta, store a zero page x
-                    0x95 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STA ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.memory_cycle_write(
-                                self.temp.wrapping_add(self.x) as u16,
-                                self.a,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sta absolute
-                    0x8d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("STA ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.memory_cycle_write(temp, self.a, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sta absolute x
-                    0x9d => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("STA ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            addr = addr.wrapping_add(self.x as u16);
-                            self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sta absolute y
-                    0x99 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("STA ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sta indirect x
-                    0x81 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STA (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //sta indirect y
-                    0x91 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STA (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
+
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //cpy, compare y immediate
+                0xc0 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("CPY #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                    if self.y == self.temp {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if self.y >= self.temp {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    if ((self.y.wrapping_sub(self.temp)) & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //cpy zero page
+                0xc4 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("CPY ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        4 => {
-                            self.subcycle = 5;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.y == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if self.y >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                    },
-                    //ldx immediate
-                    0xa2 => match self.subcycle {
-                        _ => {
-                            self.x = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDX #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if ((self.y.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //ldx zero page
-                    0xa6 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDX ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.x = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //ldx zero page y
-                    0xb6 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDX ${:02x},Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.y);
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.x = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //ldx absolute
-                    0xae => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDX ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //cpy absolute
+                0xcc => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.x = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("CPY ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //ldx absolute y
-                    0xbe => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.y == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDX ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        if self.y >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                                self.x =
-                                    self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.x == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.x & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        if ((self.y.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //cpx, compare x immediate
+                0xe0 => {
+                    self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("CPX #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                    if self.x == self.temp {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if self.x >= self.temp {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    if ((self.x.wrapping_sub(self.temp)) & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //cpx zero page
+                0xe4 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("CPX ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.x == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.x >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.x.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //cpx absolute
+                0xec => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("CPX ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.x == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.x >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.x.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //jmp absolute
+                0x4c => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        let t2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let newpc: u16 = (self.temp as u16) | (t2 as u16) << 8;
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("JMP ${:04x}", newpc);
+                            self.done_fetching = true;
+                        }
+                        self.pc = newpc;
+                        self.end_instruction();
+                    }
+                },
+                //jmp indirect
+                0x6c => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("jmp (${:04x})", temp);
+                            self.done_fetching = true;
+                        }
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let temp = self.temp;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.tempaddr = (self.temp2 as u16) << 8 | (temp.wrapping_add(1) as u16);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.temp2 = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.pc = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.end_instruction();
+                    }
+                },
+                //sta, store a zero page
+                0x85 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STA ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.temp as u16, self.a, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sta, store a zero page x
+                0x95 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STA ${:02x},X", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.memory_cycle_write(
+                            self.temp.wrapping_add(self.x) as u16,
+                            self.a,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sta absolute
+                0x8d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("STA ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.memory_cycle_write(temp, self.a, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sta absolute x
+                0x9d => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("STA ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sta absolute y
+                0x99 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("STA ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sta indirect x
+                0x81 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STA (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sta indirect y
+                0x91 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STA (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.memory_cycle_write(addr, self.a, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ldx immediate
+                0xa2 => {
+                    self.x = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("LDX #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if self.x == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.x & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //ldx zero page
+                0xa6 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDX ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.x = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.x == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.x & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ldx zero page y
+                0xb6 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDX ${:02x},Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.temp = self.temp.wrapping_add(self.y);
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.x = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.x == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.x & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ldx absolute
+                0xae => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LDX ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.x = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.x == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.x & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ldx absolute y
+                0xbe => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LDX ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
                             self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
                             self.x = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
@@ -3438,166 +3379,213 @@ impl NesCpu {
                             }
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
+                        } else {
+                            self.subcycle = 4;
                         }
-                    },
-                    //sty store y zero page
-                    0x84 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STY ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
+                    }
+                    _ => {
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.x = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.x == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.memory_cycle_write(self.temp as u16, self.y, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.x & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //sty zero page x
-                    0x94 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STY ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sty store y zero page
+                0x84 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STY ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.subcycle = 3;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.temp as u16, self.y, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sty zero page x
+                0x94 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STY ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.memory_cycle_write(
-                                self.temp.wrapping_add(self.x) as u16,
-                                self.y,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sty absolute
-                    0x8c => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("STY ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.memory_cycle_write(
+                            self.temp.wrapping_add(self.x) as u16,
+                            self.y,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sty absolute
+                0x8c => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.memory_cycle_write(temp, self.y, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("STY ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //ldy load y immediate
-                    0xa0 => match self.subcycle {
-                        _ => {
-                            self.y = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDY #${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.memory_cycle_write(temp, self.y, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ldy load y immediate
+                0xa0 => {
+                    self.y = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("LDY #${:02x}", self.temp);
+                        self.done_fetching = true;
+                    }
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if self.y == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.y & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //ldy zero page
+                0xa4 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDY ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //ldy zero page
-                    0xa4 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDY ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.y = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.y == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.y = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.y & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //ldy zero page x
-                    0xb4 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDY ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ldy zero page x
+                0xb4 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDY ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.subcycle = 3;
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.y = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.y == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.y = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.y & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //ldy absolute
-                    0xac => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ldy absolute
+                0xac => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LDY ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDY ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.y = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.y == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            let addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        if (self.y & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ldy absolute x
+                0xbc => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LDY ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let addr =
+                            (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             self.y = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if self.y == 0 {
@@ -3608,245 +3596,192 @@ impl NesCpu {
                             }
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //ldy absolute x
-                    0xbc => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDY ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let addr =
-                                (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                self.y = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.y == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.y & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.y = self.memory_cycle_read(
-                                addr.wrapping_add(self.x as u16),
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.y == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.y & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //lda immediate
-                    0xa9 => match self.subcycle {
-                        _ => {
-                            self.a = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDA #${:02x}", self.a);
-                                self.done_fetching = true;
-                            }
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lda zero page
-                    0xa5 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDA ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.a = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lda zero page x
-                    0xb5 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDA ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.a = self.memory_cycle_read(
-                                self.temp.wrapping_add(self.x) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lda absolute
-                    0xad => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDA ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.a = self.memory_cycle_read(temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //lda indirect x
-                    0xa1 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDA (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.subcycle = 5;
+                    }
+                    _ => {
+                        let addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.y = self.memory_cycle_read(
+                            addr.wrapping_add(self.x as u16),
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.y == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        if (self.y & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //lda absolute x
-                    0xbd => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lda immediate
+                0xa9 => {
+                    self.a = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = format!("LDA #${:02x}", self.a);
+                        self.done_fetching = true;
+                    }
+                    self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(2);
+                    self.end_instruction();
+                }
+                //lda zero page
+                0xa5 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDA ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDA ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.a = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.x as u16);
-                                self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lda zero page x
+                0xb5 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDA ${:02x},X", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.a = self.memory_cycle_read(
+                            self.temp.wrapping_add(self.x) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lda absolute
+                0xad => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LDA ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.a = self.memory_cycle_read(temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lda indirect x
+                0xa1 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDA (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lda absolute x
+                0xbd => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LDA ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
                             self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
@@ -3856,1924 +3791,1834 @@ impl NesCpu {
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
-
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //lda absolute y
-                    0xb9 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LDA ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
-                            let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //lda indirect y
-                    0xb1 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LDA (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
-                            }
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.x as u16);
+                        self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            addr = addr.wrapping_add(self.y as u16);
-                            self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
 
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //stx zero page
-                    0x86 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STX ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.temp as u16, self.x, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //stx zero page y
-                    0x96 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("STX ${:02x},Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.y);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.temp as u16, self.x, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //stx, store x absolute
-                    0x8e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("STX ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lda absolute y
+                0xb9 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.memory_cycle_write(temp, self.x, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                            self.disassembly = format!("LDA ${:04x},Y", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //lsr logical shift right, accumulator
-                    0x4a => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LSR A");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.a & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.a = self.a >> 1;
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if self.a == 0 {
                                 self.p |= CPU_FLAG_ZERO;
                             }
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //lsr zero page
-                    0x46 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LSR ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 >> 1;
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lsr zero page x
-                    0x56 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("LSR ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.x);
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 >> 1;
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lsr absolute
-                    0x4e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LSR ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //lsr absolute x
-                    0x5e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("LSR ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
+                    }
+                    _ => {
+                        let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lda indirect y
+                0xb1 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LDA (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //asl, arithmetic shift left accumulator
-                    0x0a => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ASL A");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.a = self.a << 1;
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
+                            addr = addr.wrapping_add(self.y as u16);
+                            self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
                             if self.a == 0 {
                                 self.p |= CPU_FLAG_ZERO;
                             }
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //asl zero page
-                    0x06 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ASL ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 << 1;
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
-                        }
-                    },
-                    //asl zero page x
-                    0x16 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ASL ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.x);
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 << 1;
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
+                        } else {
                             self.subcycle = 5;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //asl absolute
-                    0x0e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ASL ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //asl absolute x
-                    0x1e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ASL ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //ror rotate right accumulator
-                    0x6a => match self.subcycle {
-                        _ => {
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ROR A");
-                                self.done_fetching = true;
-                            }
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.a & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.a = self.a >> 1;
-                            if old_carry {
-                                self.a |= 0x80;
-                            }
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //ror zero page
-                    0x66 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ROR ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 >> 1;
-                            if old_carry {
-                                self.temp2 |= 0x80;
-                            }
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //ror zero page x
-                    0x76 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ROR ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.x);
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 >> 1;
-                            if old_carry {
-                                self.temp2 |= 0x80;
-                            }
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //ror absolute
-                    0x6e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ROR ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //ror absolute x
-                    0x7e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ROR ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rol accumulator
-                    0x2a => match self.subcycle {
-                        _ => {
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ROL A");
-                                self.done_fetching = true;
-                            }
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.a = self.a << 1;
-                            if old_carry {
-                                self.a |= 0x1;
-                            }
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //rol zero page
-                    0x26 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ROL ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 << 1;
-                            if old_carry {
-                                self.temp2 |= 1;
-                            }
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rol zero page x
-                    0x36 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("ROL ${:02x},X", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.x);
-                        }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp2 = self.temp2 << 1;
-                            if old_carry {
-                                self.temp2 |= 1;
-                            }
-                            if self.temp2 == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp2 & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rol absolute
-                    0x2e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ROL ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 1;
-                            }
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rol absolute x
-                    0x3e => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("ROL ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 1;
-                            }
-                            if self.temp == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rti, return from interrupt
-                    0x40 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("RTI");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.s = self.s.wrapping_add(1);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.p =
-                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                            self.p = self.p & !CPU_FLAG_B1;
-                            self.p |= CPU_FLAG_B2;
-                            self.s = self.s.wrapping_add(1);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp =
-                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                            self.s = self.s.wrapping_add(1);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.temp2 =
-                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                            self.pc = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.end_instruction();
-                        }
-                    },
-                    //jsr absolute
-                    0x20 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let pc = (self.pc + 2).to_le_bytes();
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                pc[1],
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let pc = (self.pc + 2).to_le_bytes();
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                pc[0],
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.s = self.s.wrapping_sub(1);
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            let t2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let newpc: u16 = (self.temp as u16) | (t2 as u16) << 8;
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("JSR ${:04x}", newpc);
-                                self.done_fetching = true;
-                            }
-                            self.pc = newpc;
-                            self.end_instruction();
-                        }
-                    },
-                    //nop
-                    0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xea | 0xfa => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("NOP");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(1);
-                            self.subcycle = 0;
-                            self.opcode = None;
-                        }
-                    },
-                    //extra nop
-                    0x04 | 0x44 | 0x64 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("NOP");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.subcycle = 0;
-                            self.opcode = None;
-                        }
-                    },
-                    //extra nop
-                    0x0c => match self.subcycle {
-                        1 => {
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("NOP");
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.subcycle = 0;
-                            self.opcode = None;
-                        }
-                    },
-                    //extra nop
-                    0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 => match self.subcycle {
-                        1 => {
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("NOP");
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.subcycle = 0;
-                            self.opcode = None;
-                        }
-                    },
-                    //extra nop
-                    0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("NOP");
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            let (_val, overflow) = self.temp.overflowing_add(self.x);
-                            if overflow {
-                                self.subcycle = 4;
-                            } else {
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            }
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //extra nop
-                    0x80 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("NOP");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.subcycle = 0;
-                            self.opcode = None;
-                        }
-                    },
-                    //clv, clear overflow flag
-                    0xb8 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CLV");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p &= !CPU_FLAG_OVERFLOW;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //sec set carry flag
-                    0x38 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SEC");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //stx zero page
+                0x86 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STX ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.temp as u16, self.x, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //stx zero page y
+                0x96 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("STX ${:02x},Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.temp = self.temp.wrapping_add(self.y);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.temp as u16, self.x, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //stx, store x absolute
+                0x8e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("STX ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.memory_cycle_write(temp, self.x, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lsr logical shift right, accumulator
+                0x4a => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "LSR A".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.a & 1) != 0 {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    self.a >>= 1;
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //lsr zero page
+                0x46 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LSR ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 1) != 0 {
                             self.p |= CPU_FLAG_CARRY;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
                         }
-                    },
-                    //sei set interrupt disable flag
-                    0x78 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SEI");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p |= CPU_FLAG_INT_DISABLE;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.temp2 >>= 1;
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //sed set decimal flag
-                    0xf8 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("SED");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p |= CPU_FLAG_DECIMAL;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //cld, clear decimal flag
-                    0xd8 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CLD");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p &= !CPU_FLAG_DECIMAL;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lsr zero page x
+                0x56 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("LSR ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //clc clear carry flag
-                    0x18 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CLC");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p &= !CPU_FLAG_CARRY;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.temp = self.temp.wrapping_add(self.x);
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                    },
-                    //cli clear interrupt disable
-                    0x58 => match self.subcycle {
-                        _ => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("CLI");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.p &= !CPU_FLAG_INT_DISABLE;
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.temp2 >>= 1;
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //beq, branch if equal (zero flag set)
-                    0xf0 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BEQ ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_ZERO) != 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lsr absolute
+                0x4e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LSR ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.end_instruction();
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                    },
-                    //bne, branch if not equal (zero flag not set)
-                    0xd0 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BNE ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_ZERO) == 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        self.temp >>= 1;
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.end_instruction();
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lsr absolute x
+                0x5e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("LSR ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //bvs, branch if overflow set
-                    0x70 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BVS ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_OVERFLOW) != 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        self.temp >>= 1;
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.end_instruction();
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //bvc branch if overflow clear
-                    0x50 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BVC ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_OVERFLOW) == 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //asl, arithmetic shift left accumulator
+                0x0a => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "ASL A".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    self.a <<= 1;
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //asl zero page
+                0x06 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ASL ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        _ => {
-                            self.end_instruction();
+                        self.temp2 <<= 1;
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //bpl, branch if negative clear
-                    0x10 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BPL ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_NEGATIVE) == 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //asl zero page x
+                0x16 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ASL ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.end_instruction();
+                        self.temp = self.temp.wrapping_add(self.x);
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                    },
-                    //bmi branch if negative flag set
-                    0x30 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BMI ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_NEGATIVE) != 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        self.temp2 <<= 1;
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.end_instruction();
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //asl absolute
+                0x0e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ASL ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //bcs, branch if carry set
-                    0xb0 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BCS ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_CARRY) != 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        self.temp <<= 1;
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.end_instruction();
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //bcc branch if carry flag clear
-                    0x90 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
-                                self.disassembly = format!("BCC ${:04X}", tempaddr);
-                                self.done_fetching = true;
-                            }
-                            if (self.p & CPU_FLAG_CARRY) == 0 {
-                                self.pc = self.pc.wrapping_add(2);
-                                let mut adjust = self.temp as u16;
-                                if (self.temp & 0x80) != 0 {
-                                    adjust |= 0xff00;
-                                }
-                                self.tempaddr = self.pc.wrapping_add(adjust);
-                                self.subcycle = 2;
-                            } else {
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //asl absolute x
+                0x1e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ASL ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            let pc = self.pc.to_le_bytes();
-                            let pc2 = self.tempaddr.to_le_bytes();
-                            self.pc = self.tempaddr;
-                            if pc[1] != pc2[1] {
-                                self.subcycle = 3;
-                            } else {
-                                self.end_instruction();
-                            }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        _ => {
-                            self.end_instruction();
+                        self.temp <<= 1;
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //pha push accumulator
-                    0x48 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("PHA");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                self.a,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 2;
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.s = self.s.wrapping_sub(1);
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ror rotate right accumulator
+                0x6a => {
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "ROR A".to_string();
+                        self.done_fetching = true;
+                    }
+                    let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                    self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.a & 1) != 0 {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    self.a >>= 1;
+                    if old_carry {
+                        self.a |= 0x80;
+                    }
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //ror zero page
+                0x66 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ROR ${:02x}", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //php push processor status
-                    0x08 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("PHP");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_write(
-                                0x100 + self.s as u16,
-                                self.p | CPU_FLAG_B1,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        _ => {
-                            self.s = self.s.wrapping_sub(1);
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.temp2 >>= 1;
+                        if old_carry {
+                            self.temp2 |= 0x80;
                         }
-                    },
-                    //plp, pull processor status
-                    0x28 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("PLP");
-                                self.done_fetching = true;
-                            }
-                            self.s = self.s.wrapping_add(1);
-                            self.p =
-                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                            self.p = self.p & !CPU_FLAG_B1;
-                            self.p |= CPU_FLAG_B2;
-                            self.subcycle = 2;
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.subcycle = 3;
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ror zero page x
+                0x76 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ROR ${:02x},X", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //pla, pull accumulator
-                    0x68 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("PLA");
-                                self.done_fetching = true;
-                            }
-                            self.s = self.s.wrapping_add(1);
-                            self.a =
-                                self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.temp = self.temp.wrapping_add(self.x);
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        2 => {
-                            self.subcycle = 3;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
+                        self.temp2 >>= 1;
+                        if old_carry {
+                            self.temp2 |= 0x80;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                    },
-                    //rts, return from subroutine
-                    0x60 => match self.subcycle {
-                        1 => {
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("RTS");
-                                self.done_fetching = true;
-                            }
-                            self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        2 => {
-                            self.memory_cycle_read(self.s as u16 + 0x100, bus, cpu_peripherals);
-                            self.subcycle = 3;
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //ror absolute
+                0x6e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ROR ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                        3 => {
-                            self.s = self.s.wrapping_add(1);
-                            self.temp =
-                                self.memory_cycle_read(self.s as u16 + 0x100, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
+                        }
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //ror absolute x
+                0x7e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ROR ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
+                        }
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rol accumulator
+                0x2a => {
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "ROL A".to_string();
+                        self.done_fetching = true;
+                    }
+                    let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                    self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_CARRY;
+                    }
+                    self.a <<= 1;
+                    if old_carry {
+                        self.a |= 0x1;
+                    }
+                    if self.a == 0 {
+                        self.p |= CPU_FLAG_ZERO;
+                    }
+                    if (self.a & 0x80) != 0 {
+                        self.p |= CPU_FLAG_NEGATIVE;
+                    }
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //rol zero page
+                0x26 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ROL ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp2 <<= 1;
+                        if old_carry {
+                            self.temp2 |= 1;
+                        }
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rol zero page x
+                0x36 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("ROL ${:02x},X", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.temp = self.temp.wrapping_add(self.x);
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp2 <<= 1;
+                        if old_carry {
+                            self.temp2 |= 1;
+                        }
+                        if self.temp2 == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp2 & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rol absolute
+                0x2e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ROL ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 1;
+                        }
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rol absolute x
+                0x3e => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("ROL ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 1;
+                        }
+                        if self.temp == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rti, return from interrupt
+                0x40 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "RTI".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.s = self.s.wrapping_add(1);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.p =
+                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.p &= !CPU_FLAG_B1;
+                        self.p |= CPU_FLAG_B2;
+                        self.s = self.s.wrapping_add(1);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp =
+                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.s = self.s.wrapping_add(1);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.temp2 =
+                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.pc = (self.temp2 as u16) << 8 | self.temp as u16;
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //jsr absolute
+                0x20 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let pc = (self.pc + 2).to_le_bytes();
+                        self.memory_cycle_write(0x100 + self.s as u16, pc[1], bus, cpu_peripherals);
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let pc = (self.pc + 2).to_le_bytes();
+                        self.memory_cycle_write(0x100 + self.s as u16, pc[0], bus, cpu_peripherals);
+                        self.s = self.s.wrapping_sub(1);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        let t2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let newpc: u16 = (self.temp as u16) | (t2 as u16) << 8;
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("JSR ${:04x}", newpc);
+                            self.done_fetching = true;
+                        }
+                        self.pc = newpc;
+                        self.end_instruction();
+                    }
+                },
+                //nop
+                0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xea | 0xfa => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "NOP".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.pc = self.pc.wrapping_add(1);
+                    self.subcycle = 0;
+                    self.opcode = None;
+                }
+                //extra nop
+                0x04 | 0x44 | 0x64 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "NOP".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.subcycle = 0;
+                        self.opcode = None;
+                    }
+                },
+                //extra nop
+                0x0c => match self.subcycle {
+                    1 => {
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "NOP".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.subcycle = 0;
+                        self.opcode = None;
+                    }
+                },
+                //extra nop
+                0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 => match self.subcycle {
+                    1 => {
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "NOP".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.subcycle = 0;
+                        self.opcode = None;
+                    }
+                },
+                //extra nop
+                0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "NOP".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        if overflow {
                             self.subcycle = 4;
-                        }
-                        4 => {
-                            self.pc = self.temp as u16;
-                            self.s = self.s.wrapping_add(1);
-                            self.pc |= (self.memory_cycle_read(
-                                self.s as u16 + 0x100,
-                                bus,
-                                cpu_peripherals,
-                            ) as u16)
-                                << 8;
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(1);
-                            self.end_instruction();
-                        }
-                    },
-                    //lax (indirect x)?, undocumented
-                    0xa3 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*LAX (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.tempaddr = self.temp.wrapping_add(self.x) as u16;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.tempaddr.wrapping_add(1),
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.a = self.temp;
-                            self.x = self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lax zero page?, undocumented
-                    0xa7 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*LAX ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.a = self.temp;
-                            self.x = self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //lax absolute, undocumented
-                    0xaf => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*LAX ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            let addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                            self.a = self.temp;
-                            self.x = self.temp;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
+                        } else {
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
                         }
-                    },
-                    //lax indirect y, undocumented
-                    0xb3 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*LAX (${:02x}),Y", self.temp);
-                                self.done_fetching = true;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //extra nop
+                0x80 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "NOP".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.pc = self.pc.wrapping_add(2);
+                    self.subcycle = 0;
+                    self.opcode = None;
+                }
+                //clv, clear overflow flag
+                0xb8 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "CLV".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p &= !CPU_FLAG_OVERFLOW;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //sec set carry flag
+                0x38 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "SEC".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p |= CPU_FLAG_CARRY;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //sei set interrupt disable flag
+                0x78 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "SEI".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p |= CPU_FLAG_INT_DISABLE;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //sed set decimal flag
+                0xf8 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "SED".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p |= CPU_FLAG_DECIMAL;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //cld, clear decimal flag
+                0xd8 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "CLD".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p &= !CPU_FLAG_DECIMAL;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //clc clear carry flag
+                0x18 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "CLC".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p &= !CPU_FLAG_CARRY;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //cli clear interrupt disable
+                0x58 => {
+                    #[cfg(debug_assertions)]
+                    {
+                        self.disassembly = "CLI".to_string();
+                        self.done_fetching = true;
+                    }
+                    self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                    self.p &= !CPU_FLAG_INT_DISABLE;
+                    self.pc = self.pc.wrapping_add(1);
+                    self.end_instruction();
+                }
+                //beq, branch if equal (zero flag set)
+                0xf0 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
                             }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BEQ ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_ZERO) != 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
                             self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
                         }
-                        2 => {
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
                             self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
                         }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            let (_val, overflow) = self.temp2.overflowing_add(self.y);
-                            if !overflow {
-                                addr = addr.wrapping_add(self.y as u16);
-                                self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                                self.x = self.a;
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.a == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.a & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(2);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 5;
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bne, branch if not equal (zero flag not set)
+                0xd0 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
                             }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BNE ${:04X}", tempaddr);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        if (self.p & CPU_FLAG_ZERO) == 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bvs, branch if overflow set
+                0x70 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BVS ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_OVERFLOW) != 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bvc branch if overflow clear
+                0x50 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BVC ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_OVERFLOW) == 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bpl, branch if negative clear
+                0x10 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BPL ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_NEGATIVE) == 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bmi branch if negative flag set
+                0x30 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BMI ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_NEGATIVE) != 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bcs, branch if carry set
+                0xb0 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BCS ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_CARRY) != 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //bcc branch if carry flag clear
+                0x90 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            let tempaddr = self.pc.wrapping_add(2).wrapping_add(adjust);
+                            self.disassembly = format!("BCC ${:04X}", tempaddr);
+                            self.done_fetching = true;
+                        }
+                        if (self.p & CPU_FLAG_CARRY) == 0 {
+                            self.pc = self.pc.wrapping_add(2);
+                            let mut adjust = self.temp as u16;
+                            if (self.temp & 0x80) != 0 {
+                                adjust |= 0xff00;
+                            }
+                            self.tempaddr = self.pc.wrapping_add(adjust);
+                            self.subcycle = 2;
+                        } else {
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        }
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
+                        self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
+                        self.end_instruction();
+                    }
+                },
+                //pha push accumulator
+                0x48 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "PHA".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.memory_cycle_write(
+                            0x100 + self.s as u16,
+                            self.a,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.s = self.s.wrapping_sub(1);
+                        self.pc = self.pc.wrapping_add(1);
+                        self.end_instruction();
+                    }
+                },
+                //php push processor status
+                0x08 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "PHP".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.memory_cycle_write(
+                            0x100 + self.s as u16,
+                            self.p | CPU_FLAG_B1,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.s = self.s.wrapping_sub(1);
+                        self.pc = self.pc.wrapping_add(1);
+                        self.end_instruction();
+                    }
+                },
+                //plp, pull processor status
+                0x28 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "PLP".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.s = self.s.wrapping_add(1);
+                        self.p =
+                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.p &= !CPU_FLAG_B1;
+                        self.p |= CPU_FLAG_B2;
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(1);
+                        self.end_instruction();
+                    }
+                },
+                //pla, pull accumulator
+                0x68 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "PLA".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.s = self.s.wrapping_add(1);
+                        self.a =
+                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(1);
+                        self.end_instruction();
+                    }
+                },
+                //rts, return from subroutine
+                0x60 => match self.subcycle {
+                    1 => {
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = "RTS".to_string();
+                            self.done_fetching = true;
+                        }
+                        self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.memory_cycle_read(self.s as u16 + 0x100, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.s = self.s.wrapping_add(1);
+                        self.temp =
+                            self.memory_cycle_read(self.s as u16 + 0x100, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.pc = self.temp as u16;
+                        self.s = self.s.wrapping_add(1);
+                        self.pc |=
+                            (self.memory_cycle_read(self.s as u16 + 0x100, bus, cpu_peripherals)
+                                as u16)
+                                << 8;
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(1);
+                        self.end_instruction();
+                    }
+                },
+                //lax (indirect x)?, undocumented
+                0xa3 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*LAX (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.tempaddr = self.temp.wrapping_add(self.x) as u16;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.tempaddr.wrapping_add(1),
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.a = self.temp;
+                        self.x = self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lax zero page?, undocumented
+                0xa7 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*LAX ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.temp = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.a = self.temp;
+                        self.x = self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lax absolute, undocumented
+                0xaf => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*LAX ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        let addr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.a = self.temp;
+                        self.x = self.temp;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //lax indirect y, undocumented
+                0xb3 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*LAX (${:02x}),Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
                             self.x = self.a;
@@ -5784,78 +5629,78 @@ impl NesCpu {
                             if (self.a & 0x80) != 0 {
                                 self.p |= CPU_FLAG_NEGATIVE;
                             }
+                            self.pc = self.pc.wrapping_add(2);
+                            self.end_instruction();
+                        } else {
+                            self.subcycle = 5;
+                        }
+                    }
+                    _ => {
+                        let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        addr = addr.wrapping_add(self.y as u16);
+                        self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.x = self.a;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
 
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lax zero page y, undocumented
+                0xb7 => match self.subcycle {
+                    1 => {
+                        self.subcycle = 2;
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*LAX ${:02x},Y", self.temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //lax zero page y, undocumented
-                    0xb7 => match self.subcycle {
-                        1 => {
-                            self.subcycle = 2;
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*LAX ${:02x},Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.temp = self.temp.wrapping_add(self.y);
+                        self.temp = self.temp.wrapping_add(self.y);
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.x = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.a = self.x;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.x == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        2 => {
-                            self.subcycle = 3;
+                        if (self.x & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                        _ => {
-                            self.x = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.a = self.x;
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if self.x == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.x & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //lax absolute y, undocumented
+                0xbf => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*LAX ${:04x},Y", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //lax absolute y, undocumented
-                    0xbf => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*LAX ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
-                            let (_val, overflow) = self.temp.overflowing_add(self.y);
-                            if !overflow {
-                                self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                                self.x =
-                                    self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                                self.a = self.x;
-                                self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                if self.x == 0 {
-                                    self.p |= CPU_FLAG_ZERO;
-                                }
-                                if (self.x & 0x80) != 0 {
-                                    self.p |= CPU_FLAG_NEGATIVE;
-                                }
-                                self.pc = self.pc.wrapping_add(3);
-                                self.end_instruction();
-                            } else {
-                                self.subcycle = 4;
-                            }
-                        }
-                        _ => {
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | self.temp as u16;
+                        let (_val, overflow) = self.temp.overflowing_add(self.y);
+                        if !overflow {
                             self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
                             self.x = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
                             self.a = self.x;
@@ -5868,2074 +5713,1990 @@ impl NesCpu {
                             }
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
-                        }
-                    },
-                    //sax indirect x
-                    0x83 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SAX (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.tempaddr = self.temp.wrapping_add(self.x) as u16;
-                            self.temp2 =
-                                self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = self.temp.wrapping_add(self.x).wrapping_add(1) as u16;
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        } else {
                             self.subcycle = 4;
                         }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.x & self.a;
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sax zero page
-                    0x87 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SAX ${:02x}", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        _ => {
-                            self.temp2 = self.a & self.x;
-                            self.memory_cycle_write(
-                                self.temp as u16,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sax absolute
-                    0x8f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SAX ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp2 = self.a & self.x;
-                            self.memory_cycle_write(
-                                self.tempaddr,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sax absolute y
-                    0x97 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SAX ${:02x},Y", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.subcycle = 3;
-                        }
-                        _ => {
-                            self.tempaddr = self.temp.wrapping_add(self.y) as u16;
-                            self.temp2 = self.a & self.x;
-                            self.memory_cycle_write(
-                                self.tempaddr,
-                                self.temp2,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp, undocumented, decrement and compare indirect x
-                    0xc3 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*DCP (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp zero page, undocumented
-                    0xc7 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*DCP ${:02x}", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp absolute, undocumented
-                    0xcf => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*DCP ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp indirect y
-                    0xd3 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*DCP (${:02x}),Y", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.temp2.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp zero page x, undocumented
-                    0xd7 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*DCP ${:02x},X", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.temp2 = self.temp2.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp absolute y, undocumented
-                    0xdb => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*DCP ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //dcp absolute x, undocumented
-                    0xdf => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*DCP ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_sub(1);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
-                            if self.a == self.temp {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if self.a >= self.temp {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb indirect x, increment memory, sub memory from accumulator, undocumented
-                    0xe3 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*ISB (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_add(1);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.cpu_sbc(self.temp);
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb zero page, undocumented
-                    0xe7 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*ISB ${:02x}", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.temp.wrapping_add(1);
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb absolute, undocumented
-                    0xef => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*ISB ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_add(1);
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.cpu_sbc(self.temp);
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb indirect y, undocumented
-                    0xf3 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*ISB (${:02x}),Y", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.temp2.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.temp = self.temp.wrapping_add(1);
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb zero page x, undocumented
-                    0xf7 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*ISB ${:02x},X", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.temp2 = self.temp2.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.temp.wrapping_add(1);
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb absolute y, undocumented
-                    0xfb => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*ISB ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_add(1);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.cpu_sbc(self.temp);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //isb absolute x, undocumented
-                    0xff => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*ISB ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.temp = self.temp.wrapping_add(1);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.cpu_sbc(self.temp);
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo shift left, then or with accumulator, undocumented
-                    //indirect x
-                    0x03 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SLO (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo zero page, undocumented
-                    0x07 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SLO ${:02x}", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo absolute, undocumented
-                    0x0f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SLO ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo indirect y, undocumented
-                    0x13 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SLO (${:02x}),Y", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.temp2.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo zero page x, undocumented
-                    0x17 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SLO ${:02x},X", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.temp2 = self.temp2.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo absolute y, undocumented
-                    0x1b => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SLO ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //slo absolute x, undocumented
-                    0x1f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SLO ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.a = self.a | self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla, rotate left, then and with accumulator, undocumented
-                    //indirect x
-                    0x23 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RLA (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla zero page, undocumented
-                    0x27 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RLA ${:02x}", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 4;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla absolute, undocumented
-                    0x2f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*RLA ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla indirect y
-                    0x33 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RLA (${:02x}),Y", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.temp2.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla zero page x, undocumented
-                    0x37 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RLA ${:02x},X", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.temp2 = self.temp2.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla absolute y, undocumented
-                    0x3b => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*RLA ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rla absolute x, undocumented
-                    0x3f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*RLA ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x80) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp << 1;
-                            if old_carry {
-                                self.temp |= 0x1;
-                            }
-                            self.a = self.a & self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre, shift right, then xor with accumulator, undocumented
-                    //indirect x
-                    0x43 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SRE (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre zero page, undocumented
-                    0x47 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SRE ${:02x}", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre absolute, undocumented
-                    0x4f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SRE ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre indirect y, undocumented
-                    0x53 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SRE (${:02x}),Y", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.temp2.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.subcycle = 6;
-                        }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre zero page x, undocumented
-                    0x57 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*SRE ${:02x},X", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.temp2 = self.temp2.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre absolute y, undocumented
-                    0x5b => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SRE ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //sre absolute x, undocumented
-                    0x5f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*SRE ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
+                    }
+                    _ => {
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.x = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.a = self.x;
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if self.x == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.x & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sax indirect x
+                0x83 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SAX (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.tempaddr = self.temp.wrapping_add(self.x) as u16;
+                        self.temp2 = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = self.temp.wrapping_add(self.x).wrapping_add(1) as u16;
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.x & self.a;
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sax zero page
+                0x87 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SAX ${:02x}", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    _ => {
+                        self.temp2 = self.a & self.x;
+                        self.memory_cycle_write(self.temp as u16, self.temp2, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sax absolute
+                0x8f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SAX ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp2 = self.a & self.x;
+                        self.memory_cycle_write(self.tempaddr, self.temp2, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sax absolute y
+                0x97 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SAX ${:02x},Y", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.subcycle = 3;
+                    }
+                    _ => {
+                        self.tempaddr = self.temp.wrapping_add(self.y) as u16;
+                        self.temp2 = self.a & self.x;
+                        self.memory_cycle_write(self.tempaddr, self.temp2, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dcp, undocumented, decrement and compare indirect x
+                0xc3 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*DCP (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dcp zero page, undocumented
+                0xc7 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*DCP ${:02x}", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dcp absolute, undocumented
+                0xcf => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*DCP ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //dcp indirect y
+                0xd3 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*DCP (${:02x}),Y", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.temp2.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dcp zero page x, undocumented
+                0xd7 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*DCP ${:02x},X", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.temp2 = self.temp2.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //dcp absolute y, undocumented
+                0xdb => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*DCP ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //dcp absolute x, undocumented
+                0xdf => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*DCP ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_sub(1);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_ZERO | CPU_FLAG_CARRY | CPU_FLAG_NEGATIVE);
+                        if self.a == self.temp {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if self.a >= self.temp {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        if ((self.a.wrapping_sub(self.temp)) & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //isb indirect x, increment memory, sub memory from accumulator, undocumented
+                0xe3 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*ISB (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_add(1);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.cpu_sbc(self.temp);
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //isb zero page, undocumented
+                0xe7 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*ISB ${:02x}", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.temp.wrapping_add(1);
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //isb absolute, undocumented
+                0xef => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*ISB ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_add(1);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.cpu_sbc(self.temp);
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //isb indirect y, undocumented
+                0xf3 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*ISB (${:02x}),Y", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.temp2.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.temp = self.temp.wrapping_add(1);
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //isb zero page x, undocumented
+                0xf7 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*ISB ${:02x},X", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.temp2 = self.temp2.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.temp.wrapping_add(1);
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //isb absolute y, undocumented
+                0xfb => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*ISB ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_add(1);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.cpu_sbc(self.temp);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //isb absolute x, undocumented
+                0xff => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*ISB ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.temp = self.temp.wrapping_add(1);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.cpu_sbc(self.temp);
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //slo shift left, then or with accumulator, undocumented
+                //indirect x
+                0x03 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SLO (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //slo zero page, undocumented
+                0x07 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SLO ${:02x}", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //slo absolute, undocumented
+                0x0f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SLO ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //slo indirect y, undocumented
+                0x13 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SLO (${:02x}),Y", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.temp2.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //slo zero page x, undocumented
+                0x17 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SLO ${:02x},X", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.temp2 = self.temp2.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //slo absolute y, undocumented
+                0x1b => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SLO ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //slo absolute x, undocumented
+                0x1f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SLO ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_NEGATIVE | CPU_FLAG_ZERO | CPU_FLAG_CARRY);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.a |= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rla, rotate left, then and with accumulator, undocumented
+                //indirect x
+                0x23 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RLA (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rla zero page, undocumented
+                0x27 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RLA ${:02x}", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rla absolute, undocumented
+                0x2f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*RLA ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rla indirect y
+                0x33 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RLA (${:02x}),Y", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.temp2.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rla zero page x, undocumented
+                0x37 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RLA ${:02x},X", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.temp2 = self.temp2.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rla absolute y, undocumented
+                0x3b => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*RLA ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rla absolute x, undocumented
+                0x3f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*RLA ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x80) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp <<= 1;
+                        if old_carry {
+                            self.temp |= 0x1;
+                        }
+                        self.a &= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sre, shift right, then xor with accumulator, undocumented
+                //indirect x
+                0x43 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SRE (${:02x},X)", self.temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sre zero page, undocumented
+                0x47 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SRE ${:02x}", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sre absolute, undocumented
+                0x4f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SRE ${:04x}", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sre indirect y, undocumented
+                0x53 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SRE (${:02x}),Y", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.temp2.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sre zero page x, undocumented
+                0x57 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*SRE ${:02x},X", self.temp2);
+                            self.done_fetching = true;
+                        }
+                        self.temp2 = self.temp2.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //sre absolute y, undocumented
+                0x5b => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SRE ${:04x},Y", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
+                        }
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
+                        }
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //sre absolute x, undocumented
+                0x5f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*SRE ${:04x},X", temp);
+                            self.done_fetching = true;
+                        }
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
+                        }
+                        self.temp >>= 1;
 
-                            self.a = self.a ^ self.temp;
-                            if self.a == 0 {
-                                self.p |= CPU_FLAG_ZERO;
-                            }
-                            if (self.a & 0x80) != 0 {
-                                self.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            self.subcycle = 6;
+                        self.a ^= self.temp;
+                        if self.a == 0 {
+                            self.p |= CPU_FLAG_ZERO;
                         }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                        if (self.a & 0x80) != 0 {
+                            self.p |= CPU_FLAG_NEGATIVE;
                         }
-                    },
-                    //rra, rotate right, then and with accumulator, undocumented
-                    //indirect x
-                    0x63 => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RRA (${:02x},X)", self.temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rra, rotate right, then and with accumulator, undocumented
+                //indirect x
+                0x63 => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RRA (${:02x},X)", self.temp);
+                            self.done_fetching = true;
                         }
-                        2 => {
-                            self.temp = self.temp.wrapping_add(self.x);
-                            self.temp2 =
-                                self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.temp.wrapping_add(self.x);
+                        self.temp2 = self.memory_cycle_read(self.temp as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp = self.memory_cycle_read(
+                            self.temp.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        3 => {
-                            self.temp = self.memory_cycle_read(
-                                self.temp.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        4 => {
-                            self.tempaddr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
+                        self.cpu_adc(self.temp);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rra zero page, undocumented
+                0x67 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RRA ${:02x}", self.temp2);
+                            self.done_fetching = true;
                         }
-                        5 => {
-                            self.subcycle = 6;
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.cpu_adc(self.temp);
-                            self.subcycle = 7;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.subcycle = 4;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rra absolute, undocumented
+                0x6f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*RRA ${:04x}", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //rra zero page, undocumented
-                    0x67 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RRA ${:02x}", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        3 => {
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.cpu_adc(self.temp);
-                            self.subcycle = 4;
+                        self.cpu_adc(self.temp);
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rra indirect y
+                0x73 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RRA (${:02x}),Y", self.temp2);
+                            self.done_fetching = true;
                         }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.temp2 = self.memory_cycle_read(
+                            self.temp2.wrapping_add(1) as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.subcycle = 6;
+                    }
+                    6 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.subcycle = 7;
+                    }
+                    _ => {
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                    },
-                    //rra absolute, undocumented
-                    0x6f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*RRA ${:04x}", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rra zero page x, undocumented
+                0x77 => match self.subcycle {
+                    1 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            self.disassembly = format!("*RRA ${:02x},X", self.temp2);
+                            self.done_fetching = true;
                         }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
+                        self.temp2 = self.temp2.wrapping_add(self.x);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp = self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        4 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.cpu_adc(self.temp);
-                            self.subcycle = 5;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
+                        self.memory_cycle_write(self.temp2 as u16, self.temp, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    _ => {
+                        self.pc = self.pc.wrapping_add(2);
+                        self.end_instruction();
+                    }
+                },
+                //rra absolute y, undocumented
+                0x7b => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*RRA ${:04x},Y", temp);
+                            self.done_fetching = true;
                         }
-                    },
-                    //rra indirect y
-                    0x73 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RRA (${:02x}),Y", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 2;
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        3 => {
-                            self.temp2 = self.memory_cycle_read(
-                                self.temp2.wrapping_add(1) as u16,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.subcycle = 4;
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.cpu_adc(self.temp);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                //rra absolute x, undocumented
+                0x7f => match self.subcycle {
+                    1 => {
+                        self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
+                        self.subcycle = 2;
+                    }
+                    2 => {
+                        self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
+                        #[cfg(debug_assertions)]
+                        {
+                            let temp = (self.temp2 as u16) << 8 | self.temp as u16;
+                            self.disassembly = format!("*RRA ${:04x},X", temp);
+                            self.done_fetching = true;
                         }
-                        4 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 5;
+                        self.subcycle = 3;
+                    }
+                    3 => {
+                        self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
+                        self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
+                        self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
+                        self.subcycle = 4;
+                    }
+                    4 => {
+                        self.subcycle = 5;
+                    }
+                    5 => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
+                        self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                        if (self.temp & 0x1) != 0 {
+                            self.p |= CPU_FLAG_CARRY;
                         }
-                        5 => {
-                            self.subcycle = 6;
+                        self.temp >>= 1;
+                        if old_carry {
+                            self.temp |= 0x80;
                         }
-                        6 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.subcycle = 7;
-                        }
-                        _ => {
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rra zero page x, undocumented
-                    0x77 => match self.subcycle {
-                        1 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                self.disassembly = format!("*RRA ${:02x},X", self.temp2);
-                                self.done_fetching = true;
-                            }
-                            self.temp2 = self.temp2.wrapping_add(self.x);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp =
-                                self.memory_cycle_read(self.temp2 as u16, bus, cpu_peripherals);
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.memory_cycle_write(
-                                self.temp2 as u16,
-                                self.temp,
-                                bus,
-                                cpu_peripherals,
-                            );
-                            self.cpu_adc(self.temp);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        _ => {
-                            self.pc = self.pc.wrapping_add(2);
-                            self.end_instruction();
-                        }
-                    },
-                    //rra absolute y, undocumented
-                    0x7b => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*RRA ${:04x},Y", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.y as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.cpu_adc(self.temp);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    //rra absolute x, undocumented
-                    0x7f => match self.subcycle {
-                        1 => {
-                            self.temp = self.memory_cycle_read(self.pc + 1, bus, cpu_peripherals);
-                            self.subcycle = 2;
-                        }
-                        2 => {
-                            self.temp2 = self.memory_cycle_read(self.pc + 2, bus, cpu_peripherals);
-                            #[cfg(debug_assertions)]
-                            {
-                                let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                                self.disassembly = format!("*RRA ${:04x},X", temp);
-                                self.done_fetching = true;
-                            }
-                            self.subcycle = 3;
-                        }
-                        3 => {
-                            self.tempaddr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                            self.tempaddr = self.tempaddr.wrapping_add(self.x as u16);
-                            self.temp = self.memory_cycle_read(self.tempaddr, bus, cpu_peripherals);
-                            self.subcycle = 4;
-                        }
-                        4 => {
-                            self.subcycle = 5;
-                        }
-                        5 => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            let old_carry = (self.p & CPU_FLAG_CARRY) != 0;
-                            self.p &= !(CPU_FLAG_CARRY | CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if (self.temp & 0x1) != 0 {
-                                self.p |= CPU_FLAG_CARRY;
-                            }
-                            self.temp = self.temp >> 1;
-                            if old_carry {
-                                self.temp |= 0x80;
-                            }
-                            self.cpu_adc(self.temp);
-                            self.subcycle = 6;
-                        }
-                        _ => {
-                            self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
-                            self.pc = self.pc.wrapping_add(3);
-                            self.end_instruction();
-                        }
-                    },
-                    _ => {}
-                }
+                        self.cpu_adc(self.temp);
+                        self.subcycle = 6;
+                    }
+                    _ => {
+                        self.memory_cycle_write(self.tempaddr, self.temp, bus, cpu_peripherals);
+                        self.pc = self.pc.wrapping_add(3);
+                        self.end_instruction();
+                    }
+                },
+                _ => {}
             }
         }
     }

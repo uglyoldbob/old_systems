@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 
-pub mod apu;
-pub mod cartridge;
-pub mod controller;
-pub mod cpu;
-pub mod emulator_data;
-pub mod motherboard;
-pub mod ppu;
-pub mod romlist;
-pub mod utility;
+mod apu;
+mod cartridge;
+mod controller;
+mod cpu;
+mod emulator_data;
+mod motherboard;
+mod ppu;
+mod romlist;
+mod utility;
 
 use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
@@ -154,7 +154,7 @@ pub fn romlist_bench(c: &mut Criterion) {
         b.iter(|| {
             let _e = std::fs::remove_file("./roms.bin");
             let mut list = romlist::RomListParser::new();
-            list.find_roms("../roms");
+            list.find_roms("../test_roms");
             println!("There are {} roms", list.count());
             list.process_roms();
         });
@@ -163,7 +163,7 @@ pub fn romlist_bench(c: &mut Criterion) {
     group.bench_function("second run", |b| {
         b.iter(|| {
             let mut list = romlist::RomListParser::new();
-            list.find_roms("../roms");
+            list.find_roms("../test_roms");
             println!("There are {} roms", list.count());
             list.process_roms();
         });

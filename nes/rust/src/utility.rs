@@ -1,3 +1,4 @@
+#[cfg(test)]
 pub fn convert_hex_to_decimal(d: char) -> u8 {
     match d {
         '0' => 0,

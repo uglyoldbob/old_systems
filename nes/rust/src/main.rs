@@ -1,14 +1,19 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![deny(missing_docs)]
+#![deny(clippy::missing_docs_in_private_items)]
 
-pub mod apu;
-pub mod cartridge;
-pub mod controller;
-pub mod cpu;
-pub mod emulator_data;
-pub mod motherboard;
-pub mod ppu;
-pub mod romlist;
-pub mod utility;
+//! This is the nes emulator written in rust. It is compatible with windows, linux, and osx.
+
+mod apu;
+mod cartridge;
+mod controller;
+mod cpu;
+mod emulator_data;
+mod motherboard;
+mod ppu;
+mod romlist;
+#[cfg(test)]
+mod utility;
 
 use std::io::Write;
 
@@ -22,10 +27,7 @@ mod tests;
 use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
-//const INITIAL_ROM : Option<&str> = None;
-
-//const INITIAL_ROM : Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/5.Emulator.nes");
-//const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/2.Details.nes");
+/// The initial rom that the emulator will load. Only for developmment of the beta version (0.1.x)
 const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/read_joy3/test_buttons.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
@@ -62,17 +64,26 @@ use sdl2::render::TextureCreator;
 #[cfg(feature = "sdl2")]
 pub const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
 
+/// The struct for the main window of the emulator.
 struct MainNesWindow {
+    /// The time of the last emulated frame for the emulator. Even if the emulator is paused, the screen will still run at the proper frame rate.
     last_frame_time: std::time::SystemTime,
     #[cfg(feature = "eframe")]
     c: NesEmulatorData,
+    /// The calculated frames per second performance of the emulator.
     fps: f64,
+    /// The number of samples per second of the audio output.
     sound_rate: u32,
+    /// The producing half of the ring buffer used for audio.
     sound: Option<rb::Producer<f32>>,
+    /// The texture used for rendering the ppu image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
+    /// The filter used for audio playback, filtering out high frequency noise, increasing the quality of audio playback.
     filter: Option<biquad::DirectForm1<f32>>,
+    /// The interval between sound samples based on the sample rate used in the stream
     sound_sample_interval: f32,
+    /// The stream used for audio playback during emulation
     sound_stream: Option<cpal::Stream>,
 }
 
@@ -91,8 +102,10 @@ impl MainNesWindow {
             fps: 0.0,
         }
     }
+
+    /// Create a new request for a main window of the emulator.
     #[cfg(feature = "egui-multiwin")]
-    fn new(
+    fn new_request(
         rate: u32,
         producer: Option<rb::Producer<f32>>,
         stream: Option<cpal::Stream>,
@@ -260,12 +273,10 @@ impl TrackedWindow for MainNesWindow {
             {
                 if !c.paused {
                     c.cycle_step(&mut self.sound, &mut self.filter);
-                    if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() {
-                        if c.single_step {
-                            c.paused = true;
-                            c.single_step = false;
-                            break 'emulator_loop;
-                        }
+                    if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() && c.single_step {
+                        c.paused = true;
+                        c.single_step = false;
+                        break 'emulator_loop;
                     }
                 } else {
                     break 'emulator_loop;
@@ -289,7 +300,7 @@ impl TrackedWindow for MainNesWindow {
 
         let image = NesPpu::convert_to_egui(c.cpu_peripherals.ppu_get_frame());
 
-        if let None = self.texture {
+        if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
                 "NES_PPU",
                 image,
@@ -307,7 +318,7 @@ impl TrackedWindow for MainNesWindow {
                 ui.menu_button("File", |ui| {
                     let button = egui_multiwin::egui::Button::new("Open rom?");
                     if ui.add_enabled(true, button).clicked() {
-                        windows_to_create.push(RomFinder::new());
+                        windows_to_create.push(RomFinder::new_request());
                         ui.close_menu();
                     }
 
@@ -339,7 +350,7 @@ impl TrackedWindow for MainNesWindow {
                     ui.menu_button("Debug", |ui| {
                         if ui.button("Debugger").clicked() {
                             ui.close_menu();
-                            windows_to_create.push(DebugNesWindow::new());
+                            windows_to_create.push(DebugNesWindow::new_request());
                         }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();
@@ -378,7 +389,7 @@ impl TrackedWindow for MainNesWindow {
 
         if load_state {
             if let Ok(a) = std::fs::read("./state.bin") {
-                c.deserialize(a);
+                let _e = c.deserialize(a);
             }
         }
 
@@ -407,18 +418,20 @@ impl TrackedWindow for MainNesWindow {
         self.last_frame_time = new_frame_time;
 
         RedrawResponse {
-            quit: quit,
+            quit,
             new_windows: windows_to_create,
         }
     }
 }
 
+/// The structure for a debug window of the emulator.
 #[cfg(feature = "egui-multiwin")]
 struct DebugNesWindow {}
 
 #[cfg(feature = "egui-multiwin")]
 impl DebugNesWindow {
-    fn new() -> NewWindowRequest<NesEmulatorData> {
+    /// Create a new request for a Debug window.
+    fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(DebugNesWindow {}),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
@@ -472,10 +485,8 @@ impl TrackedWindow for DebugNesWindow {
                         c.wait_for_frame_end = true;
                         c.paused = false;
                     }
-                } else {
-                    if ui.button("Pause").clicked() {
-                        c.single_step = true;
-                    }
+                } else if ui.button("Pause").clicked() {
+                    c.single_step = true;
                 }
                 ui.horizontal(|ui| {
                     ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
@@ -498,20 +509,23 @@ impl TrackedWindow for DebugNesWindow {
             }
         });
         RedrawResponse {
-            quit: quit,
+            quit,
             new_windows: windows_to_create,
         }
     }
 }
 
+/// The structure for a window that helps a user select a rom to load.
 #[cfg(feature = "egui-multiwin")]
 struct RomFinder {
+    /// The element responsible for parsing the list of roms known by the emulator.
     parser: romlist::RomListParser,
 }
 
 #[cfg(feature = "egui-multiwin")]
 impl RomFinder {
-    fn new() -> NewWindowRequest<NesEmulatorData> {
+    /// Create a new request to make a RomFinder window.
+    fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(RomFinder {
                 parser: romlist::RomListParser::new(),
@@ -559,20 +573,18 @@ impl TrackedWindow for RomFinder {
                 let mut new_rom = None;
                 for (p, entry) in self.parser.list().elements.iter() {
                     if let Some(r) = &entry.result {
-                        if r.is_ok() {
-                            if ui
+                        if r.is_ok()
+                            && ui
                                 .add(
                                     egui_multiwin::egui::Label::new(format!("{}", p.display()))
                                         .sense(Sense::click()),
                                 )
                                 .double_clicked()
-                            {
-                                new_rom = Some(
-                                    NesCartridge::load_cartridge(p.to_str().unwrap().into())
-                                        .unwrap(),
-                                );
-                                quit = true;
-                            }
+                        {
+                            new_rom = Some(
+                                NesCartridge::load_cartridge(p.to_str().unwrap().into()).unwrap(),
+                            );
+                            quit = true;
                         }
                     }
                 }
@@ -585,7 +597,7 @@ impl TrackedWindow for RomFinder {
         });
 
         RedrawResponse {
-            quit: quit,
+            quit,
             new_windows: windows_to_create,
         }
     }
@@ -844,7 +856,7 @@ fn main() {
         None
     };
 
-    let root_window = MainNesWindow::new(sound_rate, sound_producer, sound_stream);
+    let root_window = MainNesWindow::new_request(sound_rate, sound_producer, sound_stream);
 
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
@@ -859,7 +871,7 @@ fn main() {
     #[cfg(debug_assertions)]
     {
         if nes_data.paused {
-            let debug_win = DebugNesWindow::new();
+            let debug_win = DebugNesWindow::new_request();
             let _e = multi_window.add(debug_win, &event_loop);
         }
     }

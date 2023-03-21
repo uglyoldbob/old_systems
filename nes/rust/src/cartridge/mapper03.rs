@@ -1,14 +1,20 @@
+//! Implements mapper 03
+
 use crate::cartridge::NesCartridgeData;
 use crate::cartridge::{NesMapper, NesMapperTrait};
 
+/// Mapper 03
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Mapper03 {
+    /// Flag determining if mirroring is vertical
     mirror_vertical: bool,
+    /// The ppu address for ppu addressing
     ppu_address: u16,
 }
 
 impl Mapper03 {
+    /// Create a new mapper03
     pub fn new(d: &NesCartridgeData) -> NesMapper {
         NesMapper::from(Self {
             mirror_vertical: d.mirroring,
@@ -22,8 +28,8 @@ impl NesMapperTrait for Mapper03 {
         match addr {
             0x6000..=0x7fff => {
                 let mut addr2 = addr & 0x1fff;
-                if cart.prg_ram.len() != 0 {
-                    addr2 = addr2 % cart.prg_ram.len() as u16;
+                if !cart.prg_ram.is_empty() {
+                    addr2 %= cart.prg_ram.len() as u16;
                     Some(cart.prg_ram[addr2 as usize])
                 } else {
                     None
@@ -53,7 +59,7 @@ impl NesMapperTrait for Mapper03 {
     }
 
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
-        if cart.chr_rom.len() == 0 {
+        if cart.chr_rom.is_empty() {
             return None;
         }
         Some(cart.chr_rom[self.ppu_address as usize])

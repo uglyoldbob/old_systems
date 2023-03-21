@@ -1,3 +1,5 @@
+//! This module is responsible for cartridge related emulation, including mapper emulation.
+
 mod mapper00;
 mod mapper01;
 mod mapper03;
@@ -8,21 +10,29 @@ use mapper03::Mapper03;
 
 use serde::{Deserialize, Serialize};
 
+/// All mappers must implement this.
 #[enum_dispatch::enum_dispatch]
 trait NesMapperTrait {
+    /// Run a cpu memory read cycle
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
+    /// Run a cpu memory write cycle
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+    /// Runs a memory cycle that does nothing, for mappers that need to do special things.
     fn memory_cycle_nop(&mut self);
     #[must_use]
-    //performs the first half of a ppu memory cycle
-    //returns A10 for internal VRAM and the motherboard CS line (for internal VRAM)
-    //A10 is straight forward, CS line is active low like the electronics would be
+    /// performs the first half of a ppu memory cycle
+    /// returns A10 for internal VRAM and the motherboard CS line (for internal VRAM)
+    /// A10 is straight forward, CS line is active low like the electronics would be
     fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool);
+    /// Run a ppu read cycle
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8>;
+    /// Run a ppu write cycle
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
+    /// Modify a byte for the cartridge rom
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
 }
 
+/// The mapper for an nes cartridge
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(NesMapperTrait)]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -31,58 +41,83 @@ pub enum NesMapper {
     Mapper01,
     Mapper03,
 }
+
+/// The trait for cpu memory reads and writes, implemented by devices on the bus
 pub trait NesMemoryBusDevice {
+    /// Run a cpu memory read cycle on the cartridge
     fn memory_cycle_read(
         &mut self,
         addr: u16,
         out: [bool; 3],
         controllers: [bool; 2],
     ) -> Option<u8>;
+    /// Run a cpu memory write cycle on the cartridge
     fn memory_cycle_write(&mut self, addr: u16, data: u8);
 }
 
+/// The data for a cartridge.
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridgeData {
+    /// An optional trainer for the cartridge
     trainer: Option<Vec<u8>>,
+    /// The prg rom, where code typically goes.
     prg_rom: Vec<u8>,
+    /// The chr rom, where graphics are generally stored
     chr_rom: Vec<u8>,
+    /// chr_ram ?
     chr_ram: bool,
+    /// inst_rom ?
     inst_rom: Option<Vec<u8>>,
+    /// prom?
     prom: Option<(Vec<u8>, Vec<u8>)>,
+    /// Program ram
     prg_ram: Vec<u8>,
     /// True for vertical mirroring, false for horizontal mirroring
     mirroring: bool,
+    /// The mapper number
     mapper: u32,
 }
 
+/// A cartridge, including the mapper structure
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridge {
+    /// The data in the cartridge, including ram and everything else
     data: NesCartridgeData,
+    /// The mapper
     mapper: NesMapper,
+    /// The mapper number
     mappernum: u32,
 }
 
+/// The types of errors that can occur when loading a rom
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CartridgeError {
+    /// There can be a filesystem error opening the file
     FsError(String),
+    /// It might not be any known type of rom
     InvalidRom,
+    /// The rom might be incompatible (unparsed format)
     IncompatibleRom,
+    /// The rom might use a mapper that is not yet implemented
     IncompatibleMapper(u32),
+    /// The rom might be too short, indicating some bytes got cut off of the end, or that it has been corrupted/modified
     RomTooShort,
 }
 
 impl NesCartridge {
+    /// "Parses" an obsolete ines rom
     fn load_obsolete_ines(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
     }
 
+    /// Builds a mapper for the rom
     fn get_mapper(mapper: u32, rom_data: &NesCartridgeData) -> Result<NesMapper, CartridgeError> {
         let mapper = match mapper {
-            0 => mapper00::Mapper00::new(&rom_data),
-            1 => mapper01::Mapper01::new(&rom_data),
-            3 => mapper03::Mapper03::new(&rom_data),
+            0 => mapper00::Mapper00::new(rom_data),
+            1 => mapper01::Mapper01::new(rom_data),
+            3 => mapper03::Mapper03::new(rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper));
             }
@@ -90,10 +125,11 @@ impl NesCartridge {
         Ok(mapper)
     }
 
+    /// Parses an ines1 format rom
     fn load_ines1(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        if rom_contents[0] != 'N' as u8
-            || rom_contents[1] != 'E' as u8
-            || rom_contents[2] != 'S' as u8
+        if rom_contents[0] != b'N'
+            || rom_contents[1] != b'E'
+            || rom_contents[2] != b'S'
             || rom_contents[3] != 0x1a
         {
             return Err(CartridgeError::InvalidRom);
@@ -104,7 +140,7 @@ impl NesCartridge {
         let chr_ram = chr_rom_size == 0;
         if chr_ram {
             //TODO determine correct size for chr-ram
-            chr_rom_size = 8192 * 1;
+            chr_rom_size = 8192;
         }
         let mut file_offset: usize = 16;
         let trainer = if (rom_contents[6] & 8) != 0 {
@@ -166,15 +202,15 @@ impl NesCartridge {
             prg_ram.push(v);
         }
 
-        let mappernum = (rom_contents[6] >> 4) as u8 | (rom_contents[7] & 0xf0) as u8;
+        let mappernum = (rom_contents[6] >> 4) | (rom_contents[7] & 0xf0);
         let rom_data = NesCartridgeData {
-            trainer: trainer,
-            prg_rom: prg_rom,
-            chr_rom: chr_rom,
-            chr_ram: chr_ram,
-            inst_rom: inst_rom,
+            trainer,
+            prg_rom,
+            chr_rom,
+            chr_ram,
+            inst_rom,
             prom: None,
-            prg_ram: prg_ram,
+            prg_ram,
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mappernum as u32,
         };
@@ -187,10 +223,11 @@ impl NesCartridge {
         })
     }
 
+    /// Parses an ines2 format rom
     fn load_ines2(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        if rom_contents[0] != 'N' as u8
-            || rom_contents[1] != 'E' as u8
-            || rom_contents[2] != 'S' as u8
+        if rom_contents[0] != b'N'
+            || rom_contents[1] != b'E'
+            || rom_contents[2] != b'S'
             || rom_contents[3] != 0x1a
         {
             return Err(CartridgeError::InvalidRom);
@@ -255,9 +292,9 @@ impl NesCartridge {
             | (rom_contents[7] & 0xf0) as u16
             | (rom_contents[8] as u16) << 8;
         let rom_data = NesCartridgeData {
-            trainer: trainer,
-            prg_rom: prg_rom,
-            chr_rom: chr_rom,
+            trainer,
+            prg_rom,
+            chr_rom,
             chr_ram: false,
             inst_rom: None,
             prom: None,
@@ -270,11 +307,12 @@ impl NesCartridge {
 
         Ok(Self {
             data: rom_data,
-            mapper: mapper,
+            mapper,
             mappernum: mappernum as u32,
         })
     }
 
+    /// Load a cartridge, returning an error or the new cartridge
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
         let rom_contents = std::fs::read(name);
         if let Err(e) = rom_contents {
@@ -284,53 +322,59 @@ impl NesCartridge {
         if rom_contents.len() < 16 {
             return Err(CartridgeError::InvalidRom);
         }
-        if rom_contents[0] != 'N' as u8
-            || rom_contents[1] != 'E' as u8
-            || rom_contents[2] != 'S' as u8
+        if rom_contents[0] != b'N'
+            || rom_contents[1] != b'E'
+            || rom_contents[2] != b'S'
             || rom_contents[3] != 0x1a
         {
             return Err(CartridgeError::InvalidRom);
         }
         if (rom_contents[7] & 0xC) == 8 {
-            return Self::load_ines2(&rom_contents);
+            Self::load_ines2(&rom_contents)
         } else if (rom_contents[7] & 0xC) == 4 {
-            return Self::load_obsolete_ines(&rom_contents);
+            Self::load_obsolete_ines(&rom_contents)
         } else if (rom_contents[7] & 0xC) == 0
             && rom_contents[12] == 0
             && rom_contents[13] == 0
             && rom_contents[14] == 0
             && rom_contents[15] == 0
         {
-            return Self::load_ines1(&rom_contents);
+            Self::load_ines1(&rom_contents)
         } else {
             //or ines 0.7
-            return Self::load_obsolete_ines(&rom_contents);
+            Self::load_obsolete_ines(&rom_contents)
         }
     }
 }
 
 impl NesCartridge {
+    /// Drive a cpu memory read cycle
     pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_read(&mut self.data, addr)
     }
 
+    /// Drive a cpu memory write cycle
     pub fn memory_write(&mut self, addr: u16, data: u8) {
         self.mapper.memory_cycle_write(&mut self.data, addr, data);
     }
 
+    /// A nop for the cpu bus, for driving mapper logic that needs it.
     pub fn memory_nop(&mut self) {
         self.mapper.memory_cycle_nop();
     }
 
+    /// Run a ppu address cycle
     #[must_use]
     pub fn ppu_cycle_1(&mut self, addr: u16) -> (bool, bool) {
         self.mapper.ppu_memory_cycle_address(addr)
     }
 
+    /// Run a ppu write cyle
     pub fn ppu_cycle_write(&mut self, data: u8) {
         self.mapper.ppu_memory_cycle_write(&mut self.data, data);
     }
 
+    /// Run a ppu read cycle
     pub fn ppu_cycle_read(&mut self) -> u8 {
         if let Some(a) = self.mapper.ppu_memory_cycle_read(&mut self.data) {
             a
@@ -340,6 +384,7 @@ impl NesCartridge {
         }
     }
 
+    ///Used in testing to over-write the contents of a specific byte in the rom image
     #[cfg(test)]
     pub fn rom_byte_hack(&mut self, addr: u32, new_byte: u8) {
         self.mapper.rom_byte_hack(&mut self.data, addr, new_byte);

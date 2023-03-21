@@ -1,3 +1,5 @@
+//! The ppu module for the emulator. Responsible for emulating the chip that generates all of the graphics for the nes.
+
 use crate::motherboard::NesMotherboard;
 use serde_with::Bytes;
 
@@ -7,26 +9,38 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
+/// The various modes of evaluating sprites for a scanline
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 enum PpuSpriteEvalMode {
+    /// Look for sprites on the current scanline
     Normal,
+    /// A sprite has been found, copy the other bytes of that sprite
     CopyCurrentSprite,
+    /// The are currently 8 sprites that have been found for the current scanline
     Sprites8,
+    /// Sprites are done being evaluated
     Done,
 }
 
+/// A struct for a single sprite of the ppu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug)]
 pub struct PpuSprite {
+    /// The y coordinate for the sprite on screen
     y: u8,
+    /// The tile number for the sprite
     tile: u8,
+    /// The attribute data for the sprite
     attribute: u8,
+    /// The x coordinate of the sprite on screen
     x: u8,
+    /// The pattern table data for the sprite
     patterntable_data: u16,
 }
 
 impl PpuSprite {
+    /// Create a new sprite, off of the rendered screen
     fn new() -> Self {
         Self {
             y: 0xff,
@@ -37,16 +51,19 @@ impl PpuSprite {
         }
     }
 
+    /// Returns the pallete for the sprite
     pub fn pallete(&self) -> u16 {
         ((self.attribute & 3) as u16) << 2
     }
 
+    /// Returns the tile number to fetch for this sprite. Probably incorrect for tall sprites
     pub fn tile_num(&self, _scanline: u8) -> u16 {
-        let calc = (self.tile & 0xff) as u16;
+        let calc = self.tile as u16;
         let adder: u16 = 0;
         adder + calc * 0x10
     }
 
+    /// Returns the line number to render of the sprite, given the scanline being rendered
     pub fn line_number(&self, scanline: u8) -> u8 {
         if self.y <= scanline {
             let sprite_line = (scanline - self.y) % 8;
@@ -61,73 +78,118 @@ impl PpuSprite {
     }
 }
 
+/// The structure for the nes PPU (picture processing unit)
 #[non_exhaustive]
 #[serde_with::serde_as]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesPpu {
+    /// The registers for the ppu
     registers: [u8; 8],
+    /// The index of the current rendering row
     scanline_number: u16,
+    /// The index of the current rendering column
     scanline_cycle: u16,
+    /// The flag that indicates the end of a frame has occurred. Used for synchronizing frame rate of the emulator.
     frame_end: bool,
+    /// Controls access to registers 5 and 6 for writes by the cpu
     address_bit: bool,
-    data_bit: bool,
+    /// Used for clearing the vblank flag
     vblank_clear: bool,
+    /// Flag used for generating irq signals used by the cpu.
     vblank_nmi: bool,
+    /// Indicates that an odd frame is currently being rendered.
     frame_odd: bool,
+    /// Used to ignore writes to certain registers during ppu startup. Used with PPU_STARTUP_CYCLE_COUNT
     write_ignore_counter: u16,
+    /// The data from the nametable, used for background fetching
     nametable_data: u8,
+    /// The attribute table data, used for background rendering
     attributetable_data: u8,
+    /// The shift register for the attribute table, used for background rendering
     attributetable_shift: [u8; 2],
+    /// The patterntable data, for displaying background data.
     patterntable_tile: u16,
+    /// The shift register for the patterntable, used for background rendering
     #[serde_as(as = "[_; 2]")]
     patterntable_shift: [u16; 2],
+    /// The frame data stored in the ppu for being displayed onto the screen later.
     #[serde_as(as = "Bytes")]
     frame_data: Box<[u8; 3 * 256 * 240]>,
+    /// Indicates that there is a pending write from the cpu
     pend_vram_write: Option<u8>,
+    /// Indicates that there is a pending read from the cpu
     pend_vram_read: Option<u16>,
+    /// The vram address for accessing ppu vram (different from oam)
     vram_address: u16,
+    /// The frame number of the ppu, used for testing and debugging purposes.
     #[cfg(any(test, debug_assertions))]
     frame_number: u64,
-    last_nmi: bool,
+    /// For read operations by the cpu
     ppudata_buffer: u8,
+    /// The data for emulating pen bus behavior
     last_cpu_data: u8,
+    /// The counter used for emulating open bus behavior of the ppu
     last_cpu_counter: [u32; 2],
     #[serde_as(as = "Bytes")]
+    /// The memory for holding up to 64 sprites for the entire frame.
     oam: [u8; 256],
+    /// The memory for storing evaluated sprites for the next scanline
     secondary_oam: [u8; 32],
+    /// The sprites for the current scanline being rendered
     sprites: [PpuSprite; 8],
+    /// The address to use for secondary oam access
     secondaryoamaddress: u8,
-    numsprites: u8,
+    /// The data retrieved from the oam
     oamdata: u8,
+    /// The address to use for oam access
     oamaddress: u8,
+    /// The mode for sprite evaluation in the sprite_eval function
     sprite_eval_mode: PpuSpriteEvalMode,
+    /// Indicates that the first half of the ppu memory cycle has been completed.
     cycle1_done: bool,
-    debug_special: bool,
+    /// The horizontal scroll amount, in pixels
     scrollx: u8,
+    /// The vertical scroll amount, in pixels
     scrolly: u8,
-    frame_scrolly: u8,
 }
 
+/// The flags that set the nametable base
 const PPU_REGISTER0_NAMETABLE_BASE: u8 = 0x03;
+/// The flag that sets the vram address increment amount
 const PPU_REGISTER0_VRAM_ADDRESS_INCREMENT: u8 = 0x04;
+/// The flag to select the sprite table base
 const PPU_REGISTER0_SPRITETABLE_BASE: u8 = 0x08;
+/// The flag that selects the second half of the pattern table for the background
 const PPU_REGISTER0_BACKGROUND_PATTERNTABLE_BASE: u8 = 0x10;
+/// The flag that indicates a larger sprite size of 16 pixels height instead of 8 pixels
 const PPU_REGISTER0_SPRITE_SIZE: u8 = 0x20;
+/// The flag that indicates that the nmi should be generated
 const PPU_REGISTER0_GENERATE_NMI: u8 = 0x80;
 
+/// The flag that indicates that everything should be in grayscale
 const PPU_REGISTER1_GREYSCALE: u8 = 0x01;
+/// The flag that indicates that the background should be drawn in the first column
 const PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN: u8 = 0x02;
+/// The flag that indicates sprites should be drawn in the first column
 const PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN: u8 = 0x04;
+/// The flag that indicates the background should be drawn
 const PPU_REGISTER1_DRAW_BACKGROUND: u8 = 0x08;
+/// The flag that indicates sprites should be drawn
 const PPU_REGISTER1_DRAW_SPRITES: u8 = 0x10;
+/// The flag for emphasizing the red channel
 const PPU_REGISTER1_EMPHASIZE_RED: u8 = 0x20;
+/// The flag for emphasizing the green channel
 const PPU_REGISTER1_EMPHASIZE_GREEN: u8 = 0x40;
+/// The flag for emphasizing the blue channel
 const PPU_REGISTER1_EMPHASIZE_BLUE: u8 = 0x80;
 
+/// The number of cycles where the ppu is in a special state on startup.
 const PPU_STARTUP_CYCLE_COUNT: u16 = 29658;
 
+/// The palette for the ppu
 const PPU_PALETTE: [[u8; 3]; 64] = palette_generator(); //TODO put in correct colors into the palette
 
+/// Build a palette for the ppu.
 const fn palette_generator() -> [[u8; 3]; 64] {
     let mut palette: [[u8; 3]; 64] = [[0; 3]; 64];
     palette[0] = [84, 84, 84];
@@ -201,6 +263,7 @@ const fn palette_generator() -> [[u8; 3]; 64] {
 }
 
 impl NesPpu {
+    /// Return a new ppu.
     pub fn new() -> Self {
         let reg2: u8 = rand::random::<u8>() & !0x40;
         let mut oam = [0; 256];
@@ -217,7 +280,6 @@ impl NesPpu {
             scanline_cycle: 0,
             registers: [0, 0, reg2, 0, 0, 0, 0, 0],
             address_bit: false,
-            data_bit: false,
             vblank_nmi: false,
             vblank_clear: false,
             frame_end: false,
@@ -234,31 +296,29 @@ impl NesPpu {
             vram_address: 0,
             #[cfg(any(test, debug_assertions))]
             frame_number: 0,
-            last_nmi: false,
             ppudata_buffer: 0,
             last_cpu_data: 0,
             last_cpu_counter: [0, 0],
-            oam: oam,
+            oam,
             secondary_oam: oam2,
             sprites: [PpuSprite::new(); 8],
             secondaryoamaddress: 0,
-            numsprites: 0,
             oamdata: 0,
             sprite_eval_mode: PpuSpriteEvalMode::Normal,
             oamaddress: 0,
             cycle1_done: false,
-            debug_special: false,
             scrollx: 0,
             scrolly: 0,
-            frame_scrolly: 0,
         }
     }
 
+    /// Return the frame number of the ppu, mostly used for testing and debugging the ppu
     #[cfg(any(test, debug_assertions))]
     pub fn frame_number(&self) -> u64 {
         self.frame_number
     }
 
+    /// Reset the ppu
     pub fn reset(&mut self) {
         self.registers[0] = 0;
         self.registers[1] = 0;
@@ -268,45 +328,47 @@ impl NesPpu {
         }
     }
 
+    /// Returns the vram address of the ppu
     pub fn vram_address(&self) -> u16 {
         self.vram_address
     }
 
+    /// Increment the vram address, ignoring any wrapping
     pub fn increment_vram(&mut self) {
         self.vram_address = self.vram_address.wrapping_add(1);
     }
 
+    /// Allows providing palette data directly to the ppu
     pub fn provide_palette_data(&mut self, data: u8) {
         let data2 = data & 0x3f;
         self.last_cpu_data = data2;
         self.last_cpu_counter[1] = 893420;
     }
 
+    /// Returns a copy of the sprites in the ppu memory
     #[cfg(any(test, debug_assertions))]
     pub fn get_64_sprites(&self) -> [PpuSprite; 64] {
         let mut s: [PpuSprite; 64] = [PpuSprite::new(); 64];
-        for i in 0..64 {
-            s[i].y = self.oam[i * 4];
-            s[i].tile = self.oam[1 + i * 4];
-            s[i].attribute = self.oam[2 + i * 4];
-            s[i].x = self.oam[3 + i * 4];
+        for (i, e) in s.iter_mut().enumerate() {
+            e.y = self.oam[i * 4];
+            e.tile = self.oam[1 + i * 4];
+            e.attribute = self.oam[2 + i * 4];
+            e.x = self.oam[3 + i * 4];
         }
         s
     }
 
+    /// Perform reads done by the cpu.
     pub fn read(&mut self, addr: u16) -> Option<u8> {
         match addr {
             0 | 1 | 3 | 5 | 6 => Some(self.last_cpu_data),
             4 => {
                 let mut data = self.oam[self.oamaddress as usize];
-                match self.oamaddress & 3 {
-                    2 => {
-                        data &= 0xe3;
-                        self.last_cpu_data = data;
-                        self.last_cpu_counter[0] = 893420;
-                        self.last_cpu_counter[1] = 893420;
-                    }
-                    _ => {}
+                if (self.oamaddress & 3) == 2 {
+                    data &= 0xe3;
+                    self.last_cpu_data = data;
+                    self.last_cpu_counter[0] = 893420;
+                    self.last_cpu_counter[1] = 893420;
                 }
                 Some(data)
             }
@@ -332,7 +394,6 @@ impl NesPpu {
                 let mut val = self.registers[addr as usize];
                 if addr == 2 {
                     self.address_bit = false;
-                    self.data_bit = false;
                     self.vblank_clear = true;
                     val = (val & 0xE0) | self.last_cpu_data & 0x1f;
                     self.last_cpu_data = (self.last_cpu_data & 0x1f) | (val & 0xE0);
@@ -343,6 +404,7 @@ impl NesPpu {
         }
     }
 
+    /// Perform writes done by the cpu.
     pub fn write(&mut self, addr: u16, data: u8) {
         self.last_cpu_data = data;
         self.last_cpu_counter[0] = 893420;
@@ -381,12 +443,11 @@ impl NesPpu {
                 self.oam[self.oamaddress as usize] = data;
                 self.oamaddress = self.oamaddress.wrapping_add(1);
             }
-            7 => match self.vram_address {
-                0..=0x3eff => {
+            7 => {
+                if let 0..=0x3eff = self.vram_address {
                     self.pend_vram_write = Some(data);
                 }
-                _ => {}
-            },
+            }
             2 => {}
             _ => {
                 self.registers[addr as usize] = data;
@@ -394,6 +455,7 @@ impl NesPpu {
         }
     }
 
+    /// This increments the scanline cycle machine, sweeping across every scanline, and down every row sequentially.
     fn increment_scanline_cycle(&mut self) {
         self.scanline_cycle += 1;
         if self.scanline_cycle == 341 {
@@ -415,16 +477,17 @@ impl NesPpu {
         }
     }
 
+    /// Calculates the base for the name table, taking into account x and y scrolling
     fn nametable_base(&self) -> u16 {
-        let base = match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
+        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
             0 => 0x2000,
             1 => 0x2400,
             2 => 0x2800,
             _ => 0x2c00,
-        };
-        base
+        }
     }
 
+    /// Calculates the coordinates for the name table, taking into account x and y scrolling
     fn nametable_coordinates(&self, x: u8, y: u8) -> (u16, u8, u8) {
         let mut base = self.nametable_base();
         let (x, ox) = x.overflowing_add(self.scrollx);
@@ -438,16 +501,17 @@ impl NesPpu {
         (base, x, (y % 240) as u8)
     }
 
+    /// Calculates the base for the attribute table, taking into account x and y scrolling
     fn attributetable_base(&self) -> u16 {
-        let base = match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
+        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
             0 => 0x23c0,
             1 => 0x27c0,
             2 => 0x2bc0,
             _ => 0x2fc0,
-        };
-        base
+        }
     }
 
+    /// Calculates the coordinates for the attribute table, taking into account x and y scrolling
     fn attributetable_coordinates(&self, x: u8, y: u8) -> (u16, u8, u8) {
         let mut base = self.attributetable_base();
         let (x, ox) = x.overflowing_add(self.scrollx);
@@ -461,6 +525,7 @@ impl NesPpu {
         (base, x, (y % 240) as u8)
     }
 
+    /// Returns the pattern table base for the sprites.
     fn sprite_patterntable_base(&self) -> u16 {
         if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0
             || (self.registers[0] & PPU_REGISTER0_SPRITETABLE_BASE) == 0
@@ -471,6 +536,7 @@ impl NesPpu {
         }
     }
 
+    /// Returns the pattern table base for the background.
     fn background_patterntable_base(&self) -> u16 {
         if (self.registers[0] & PPU_REGISTER0_BACKGROUND_PATTERNTABLE_BASE) == 0 {
             0
@@ -479,6 +545,7 @@ impl NesPpu {
         }
     }
 
+    /// Returns true when the background should be rendered.
     fn should_render_background(&self, cycle: u8) -> bool {
         if cycle < 8 {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
@@ -487,6 +554,7 @@ impl NesPpu {
         }
     }
 
+    /// Returns true when sprites should be rendered.
     fn should_render_sprites(&self, cycle: u8) -> bool {
         if cycle == 0 {
             (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN) != 0
@@ -495,6 +563,7 @@ impl NesPpu {
         }
     }
 
+    /// Computes the xy coordinates to be used by the background fetcher.
     fn compute_xy(&self, cycle: u8, offset: u8) -> (u8, u8) {
         let (cycle2, ox) = cycle.overflowing_add(offset);
         let mut scanline = self.scanline_number;
@@ -505,6 +574,7 @@ impl NesPpu {
         (cycle2, scanline as u8)
     }
 
+    /// Performs fetches for the background data of the ppu.
     fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u8) {
         let (x, y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
@@ -537,8 +607,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc =
-                        base + offset + ((self.scanline_number + self.scrolly as u16) % 8) as u16;
+                    let calc = base + offset + (self.scanline_number + self.scrolly as u16) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -553,10 +622,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8
-                        + base
-                        + offset
-                        + ((self.scanline_number + self.scrolly as u16) % 8) as u16;
+                    let calc = 8 + base + offset + (self.scanline_number + self.scrolly as u16) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -574,6 +640,7 @@ impl NesPpu {
         }
     }
 
+    /// Allows for cpu operations to read and write to ppu vram
     fn idle_operation(&mut self, bus: &mut NesMotherboard, cycle: u16) {
         if (cycle & 1) == 0 {
             if let Some(_a) = self.pend_vram_write {
@@ -601,6 +668,7 @@ impl NesPpu {
         }
     }
 
+    /// Returns the height of sprites, by examining the current configuration of the ppu
     fn sprite_height(&self) -> u8 {
         let big = (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0;
         if big {
@@ -610,6 +678,8 @@ impl NesPpu {
         }
     }
 
+    /// Evaluate sprites in the ppu, condensing 64 sprites down to 8 sprites for a single scanline.
+    /// This function operates "asynchronously", requiring multiple calls to perform the entire job for any given scanline.
     fn sprite_eval(&mut self) {
         if self.scanline_number < 240 {
             let row = (self.scanline_number + 1) as u8;
@@ -620,7 +690,6 @@ impl NesPpu {
                     self.oamaddress = 0;
                     self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
                     self.secondaryoamaddress = 0;
-                    self.numsprites = 0;
                 }
                 1..=64 => {
                     if (self.scanline_cycle & 1) == 0 {
@@ -638,11 +707,10 @@ impl NesPpu {
                                     && row >= self.oamdata
                                     && row < (self.oamdata + self.sprite_height())
                                 {
-                                    self.numsprites += 1;
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
-                                    self.secondaryoamaddress = self.secondaryoamaddress + 1;
+                                    self.secondaryoamaddress += 1;
                                     self.sprite_eval_mode = PpuSpriteEvalMode::CopyCurrentSprite;
                                 } else {
                                     self.oamaddress = self.oamaddress.wrapping_add(4);
@@ -656,7 +724,6 @@ impl NesPpu {
                                     && row >= self.oamdata
                                     && row < (self.oamdata + self.sprite_height())
                                 {
-                                    self.numsprites += 1;
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     self.registers[2] |= 0x20; //the sprite overflow flag
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
@@ -671,7 +738,7 @@ impl NesPpu {
                                 self.secondary_oam[self.secondaryoamaddress as usize] =
                                     self.oamdata;
                                 self.oamaddress = self.oamaddress.wrapping_add(1);
-                                self.secondaryoamaddress = self.secondaryoamaddress + 1;
+                                self.secondaryoamaddress += 1;
                                 if (self.secondaryoamaddress & 3) == 0 {
                                     //done copying the sprite
                                     if self.oamaddress == 0 {
@@ -687,9 +754,6 @@ impl NesPpu {
                             }
                             PpuSpriteEvalMode::Done => {
                                 self.oamaddress = self.oamaddress.wrapping_add(4);
-                                if self.numsprites > 0 {
-                                    self.numsprites = 0;
-                                }
                             }
                         }
                     }
@@ -725,6 +789,7 @@ impl NesPpu {
         }
     }
 
+    /// Run a single clock cycle of the ppu
     pub fn cycle(&mut self, bus: &mut NesMotherboard) {
         if self.write_ignore_counter < PPU_STARTUP_CYCLE_COUNT {
             self.write_ignore_counter += 1;
@@ -759,15 +824,14 @@ impl NesPpu {
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
                 let cycle = (self.scanline_cycle - 1) as u8;
-                let bg_pixel = if self.should_render_background(cycle as u8) {
+                let bg_pixel = if self.should_render_background(cycle) {
                     let index = 7 - ((cycle) % 8);
                     let pt = self.patterntable_shift[0].to_le_bytes();
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
 
                     let modx = ((cycle) / 16) & 1;
-                    let mody =
-                        (((self.scanline_number as u16 + self.scrolly as u16) / 16) & 1) as u8;
+                    let mody = (((self.scanline_number + self.scrolly as u16) / 16) & 1) as u8;
                     let combined = (mody << 1) | modx;
                     let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
 
@@ -795,7 +859,7 @@ impl NesPpu {
                 } else {
                     self.idle_operation(bus, cycle as u16);
                 }
-                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle as u8) {
+                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) {
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
                             if cycle >= e.x && (cycle < (e.x.wrapping_add(8))) && e.y < 240 {
@@ -842,12 +906,13 @@ impl NesPpu {
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];
                 self.frame_data
-                    [((self.scanline_number as u16 * 256 + cycle as u16) as u32 * 3) as usize] =
-                    pixel[0];
-                self.frame_data[((self.scanline_number as u16 * 256 + cycle as u16) as u32 * 3 + 1)
-                    as usize] = pixel[1];
-                self.frame_data[((self.scanline_number as u16 * 256 + cycle as u16) as u32 * 3 + 2)
-                    as usize] = pixel[2];
+                    [((self.scanline_number * 256 + cycle as u16) as u32 * 3) as usize] = pixel[0];
+                self.frame_data
+                    [((self.scanline_number * 256 + cycle as u16) as u32 * 3 + 1) as usize] =
+                    pixel[1];
+                self.frame_data
+                    [((self.scanline_number * 256 + cycle as u16) as u32 * 3 + 2) as usize] =
+                    pixel[2];
 
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 320 {
@@ -946,7 +1011,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = 0; //TODO calculate this correctly
                     let offset = cycle % 8; //TODO calculate this value correctly
-                    bus.ppu_cycle_1(base + offset as u16);
+                    bus.ppu_cycle_1(base + offset);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     bus.ppu_cycle_2_read();
@@ -986,48 +1051,47 @@ impl NesPpu {
             self.vblank_clear = false;
             self.registers[2] &= !0x80; //clear vblank flag
         }
-        self.last_nmi = self.vblank_nmi;
         self.vblank_nmi = ((self.registers[2] & 0x80) != 0)
             & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
     }
 
+    /// Returns true if the frame has ended. Used for frame rate synchronizing.
     pub fn get_frame_end(&mut self) -> bool {
         let flag = self.frame_end;
         self.frame_end = false;
         flag
     }
 
-    pub fn get_frame(&mut self) -> &Box<[u8; 256 * 240 * 3]> {
+    /// Returns a reference to the frame data stored in the ppu.
+    pub fn get_frame(&mut self) -> &[u8; 256 * 240 * 3] {
         &self.frame_data
     }
 
+    /// Returns the irq status for the ppu
     pub fn irq(&self) -> bool {
         self.vblank_nmi
     }
 
+    /// Converts the data in the given reference (from this module usually), into a form that sdl2 can use directly.
     #[cfg(feature = "sdl2")]
-    pub fn convert_for_sdl2(
-        f: &Box<[u8; 256 * 240 * 3]>,
-        buf: &mut Vec<egui_sdl2_gl::egui::Color32>,
-    ) {
-        let data = &**f;
-        let pixels: Vec<egui_sdl2_gl::egui::Color32> = data
+    pub fn convert_for_sdl2(f: &[u8; 256 * 240 * 3], buf: &mut Vec<egui_sdl2_gl::egui::Color32>) {
+        let pixels: Vec<egui_sdl2_gl::egui::Color32> = f
             .chunks_exact(3)
             .map(|p| egui_sdl2_gl::egui::Color32::from_rgb(p[0], p[1], p[2]))
             .collect();
         *buf = pixels;
     }
 
+    /// Converts the data in the given reference (from this module usually), into a form that egui can use directly.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    pub fn convert_to_egui(f: &Box<[u8; 256 * 240 * 3]>) -> egui::ColorImage {
-        let data = &**f;
-        let pixels = data
+    pub fn convert_to_egui(f: &[u8; 256 * 240 * 3]) -> egui::ColorImage {
+        let pixels = f
             .chunks_exact(3)
             .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
             .collect();
         egui::ColorImage {
             size: [256, 240],
-            pixels: pixels,
+            pixels,
         }
     }
 }

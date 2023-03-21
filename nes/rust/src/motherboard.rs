@@ -1,25 +1,37 @@
+//! This module handles all of the wiring and memory for the nes system.
+
 use crate::controller::NesController;
 use crate::controller::NesControllerTrait;
 use crate::{cartridge::NesCartridge, cpu::NesCpuPeripherals};
 use serde_with::Bytes;
 
+/// A struct for the nes motherboard, containing accessories to the main chips.
 #[non_exhaustive]
 #[serde_with::serde_as]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesMotherboard {
+    /// The cartridge to use in the system
     cart: Option<NesCartridge>,
+    /// The cpu ram
     #[serde_as(as = "Bytes")]
     ram: [u8; 2048],
+    /// The ppu vram, physically outside the ppu, so this makes perfect sense.
     #[serde_as(as = "Bytes")]
     vram: [u8; 2048],
+    /// The palette ram for the ppu, technically belongs in the ppu.
     ppu_palette_ram: [u8; 32],
+    /// The vram address fromm the last ppu address cycle
     vram_address: Option<u16>,
+    /// Used for detecting sequence problems in the ppu
     last_ppu_cycle: u8,
+    /// Used for open bus implementation of the cpu memory bus
     last_cpu_data: u8,
+    /// The controllers for the system
     pub controllers: [Option<NesController>; 2],
 }
 
 impl NesMotherboard {
+    /// Create a new nes motherboard
     pub fn new() -> Self {
         //board ram is random on startup
         let mut main_ram: [u8; 2048] = [0; 2048];
@@ -39,7 +51,7 @@ impl NesMotherboard {
         Self {
             cart: None,
             ram: main_ram,
-            vram: vram,
+            vram,
             ppu_palette_ram: pram,
             vram_address: None,
             last_ppu_cycle: 2,
@@ -48,24 +60,29 @@ impl NesMotherboard {
         }
     }
 
+    /// Remove any cartridge that may exist in the system.
     pub fn remove_cartridge(&mut self) {
         self.cart = None;
     }
 
+    /// Insert a cartridge into the system, but only if one is not already present
     pub fn insert_cartridge(&mut self, c: NesCartridge) {
-        if let None = self.cart {
+        if self.cart.is_none() {
             self.cart = Some(c);
         }
     }
 
+    /// Insert a controller into the controller 1 port, removing any existing controller
     pub fn insert_controller1(&mut self, c: NesController) {
         self.controllers[0] = Some(c);
     }
 
+    /// Insert a controller into the controller 2 port, removing any existing controller
     pub fn insert_controller2(&mut self, c: NesController) {
         self.controllers[1] = Some(c);
     }
 
+    /// Used by testing code for automated testing.
     #[cfg(test)]
     pub fn check_vram(&self, addr: u16, check: &[u8]) -> bool {
         for (i, data) in check.iter().enumerate() {
@@ -76,6 +93,7 @@ impl NesMotherboard {
         return true;
     }
 
+    /// Perform a read operation on the cpu memory bus
     pub fn memory_cycle_read(
         &mut self,
         addr: u16,
@@ -174,6 +192,7 @@ impl NesMotherboard {
         response
     }
 
+    /// Perform a write operation on the cpu memory bus
     pub fn memory_cycle_write(
         &mut self,
         addr: u16,
@@ -249,6 +268,7 @@ impl NesMotherboard {
         }
     }
 
+    /// Perform the address part of a ppu memory cycle
     pub fn ppu_cycle_1(&mut self, addr: u16) {
         if self.last_ppu_cycle != 2 {
             println!("ERROR PPU CYCLING a");
@@ -257,7 +277,7 @@ impl NesMotherboard {
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
             self.vram_address = if !vram_enable {
-                if addr >= 0x2000 && addr <= 0x3fff {
+                if (0x2000..=0x3fff).contains(&addr) {
                     Some(addr | ((a10 as u16) << 10))
                 } else {
                     None
@@ -268,6 +288,7 @@ impl NesMotherboard {
         }
     }
 
+    /// Perform the write portion of a ppu memory cycle
     pub fn ppu_cycle_2_write(&mut self, data: u8) {
         if self.last_ppu_cycle != 1 {
             println!("ERROR PPU CYCLING b");
@@ -292,13 +313,12 @@ impl NesMotherboard {
                 }
                 _ => {}
             }
-        } else {
-            if let Some(cart) = &mut self.cart {
-                cart.ppu_cycle_write(data);
-            }
+        } else if let Some(cart) = &mut self.cart {
+            cart.ppu_cycle_write(data);
         }
     }
 
+    /// Perform the read portion of a ppu memory cycle
     pub fn ppu_cycle_2_read(&mut self) -> u8 {
         if self.last_ppu_cycle != 1 {
             println!("ERROR PPU CYCLING c");
@@ -330,6 +350,7 @@ impl NesMotherboard {
         }
     }
 
+    /// Read a palette address
     pub fn ppu_palette_read(&self, addr: u16) -> u8 {
         let addr2: usize = (addr as usize) & 0x1f;
         self.ppu_palette_ram[addr2]
