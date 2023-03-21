@@ -314,6 +314,10 @@ impl NesApu {
         }
     }
 
+    pub fn set_audio_interval(&mut self, interval: f32) {
+        self.sample_interval = interval;
+    }
+
     fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()

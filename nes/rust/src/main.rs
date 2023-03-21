@@ -26,7 +26,7 @@ use crate::ppu::NesPpu;
 
 //const INITIAL_ROM : Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/5.Emulator.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/2.Details.nes");
-const INITIAL_ROM : Option<&str> = Some("./nes/test_roms/read_joy3/test_buttons.nes");
+const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/read_joy3/test_buttons.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
 #[cfg(feature = "egui-multiwin")]
@@ -73,6 +73,7 @@ struct MainNesWindow {
     pub texture: Option<egui::TextureHandle>,
     filter: Option<biquad::DirectForm1<f32>>,
     sound_sample_interval: f32,
+    sound_stream: Option<cpal::Stream>,
 }
 
 impl MainNesWindow {
@@ -91,7 +92,11 @@ impl MainNesWindow {
         }
     }
     #[cfg(feature = "egui-multiwin")]
-    fn new(rate: u32, producer: Option<rb::Producer<f32>>) -> NewWindowRequest<NesEmulatorData> {
+    fn new(
+        rate: u32,
+        producer: Option<rb::Producer<f32>>,
+        stream: Option<cpal::Stream>,
+    ) -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
                 last_frame_time: std::time::SystemTime::now(),
@@ -101,6 +106,7 @@ impl MainNesWindow {
                 texture: None,
                 filter: None,
                 sound_sample_interval: 0.0,
+                sound_stream: stream,
             }),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -231,6 +237,9 @@ impl TrackedWindow for MainNesWindow {
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
             self.sound_sample_interval = sampling_frequency / rf;
+            c.cpu_peripherals
+                .apu
+                .set_audio_interval(self.sound_sample_interval);
         }
 
         let quit = false;
@@ -290,6 +299,9 @@ impl TrackedWindow for MainNesWindow {
             t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
         }
 
+        let mut save_state = false;
+        let mut load_state = false;
+
         egui_multiwin::egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -306,14 +318,7 @@ impl TrackedWindow for MainNesWindow {
                             .input()
                             .key_pressed(egui_multiwin::egui::Key::F5)
                     {
-                        println!("Saving state");
-                        let state = c.serialize();
-                        let _e = std::fs::OpenOptions::new()
-                            .write(true)
-                            .create(true)
-                            .open("./state.bin")
-                            .unwrap()
-                            .write_all(&state);
+                        save_state = true;
                         ui.close_menu();
                     }
 
@@ -325,9 +330,7 @@ impl TrackedWindow for MainNesWindow {
                             .key_pressed(egui_multiwin::egui::Key::F6)
                     {
                         println!("Loading state");
-                        if let Ok(a) = std::fs::read("./state.bin") {
-                            c.deserialize(a);
-                        }
+                        load_state = true;
                         ui.close_menu();
                     }
                 });
@@ -346,6 +349,38 @@ impl TrackedWindow for MainNesWindow {
                 }
             });
         });
+
+        if egui
+            .egui_ctx
+            .input()
+            .key_pressed(egui_multiwin::egui::Key::F5)
+        {
+            save_state = true;
+        }
+
+        if egui
+            .egui_ctx
+            .input()
+            .key_pressed(egui_multiwin::egui::Key::F6)
+        {
+            load_state = true;
+        }
+
+        if save_state {
+            let state = Box::new(c.serialize());
+            let _e = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open("./state.bin")
+                .unwrap()
+                .write_all(&state);
+        }
+
+        if load_state {
+            if let Ok(a) = std::fs::read("./state.bin") {
+                c.deserialize(a);
+            }
+        }
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
@@ -776,7 +811,7 @@ fn main() {
     let device = host.default_output_device();
     let mut sound_rate = 0;
     let mut sound_producer = None;
-    if let Some(d) = &device {
+    let sound_stream = if let Some(d) = &device {
         let ranges = d.supported_output_configs();
         if let Ok(mut r) = ranges {
             let config = r.next().unwrap().with_max_sample_rate();
@@ -801,10 +836,15 @@ fn main() {
                 sound_rate = config.sample_rate.0;
                 sound_producer = Some(producer);
             }
+            stream
+        } else {
+            None
         }
-    }
+    } else {
+        None
+    };
 
-    let root_window = MainNesWindow::new(sound_rate, sound_producer);
+    let root_window = MainNesWindow::new(sound_rate, sound_producer, sound_stream);
 
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());

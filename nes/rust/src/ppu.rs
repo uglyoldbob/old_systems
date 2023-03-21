@@ -431,11 +431,11 @@ impl NesPpu {
         if ox {
             base += 0x400;
         }
-        let (y, oy) = y.overflowing_add(self.scrolly);
-        if ox || oy || y > 240 {
-            base += 0x400;
+        let y = y as u16 + self.scrolly as u16;
+        if y > 240 {
+            base += 0x800;
         }
-        (base, x, y % 240)
+        (base, x, (y % 240) as u8)
     }
 
     fn attributetable_base(&self) -> u16 {
@@ -454,11 +454,11 @@ impl NesPpu {
         if ox {
             base += 0x400;
         }
-        let (y, oy) = y.overflowing_add(self.scrolly);
-        if ox || oy || y > 240 {
-            base += 0x400;
+        let y = y as u16 + self.scrolly as u16;
+        if y > 240 {
+            base += 0x800;
         }
-        (base, x, y % 240)
+        (base, x, (y % 240) as u8)
     }
 
     fn sprite_patterntable_base(&self) -> u16 {
