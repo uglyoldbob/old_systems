@@ -3,6 +3,51 @@
 use biquad::Biquad;
 use rb::RbProducer;
 
+///The modes that the sweep can operate in
+#[derive(serde::Serialize, serde::Deserialize)]
+enum ApuSweepAddition {
+    /// The math uses ones complement numbers
+    OnesComplement,
+    /// The math uses twos complement numbers
+    TwosComplement,
+}
+
+/// An sweep unit for the square channels of the apu
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ApuSweep {
+    /// The math mode for the sweep unit
+    mode: ApuSweepAddition,
+}
+
+impl ApuSweep {
+    /// Create a new apu sweep
+    fn new(math: ApuSweepAddition) -> Self {
+        Self { mode: math }
+    }
+
+    /// Clock the unit
+    fn clock(&mut self, data: &[u8]) -> i16 {
+        let enabled = (data[1] & 0x80) != 0;
+        let negative = (data[1] & 8) != 0;
+        let shift = data[1] & 7;
+
+        if enabled {
+            let period = data[2] as u16 | (data[3] as u16) << 3;
+            let mut delta = (period >> shift) as i16;
+            if negative {
+                match self.mode {
+                    ApuSweepAddition::OnesComplement => delta = (-delta) - 1,
+                    ApuSweepAddition::TwosComplement => delta = -delta,
+                }
+            }
+            delta
+        } else {
+            0
+        }
+    }
+}
+
 /// An envelope sequencer for the apu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -46,13 +91,11 @@ impl ApuEnvelope {
                 self.divider = cv;
                 if self.decay > 0 {
                     self.decay -= 1;
-                }
-                else if eloop {
+                } else if eloop {
                     self.decay = 15;
                 }
             }
-        }
-        else {
+        } else {
             self.decay = 15;
             self.divider = cv;
         }
@@ -64,20 +107,23 @@ impl ApuEnvelope {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuSquareChannel {
     /// The channel registers
-    registers: [u8;4],
+    registers: [u8; 4],
     /// The length of the channel for playback
     length: u8,
     /// The counter for the channel
     counter: u8,
     /// The envelope for sound generation
     envelope: ApuEnvelope,
+    /// The sweep module
+    sweep: ApuSweep,
 }
 
 impl ApuSquareChannel {
     /// Create a new square channel for the apu
-    fn new() -> Self {
+    fn new(math: ApuSweepAddition) -> Self {
         Self {
-            registers: [0;4],
+            registers: [0; 4],
+            sweep: ApuSweep::new(math),
             length: 0,
             counter: 0,
             envelope: ApuEnvelope::new(),
@@ -92,6 +138,11 @@ impl ApuSquareChannel {
         self.envelope.clock(&self.registers);
     }
 
+    /// Clock the sweep
+    fn clock_sweep(&mut self) {
+        self.sweep.clock(&self.registers);
+    }
+
     /// Return the audio sample for this channel
     fn audio(&self) -> f32 {
         self.counter as f32
@@ -103,7 +154,7 @@ impl ApuSquareChannel {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuNoiseChannel {
     /// The channel registers
-    registers: [u8;4],
+    registers: [u8; 4],
     /// The length of the channel
     length: u8,
     /// The counter for the channel
@@ -116,7 +167,7 @@ impl ApuNoiseChannel {
     /// Create a new channel
     fn new() -> Self {
         Self {
-            registers: [0;4],
+            registers: [0; 4],
             length: 0,
             counter: 0,
             envelope: ApuEnvelope::new(),
@@ -142,7 +193,7 @@ impl ApuNoiseChannel {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuTriangleChannel {
     /// The channel registers
-    registers: [u8;4],
+    registers: [u8; 4],
     /// The length of the channel for playback
     length: u8,
     /// The counter for the channel
@@ -153,7 +204,7 @@ impl ApuTriangleChannel {
     /// Create a new triangle channel
     fn new() -> Self {
         Self {
-            registers: [0;4],
+            registers: [0; 4],
             length: 0,
             counter: 0,
         }
@@ -173,7 +224,7 @@ impl ApuTriangleChannel {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuDmcChannel {
     /// The channel registers
-    registers: [u8;4],
+    registers: [u8; 4],
     /// The interrupt flag
     interrupt_flag: bool,
     /// The interrupt is enabled
@@ -212,7 +263,7 @@ impl ApuDmcChannel {
     /// Create a new dmc channel
     fn new() -> Self {
         Self {
-            registers: [0;4],
+            registers: [0; 4],
             interrupt_flag: false,
             interrupt_enable: false,
             bit_counter: 0,
@@ -308,7 +359,10 @@ impl NesApu {
             clock: false,
             status: 0,
             fclock: 0,
-            squares: [ApuSquareChannel::new(), ApuSquareChannel::new()],
+            squares: [
+                ApuSquareChannel::new(ApuSweepAddition::OnesComplement),
+                ApuSquareChannel::new(ApuSweepAddition::TwosComplement),
+            ],
             noise: ApuNoiseChannel::new(),
             triangle: ApuTriangleChannel::new(),
             dmc: ApuDmcChannel::new(),
@@ -415,7 +469,7 @@ impl NesApu {
 
     /// The quarter frame, as determined by the frame sequencer
     fn quarter_frame(&mut self) {
-        //TODO clock the envelopes, and triangle linear counter
+        //TODO clock the triangle linear counter
         self.squares[0].envelope_clock();
         self.squares[1].envelope_clock();
         self.noise.envelope_clock();
@@ -423,17 +477,18 @@ impl NesApu {
 
     /// The half frame, as determined by the frame sequencer
     fn half_frame(&mut self) {
-        //TODO clock the length counters and sweep units
         //first square length counter
         let halt = (self.squares[0].registers[0] & 0x20) != 0;
         if !halt && self.squares[0].length > 0 {
             self.squares[0].length -= 1;
         }
+        self.squares[0].clock_sweep();
         //second square length counter
         let halt = (self.squares[1].registers[0] & 0x20) != 0;
         if !halt && self.squares[1].length > 0 {
             self.squares[1].length -= 1;
         }
+        self.squares[1].clock_sweep();
         //triangle channel length counter
         let halt = (self.triangle.registers[0] & 0x80) != 0;
         if !halt && self.triangle.length > 0 {
