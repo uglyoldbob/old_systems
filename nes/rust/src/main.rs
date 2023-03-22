@@ -28,7 +28,7 @@ use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
 /// The initial rom that the emulator will load. Only for developmment of the beta version (0.1.x)
-const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/spritecans-2011/spritecans.nes");
+const INITIAL_ROM: Option<&str> = None;//Some("./nes/test_roms/spritecans-2011/spritecans.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
 #[cfg(feature = "egui-multiwin")]
@@ -238,7 +238,7 @@ impl TrackedWindow for MainNesWindow {
         #[cfg(feature = "puffin")]
         puffin::profile_scope!("frame rendering");
 
-        if self.filter.is_none() {
+        if self.filter.is_none() && self.sound_stream.is_some() {
             let rf = self.sound_rate as f32;
             let sampling_frequency = 21.47727e6 / 12.0;
             let filter_coeff = biquad::Coefficients::<f32>::from_params(

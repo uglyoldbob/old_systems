@@ -63,6 +63,8 @@ impl ApuEnvelope {
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuSquareChannel {
+    /// The channel registers
+    registers: [u8;4],
     /// The length of the channel for playback
     length: u8,
     /// The counter for the channel
@@ -75,6 +77,7 @@ impl ApuSquareChannel {
     /// Create a new square channel for the apu
     fn new() -> Self {
         Self {
+            registers: [0;4],
             length: 0,
             counter: 0,
             envelope: ApuEnvelope::new(),
@@ -83,6 +86,11 @@ impl ApuSquareChannel {
 
     /// Clock the channel
     fn cycle(&mut self) {}
+
+    /// Clock the envelope
+    fn envelope_clock(&mut self) {
+        self.envelope.clock(&self.registers);
+    }
 
     /// Return the audio sample for this channel
     fn audio(&self) -> f32 {
@@ -94,6 +102,8 @@ impl ApuSquareChannel {
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuNoiseChannel {
+    /// The channel registers
+    registers: [u8;4],
     /// The length of the channel
     length: u8,
     /// The counter for the channel
@@ -106,6 +116,7 @@ impl ApuNoiseChannel {
     /// Create a new channel
     fn new() -> Self {
         Self {
+            registers: [0;4],
             length: 0,
             counter: 0,
             envelope: ApuEnvelope::new(),
@@ -114,6 +125,11 @@ impl ApuNoiseChannel {
 
     /// clock the channel
     fn cycle(&mut self) {}
+
+    /// Clock the envelope
+    fn envelope_clock(&mut self) {
+        self.envelope.clock(&self.registers);
+    }
 
     /// Return the audio sample for this channel
     fn audio(&self) -> f32 {
@@ -125,6 +141,8 @@ impl ApuNoiseChannel {
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuTriangleChannel {
+    /// The channel registers
+    registers: [u8;4],
     /// The length of the channel for playback
     length: u8,
     /// The counter for the channel
@@ -135,6 +153,7 @@ impl ApuTriangleChannel {
     /// Create a new triangle channel
     fn new() -> Self {
         Self {
+            registers: [0;4],
             length: 0,
             counter: 0,
         }
@@ -153,6 +172,8 @@ impl ApuTriangleChannel {
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ApuDmcChannel {
+    /// The channel registers
+    registers: [u8;4],
     /// The interrupt flag
     interrupt_flag: bool,
     /// The interrupt is enabled
@@ -191,6 +212,7 @@ impl ApuDmcChannel {
     /// Create a new dmc channel
     fn new() -> Self {
         Self {
+            registers: [0;4],
             interrupt_flag: false,
             interrupt_enable: false,
             bit_counter: 0,
@@ -251,8 +273,10 @@ impl ApuDmcChannel {
 pub struct NesApu {
     /// Used to divide the input clock by 2
     clock: bool,
-    /// The registers for the apu
-    registers: [u8; 24],
+    /// Status register
+    status: u8,
+    /// Frame clock
+    fclock: u8,
     /// The two square audio channels
     squares: [ApuSquareChannel; 2],
     /// The noise audio channel
@@ -282,7 +306,8 @@ impl NesApu {
     pub fn new() -> Self {
         Self {
             clock: false,
-            registers: [0; 24],
+            status: 0,
+            fclock: 0,
             squares: [ApuSquareChannel::new(), ApuSquareChannel::new()],
             noise: ApuNoiseChannel::new(),
             triangle: ApuTriangleChannel::new(),
@@ -299,7 +324,7 @@ impl NesApu {
 
     /// Reset the apu
     pub fn reset(&mut self) {
-        self.registers[0x15] = 0;
+        self.status = 0;
         self.sound_disabled = true;
         self.sound_disabled_clock = 0;
         self.frame_sequencer_reset = 2;
@@ -307,7 +332,7 @@ impl NesApu {
 
     /// Get the irq line for the apu
     pub fn irq(&self) -> bool {
-        (self.registers[0x15] & 0xc0) != 0 && (self.registers[0x17] & 0x40) == 0
+        (self.status & 0xc0) != 0 && (self.fclock & 0x40) == 0
     }
 
     /// Get the dmc dma request
@@ -333,8 +358,8 @@ impl NesApu {
 
     /// Set the interrupt flag from the frame sequencer
     fn set_interrupt_flag(&mut self) {
-        if (self.registers[0x17] & 0x40) == 0 {
-            self.registers[0x15] |= 0x40;
+        if (self.fclock & 0x40) == 0 {
+            self.status |= 0x40;
         }
     }
 
@@ -348,7 +373,7 @@ impl NesApu {
                 }
             }
         }
-        if (self.registers[0x17] & 0x80) == 0 {
+        if (self.fclock & 0x80) == 0 {
             //4 step sequence
             if self.frame_sequencer_clock == 14915 {
                 self.set_interrupt_flag();
@@ -391,31 +416,31 @@ impl NesApu {
     /// The quarter frame, as determined by the frame sequencer
     fn quarter_frame(&mut self) {
         //TODO clock the envelopes, and triangle linear counter
-        self.squares[0].envelope.clock(&self.registers[0..4]);
-        self.squares[1].envelope.clock(&self.registers[4..8]);
-        self.noise.envelope.clock(&self.registers[12..16]);
+        self.squares[0].envelope_clock();
+        self.squares[1].envelope_clock();
+        self.noise.envelope_clock();
     }
 
     /// The half frame, as determined by the frame sequencer
     fn half_frame(&mut self) {
         //TODO clock the length counters and sweep units
         //first square length counter
-        let halt = (self.registers[0] & 0x20) != 0;
+        let halt = (self.squares[0].registers[0] & 0x20) != 0;
         if !halt && self.squares[0].length > 0 {
             self.squares[0].length -= 1;
         }
         //second square length counter
-        let halt = (self.registers[4] & 0x20) != 0;
+        let halt = (self.squares[1].registers[0] & 0x20) != 0;
         if !halt && self.squares[1].length > 0 {
             self.squares[1].length -= 1;
         }
         //triangle channel length counter
-        let halt = (self.registers[8] & 0x80) != 0;
+        let halt = (self.triangle.registers[0] & 0x80) != 0;
         if !halt && self.triangle.length > 0 {
             self.triangle.length -= 1;
         }
         //noise channel length counter
-        let halt = (self.registers[12] & 0x20) != 0;
+        let halt = (self.noise.registers[0] & 0x20) != 0;
         if !halt && self.noise.length > 0 {
             self.noise.length -= 1;
         }
@@ -434,7 +459,7 @@ impl NesApu {
             + self.noise.audio()
             + self.dmc.audio();
         if let Some(filter) = filter {
-            //let audio = rand::Rng::gen::<f32>(&mut rand::thread_rng());
+            let audio = rand::Rng::gen::<f32>(&mut rand::thread_rng());
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
@@ -520,25 +545,25 @@ impl NesApu {
         match addr {
             3 => {
                 let length = data >> 3;
-                if (self.registers[0x15] & 1 << 0) != 0 {
+                if (self.status & (1 << 0)) != 0 {
                     self.squares[0].length = NesApu::LENGTH_TABLE[length as usize];
                 }
             }
             7 => {
                 let length = data >> 3;
-                if (self.registers[0x15] & 1 << 1) != 0 {
+                if (self.status & (1 << 1)) != 0 {
                     self.squares[1].length = NesApu::LENGTH_TABLE[length as usize];
                 }
             }
             0xb => {
                 let length = data >> 3;
-                if (self.registers[0x15] & 1 << 2) != 0 {
+                if (self.status & (1 << 2)) != 0 {
                     self.triangle.length = NesApu::LENGTH_TABLE[length as usize];
                 }
             }
             0xf => {
                 let length = data >> 3;
-                if (self.registers[0x15] & 1 << 3) != 0 {
+                if (self.status & (1 << 3)) != 0 {
                     self.noise.length = NesApu::LENGTH_TABLE[length as usize];
                 }
             }
@@ -550,10 +575,10 @@ impl NesApu {
             }
             0x13 => {
                 self.dmc.programmed_length = (data as u16) * 16 + 1;
-                self.registers[addr2 as usize] = data;
+                self.dmc.registers[3] = data;
             }
             0x15 => {
-                let data2 = (self.registers[0x15] & 0x60) | (data & 0x1f);
+                let data2 = (self.status & 0x60) | (data & 0x1f);
                 if (data2 & 1) == 0 {
                     self.squares[0].length = 0;
                 }
@@ -569,36 +594,38 @@ impl NesApu {
                 if (data2 & 0x10) == 0 {
                     self.dmc.length = 0;
                 } else if self.dmc.length == 0 {
-                    self.dmc.programmed_length = (self.registers[0x13] as u16) * 16 + 1;
+                    self.dmc.programmed_length = (self.dmc.registers[3] as u16) * 16 + 1;
                     self.dmc.length = self.dmc.programmed_length;
                     self.dmc.playing = true;
                 }
                 self.dmc.interrupt_flag = false;
-                self.registers[addr2 as usize] = data2;
+                self.status = data2;
             }
             0x17 => {
                 self.frame_sequencer_reset = 2;
                 if (data & 0x80) != 0 {
                     self.half_frame();
                 }
-                self.registers[addr2 as usize] = data;
+                self.fclock = data;
                 if (data & 0x40) != 0 {
-                    self.registers[0x15] &= !0x40;
+                    self.status &= !0x40;
                 }
             }
             _ => {}
         }
         match addr {
-            0x15 | 0x17 => {}
-            _ => {
-                self.registers[addr2 as usize] = data;
-            }
+            0..=3 => self.squares[0].registers[addr as usize] = data,
+            4..=7 => self.squares[1].registers[(addr & 3) as usize] = data,
+            8..=11 => self.triangle.registers[(addr & 3) as usize] = data,
+            12..=15 => self.noise.registers[(addr & 3) as usize] = data,
+            16..=19 => self.dmc.registers[(addr & 3) as usize] = data,
+            _ => {}
         }
     }
 
     /// Read the apu register, it is assumed that the only readable address is filtered before making it to this function
     pub fn read(&mut self, _addr: u16) -> u8 {
-        let mut data = self.registers[0x15] & 0x40;
+        let mut data = self.status & 0x40;
         if self.dmc.interrupt_flag {
             data |= 0x80;
         }
@@ -618,7 +645,7 @@ impl NesApu {
         if self.dmc.length > 0 {
             data |= 1 << 4;
         }
-        self.registers[0x15] &= !0x40;
+        self.status &= !0x40;
         data
     }
 }
