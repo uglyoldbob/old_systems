@@ -696,7 +696,6 @@ impl NesPpu {
                     //TODO: trigger bug that occurs when oamaddress is nonzero
                     //it copies 8 bytes of sprite data
                     self.oamaddress = 0;
-                    self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
                     self.secondaryoamaddress = 0;
                 }
                 1..=64 => {
@@ -705,6 +704,9 @@ impl NesPpu {
                     }
                 }
                 65..=256 => {
+                    if self.scanline_cycle == 65 {
+                        self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+                    }
                     if (self.scanline_cycle & 1) == 1 {
                         self.oamdata = self.oam[self.oamaddress as usize];
                     } else {

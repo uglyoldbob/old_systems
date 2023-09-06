@@ -28,7 +28,7 @@ use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
 /// The initial rom that the emulator will load. Only for developmment of the beta version (0.1.x)
-const INITIAL_ROM: Option<&str> = None;//Some("./nes/test_roms/spritecans-2011/spritecans.nes");
+const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/3.Timing.nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
 #[cfg(feature = "egui-multiwin")]
