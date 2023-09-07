@@ -93,6 +93,79 @@ impl NesMotherboard {
         return true;
     }
 
+    /// Perform a read operation on the cpu memory bus, but doesn;t have any side effects like a normal read might
+    pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals,) -> u8 {
+        let mut response: u8 = self.last_cpu_data;
+        match addr {
+            0..=0x1fff => {
+                let addr = addr & 0x7ff;
+                response = self.ram[addr as usize];
+            }
+            0x2000..=0x3fff => {
+                let addr = addr & 7;
+                if let Some(r) = per.ppu_dump(addr) {
+                    response = r;
+                    if addr == 7 {
+                        let a = per.ppu.vram_address();
+                        if a >= 0x3f00 {
+                            let addr = a & 0x1f;
+                            let addr2 = match addr {
+                                0x10 => 0,
+                                0x14 => 4,
+                                0x18 => 8,
+                                0x1c => 0xc,
+                                _ => addr,
+                            };
+                            let palette_data = self.ppu_palette_ram[addr2 as usize];
+                            response |= palette_data;
+                        }
+                    }
+                } else {
+                    //TODO open bus implementation
+                }
+            }
+            0x4000..=0x4017 => {
+                //apu and io
+                match addr {
+                    0x4000..=0x4014 => {}
+                    0x4015 => {
+                        response = per.apu.dump(addr & 0x1f);
+                    }
+                    0x4016 => {
+                        if let Some(c) = &self.controllers[0] {
+                            let d = c.dump_data() & 0x1f;
+                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
+                        } else {
+                            response = self.last_cpu_data & 0xe0;
+                        }
+                    }
+                    0x4017 => {
+                        if let Some(c) = &self.controllers[1] {
+                            let d = c.dump_data() & 0x1f;
+                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
+                        } else {
+                            response = self.last_cpu_data & 0xe0;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            0x4018..=0x401f => {
+                //disabled apu and oi functionality
+                //test mode
+            }
+            _ => {
+                if let Some(cart) = &self.cart {
+                    let resp = cart.memory_dump(addr);
+                    if let Some(v) = resp {
+                        response = v;
+                    }
+                }
+            }
+        }
+        response
+    }
+
     /// Perform a read operation on the cpu memory bus
     pub fn memory_cycle_read(
         &mut self,

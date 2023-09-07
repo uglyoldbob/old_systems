@@ -25,6 +25,11 @@ impl NesCpuPeripherals {
         self.ppu.cycle(bus);
     }
 
+    /// A ppu dump cycle, no side effects
+    pub fn ppu_dump(&self, addr: u16) -> Option<u8> {
+        self.ppu.dump(addr)
+    }
+
     /// Run a ppu read cycle
     pub fn ppu_read(&mut self, addr: u16) -> Option<u8> {
         self.ppu.read(addr)

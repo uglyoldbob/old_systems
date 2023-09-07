@@ -38,6 +38,64 @@ impl Mapper01 {
 }
 
 impl NesMapperTrait for Mapper01 {
+    fn memory_cycle_dump(&self,cart: &NesCartridgeData,addr:u16) -> Option<u8> {
+        match addr {
+            0x6000..=0x7fff => {
+                let mut addr2 = addr & 0x1fff;
+                if !cart.prg_ram.is_empty() {
+                    addr2 %= cart.prg_ram.len() as u16;
+                    Some(cart.prg_ram[addr2 as usize])
+                } else {
+                    None
+                }
+            }
+            0x8000..=0xffff => {
+                match (self.registers[0] & 0xC0) >> 2 {
+                    0 | 1 => {
+                        //32kb bankswitch
+                        let addr2 = addr & 0x7fff;
+                        let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                        let addr4 = (self.registers[3] as u32 & 0xE) << 14;
+                        let addr5 = addr3 | addr4;
+                        Some(cart.prg_rom[addr5 as usize])
+                    }
+                    2 => {
+                        //first half fixed, second half switched
+                        if addr < 0xc000 {
+                            //fixed to first bank
+                            let addr2 = addr & 0x3fff;
+                            let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                            Some(cart.prg_rom[addr3 as usize])
+                        } else {
+                            //switched
+                            let addr2 = addr & 0x3fff;
+                            let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
+                            Some(cart.prg_rom[addr3 as usize])
+                        }
+                    }
+                    _ => {
+                        //first half switched, second half fixed
+                        if addr < 0xc000 {
+                            //switched
+                            let addr2 = addr & 0x3fff;
+                            let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
+                            Some(cart.prg_rom[addr3 as usize])
+                        } else {
+                            //fixed to last bank
+                            let addr2 = addr & 0x3fff;
+                            let mut addr3 = addr2 as u32;
+                            addr3 |= ((cart.prg_rom.len() - 1) & !0x3fff) as u32;
+                            Some(cart.prg_rom[addr3 as usize])
+                        }
+                    }
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         self.shift_locked = false;
         match addr {

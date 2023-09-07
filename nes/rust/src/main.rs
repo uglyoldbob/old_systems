@@ -352,11 +352,16 @@ impl TrackedWindow for MainNesWindow {
                             ui.close_menu();
                             windows_to_create.push(DebugNesWindow::new_request());
                         }
+                        if ui.button("Dump CPU Data").clicked() {
+                            ui.close_menu();
+                            windows_to_create.push(CpuMemoryDumpWindow::new_request());
+                        }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();
                             c.reset();
                         }
                     });
+
                 }
             });
         });
@@ -417,6 +422,77 @@ impl TrackedWindow for MainNesWindow {
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
         self.last_frame_time = new_frame_time;
 
+        RedrawResponse {
+            quit,
+            new_windows: windows_to_create,
+        }
+    }
+}
+
+
+/// The window for dumping cpu data
+#[cfg(feature = "egui-multiwin")]
+struct CpuMemoryDumpWindow { }
+
+impl CpuMemoryDumpWindow {
+    fn new_request() -> NewWindowRequest<NesEmulatorData> {
+        NewWindowRequest {
+            window_state: Box::new(CpuMemoryDumpWindow {}),
+            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+                .with_resizable(true)
+                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                    width: 320.0,
+                    height: 240.0,
+                })
+                .with_title("UglyOldBob NES CPU Dump"),
+            options: egui_multiwin::tracked_window::TrackedWindowOptions {
+                vsync: false,
+                shader: None,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "egui-multiwin")]
+impl TrackedWindow for CpuMemoryDumpWindow {
+    type Data = NesEmulatorData;
+
+    fn is_root(&self) -> bool {
+        false
+    }
+
+    fn set_root(&mut self, _root: bool) {}
+
+    fn redraw(
+        &mut self,
+        c: &mut NesEmulatorData,
+        egui: &mut EguiGlow,
+    ) -> RedrawResponse<Self::Data> {
+        egui.egui_ctx.request_repaint();
+        let quit = false;
+        let windows_to_create = vec![];
+
+        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            ui.label("CPU Dump Window");
+            egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                #[cfg(feature = "debugger")]
+                {
+                    for i in (0..=0xFFFF).step_by(8) {
+                        ui.label(format!("{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}", 
+                            i,
+                            c.mb.memory_dump(i, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+1, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+2, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+3, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+4, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+5, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+6, &c.cpu_peripherals),
+                            c.mb.memory_dump(i+7, &c.cpu_peripherals),
+                        ));
+                    }
+                }
+            });
+        });
         RedrawResponse {
             quit,
             new_windows: windows_to_create,

@@ -678,6 +678,31 @@ impl NesApu {
         }
     }
 
+    /// Dump, like read, but without side effects
+    pub fn dump(&self, _addr: u16) -> u8 {
+        let mut data = self.status & 0x40;
+        if self.dmc.interrupt_flag {
+            data |= 0x80;
+        }
+
+        if self.squares[0].length > 0 {
+            data |= 1;
+        }
+        if self.squares[1].length > 0 {
+            data |= 1 << 1;
+        }
+        if self.triangle.length > 0 {
+            data |= 1 << 2;
+        }
+        if self.noise.length > 0 {
+            data |= 1 << 3;
+        }
+        if self.dmc.length > 0 {
+            data |= 1 << 4;
+        }
+        data
+    }
+
     /// Read the apu register, it is assumed that the only readable address is filtered before making it to this function
     pub fn read(&mut self, _addr: u16) -> u8 {
         let mut data = self.status & 0x40;

@@ -366,6 +366,35 @@ impl NesPpu {
         s
     }
 
+    /// Performs a dump of the ppu without side effects.
+    pub fn dump(&self, addr: u16) -> Option<u8> {
+        match addr {
+            0 | 1 | 3 | 5 | 6 => Some(self.last_cpu_data),
+            4 => {
+                let mut data = self.oam[self.oamaddress as usize];
+                if (self.oamaddress & 3) == 2 {
+                    data &= 0xe3;
+                }
+                Some(data)
+            }
+            7 => match self.vram_address {
+                0..=0x3eff => {
+                    Some(self.ppudata_buffer)
+                }
+                _ => {
+                    Some(self.last_cpu_data & 0xC0)
+                }
+            },
+            _ => {
+                let mut val = self.registers[addr as usize];
+                if addr == 2 {
+                    val = (val & 0xE0) | self.last_cpu_data & 0x1f;
+                }
+                Some(val)
+            }
+        }
+    }
+
     /// Perform reads done by the cpu.
     pub fn read(&mut self, addr: u16) -> Option<u8> {
         match addr {

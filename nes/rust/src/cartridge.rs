@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 /// All mappers must implement this.
 #[enum_dispatch::enum_dispatch]
 trait NesMapperTrait {
+    /// Dump some data from the cart
+    fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8>;
     /// Run a cpu memory read cycle
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     /// Run a cpu memory write cycle
@@ -352,6 +354,11 @@ impl NesCartridge {
 }
 
 impl NesCartridge {
+    /// Perform a dump of a cartridge
+    pub fn memory_dump(&self, addr: u16) -> Option<u8> {
+        self.mapper.memory_cycle_dump(&self.data, addr)
+    }
+
     /// Drive a cpu memory read cycle
     pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_read(&mut self.data, addr)

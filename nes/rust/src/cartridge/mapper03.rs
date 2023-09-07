@@ -24,6 +24,26 @@ impl Mapper03 {
 }
 
 impl NesMapperTrait for Mapper03 {
+    fn memory_cycle_dump(&self,cart: &NesCartridgeData,addr:u16) -> Option<u8> {
+        match addr {
+            0x6000..=0x7fff => {
+                let mut addr2 = addr & 0x1fff;
+                if !cart.prg_ram.is_empty() {
+                    addr2 %= cart.prg_ram.len() as u16;
+                    Some(cart.prg_ram[addr2 as usize])
+                } else {
+                    None
+                }
+            }
+            0x8000..=0xffff => {
+                let addr2 = addr & 0x7fff;
+                let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                Some(cart.prg_rom[addr3 as usize])
+            }
+            _ => None,
+        }
+    }
+
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {

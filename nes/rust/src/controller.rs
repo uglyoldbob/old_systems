@@ -11,6 +11,8 @@ use egui_multiwin::egui;
 pub trait NesControllerTrait {
     /// Update the latch bits on the controller
     fn update_latch_bits(&mut self, data: [bool; 3]);
+    /// Dump data from the controller. No side effects.
+    fn dump_data(&self) -> u8;
     /// Read data from the controller.
     fn read_data(&mut self) -> u8;
     /// Provides an egui input state to update the controller state.
@@ -78,6 +80,11 @@ impl NesControllerTrait for StandardController {
         self.strobe = data[0];
         self.check_strobe();
     }
+    fn dump_data(&self) -> u8 {
+        let data = self.shift_register & 1;
+        data | 0x1e
+    }
+
     fn read_data(&mut self) -> u8 {
         self.check_strobe();
         let data = self.shift_register & 1;
@@ -129,6 +136,9 @@ impl DummyController {
 
 impl NesControllerTrait for DummyController {
     fn update_latch_bits(&mut self, _data: [bool; 3]) {}
+    fn dump_data(&self) -> u8 {
+        0x1f
+    }
     fn read_data(&mut self) -> u8 {
         0x1f
     }
