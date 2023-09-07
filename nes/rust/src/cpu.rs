@@ -97,7 +97,7 @@ pub struct NesCpu {
     tempaddr: u16,
     /// A list of breakpoints for the cpu
     #[cfg(feature = "debugger")]
-    breakpoints: [Option<u16>; 10],
+    pub breakpoints: Vec<u16>,
     /// The string that corresponds to the disassembly for the most recently fetched instruction
     #[cfg(feature = "debugger")]
     disassembly: String,
@@ -160,7 +160,7 @@ impl NesCpu {
             temp2: 0,
             tempaddr: 0,
             #[cfg(feature = "debugger")]
-            breakpoints: [None; 10],
+            breakpoints: vec![],
             #[cfg(feature = "debugger")]
             disassembly: "RESET".to_string(),
             #[cfg(feature = "debugger")]
@@ -330,11 +330,22 @@ impl NesCpu {
     /// Check all breakpoints to see if a break needs to occur
     #[cfg(feature = "debugger")]
     fn check_breakpoints(&mut self) {
-        for b in self.breakpoints.into_iter().flatten() {
-            if self.pc == b {
+        for b in &self.breakpoints {
+            if self.pc == *b {
                 self.subcycle = 1;
             }
         }
+    }
+
+    /// Returns true when a breakpoint is active
+    pub fn breakpoint(&self) -> bool {
+        let mut b = false;
+        for v in &self.breakpoints {
+            if self.pc == *v {
+                b = true;
+            }
+        }
+        b
     }
 
     /// Show the disassembly of the current instruction

@@ -94,7 +94,7 @@ impl NesMotherboard {
     }
 
     /// Perform a read operation on the cpu memory bus, but doesn;t have any side effects like a normal read might
-    pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals,) -> u8 {
+    pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals) -> u8 {
         let mut response: u8 = self.last_cpu_data;
         match addr {
             0..=0x1fff => {

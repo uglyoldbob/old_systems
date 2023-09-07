@@ -273,7 +273,7 @@ impl TrackedWindow for MainNesWindow {
             {
                 if !c.paused {
                     c.cycle_step(&mut self.sound, &mut self.filter);
-                    if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() && c.single_step {
+                    if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() && (c.cpu.breakpoint() || c.single_step) {
                         c.paused = true;
                         c.single_step = false;
                         break 'emulator_loop;
@@ -361,7 +361,6 @@ impl TrackedWindow for MainNesWindow {
                             c.reset();
                         }
                     });
-
                 }
             });
         });
@@ -429,10 +428,9 @@ impl TrackedWindow for MainNesWindow {
     }
 }
 
-
 /// The window for dumping cpu data
 #[cfg(feature = "egui-multiwin")]
-struct CpuMemoryDumpWindow { }
+struct CpuMemoryDumpWindow {}
 
 impl CpuMemoryDumpWindow {
     fn new_request() -> NewWindowRequest<NesEmulatorData> {
@@ -478,16 +476,17 @@ impl TrackedWindow for CpuMemoryDumpWindow {
                 #[cfg(feature = "debugger")]
                 {
                     for i in (0..=0xFFFF).step_by(8) {
-                        ui.label(format!("{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}", 
+                        ui.label(format!(
+                            "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
                             i,
                             c.mb.memory_dump(i, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+1, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+2, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+3, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+4, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+5, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+6, &c.cpu_peripherals),
-                            c.mb.memory_dump(i+7, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 1, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 2, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 3, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 4, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 5, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 6, &c.cpu_peripherals),
+                            c.mb.memory_dump(i + 7, &c.cpu_peripherals),
                         ));
                     }
                 }
@@ -502,14 +501,18 @@ impl TrackedWindow for CpuMemoryDumpWindow {
 
 /// The structure for a debug window of the emulator.
 #[cfg(feature = "egui-multiwin")]
-struct DebugNesWindow {}
+struct DebugNesWindow {
+    breakpoint: String,
+}
 
 #[cfg(feature = "egui-multiwin")]
 impl DebugNesWindow {
     /// Create a new request for a Debug window.
     fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
-            window_state: Box::new(DebugNesWindow {}),
+            window_state: Box::new(DebugNesWindow {
+                breakpoint: "".to_string(),
+            }),
             builder: egui_multiwin::glutin::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
@@ -586,6 +589,32 @@ impl TrackedWindow for DebugNesWindow {
                     "Frame number {}",
                     c.cpu_peripherals.ppu_frame_number()
                 ));
+                ui.label("Breakpoints");
+                egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                    let mut found = false;
+                    let mut delete = None;
+                    for (i, b) in c.cpu.breakpoints.iter().enumerate() {
+                        found = true;
+                        egui_multiwin::egui::ScrollArea::horizontal().show(ui, |ui| {
+                            ui.label(format!("Breakpoint at {:X}", b));
+                            if ui.button("Delete").clicked() {
+                                delete = Some(i);
+                            }
+                        });
+                    }
+                    if let Some(i) = delete {
+                        c.cpu.breakpoints.remove(i);
+                    }
+                    if !found {
+                        ui.label("No breakpoints");
+                    }
+                });
+                ui.text_edit_singleline(&mut self.breakpoint);
+                if let Ok(v) = u16::from_str_radix(&self.breakpoint, 16) {
+                    if ui.button("Create breakpoint").clicked() {
+                        c.cpu.breakpoints.push(v);
+                    }
+                }
             }
         });
         RedrawResponse {

@@ -24,7 +24,7 @@ impl Mapper03 {
 }
 
 impl NesMapperTrait for Mapper03 {
-    fn memory_cycle_dump(&self,cart: &NesCartridgeData,addr:u16) -> Option<u8> {
+    fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
                 let mut addr2 = addr & 0x1fff;

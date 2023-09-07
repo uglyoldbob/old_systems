@@ -378,12 +378,8 @@ impl NesPpu {
                 Some(data)
             }
             7 => match self.vram_address {
-                0..=0x3eff => {
-                    Some(self.ppudata_buffer)
-                }
-                _ => {
-                    Some(self.last_cpu_data & 0xC0)
-                }
+                0..=0x3eff => Some(self.ppudata_buffer),
+                _ => Some(self.last_cpu_data & 0xC0),
             },
             _ => {
                 let mut val = self.registers[addr as usize];
