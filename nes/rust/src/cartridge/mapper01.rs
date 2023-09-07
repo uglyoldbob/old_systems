@@ -1,5 +1,7 @@
 //! Implements mapper01
 
+use std::collections::BTreeMap;
+
 use crate::cartridge::NesCartridgeData;
 use crate::cartridge::{NesMapper, NesMapperTrait};
 
@@ -38,6 +40,15 @@ impl Mapper01 {
 }
 
 impl NesMapperTrait for Mapper01 {
+    fn cartridge_registers(&self) -> BTreeMap<String, u8> {
+        let mut hm = BTreeMap::new();
+        hm.insert("Control".to_string(), self.registers[0]);
+        hm.insert("Chr0".to_string(), self.registers[1]);
+        hm.insert("Chr1".to_string(), self.registers[2]);
+        hm.insert("prg bank".to_string(), self.registers[3]);
+        hm
+    }
+
     fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {

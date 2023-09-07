@@ -60,6 +60,16 @@ impl NesMotherboard {
         }
     }
 
+    /// Return a reference to the cartridge if it exists
+    pub fn cartridge(&self) -> Option<&NesCartridge> {
+        if let Some(c) = &self.cart {
+            Some(&c)
+        }
+        else {
+            None
+        }
+    }
+
     /// Remove any cartridge that may exist in the system.
     pub fn remove_cartridge(&mut self) {
         self.cart = None;

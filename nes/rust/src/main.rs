@@ -615,6 +615,12 @@ impl TrackedWindow for DebugNesWindow {
                         c.cpu.breakpoints.push(v);
                     }
                 }
+                ui.label("Cartridge registers:");
+                if let Some(c) = c.mb.cartridge() {
+                    for (n, v) in c.cartridge_registers() {
+                        ui.label(format!("{}: {:x}", n, v));
+                    }
+                }
             }
         });
         RedrawResponse {

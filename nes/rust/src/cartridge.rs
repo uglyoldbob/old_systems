@@ -4,6 +4,8 @@ mod mapper00;
 mod mapper01;
 mod mapper03;
 
+use std::collections::BTreeMap;
+
 use mapper00::Mapper00;
 use mapper01::Mapper01;
 use mapper03::Mapper03;
@@ -32,6 +34,8 @@ trait NesMapperTrait {
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
     /// Modify a byte for the cartridge rom
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
+    /// Returns a list of registers used by the cartridge
+    fn cartridge_registers(&self) -> BTreeMap<String, u8>;
 }
 
 /// The mapper for an nes cartridge
@@ -354,6 +358,11 @@ impl NesCartridge {
 }
 
 impl NesCartridge {
+    /// Retrieve a list of cartridge registers
+    pub fn cartridge_registers(&self) -> BTreeMap<String, u8> {
+        self.mapper.cartridge_registers()
+    }
+
     /// Perform a dump of a cartridge
     pub fn memory_dump(&self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_dump(&self.data, addr)
