@@ -130,7 +130,7 @@ pub struct NesPpu {
     /// The vram address for accessing ppu vram (different from oam)
     vram_address: u16,
     /// The frame number of the ppu, used for testing and debugging purposes.
-    #[cfg(any(test, debug_assertions))]
+    #[cfg(any(test, feature = "debugger"))]
     frame_number: u64,
     /// For read operations by the cpu
     ppudata_buffer: u8,
@@ -302,7 +302,7 @@ impl NesPpu {
             pend_vram_write: None,
             pend_vram_read: None,
             vram_address: 0,
-            #[cfg(any(test, debug_assertions))]
+            #[cfg(any(test, feature = "debugger"))]
             frame_number: 0,
             ppudata_buffer: 0,
             last_cpu_data: 0,
@@ -321,7 +321,7 @@ impl NesPpu {
     }
 
     /// Return the frame number of the ppu, mostly used for testing and debugging the ppu
-    #[cfg(any(test, debug_assertions))]
+    #[cfg(any(test, feature = "debugger"))]
     pub fn frame_number(&self) -> u64 {
         self.frame_number
     }
@@ -330,7 +330,7 @@ impl NesPpu {
     pub fn reset(&mut self) {
         self.registers[0] = 0;
         self.registers[1] = 0;
-        #[cfg(any(test, debug_assertions))]
+        #[cfg(any(test, feature = "debugger"))]
         {
             self.frame_number = 0;
         }
@@ -354,7 +354,7 @@ impl NesPpu {
     }
 
     /// Returns a copy of the sprites in the ppu memory
-    #[cfg(any(test, debug_assertions))]
+    #[cfg(any(test, feature = "debugger"))]
     pub fn get_64_sprites(&self) -> [PpuSprite; 64] {
         let mut s: [PpuSprite; 64] = [PpuSprite::new(); 64];
         for (i, e) in s.iter_mut().enumerate() {
@@ -1039,7 +1039,7 @@ impl NesPpu {
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
                 self.registers[2] |= 0x80;
                 self.frame_end = true;
-                #[cfg(any(test, debug_assertions))]
+                #[cfg(any(test, feature = "debugger"))]
                 {
                     self.frame_number = self.frame_number.wrapping_add(1);
                 }

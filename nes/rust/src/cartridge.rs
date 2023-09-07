@@ -112,6 +112,10 @@ impl NesCartridge {
         Err(CartridgeError::IncompatibleRom)
     }
 
+    pub fn mappernum(&self) -> u32 {
+        self.mappernum
+    }
+
     /// Builds a mapper for the rom
     fn get_mapper(mapper: u32, rom_data: &NesCartridgeData) -> Result<NesMapper, CartridgeError> {
         let mapper = match mapper {

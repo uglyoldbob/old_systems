@@ -514,7 +514,7 @@ impl NesApu {
             + self.noise.audio()
             + self.dmc.audio();
         if let Some(filter) = filter {
-            let audio = rand::Rng::gen::<f32>(&mut rand::thread_rng());
+            let audio = 0.0; //rand::Rng::gen::<f32>(&mut rand::thread_rng());
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {

@@ -5,11 +5,17 @@ use crate::cartridge::{CartridgeError, NesCartridge};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Data gathered fromm a successful rom load
+#[derive(Serialize, Deserialize)]
+pub struct RomListResult {
+    pub mapper: u32,
+}
+
 /// A single entry for a potentially valid rom for the emulator
 #[derive(Serialize, Deserialize)]
 pub struct RomListEntry {
     /// Stores whether or not the rom is valid, and what kind of error was encountered.
-    pub result: Option<Result<(), CartridgeError>>,
+    pub result: Option<Result<RomListResult, CartridgeError>>,
     /// The time when the rom file was last modified. USed for rechecking mmodified roms.
     pub modified: Option<std::time::SystemTime>,
 }
@@ -75,6 +81,7 @@ impl RomListParser {
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
     pub fn find_roms(&mut self, dir: &str) {
         if !self.scan_complete {
+            println!("Searching in {} for roms", dir);
             for entry in walkdir::WalkDir::new(dir)
                 .into_iter()
                 .filter_map(Result::ok)
@@ -84,11 +91,15 @@ impl RomListParser {
                 if meta.is_ok() {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
-                    if NesCartridge::load_cartridge(name).is_ok() {
+                    println!("Checking2 {}", name);
+                    if NesCartridge::load_cartridge(name.clone()).is_ok() {
+                        println!("{} is ok", name);
                         self.list.elements.entry(m).or_insert_with(|| RomListEntry {
                             result: None,
                             modified: None,
                         });
+                    } else {
+                        println!("{} NOT GOOD", name);
                     }
                 }
             }
@@ -106,10 +117,13 @@ impl RomListParser {
                     let modified = metadata.modified().unwrap_or(std::time::SystemTime::now());
                     let last_modified = entry.modified.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                     if modified > last_modified {
+                        println!("Checking {}", p.display());
                         let romcheck = NesCartridge::load_cartridge(
                             p.as_os_str().to_str().unwrap().to_string(),
                         );
-                        entry.result = Some(romcheck.map(|_i| ()));
+                        entry.result = Some(romcheck.map(|i| RomListResult {
+                            mapper: i.mappernum(),
+                        }));
                         entry.modified = Some(modified);
                     }
                 }

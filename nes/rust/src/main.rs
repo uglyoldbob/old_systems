@@ -269,7 +269,7 @@ impl TrackedWindow for MainNesWindow {
         }
 
         'emulator_loop: loop {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugger")]
             {
                 if !c.paused {
                     c.cycle_step(&mut self.sound, &mut self.filter);
@@ -289,7 +289,7 @@ impl TrackedWindow for MainNesWindow {
                     break 'emulator_loop;
                 }
             }
-            #[cfg(not(debug_assertions))]
+            #[cfg(not(feature = "debugger"))]
             {
                 c.cycle_step(&mut self.sound, &mut self.filter);
                 if c.cpu_peripherals.ppu_frame_end() {
@@ -345,7 +345,7 @@ impl TrackedWindow for MainNesWindow {
                         ui.close_menu();
                     }
                 });
-                #[cfg(debug_assertions)]
+                #[cfg(feature = "debugger")]
                 {
                     ui.menu_button("Debug", |ui| {
                         if ui.button("Debugger").clicked() {
@@ -470,7 +470,7 @@ impl TrackedWindow for DebugNesWindow {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("Debug window");
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugger")]
             {
                 if c.paused {
                     if ui.button("Unpause").clicked() {
@@ -485,8 +485,12 @@ impl TrackedWindow for DebugNesWindow {
                         c.wait_for_frame_end = true;
                         c.paused = false;
                     }
+                    if ui.button("Reset").clicked() {
+                        c.reset();
+                    }
                 } else if ui.button("Pause").clicked() {
                     c.single_step = true;
+                    c.paused = true;
                 }
                 ui.horizontal(|ui| {
                     ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
@@ -573,19 +577,31 @@ impl TrackedWindow for RomFinder {
                 let mut new_rom = None;
                 for (p, entry) in self.parser.list().elements.iter() {
                     if let Some(r) = &entry.result {
-                        if r.is_ok()
-                            && ui
+                        if let Ok(r) = r {
+                            if ui
                                 .add(
-                                    egui_multiwin::egui::Label::new(format!("{}", p.display()))
-                                        .sense(Sense::click()),
+                                    egui_multiwin::egui::Label::new(format!(
+                                        "{:x}: {}",
+                                        r.mapper,
+                                        p.display()
+                                    ))
+                                    .sense(Sense::click()),
                                 )
                                 .double_clicked()
-                        {
-                            new_rom = Some(
-                                NesCartridge::load_cartridge(p.to_str().unwrap().into()).unwrap(),
-                            );
-                            quit = true;
+                            {
+                                new_rom = Some(
+                                    NesCartridge::load_cartridge(p.to_str().unwrap().into())
+                                        .unwrap(),
+                                );
+                                quit = true;
+                            }
                         }
+                    }
+                }
+                ui.label("Unsupported roms below here");
+                for (p, entry) in self.parser.list().elements.iter() {
+                    if let Some(Err(r)) = &entry.result {
+                        ui.label(format!("Rom: {}: {:?}", p.display(), r));
                     }
                 }
                 if let Some(nc) = new_rom {
@@ -868,7 +884,7 @@ fn main() {
     }
 
     let _e = multi_window.add(root_window, &event_loop);
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugger")]
     {
         if nes_data.paused {
             let debug_win = DebugNesWindow::new_request();

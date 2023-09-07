@@ -27,13 +27,13 @@ pub struct NesEmulatorData {
     /// Used for operating the ppu clock divider
     ppu_clock_counter: u8,
     /// Indicates that the emulator is paused.
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugger")]
     pub paused: bool,
     /// Indicates that the cpu should be single stepped, used for debugging
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugger")]
     pub single_step: bool,
     /// Used for debugging, to indicate to run to the end of the current frame, then pause.
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debugger")]
     pub wait_for_frame_end: bool,
     /// Used for frame timing
     pub last_frame_time: u128,
@@ -57,11 +57,11 @@ impl NesEmulatorData {
             cpu: NesCpu::new(),
             cpu_peripherals: NesCpuPeripherals::new(ppu, apu),
             mb,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugger")]
             paused: false,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugger")]
             single_step: false,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debugger")]
             wait_for_frame_end: false,
             cpu_clock_counter: rand::random::<u8>() % 16,
             ppu_clock_counter: rand::random::<u8>() % 4,
