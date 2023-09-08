@@ -356,6 +356,10 @@ impl TrackedWindow for MainNesWindow {
                             ui.close_menu();
                             windows_to_create.push(CpuMemoryDumpWindow::new_request());
                         }
+                        if ui.button("Dump Cartridge Data").clicked() {
+                            ui.close_menu();
+                            windows_to_create.push(CartridgeMemoryDumpWindow::new_request());
+                        }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();
                             c.reset();
@@ -421,6 +425,79 @@ impl TrackedWindow for MainNesWindow {
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
         self.last_frame_time = new_frame_time;
 
+        RedrawResponse {
+            quit,
+            new_windows: windows_to_create,
+        }
+    }
+}
+
+/// The window for dumping cartridge program data
+#[cfg(feature = "egui-multiwin")]
+struct CartridgeMemoryDumpWindow {}
+
+impl CartridgeMemoryDumpWindow {
+    fn new_request() -> NewWindowRequest<NesEmulatorData> {
+        NewWindowRequest {
+            window_state: Box::new(CartridgeMemoryDumpWindow {}),
+            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+                .with_resizable(true)
+                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                    width: 320.0,
+                    height: 240.0,
+                })
+                .with_title("UglyOldBob NES CPU Dump"),
+            options: egui_multiwin::tracked_window::TrackedWindowOptions {
+                vsync: false,
+                shader: None,
+            },
+        }
+    }
+}
+
+#[cfg(feature = "egui-multiwin")]
+impl TrackedWindow for CartridgeMemoryDumpWindow {
+    type Data = NesEmulatorData;
+
+    fn is_root(&self) -> bool {
+        false
+    }
+
+    fn set_root(&mut self, _root: bool) {}
+
+    fn redraw(
+        &mut self,
+        c: &mut NesEmulatorData,
+        egui: &mut EguiGlow,
+    ) -> RedrawResponse<Self::Data> {
+        egui.egui_ctx.request_repaint();
+        let quit = false;
+        let windows_to_create = vec![];
+
+        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            ui.label("Cartridge Dump Window");
+            egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                #[cfg(feature = "debugger")]
+                {
+                    if let Some(cart) = c.mb.cartridge() {
+                        for (i, chunk) in cart.cartridge().prg_rom.chunks(8).enumerate() {
+                            ui.label(format!(
+                                "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
+                                i*8,
+                                chunk[0],
+                                chunk[1],
+                                chunk[2],
+                                chunk[3],
+                                chunk[4],
+                                chunk[5],
+                                chunk[6],
+                                chunk[7],
+                            ));
+                        }
+                    }
+                }
+            });
+        });
         RedrawResponse {
             quit,
             new_windows: windows_to_create,
@@ -944,6 +1021,7 @@ fn main() {
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let event_loop = egui_multiwin::glutin::event_loop::EventLoopBuilder::with_user_event().build();
     let mut nes_data = NesEmulatorData::new();
+    nes_data.paused = true;
     let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();

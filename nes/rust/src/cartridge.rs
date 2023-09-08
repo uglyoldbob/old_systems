@@ -66,23 +66,23 @@ pub trait NesMemoryBusDevice {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridgeData {
     /// An optional trainer for the cartridge
-    trainer: Option<Vec<u8>>,
+    pub trainer: Option<Vec<u8>>,
     /// The prg rom, where code typically goes.
-    prg_rom: Vec<u8>,
+    pub prg_rom: Vec<u8>,
     /// The chr rom, where graphics are generally stored
-    chr_rom: Vec<u8>,
+    pub chr_rom: Vec<u8>,
     /// chr_ram ?
-    chr_ram: bool,
+    pub chr_ram: bool,
     /// inst_rom ?
-    inst_rom: Option<Vec<u8>>,
+    pub inst_rom: Option<Vec<u8>>,
     /// prom?
-    prom: Option<(Vec<u8>, Vec<u8>)>,
+    pub prom: Option<(Vec<u8>, Vec<u8>)>,
     /// Program ram
-    prg_ram: Vec<u8>,
+    pub prg_ram: Vec<u8>,
     /// True for vertical mirroring, false for horizontal mirroring
-    mirroring: bool,
+    pub mirroring: bool,
     /// The mapper number
-    mapper: u32,
+    pub mapper: u32,
 }
 
 /// A cartridge, including the mapper structure
@@ -168,6 +168,7 @@ impl NesCartridge {
         };
 
         let mut prg_rom = Vec::with_capacity(prg_rom_size);
+        println!("Prg rom is at {:x}, len {:x}", file_offset, prg_rom_size);
         for i in 0..prg_rom_size {
             if rom_contents.len() <= (file_offset + i) {
                 return Err(CartridgeError::RomTooShort);
@@ -266,6 +267,7 @@ impl NesCartridge {
         };
 
         let mut prg_rom = Vec::with_capacity(prg_rom_size);
+        println!("Prg rom is at {:x}, len {:x}", file_offset, prg_rom_size);
         for i in 0..prg_rom_size {
             if rom_contents.len() <= (file_offset + i) {
                 return Err(CartridgeError::RomTooShort);
@@ -358,6 +360,11 @@ impl NesCartridge {
 }
 
 impl NesCartridge {
+    ///Retrieve a reference to the cartridge data
+    pub fn cartridge(&self) -> &NesCartridgeData {
+        &self.data
+    }
+
     /// Retrieve a list of cartridge registers
     pub fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         self.mapper.cartridge_registers()
