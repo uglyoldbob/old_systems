@@ -68,7 +68,7 @@ impl NesMapperTrait for Mapper01 {
                         let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
                         let addr4 = (self.registers[3] as u32 & 0xE) << 14;
                         let addr5 = addr3 | addr4;
-                        Some(cart.prg_rom[addr5 as usize % (cart.prg_rom.len() - 1)])
+                        Some(cart.prg_rom[addr5 as usize & (cart.prg_rom.len() - 1)])
                     }
                     2 => {
                         //first half fixed, second half switched
@@ -76,13 +76,13 @@ impl NesMapperTrait for Mapper01 {
                             //fixed to first bank
                             let addr2 = addr & 0x3fff;
                             let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            Some(cart.prg_rom[addr3 as usize % (cart.prg_rom.len() - 1)])
+                            Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         } else {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
-                            Some(cart.prg_rom[addr3 as usize % (cart.prg_rom.len() - 1)])
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 8192;
+                            Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         }
                     }
                     _ => {
@@ -91,14 +91,16 @@ impl NesMapperTrait for Mapper01 {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
-                            Some(cart.prg_rom[addr3 as usize % (cart.prg_rom.len() - 1)])
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 8192;
+                            println!("Map {:x} to {:x} {:x}", addr, addr3, addr3 as usize & (cart.prg_rom.len() - 1));
+                            Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         } else {
                             //fixed to last bank
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32;
                             addr3 |= ((cart.prg_rom.len() - 1) & !0x3fff) as u32;
-                            Some(cart.prg_rom[addr3 as usize % (cart.prg_rom.len() - 1)])
+                            //println!("Map {:x} to {:x} {:x}", addr, addr3, addr3 as usize & (cart.prg_rom.len() - 1));
+                            Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         }
                     }
                 }
@@ -119,18 +121,20 @@ impl NesMapperTrait for Mapper01 {
     fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {
         if addr >= 0x8000 && !self.shift_locked {
             self.shift_locked = true;
+            println!("Write addr {:x} val {:x}", addr, data);
             if (data & 0x80) != 0 {
                 self.shift_counter = 0;
                 self.shift_register = 0;
                 self.registers[0] |= 0x0C;
-            } else if self.shift_counter < 5 {
-                self.shift_counter += 1;
-                self.shift_register >>= 1;
-                if (data & 1) != 0 {
-                    self.shift_register |= 0x10;
-                }
-            } else {
+            }
+            self.shift_counter += 1;
+            self.shift_register >>= 1;
+            if (data & 1) != 0 {
+                self.shift_register |= 0x10;
+            }
+            if self.shift_counter == 5 {
                 let adr_select = (addr & 0x6000) >> 13;
+                println!("Register {} is now {:x}", adr_select, self.shift_register);
                 self.update_register(adr_select as u8, self.shift_register);
                 self.shift_counter = 0;
                 self.shift_register = 0;

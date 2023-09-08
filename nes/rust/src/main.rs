@@ -672,7 +672,7 @@ impl TrackedWindow for DebugNesWindow {
                     let mut delete = None;
                     for (i, b) in c.cpu.breakpoints.iter().enumerate() {
                         found = true;
-                        egui_multiwin::egui::ScrollArea::horizontal().show(ui, |ui| {
+                        ui.horizontal(|ui| {
                             ui.label(format!("Breakpoint at {:X}", b));
                             if ui.button("Delete").clicked() {
                                 delete = Some(i);
