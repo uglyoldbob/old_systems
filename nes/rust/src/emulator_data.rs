@@ -11,6 +11,7 @@ use crate::{
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
+use egui_multiwin::multi_window::CommonEventHandler;
 
 /// The main struct for the nes emulator.
 #[non_exhaustive]
@@ -44,6 +45,12 @@ pub struct NesEmulatorData {
     prev_irq: bool,
     /// The list of roms for the emulator
     pub roms: RomList,
+}
+
+impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
+    fn process_event(&mut self, event: u32) -> Vec<egui_multiwin::multi_window::NewWindowRequest<NesEmulatorData>> {
+        vec![]
+    }
 }
 
 impl NesEmulatorData {

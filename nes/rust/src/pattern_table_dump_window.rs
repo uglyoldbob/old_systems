@@ -21,9 +21,9 @@ impl DumpWindow {
                 buf: Box::new(RgbImage::new(256, 128)),
                 texture: None,
             }),
-            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
                     height: 240.0,
                 })
@@ -37,8 +37,7 @@ impl DumpWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for DumpWindow {
-    type Data = NesEmulatorData;
+impl TrackedWindow<NesEmulatorData> for DumpWindow {
 
     fn is_root(&self) -> bool {
         false
@@ -50,7 +49,8 @@ impl TrackedWindow for DumpWindow {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
+        _window: &egui_multiwin::winit::window::Window,
+    ) -> RedrawResponse<NesEmulatorData> {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];

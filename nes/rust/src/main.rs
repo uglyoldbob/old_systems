@@ -121,9 +121,9 @@ impl MainNesWindow {
                 sound_sample_interval: 0.0,
                 sound_stream: stream,
             }),
-            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
                     height: 300.0,
                 })
@@ -212,9 +212,7 @@ impl eframe::App for MainNesWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for MainNesWindow {
-    type Data = NesEmulatorData;
-
+impl TrackedWindow<NesEmulatorData> for MainNesWindow {
     fn is_root(&self) -> bool {
         true
     }
@@ -225,7 +223,8 @@ impl TrackedWindow for MainNesWindow {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
+        _window: &egui_multiwin::winit::window::Window,
+    ) -> RedrawResponse<NesEmulatorData> {
         egui.egui_ctx.request_repaint();
 
         #[cfg(feature = "puffin")]
@@ -259,13 +258,14 @@ impl TrackedWindow for MainNesWindow {
         let mut windows_to_create = vec![];
 
         {
-            let input = egui.egui_ctx.input();
-            if let Some(c) = &mut c.mb.controllers[0] {
-                c.provide_egui_ref(&input);
-            }
-            if let Some(c) = &mut c.mb.controllers[1] {
-                c.provide_egui_ref(&input);
-            }
+            egui.egui_ctx.input(|i| {
+                if let Some(c) = &mut c.mb.controllers[0] {
+                    c.provide_egui_ref(i);
+                }
+                if let Some(c) = &mut c.mb.controllers[1] {
+                    c.provide_egui_ref(i);
+                }
+            });
         }
 
         'emulator_loop: loop {
@@ -329,8 +329,7 @@ impl TrackedWindow for MainNesWindow {
                     if ui.add_enabled(true, button).clicked()
                         || egui
                             .egui_ctx
-                            .input()
-                            .key_pressed(egui_multiwin::egui::Key::F5)
+                            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F5))
                     {
                         save_state = true;
                         ui.close_menu();
@@ -340,8 +339,7 @@ impl TrackedWindow for MainNesWindow {
                     if ui.add_enabled(true, button).clicked()
                         || egui
                             .egui_ctx
-                            .input()
-                            .key_pressed(egui_multiwin::egui::Key::F6)
+                            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
                     {
                         println!("Loading state");
                         load_state = true;
@@ -379,16 +377,14 @@ impl TrackedWindow for MainNesWindow {
 
         if egui
             .egui_ctx
-            .input()
-            .key_pressed(egui_multiwin::egui::Key::F5)
+            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F5))
         {
             save_state = true;
         }
 
         if egui
             .egui_ctx
-            .input()
-            .key_pressed(egui_multiwin::egui::Key::F6)
+            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
         {
             load_state = true;
         }
@@ -450,9 +446,9 @@ impl CartridgeMemoryDumpWindow {
     fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(CartridgeMemoryDumpWindow {}),
-            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
                     height: 240.0,
                 })
@@ -466,9 +462,7 @@ impl CartridgeMemoryDumpWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for CartridgeMemoryDumpWindow {
-    type Data = NesEmulatorData;
-
+impl TrackedWindow<NesEmulatorData> for CartridgeMemoryDumpWindow {
     fn is_root(&self) -> bool {
         false
     }
@@ -479,7 +473,8 @@ impl TrackedWindow for CartridgeMemoryDumpWindow {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
+        _window: &egui_multiwin::winit::window::Window,
+    ) -> RedrawResponse<NesEmulatorData> {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];
@@ -523,9 +518,9 @@ impl CpuMemoryDumpWindow {
     fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(CpuMemoryDumpWindow {}),
-            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
                     height: 240.0,
                 })
@@ -539,9 +534,7 @@ impl CpuMemoryDumpWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for CpuMemoryDumpWindow {
-    type Data = NesEmulatorData;
-
+impl TrackedWindow<NesEmulatorData> for CpuMemoryDumpWindow {
     fn is_root(&self) -> bool {
         false
     }
@@ -552,7 +545,8 @@ impl TrackedWindow for CpuMemoryDumpWindow {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
+        _window: &egui_multiwin::winit::window::Window,
+    ) -> RedrawResponse<NesEmulatorData> {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];
@@ -600,9 +594,9 @@ impl DebugNesWindow {
             window_state: Box::new(DebugNesWindow {
                 breakpoint: "".to_string(),
             }),
-            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
                     height: 240.0,
                 })
@@ -616,9 +610,7 @@ impl DebugNesWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for DebugNesWindow {
-    type Data = NesEmulatorData;
-
+impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
     fn is_root(&self) -> bool {
         false
     }
@@ -629,7 +621,8 @@ impl TrackedWindow for DebugNesWindow {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
+        _window: &egui_multiwin::winit::window::Window,
+    ) -> RedrawResponse<NesEmulatorData> {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];
@@ -732,9 +725,9 @@ impl RomFinder {
             window_state: Box::new(RomFinder {
                 parser: romlist::RomListParser::new(),
             }),
-            builder: egui_multiwin::glutin::window::WindowBuilder::new()
+            builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
-                .with_inner_size(egui_multiwin::glutin::dpi::LogicalSize {
+                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
                     height: 240.0,
                 })
@@ -748,9 +741,7 @@ impl RomFinder {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for RomFinder {
-    type Data = NesEmulatorData;
-
+impl TrackedWindow<NesEmulatorData> for RomFinder {
     fn is_root(&self) -> bool {
         false
     }
@@ -761,7 +752,8 @@ impl TrackedWindow for RomFinder {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-    ) -> RedrawResponse<Self::Data> {
+        _window: &egui_multiwin::winit::window::Window,
+    ) -> RedrawResponse<NesEmulatorData> {
         let mut quit = false;
         let windows_to_create = vec![];
 
@@ -1029,7 +1021,7 @@ fn main() {
 
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
-    let event_loop = egui_multiwin::glutin::event_loop::EventLoopBuilder::with_user_event().build();
+    let event_loop = egui_multiwin::winit::event_loop::EventLoopBuilder::with_user_event().build();
     let mut nes_data = NesEmulatorData::new();
     nes_data.paused = true;
     let mut multi_window = MultiWindow::new();
