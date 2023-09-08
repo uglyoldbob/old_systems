@@ -24,8 +24,8 @@ impl DumpWindow {
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
+                    width: 640.0,
+                    height: 480.0,
                 })
                 .with_title("UglyOldBob NES PPU Pattern Table Dump"),
             options: egui_multiwin::tracked_window::TrackedWindowOptions {
@@ -75,8 +75,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                     ui.image(
                         t,
                         egui_multiwin::egui::Vec2 {
-                            x: self.buf.width as f32,
-                            y: self.buf.height as f32,
+                            x: 2.0 * self.buf.width as f32,
+                            y: 2.0 * self.buf.height as f32,
                         },
                     );
                 }
