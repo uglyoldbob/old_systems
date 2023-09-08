@@ -64,8 +64,7 @@ impl NesMotherboard {
     pub fn cartridge(&self) -> Option<&NesCartridge> {
         if let Some(c) = &self.cart {
             Some(&c)
-        }
-        else {
+        } else {
             None
         }
     }
@@ -348,6 +347,52 @@ impl NesMotherboard {
                     cart.memory_write(addr, data);
                 }
             }
+        }
+    }
+
+    /// Performs a non-modifying ppu read
+    pub fn ppu_peek(&self, addr: u16) -> u8 {
+        if let Some(cart) = &self.cart {
+            let (a10, vram_enable, data) = cart.ppu_peek_1(addr);
+            let vram_address = if !vram_enable {
+                if (0x2000..=0x3fff).contains(&addr) {
+                    Some(addr | ((a10 as u16) << 10))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            if let Some(addr) = vram_address {
+                match addr {
+                    0..=0x3eff => {
+                        let addr2 = addr & 0x7ff;
+                        self.vram[addr2 as usize]
+                    }
+                    0x3f00..=0x3fff => {
+                        let mut addr2 = addr & 0x1F;
+                        addr2 = match addr2 {
+                            0x10 => 0,
+                            0x14 => 4,
+                            0x18 => 8,
+                            0x1c => 0xc,
+                            _ => addr2,
+                        };
+                        self.ppu_palette_ram[addr2 as usize]
+                    }
+                    _ => 42,
+                }
+            } else if let Some(cart) = &self.cart {
+                if let Some(a) = data {
+                    a
+                } else {
+                    42
+                }
+            } else {
+                41
+            }
+        } else {
+            0
         }
     }
 

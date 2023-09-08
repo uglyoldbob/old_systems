@@ -23,6 +23,22 @@ impl Mapper03 {
             ppu_address: 0,
         })
     }
+
+    fn check_mirroring(&self, addr: u16) -> (bool, bool) {
+        let a10 = if self.mirror_vertical {
+            (addr & 1 << 10) != 0
+        } else {
+            (addr & 1 << 11) != 0
+        };
+        (a10, false)
+    }
+
+    fn ppu_read(&self, addr: u16, cart: &NesCartridgeData,) -> Option<u8> {
+        if cart.chr_rom.is_empty() {
+            return None;
+        }
+        Some(cart.chr_rom[addr as usize])
+    }
 }
 
 impl NesMapperTrait for Mapper03 {
@@ -76,21 +92,19 @@ impl NesMapperTrait for Mapper03 {
 
     fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
 
+    fn ppu_peek_address(&self, addr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>) {
+        let (mirror, thing) = self.check_mirroring(addr);
+        let data = self.ppu_read(addr, cart);
+        (mirror, thing, data)
+    }
+
     fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool) {
         self.ppu_address = addr;
-        let a10 = if self.mirror_vertical {
-            (addr & 1 << 10) != 0
-        } else {
-            (addr & 1 << 11) != 0
-        };
-        (a10, false)
+        self.check_mirroring(addr)
     }
 
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
-        if cart.chr_rom.is_empty() {
-            return None;
-        }
-        Some(cart.chr_rom[self.ppu_address as usize])
+        self.ppu_read(self.ppu_address, cart)
     }
 
     fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {}

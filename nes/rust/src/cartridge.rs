@@ -32,6 +32,8 @@ trait NesMapperTrait {
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8>;
     /// Run a ppu write cycle
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
+    /// Peek at a ppu memory address
+    fn ppu_peek_address(&self, adr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>);
     /// Modify a byte for the cartridge rom
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
     /// Returns a list of registers used by the cartridge
@@ -388,6 +390,11 @@ impl NesCartridge {
     /// A nop for the cpu bus, for driving mapper logic that needs it.
     pub fn memory_nop(&mut self) {
         self.mapper.memory_cycle_nop();
+    }
+
+    /// Perform a peek on ppu memory
+    pub fn ppu_peek_1(&self, addr: u16) -> (bool, bool, Option<u8>) {
+        self.mapper.ppu_peek_address(addr, &self.data)
     }
 
     /// Run a ppu address cycle

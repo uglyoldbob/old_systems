@@ -28,7 +28,7 @@ use crate::cartridge::NesCartridge;
 use crate::ppu::NesPpu;
 
 /// The initial rom that the emulator will load. Only for developmment of the beta version (0.1.x)
-const INITIAL_ROM: Option<&str> = Some("./nes/test_roms/sprite_overflow_tests/3.Timing.nes");
+const INITIAL_ROM: Option<&str> = Some("./roms/nes/Legend of Zelda, The (U) (PRG 0).nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
 #[cfg(feature = "egui-multiwin")]
@@ -273,7 +273,10 @@ impl TrackedWindow for MainNesWindow {
             {
                 if !c.paused {
                     c.cycle_step(&mut self.sound, &mut self.filter);
-                    if c.cpu_clock_counter == 0 && c.cpu.breakpoint_option() && (c.cpu.breakpoint() || c.single_step) {
+                    if c.cpu_clock_counter == 0
+                        && c.cpu.breakpoint_option()
+                        && (c.cpu.breakpoint() || c.single_step)
+                    {
                         c.paused = true;
                         c.single_step = false;
                         break 'emulator_loop;
@@ -360,6 +363,11 @@ impl TrackedWindow for MainNesWindow {
                             ui.close_menu();
                             windows_to_create.push(CartridgeMemoryDumpWindow::new_request());
                         }
+                        if ui.button("Dump ppu pattern table").clicked() {
+                            ui.close_menu();
+                            windows_to_create
+                                .push(pattern_table_dump_window::DumpWindow::new_request());
+                        }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();
                             c.reset();
@@ -432,6 +440,8 @@ impl TrackedWindow for MainNesWindow {
     }
 }
 
+mod pattern_table_dump_window;
+
 /// The window for dumping cartridge program data
 #[cfg(feature = "egui-multiwin")]
 struct CartridgeMemoryDumpWindow {}
@@ -483,7 +493,7 @@ impl TrackedWindow for CartridgeMemoryDumpWindow {
                         for (i, chunk) in cart.cartridge().prg_rom.chunks(8).enumerate() {
                             ui.label(format!(
                                 "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
-                                i*8,
+                                i * 8,
                                 chunk[0],
                                 chunk[1],
                                 chunk[2],

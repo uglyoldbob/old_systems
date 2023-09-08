@@ -9,6 +9,42 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
+/// A rgb image of variable size
+pub struct RgbImage {
+    data: Vec<u8>,
+    pub width: u16,
+    pub height: u16,
+}
+
+impl RgbImage {
+    pub fn new(w: u16, h: u16) -> Self {
+        let cap = w as usize * h as usize * 3;
+        let mut m = Vec::with_capacity(cap);
+        for _ in 0..cap {
+            m.push(0);
+        }
+        Self {
+            data: m,
+            width: w,
+            height: h,
+        }
+    }
+
+    /// Converts to egui format.
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
+    pub fn to_egui(&self) -> egui::ColorImage {
+        let pixels = self
+            .data
+            .chunks_exact(3)
+            .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
+            .collect();
+        egui::ColorImage {
+            size: [self.width as usize, self.height as usize],
+            pixels,
+        }
+    }
+}
+
 /// The various modes of evaluating sprites for a scanline
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -1100,6 +1136,41 @@ impl NesPpu {
     /// Returns a reference to the frame data stored in the ppu.
     pub fn get_frame(&mut self) -> &[u8; 256 * 240 * 3] {
         &self.frame_data
+    }
+
+    /// Renders the entire pattern table into the given buffer
+    pub fn render_pattern_table(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
+        for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
+            let column = (i & 0x78) >> 3;
+            let row = (i & 0xF800) >> 11;
+            let table = if (i & 0x80) != 0 { 0x1000 } else { 0 };
+            let pattern = column + row * 16;
+            let irow = (i & 0x700) >> 8;
+
+            let base = table as u16;
+            let offset = (pattern as u16) << 4;
+            let calc = base + offset + (irow as u16) % 8;
+            if i < 512 {
+                println!("Address {:x} -> {:x}", i, calc);
+            }
+            let data_low = bus.ppu_peek(calc);
+            let data_high = bus.ppu_peek(calc + 8);
+
+            let index = 7 - (i % 8);
+            let upper_bit = (data_high >> index) & 1;
+            let lower_bit = (data_low >> index) & 1;
+
+            let mut palette_entry =
+                ((upper_bit << 1) | lower_bit) as u16;
+            if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                palette_entry &= 0x30;
+            }
+            let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
+            let p = PPU_PALETTE[pixel_entry as usize];
+            pixel[0] = p[0];
+            pixel[1] = p[1];
+            pixel[2] = p[2];
+        }
     }
 
     /// Returns the irq status for the ppu
