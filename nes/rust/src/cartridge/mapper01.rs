@@ -123,7 +123,7 @@ impl NesMapperTrait for Mapper01 {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xE) * 8192;
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
                             Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         }
                     }
@@ -133,25 +133,13 @@ impl NesMapperTrait for Mapper01 {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xE) * 8192;
-                            println!(
-                                "Map {:x} to {:x} {:x}",
-                                addr,
-                                addr3,
-                                addr3 as usize & (cart.prg_rom.len() - 1)
-                            );
+                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
                             Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         } else {
                             //fixed to last bank
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32;
                             addr3 |= ((cart.prg_rom.len() - 1) & !0x3fff) as u32;
-                            println!(
-                                "Map {:x} to {:x} {:x}",
-                                addr,
-                                addr3,
-                                addr3 as usize & (cart.prg_rom.len() - 1)
-                            );
                             Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         }
                     }
@@ -178,11 +166,12 @@ impl NesMapperTrait for Mapper01 {
                 self.shift_counter = 0;
                 self.shift_register = 0;
                 self.registers[0] |= 0x0C;
-            }
-            self.shift_counter += 1;
-            self.shift_register >>= 1;
-            if (data & 1) != 0 {
-                self.shift_register |= 0x10;
+            } else {
+                self.shift_counter += 1;
+                self.shift_register >>= 1;
+                if (data & 1) != 0 {
+                    self.shift_register |= 0x10;
+                }
             }
             if self.shift_counter == 5 {
                 let adr_select = (addr & 0x6000) >> 13;
