@@ -116,7 +116,18 @@ struct ApuSquareChannel {
     envelope: ApuEnvelope,
     /// The sweep module
     sweep: ApuSweep,
+    /// The counter for duty cycle
+    duty_counter: u8,
+    /// The timer based on the timer register (registers 2 and 3)
+    freq_counter: u16,
 }
+
+const DUTY_TABLE: [[u8; 8]; 4] = [
+    [0, 1, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 0, 0, 0],
+    [1, 0, 0, 1, 1, 1, 1, 1],
+];
 
 impl ApuSquareChannel {
     /// Create a new square channel for the apu
@@ -127,11 +138,28 @@ impl ApuSquareChannel {
             length: 0,
             counter: 0,
             envelope: ApuEnvelope::new(),
+            duty_counter: 0,
+            freq_counter: 0,
         }
     }
 
+    fn get_duty_mode(&self) -> u8 {
+        self.registers[0]>>6
+    }
+
+    fn get_freq_timer(&self) -> u16 {
+        (self.registers[2] as u16) | (((self.registers[3] & 7) as u16)<<8)
+    }
+
     /// Clock the channel
-    fn cycle(&mut self) {}
+    fn cycle(&mut self) {
+        if self.freq_counter > 0 {
+            self.freq_counter -= 1;
+        } else {
+            self.freq_counter = self.get_freq_timer();
+            self.duty_counter = (self.duty_counter + 1) & 0x07;
+        }
+    }
 
     /// Clock the envelope
     fn envelope_clock(&mut self) {
@@ -145,7 +173,12 @@ impl ApuSquareChannel {
 
     /// Return the audio sample for this channel
     fn audio(&self) -> f32 {
-        self.counter as f32
+        if DUTY_TABLE[self.get_duty_mode() as usize][self.duty_counter as usize] != 0 {
+            1.0
+        }
+        else {
+            0.0
+        }
     }
 }
 
@@ -514,7 +547,6 @@ impl NesApu {
             + self.noise.audio()
             + self.dmc.audio();
         if let Some(filter) = filter {
-            let audio = 0.0; //rand::Rng::gen::<f32>(&mut rand::thread_rng());
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
