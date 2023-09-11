@@ -158,10 +158,9 @@ impl NesMapperTrait for Mapper01 {
         self.shift_locked = false;
     }
 
-    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {
+    fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
         if addr >= 0x8000 && !self.shift_locked {
             self.shift_locked = true;
-            println!("Write addr {:x} val {:x}", addr, data);
             if (data & 0x80) != 0 {
                 self.shift_counter = 0;
                 self.shift_register = 0;
@@ -179,6 +178,14 @@ impl NesMapperTrait for Mapper01 {
                 self.update_register(adr_select as u8, self.shift_register);
                 self.shift_counter = 0;
                 self.shift_register = 0;
+            }
+        }
+        else if (0x6000..=0x7fff).contains(&addr) {
+            let mut addr2 = addr & 0x1fff;
+            if !cart.prg_ram.is_empty() {
+                addr2 %= cart.prg_ram.len() as u16;
+                let addr3 = addr2 as usize & (cart.prg_ram.len() - 1);
+                cart.prg_ram[addr3] = data;
             }
         }
     }

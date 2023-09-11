@@ -87,6 +87,16 @@ pub struct NesCartridgeData {
     pub mapper: u32,
 }
 
+#[non_exhaustive]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// The format that a rom file is loaded from
+pub enum RomFormat {
+    /// The ines1 rom format
+    Ines1,
+    /// The ines2 rom format
+    Ines2,
+}
+
 /// A cartridge, including the mapper structure
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -97,6 +107,8 @@ pub struct NesCartridge {
     mapper: NesMapper,
     /// The mapper number
     mappernum: u32,
+    /// Rom format loaded from
+    pub rom_format: RomFormat,
 }
 
 /// The types of errors that can occur when loading a rom
@@ -181,18 +193,22 @@ impl NesCartridge {
 
         let mut chr_rom = Vec::with_capacity(chr_rom_size);
         if chr_rom_size != 0 {
+            let mut chr_rom_from_rom = false;
             for i in 0..chr_rom_size {
                 let data = if !chr_ram {
                     if rom_contents.len() <= (file_offset + i) {
                         return Err(CartridgeError::RomTooShort);
                     }
+                    chr_rom_from_rom = true;
                     rom_contents[file_offset + i]
                 } else {
                     rand::random()
                 };
                 chr_rom.push(data);
             }
-            file_offset += chr_rom_size;
+            if chr_rom_from_rom {
+                file_offset += chr_rom_size;
+            }
         }
         let inst_rom = if (rom_contents[7] & 2) != 0 {
             let mut irom = Vec::with_capacity(8192);
@@ -208,10 +224,21 @@ impl NesCartridge {
             None
         };
 
-        let ram_size = rom_contents[8] as usize * 8192;
+        let ram_size = if (rom_contents[6] & 2) != 0 {
+            0x1fff
+        }
+        else {
+            rom_contents[8] as usize * 8192
+        };
         let mut prg_ram = Vec::with_capacity(ram_size);
+        if ram_size > 0 {
+            println!("Initializing prg_ram with zeros data");
+        }
+        else {
+            println!("No prg_ram");
+        }
         for _i in 0..ram_size {
-            let v = rand::random();
+            let v = 0;//rand::random();
             prg_ram.push(v);
         }
 
@@ -229,10 +256,15 @@ impl NesCartridge {
         };
         let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
+        if file_offset != rom_contents.len() {
+            println!("Expected to read {:x} bytes, read {:x}", rom_contents.len(), file_offset);
+        }
+
         Ok(Self {
             data: rom_data,
             mapper: mapper,
             mappernum: mappernum as u32,
+            rom_format: RomFormat::Ines1,
         })
     }
 
@@ -323,6 +355,7 @@ impl NesCartridge {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
+            rom_format: RomFormat::Ines2,
         })
     }
 
@@ -333,6 +366,7 @@ impl NesCartridge {
             return Err(CartridgeError::FsError(e.kind().to_string()));
         }
         let rom_contents = rom_contents.unwrap();
+        println!("Rom length is {:x}", rom_contents.len());
         if rom_contents.len() < 16 {
             return Err(CartridgeError::InvalidRom);
         }

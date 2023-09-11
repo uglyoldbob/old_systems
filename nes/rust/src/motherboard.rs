@@ -103,17 +103,17 @@ impl NesMotherboard {
     }
 
     /// Perform a read operation on the cpu memory bus, but doesn;t have any side effects like a normal read might
-    pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals) -> u8 {
-        let mut response: u8 = self.last_cpu_data;
+    pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals) -> Option<u8> {
+        let mut response: Option<u8> = None;
         match addr {
             0..=0x1fff => {
                 let addr = addr & 0x7ff;
-                response = self.ram[addr as usize];
+                response = Some(self.ram[addr as usize]);
             }
             0x2000..=0x3fff => {
                 let addr = addr & 7;
                 if let Some(r) = per.ppu_dump(addr) {
-                    response = r;
+                    response = Some(r);
                     if addr == 7 {
                         let a = per.ppu.vram_address();
                         if a >= 0x3f00 {
@@ -126,7 +126,7 @@ impl NesMotherboard {
                                 _ => addr,
                             };
                             let palette_data = self.ppu_palette_ram[addr2 as usize];
-                            response |= palette_data;
+                            response = Some(r | palette_data)
                         }
                     }
                 } else {
@@ -138,22 +138,22 @@ impl NesMotherboard {
                 match addr {
                     0x4000..=0x4014 => {}
                     0x4015 => {
-                        response = per.apu.dump(addr & 0x1f);
+                        response = Some(per.apu.dump(addr & 0x1f));
                     }
                     0x4016 => {
                         if let Some(c) = &self.controllers[0] {
                             let d = c.dump_data() & 0x1f;
-                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
+                            response = Some((d ^ 0x1f) | (self.last_cpu_data & 0xe0));
                         } else {
-                            response = self.last_cpu_data & 0xe0;
+                            response = None;
                         }
                     }
                     0x4017 => {
                         if let Some(c) = &self.controllers[1] {
                             let d = c.dump_data() & 0x1f;
-                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
+                            response = Some((d ^ 0x1f) | (self.last_cpu_data & 0xe0));
                         } else {
-                            response = self.last_cpu_data & 0xe0;
+                            response = None;
                         }
                     }
                     _ => {}
@@ -166,9 +166,7 @@ impl NesMotherboard {
             _ => {
                 if let Some(cart) = &self.cart {
                     let resp = cart.memory_dump(addr);
-                    if let Some(v) = resp {
-                        response = v;
-                    }
+                    response = resp;
                 }
             }
         }

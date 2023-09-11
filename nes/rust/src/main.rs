@@ -557,17 +557,65 @@ impl TrackedWindow<NesEmulatorData> for CpuMemoryDumpWindow {
                 #[cfg(feature = "debugger")]
                 {
                     for i in (0..=0xFFFF).step_by(8) {
+                        let a1 = if let Some(a) = c.mb.memory_dump(i, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a2 = if let Some(a) = c.mb.memory_dump(i+1, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a3 = if let Some(a) = c.mb.memory_dump(i+2, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a4 = if let Some(a) = c.mb.memory_dump(i+3, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a5 = if let Some(a) = c.mb.memory_dump(i+4, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a6 = if let Some(a) = c.mb.memory_dump(i+5, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a7 = if let Some(a) = c.mb.memory_dump(i+6, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
+                        let a8 = if let Some(a) = c.mb.memory_dump(i+7, &c.cpu_peripherals) {
+                            format!("{:02X}", a)
+                        }
+                        else {
+                            format!("**")
+                        };
                         ui.label(format!(
-                            "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
+                            "{:04X}: {} {} {} {}\t{} {} {} {}",
                             i,
-                            c.mb.memory_dump(i, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 1, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 2, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 3, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 4, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 5, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 6, &c.cpu_peripherals),
-                            c.mb.memory_dump(i + 7, &c.cpu_peripherals),
+                            a1,
+                            a2,
+                            a3,
+                            a4,
+                            a5,
+                            a6,
+                            a7,
+                            a8,
                         ));
                     }
                 }
@@ -598,7 +646,7 @@ impl DebugNesWindow {
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
                     width: 320.0,
-                    height: 240.0,
+                    height: 480.0,
                 })
                 .with_title("UglyOldBob NES Debug"),
             options: egui_multiwin::tracked_window::TrackedWindowOptions {
@@ -650,6 +698,9 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                 } else if ui.button("Pause").clicked() {
                     c.single_step = true;
                     c.paused = true;
+                }
+                if let Some(cart) = c.mb.cartridge() {
+                    ui.label(format!("ROM format: {:?}", cart.rom_format));
                 }
                 ui.horizontal(|ui| {
                     ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
