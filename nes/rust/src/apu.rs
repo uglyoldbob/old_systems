@@ -118,7 +118,7 @@ struct ApuSquareChannel {
     sweep: ApuSweep,
     /// The counter for duty cycle
     duty_counter: u8,
-    /// The timer based on the timer register (registers 2 and 3)
+    /// The counter based on the timer register (registers 2 and 3)
     freq_counter: u16,
 }
 
@@ -173,8 +173,8 @@ impl ApuSquareChannel {
 
     /// Return the audio sample for this channel
     fn audio(&self) -> f32 {
-        if DUTY_TABLE[self.get_duty_mode() as usize][self.duty_counter as usize] != 0 {
-            1.0
+        if self.length != 0 && DUTY_TABLE[self.get_duty_mode() as usize][self.duty_counter as usize] != 0 {
+            self.envelope.audio_output(&self.registers[..]) as f32 / 255.0
         }
         else {
             0.0
