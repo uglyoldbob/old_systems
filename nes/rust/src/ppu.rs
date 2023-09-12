@@ -1160,8 +1160,7 @@ impl NesPpu {
             let upper_bit = (data_high >> index) & 1;
             let lower_bit = (data_low >> index) & 1;
 
-            let mut palette_entry =
-                ((upper_bit << 1) | lower_bit) as u16;
+            let mut palette_entry = ((upper_bit << 1) | lower_bit) as u16;
             if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                 palette_entry &= 0x30;
             }

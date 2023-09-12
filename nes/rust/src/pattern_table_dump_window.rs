@@ -38,7 +38,6 @@ impl DumpWindow {
 
 #[cfg(feature = "egui-multiwin")]
 impl TrackedWindow<NesEmulatorData> for DumpWindow {
-
     fn is_root(&self) -> bool {
         false
     }

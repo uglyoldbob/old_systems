@@ -33,7 +33,7 @@ impl Mapper03 {
         (a10, false)
     }
 
-    fn ppu_read(&self, addr: u16, cart: &NesCartridgeData,) -> Option<u8> {
+    fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
         if cart.chr_rom.is_empty() {
             return None;
         }

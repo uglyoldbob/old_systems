@@ -226,19 +226,17 @@ impl NesCartridge {
 
         let ram_size = if (rom_contents[6] & 2) != 0 {
             0x1fff
-        }
-        else {
+        } else {
             rom_contents[8] as usize * 8192
         };
         let mut prg_ram = Vec::with_capacity(ram_size);
         if ram_size > 0 {
             println!("Initializing prg_ram with zeros data");
-        }
-        else {
+        } else {
             println!("No prg_ram");
         }
         for _i in 0..ram_size {
-            let v = 0;//rand::random();
+            let v = 0; //rand::random();
             prg_ram.push(v);
         }
 
@@ -257,7 +255,11 @@ impl NesCartridge {
         let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
         if file_offset != rom_contents.len() {
-            println!("Expected to read {:x} bytes, read {:x}", rom_contents.len(), file_offset);
+            println!(
+                "Expected to read {:x} bytes, read {:x}",
+                rom_contents.len(),
+                file_offset
+            );
         }
 
         Ok(Self {

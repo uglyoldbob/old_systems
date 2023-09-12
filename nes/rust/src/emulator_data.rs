@@ -48,7 +48,10 @@ pub struct NesEmulatorData {
 }
 
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
-    fn process_event(&mut self, event: u32) -> Vec<egui_multiwin::multi_window::NewWindowRequest<NesEmulatorData>> {
+    fn process_event(
+        &mut self,
+        event: u32,
+    ) -> Vec<egui_multiwin::multi_window::NewWindowRequest<NesEmulatorData>> {
         vec![]
     }
 }

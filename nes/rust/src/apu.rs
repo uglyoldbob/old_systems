@@ -5,7 +5,7 @@ use rb::RbProducer;
 
 ///The modes that the sweep can operate in
 #[derive(serde::Serialize, serde::Deserialize)]
-enum ApuSweepAddition {
+pub enum ApuSweepAddition {
     /// The math uses ones complement numbers
     OnesComplement,
     /// The math uses twos complement numbers
@@ -102,85 +102,8 @@ impl ApuEnvelope {
     }
 }
 
-/// A square channel for the apu
-#[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ApuSquareChannel {
-    /// The channel registers
-    registers: [u8; 4],
-    /// The length of the channel for playback
-    length: u8,
-    /// The counter for the channel
-    counter: u8,
-    /// The envelope for sound generation
-    envelope: ApuEnvelope,
-    /// The sweep module
-    sweep: ApuSweep,
-    /// The counter for duty cycle
-    duty_counter: u8,
-    /// The counter based on the timer register (registers 2 and 3)
-    freq_counter: u16,
-}
-
-const DUTY_TABLE: [[u8; 8]; 4] = [
-    [0, 1, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0, 0],
-    [1, 0, 0, 1, 1, 1, 1, 1],
-];
-
-impl ApuSquareChannel {
-    /// Create a new square channel for the apu
-    fn new(math: ApuSweepAddition) -> Self {
-        Self {
-            registers: [0; 4],
-            sweep: ApuSweep::new(math),
-            length: 0,
-            counter: 0,
-            envelope: ApuEnvelope::new(),
-            duty_counter: 0,
-            freq_counter: 0,
-        }
-    }
-
-    fn get_duty_mode(&self) -> u8 {
-        self.registers[0]>>6
-    }
-
-    fn get_freq_timer(&self) -> u16 {
-        (self.registers[2] as u16) | (((self.registers[3] & 7) as u16)<<8)
-    }
-
-    /// Clock the channel
-    fn cycle(&mut self) {
-        if self.freq_counter > 0 {
-            self.freq_counter -= 1;
-        } else {
-            self.freq_counter = self.get_freq_timer();
-            self.duty_counter = (self.duty_counter + 1) & 0x07;
-        }
-    }
-
-    /// Clock the envelope
-    fn envelope_clock(&mut self) {
-        self.envelope.clock(&self.registers);
-    }
-
-    /// Clock the sweep
-    fn clock_sweep(&mut self) {
-        self.sweep.clock(&self.registers);
-    }
-
-    /// Return the audio sample for this channel
-    fn audio(&self) -> f32 {
-        if self.length != 0 && DUTY_TABLE[self.get_duty_mode() as usize][self.duty_counter as usize] != 0 {
-            self.envelope.audio_output(&self.registers[..]) as f32 / 255.0
-        }
-        else {
-            0.0
-        }
-    }
-}
+mod square;
+use square::ApuSquareChannel;
 
 /// A noise channel for the apu
 #[non_exhaustive]
@@ -221,36 +144,8 @@ impl ApuNoiseChannel {
     }
 }
 
-/// A triangle channel for the apu
-#[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ApuTriangleChannel {
-    /// The channel registers
-    registers: [u8; 4],
-    /// The length of the channel for playback
-    length: u8,
-    /// The counter for the channel
-    counter: u8,
-}
-
-impl ApuTriangleChannel {
-    /// Create a new triangle channel
-    fn new() -> Self {
-        Self {
-            registers: [0; 4],
-            length: 0,
-            counter: 0,
-        }
-    }
-
-    /// Clock the channel
-    fn cycle(&mut self) {}
-
-    /// Return the audio sample for this channel
-    fn audio(&self) -> f32 {
-        self.counter as f32
-    }
-}
+mod triangle;
+use triangle::ApuTriangleChannel;
 
 /// A dmc channel for the apu
 #[non_exhaustive]
@@ -574,11 +469,11 @@ impl NesApu {
             self.timing_clock = self.timing_clock.wrapping_add(1);
             self.squares[0].cycle();
             self.squares[1].cycle();
-            self.triangle.cycle();
             self.noise.cycle();
             self.dmc.cycle(self.timing_clock);
         }
         self.clock ^= true;
+        self.triangle.cycle();
 
         if self.sound_disabled_clock < 2048 {
             self.sound_disabled_clock += 1;

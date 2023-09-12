@@ -559,63 +559,47 @@ impl TrackedWindow<NesEmulatorData> for CpuMemoryDumpWindow {
                     for i in (0..=0xFFFF).step_by(8) {
                         let a1 = if let Some(a) = c.mb.memory_dump(i, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a2 = if let Some(a) = c.mb.memory_dump(i+1, &c.cpu_peripherals) {
+                        let a2 = if let Some(a) = c.mb.memory_dump(i + 1, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a3 = if let Some(a) = c.mb.memory_dump(i+2, &c.cpu_peripherals) {
+                        let a3 = if let Some(a) = c.mb.memory_dump(i + 2, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a4 = if let Some(a) = c.mb.memory_dump(i+3, &c.cpu_peripherals) {
+                        let a4 = if let Some(a) = c.mb.memory_dump(i + 3, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a5 = if let Some(a) = c.mb.memory_dump(i+4, &c.cpu_peripherals) {
+                        let a5 = if let Some(a) = c.mb.memory_dump(i + 4, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a6 = if let Some(a) = c.mb.memory_dump(i+5, &c.cpu_peripherals) {
+                        let a6 = if let Some(a) = c.mb.memory_dump(i + 5, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a7 = if let Some(a) = c.mb.memory_dump(i+6, &c.cpu_peripherals) {
+                        let a7 = if let Some(a) = c.mb.memory_dump(i + 6, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
-                        let a8 = if let Some(a) = c.mb.memory_dump(i+7, &c.cpu_peripherals) {
+                        let a8 = if let Some(a) = c.mb.memory_dump(i + 7, &c.cpu_peripherals) {
                             format!("{:02X}", a)
-                        }
-                        else {
+                        } else {
                             format!("**")
                         };
                         ui.label(format!(
                             "{:04X}: {} {} {} {}\t{} {} {} {}",
-                            i,
-                            a1,
-                            a2,
-                            a3,
-                            a4,
-                            a5,
-                            a6,
-                            a7,
-                            a8,
+                            i, a1, a2, a3, a4, a5, a6, a7, a8,
                         ));
                     }
                 }

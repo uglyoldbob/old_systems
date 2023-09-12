@@ -48,7 +48,7 @@ impl Mapper01 {
         (a10, false)
     }
 
-    fn ppu_read(&self, addr: u16, cart: &NesCartridgeData,) -> Option<u8> {
+    fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
         if (self.registers[0] & 0x10) != 0 {
             //two separate 4kb banks
             match addr {
@@ -179,8 +179,7 @@ impl NesMapperTrait for Mapper01 {
                 self.shift_counter = 0;
                 self.shift_register = 0;
             }
-        }
-        else if (0x6000..=0x7fff).contains(&addr) {
+        } else if (0x6000..=0x7fff).contains(&addr) {
             let mut addr2 = addr & 0x1fff;
             if !cart.prg_ram.is_empty() {
                 addr2 %= cart.prg_ram.len() as u16;
