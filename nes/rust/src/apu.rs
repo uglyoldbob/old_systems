@@ -105,44 +105,8 @@ impl ApuEnvelope {
 mod square;
 use square::ApuSquareChannel;
 
-/// A noise channel for the apu
-#[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ApuNoiseChannel {
-    /// The channel registers
-    registers: [u8; 4],
-    /// The length of the channel
-    length: u8,
-    /// The counter for the channel
-    counter: u8,
-    /// The envelope for sound generation
-    envelope: ApuEnvelope,
-}
-
-impl ApuNoiseChannel {
-    /// Create a new channel
-    fn new() -> Self {
-        Self {
-            registers: [0; 4],
-            length: 0,
-            counter: 0,
-            envelope: ApuEnvelope::new(),
-        }
-    }
-
-    /// clock the channel
-    fn cycle(&mut self) {}
-
-    /// Clock the envelope
-    fn envelope_clock(&mut self) {
-        self.envelope.clock(&self.registers);
-    }
-
-    /// Return the audio sample for this channel
-    fn audio(&self) -> f32 {
-        self.counter as f32
-    }
-}
+mod noise;
+use noise::ApuNoiseChannel;
 
 mod triangle;
 use triangle::ApuTriangleChannel;

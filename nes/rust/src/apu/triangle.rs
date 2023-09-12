@@ -33,11 +33,14 @@ impl ApuTriangleChannel {
 
     /// Clock the channel
     pub fn cycle(&mut self) {
-        if self.counter > 0 {
-            self.counter -= 1;
-        } else {
-            self.counter = (self.registers[2] as u16) | ((self.registers[3] & 7) as u16) << 8;
-            self.sequence_index = (self.sequence_index + 1) & 0x1f;
+        let timer = (self.registers[2] as u16) | ((self.registers[3] & 7) as u16) << 8;
+        if self.length != 0 && timer != 0 {
+            if self.counter > 0 {
+                self.counter -= 1;
+            } else {
+                self.counter = timer;
+                self.sequence_index = (self.sequence_index + 1) & 0x1f;
+            }
         }
     }
 
