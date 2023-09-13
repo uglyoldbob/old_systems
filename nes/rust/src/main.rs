@@ -361,6 +361,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             ui.close_menu();
                             windows_to_create.push(CartridgeMemoryDumpWindow::new_request());
                         }
+                        if ui.button("Dump Cartridge RAM").clicked() {
+                            ui.close_menu();
+                            windows_to_create.push(cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new_request());
+                        }
                         if ui.button("Dump ppu pattern table").clicked() {
                             ui.close_menu();
                             windows_to_create
@@ -437,6 +441,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 }
 
 mod pattern_table_dump_window;
+mod cartridge_prg_ram_dump;
 
 /// The window for dumping cartridge program data
 #[cfg(feature = "egui-multiwin")]
@@ -452,7 +457,7 @@ impl CartridgeMemoryDumpWindow {
                     width: 320.0,
                     height: 240.0,
                 })
-                .with_title("UglyOldBob NES CPU Dump"),
+                .with_title("UglyOldBob NES Cartridge ROM Dump"),
             options: egui_multiwin::tracked_window::TrackedWindowOptions {
                 vsync: false,
                 shader: None,

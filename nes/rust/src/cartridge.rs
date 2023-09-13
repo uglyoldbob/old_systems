@@ -225,18 +225,18 @@ impl NesCartridge {
         };
 
         let ram_size = if (rom_contents[6] & 2) != 0 {
-            0x1fff
+            0x2000
         } else {
             rom_contents[8] as usize * 8192
         };
         let mut prg_ram = Vec::with_capacity(ram_size);
         if ram_size > 0 {
-            println!("Initializing prg_ram with zeros data");
+            println!("Initializing prg_ram with random data");
         } else {
             println!("No prg_ram");
         }
         for _i in 0..ram_size {
-            let v = 0; //rand::random();
+            let v = rand::random();
             prg_ram.push(v);
         }
 
