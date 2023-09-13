@@ -48,59 +48,8 @@ impl ApuSweep {
     }
 }
 
-/// An envelope sequencer for the apu
-#[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ApuEnvelope {
-    /// Initiates reload of the timers
-    startflag: bool,
-    /// The divider for feeding the decay timer
-    divider: u8,
-    /// The counter for envelope output
-    decay: u8,
-}
-
-impl ApuEnvelope {
-    /// Create a new envelope
-    fn new() -> Self {
-        Self {
-            startflag: false,
-            divider: 0,
-            decay: 0,
-        }
-    }
-
-    /// Returns the audio level of the envelope
-    fn audio_output(&self, regs: &[u8]) -> u8 {
-        let cv_flag = (regs[0] & 0x10) != 0;
-        if cv_flag {
-            regs[0] & 0xF
-        } else {
-            self.decay
-        }
-    }
-
-    /// Clock the envelope
-    fn clock(&mut self, regs: &[u8]) {
-        let cv = regs[0] & 0xF;
-        // True when the envelope should loop
-        let eloop = (regs[0] & 0x20) != 0;
-
-        if !self.startflag {
-            if self.divider == 0 {
-                self.divider = cv;
-                if self.decay > 0 {
-                    self.decay -= 1;
-                } else if eloop {
-                    self.decay = 15;
-                }
-            }
-        } else {
-            self.decay = 15;
-            self.divider = cv;
-        }
-    }
-}
+mod envelope;
+use envelope::ApuEnvelope;
 
 mod square;
 use square::ApuSquareChannel;
@@ -304,11 +253,7 @@ impl NesApu {
 
     /// Build an audio sample and run the audio filter
     fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
-        let audio = self.squares[0].audio()
-            + self.squares[1].audio()
-            + self.triangle.audio()
-            + self.noise.audio()
-            + self.dmc.audio();
+        let audio = self.dmc.audio();
         if let Some(filter) = filter {
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
@@ -398,12 +343,14 @@ impl NesApu {
                 if (self.status & (1 << 0)) != 0 {
                     self.squares[0].length = NesApu::LENGTH_TABLE[length as usize];
                 }
+                self.squares[0].envelope.restart();
             }
             7 => {
                 let length = data >> 3;
                 if (self.status & (1 << 1)) != 0 {
                     self.squares[1].length = NesApu::LENGTH_TABLE[length as usize];
                 }
+                self.squares[1].envelope.restart();
             }
             0xb => {
                 let length = data >> 3;
@@ -416,6 +363,7 @@ impl NesApu {
                 if (self.status & (1 << 3)) != 0 {
                     self.noise.length = NesApu::LENGTH_TABLE[length as usize];
                 }
+                self.noise.envelope.restart();
             }
             0x10 => {
                 self.dmc.interrupt_flag = false;

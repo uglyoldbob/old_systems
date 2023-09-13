@@ -15,7 +15,7 @@ pub struct ApuSquareChannel {
     /// The counter for the channel
     counter: u8,
     /// The envelope for sound generation
-    envelope: ApuEnvelope,
+    pub envelope: ApuEnvelope,
     /// The sweep module
     sweep: ApuSweep,
     /// The counter for duty cycle

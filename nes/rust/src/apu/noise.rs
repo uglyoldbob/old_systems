@@ -13,14 +13,12 @@ pub struct ApuNoiseChannel {
     /// The counter for the channel
     counter: u16,
     /// The envelope for sound generation
-    envelope: ApuEnvelope,
+    pub envelope: ApuEnvelope,
     /// The shift counter for random noise generation
     shift_ctr: u16,
 }
 
-const FREQ_TABLE: [u16; 16] = [
-    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
-];
+const FREQ_TABLE: [u16; 16] = [ 4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
 
 impl ApuNoiseChannel {
     /// Create a new channel
@@ -38,12 +36,14 @@ impl ApuNoiseChannel {
     pub fn cycle(&mut self) {
         if self.counter > 0 {
             self.counter -= 1;
-        } else {
-            self.counter = FREQ_TABLE[(self.registers[3] & 0xF) as usize];
+        }
+        else {
+            self.counter = FREQ_TABLE[(self.registers[2] & 0xF) as usize] - 1;
 
             let shift = if (self.registers[3] & 0x80) != 0 {
                 6
-            } else {
+            }
+            else {
                 1
             };
             let bit1 = self.shift_ctr & 1; // Bit 0
@@ -60,7 +60,7 @@ impl ApuNoiseChannel {
 
     /// Return the audio sample for this channel
     pub fn audio(&self) -> f32 {
-        if self.shift_ctr & 1 == 0 && self.length != 0 {
+        if ((self.shift_ctr & 1) == 0) && self.length != 0 {
             self.envelope.audio_output(&self.registers[..]) as f32 / 255.0
         } else {
             0.0
