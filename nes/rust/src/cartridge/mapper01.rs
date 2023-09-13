@@ -174,7 +174,6 @@ impl NesMapperTrait for Mapper01 {
             }
             if self.shift_counter == 5 {
                 let adr_select = (addr & 0x6000) >> 13;
-                println!("Register {} is now {:x}", adr_select, self.shift_register);
                 self.update_register(adr_select as u8, self.shift_register);
                 self.shift_counter = 0;
                 self.shift_register = 0;

@@ -92,14 +92,20 @@ impl RomListParser {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
                     println!("Checking2 {}", name);
-                    if NesCartridge::load_cartridge(name.clone()).is_ok() {
-                        println!("{} is ok", name);
-                        self.list.elements.entry(m).or_insert_with(|| RomListEntry {
-                            result: None,
-                            modified: None,
-                        });
-                    } else {
-                        println!("{} NOT GOOD", name);
+                    let cart = NesCartridge::load_cartridge(name.clone());
+                    match cart {
+                        Ok(_cart) => {
+                            self.list.elements.entry(m).or_insert_with(|| RomListEntry {
+                                result: None,
+                                modified: None,
+                            });
+                        }
+                        Err(e) => {
+                            self.list.elements.entry(m).or_insert_with(|| RomListEntry {
+                                result: Some(Err(e)),
+                                modified: None,
+                            });
+                        }
                     }
                 }
             }
