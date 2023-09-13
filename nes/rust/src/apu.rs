@@ -146,6 +146,11 @@ impl NesApu {
         self.dmc.sample_buffer = Some(data);
         self.dmc.dma_result = Some(data);
 
+        self.dmc.dma_address = self.dmc.dma_address.wrapping_add(1);
+        if self.dmc.dma_address == 0 {
+            self.dmc.dma_address = 0x8000;
+        }
+
         if self.dmc.length == 0 {
             if self.dmc.loop_flag {
                 self.dmc.length = self.dmc.programmed_length;
@@ -253,9 +258,13 @@ impl NesApu {
 
     /// Build an audio sample and run the audio filter
     fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
-        let audio = self.dmc.audio();
+        let audio = self.squares[0].audio()
+            + self.squares[1].audio()
+            + self.triangle.audio()
+            + self.noise.audio()
+            + self.dmc.audio();
         if let Some(filter) = filter {
-            let e = filter.run(audio / 5.0);
+            let e = filter.run(audio / 2.5 - 1.0);
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
                 self.output_index -= self.sample_interval;
@@ -316,7 +325,7 @@ impl NesApu {
     pub fn write(&mut self, addr: u16, data: u8) {
         let addr2 = addr % 24;
         let mut halt = false;
-        match addr {
+        match addr2 {
             0 | 4 | 12 => {
                 if (data & 0x20) != 0 {
                     //println!("Halt channel");
@@ -370,6 +379,12 @@ impl NesApu {
                 self.dmc.rate = NesApu::DMC_RATE_TABLE[(data & 0xF) as usize] / 2 - 1;
                 self.dmc.interrupt_enable = (data & 0x80) != 0;
                 self.dmc.loop_flag = (data & 0x40) != 0;
+            }
+            0x11 => {
+                self.dmc.output = data & 0x7f;
+            }
+            0x12 => {
+                self.dmc.dma_address = 0xC000 + (data as u16 * 64);
             }
             0x13 => {
                 self.dmc.programmed_length = (data as u16) * 16 + 1;
@@ -447,27 +462,8 @@ impl NesApu {
     }
 
     /// Read the apu register, it is assumed that the only readable address is filtered before making it to this function
-    pub fn read(&mut self, _addr: u16) -> u8 {
-        let mut data = self.status & 0x40;
-        if self.dmc.interrupt_flag {
-            data |= 0x80;
-        }
-
-        if self.squares[0].length > 0 {
-            data |= 1;
-        }
-        if self.squares[1].length > 0 {
-            data |= 1 << 1;
-        }
-        if self.triangle.length > 0 {
-            data |= 1 << 2;
-        }
-        if self.noise.length > 0 {
-            data |= 1 << 3;
-        }
-        if self.dmc.length > 0 {
-            data |= 1 << 4;
-        }
+    pub fn read(&mut self, addr: u16) -> u8 {
+        let data = self.dump(addr);
         self.status &= !0x40;
         data
     }

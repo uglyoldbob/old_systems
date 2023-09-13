@@ -18,7 +18,9 @@ pub struct ApuNoiseChannel {
     shift_ctr: u16,
 }
 
-const FREQ_TABLE: [u16; 16] = [ 4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068];
+const FREQ_TABLE: [u16; 16] = [
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
+];
 
 impl ApuNoiseChannel {
     /// Create a new channel
@@ -36,14 +38,12 @@ impl ApuNoiseChannel {
     pub fn cycle(&mut self) {
         if self.counter > 0 {
             self.counter -= 1;
-        }
-        else {
+        } else {
             self.counter = FREQ_TABLE[(self.registers[2] & 0xF) as usize] - 1;
 
             let shift = if (self.registers[3] & 0x80) != 0 {
                 6
-            }
-            else {
+            } else {
                 1
             };
             let bit1 = self.shift_ctr & 1; // Bit 0

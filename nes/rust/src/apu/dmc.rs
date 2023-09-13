@@ -15,7 +15,7 @@ pub struct ApuDmcChannel {
     /// The programmed rate for the channel
     pub rate: u16,
     /// The counter for the divider used in the channel
-    pub rate_counter: u16,
+    rate_counter: u16,
     /// The programmed length for the channel
     pub programmed_length: u16,
     /// Length parameter for playback
@@ -74,6 +74,18 @@ impl ApuDmcChannel {
             self.rate_counter -= 1;
         } else {
             self.rate_counter = self.rate;
+
+            if !self.silence && self.playing {
+                if (self.shift_register & 1) != 0 {
+                    if self.output <= 125 {
+                        self.output += 2;
+                    }
+                } else if self.output >= 2 {
+                    self.output -= 2;
+                }
+                self.shift_register >>= 1;
+            }
+
             if self.bit_counter < 7 {
                 self.bit_counter += 1;
             } else {
@@ -95,6 +107,6 @@ impl ApuDmcChannel {
 
     /// Return the audio sample for this channel
     pub fn audio(&self) -> f32 {
-        self.output as f32
+        (self.output as f32) / 255.0
     }
 }
