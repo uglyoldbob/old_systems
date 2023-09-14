@@ -1138,6 +1138,64 @@ impl NesPpu {
         &self.frame_data
     }
 
+    /// Renders the entire nametable into the given buffer
+    pub fn render_nametable(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
+        for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
+            let col = i & 0xFF;
+            let row = i / 512;
+            let left = (i % 512) < 256;
+            let top = (i / 512) < 240;
+            let quadrant = match (left, top) {
+                (true, true) => 0,
+                (false, true) => 1,
+                (true, false) => 2,
+                (false, false) => 3,
+            };
+            let base_address = 0x2000 + 0x400 * quadrant;
+            let offset = (row as u16 / 8) << 5 | (col as u16 / 8);
+            let nametable = bus.ppu_peek(base_address + offset);
+
+            let base_address = match quadrant {
+                0 => 0x23c0,
+                1 => 0x27c0,
+                2 => 0x2bc0,
+                _ => 0x2fc0,
+            };
+            let offset = (row as u16 / 32) << 3 | (col as u16 / 32);
+            let attribute = bus.ppu_peek(base_address + offset);
+
+            let table = self.background_patterntable_base();
+            let base = table as u16;
+            let offset = (nametable as u16) << 4;
+            let calc = base + offset + (row as u16) % 8;
+            if i < 512 {
+                println!("Address {:x} -> {:x}", i, calc);
+            }
+            let data_low = bus.ppu_peek(calc);
+            let data_high = bus.ppu_peek(calc + 8);
+
+            let index = 7 - (i % 8);
+            let upper_bit = (data_high >> index) & 1;
+            let lower_bit = (data_low >> index) & 1;
+
+            let modx = ((col as u8) / 16) & 1;
+            let mody = (((row as u16) / 16) & 1) as u8;
+            let combined = (mody << 1) | modx;
+            let extra_palette_bits = (attribute >> (2 * combined)) & 3;
+
+            let mut palette_entry =
+                ((extra_palette_bits << 2) | (upper_bit << 1) | lower_bit) as u16;
+            if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                palette_entry &= 0x30;
+            }
+            let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
+            let p = PPU_PALETTE[pixel_entry as usize];
+            pixel[0] = p[0];
+            pixel[1] = p[1];
+            pixel[2] = p[2];
+        }
+    }
+
     /// Renders the entire pattern table into the given buffer
     pub fn render_pattern_table(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
@@ -1160,7 +1218,8 @@ impl NesPpu {
             let upper_bit = (data_high >> index) & 1;
             let lower_bit = (data_low >> index) & 1;
 
-            let mut palette_entry = ((upper_bit << 1) | lower_bit) as u16;
+            let mut palette_entry =
+                ((upper_bit << 1) | lower_bit) as u16;
             if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                 palette_entry &= 0x30;
             }

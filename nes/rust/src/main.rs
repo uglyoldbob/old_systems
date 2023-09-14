@@ -370,6 +370,11 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             windows_to_create
                                 .push(pattern_table_dump_window::DumpWindow::new_request());
                         }
+                        if ui.button("Dump ppu name tables").clicked() {
+                            ui.close_menu();
+                            windows_to_create
+                                .push(name_table_dump_window::DumpWindow::new_request());
+                        }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();
                             c.reset();
@@ -442,6 +447,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
 mod pattern_table_dump_window;
 mod cartridge_prg_ram_dump;
+mod name_table_dump_window;
 
 /// The window for dumping cartridge program data
 #[cfg(feature = "egui-multiwin")]
