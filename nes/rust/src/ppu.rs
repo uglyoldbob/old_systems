@@ -676,7 +676,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = base + offset + (self.scanline_number + self.scrolly as u16) % 8;
+                    let calc = base + offset + ((self.scanline_number + self.scrolly as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -691,7 +691,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + (self.scanline_number + self.scrolly as u16) % 8;
+                    let calc = 8 + base + offset + ((self.scanline_number + self.scrolly as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -901,8 +901,8 @@ impl NesPpu {
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
 
-                    let modx = ((cycle) / 16) & 1;
-                    let mody = (((self.scanline_number + self.scrolly as u16) / 16) & 1) as u8;
+                    let modx = (((cycle as u16 + self.scrollx as u16) / 16) & 1) as u8;
+                    let mody = ((((self.scanline_number + self.scrolly as u16) % 240) / 16) & 1) as u8;
                     let combined = (mody << 1) | modx;
                     let extra_palette_bits = (self.attributetable_shift[0] >> (2 * combined)) & 3;
 
