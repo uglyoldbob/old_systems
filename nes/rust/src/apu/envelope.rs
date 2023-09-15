@@ -22,6 +22,7 @@ impl ApuEnvelope {
         }
     }
 
+    /// Restart the envelope counter by setting the flag that eventually causes a reset.
     pub fn restart(&mut self) {
         self.startflag = true;
     }

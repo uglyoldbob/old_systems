@@ -37,7 +37,7 @@ impl Mapper01 {
     fn update_register(&mut self, adr: u8, data: u8) {
         self.registers[adr as usize] = data;
     }
-
+    /// Check the mirroring bit for the ppu addressing.
     fn check_mirroring(&self, addr: u16) -> (bool, bool) {
         let control = self.registers[0];
         let a10 = match control & 3 {
@@ -47,7 +47,7 @@ impl Mapper01 {
         };
         (a10, false)
     }
-
+    /// Perform a ppu read operation
     fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
         if (self.registers[0] & 0x10) != 0 {
             //two separate 4kb banks

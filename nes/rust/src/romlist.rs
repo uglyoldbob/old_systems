@@ -5,9 +5,10 @@ use crate::cartridge::{CartridgeError, NesCartridge};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Data gathered fromm a successful rom load
+/// Data gathered from a successful rom load
 #[derive(Serialize, Deserialize)]
 pub struct RomListResult {
+    /// The mapper number of the rom
     pub mapper: u32,
 }
 

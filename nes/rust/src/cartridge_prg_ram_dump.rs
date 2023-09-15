@@ -1,3 +1,5 @@
+//! This module is for the window that dumps cartridge program ram data.
+
 use crate::NesEmulatorData;
 use egui_multiwin::{
     egui_glow::EguiGlow,
@@ -10,6 +12,7 @@ use egui_multiwin::{
 pub struct CartridgeMemoryDumpWindow {}
 
 impl CartridgeMemoryDumpWindow {
+    /// Create a request to create a new window of self.
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(CartridgeMemoryDumpWindow {}),

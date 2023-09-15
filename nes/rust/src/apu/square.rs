@@ -24,6 +24,7 @@ pub struct ApuSquareChannel {
     freq_counter: u16,
 }
 
+/// A lookup table to determine the duty cycle of the square wave.
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 1, 0, 0, 0, 0, 0, 0],
     [0, 1, 1, 0, 0, 0, 0, 0],
@@ -45,10 +46,12 @@ impl ApuSquareChannel {
         }
     }
 
+    /// Retrieves the duty cycle mode.
     pub fn get_duty_mode(&self) -> u8 {
         self.registers[0] >> 6
     }
 
+    /// Calculates the timer period from the registers.
     pub fn get_freq_timer(&self) -> u16 {
         (self.registers[2] as u16) | (((self.registers[3] & 7) as u16) << 8)
     }

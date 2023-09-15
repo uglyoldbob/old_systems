@@ -9,20 +9,21 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
-/// A rgb image of variable size
+/// A rgb image of variable size. Each pixel is 8 bits per channel, red, green, blue.
 pub struct RgbImage {
+    /// The raw data of the image
     data: Vec<u8>,
+    /// The width of the image in pixels.
     pub width: u16,
+    /// The height of the image in pixels.
     pub height: u16,
 }
 
 impl RgbImage {
+    /// Create a blank rgb image of the specified dimensions.
     pub fn new(w: u16, h: u16) -> Self {
         let cap = w as usize * h as usize * 3;
-        let mut m = Vec::with_capacity(cap);
-        for _ in 0..cap {
-            m.push(0);
-        }
+        let m = vec![0;cap];
         Self {
             data: m,
             width: w,
@@ -102,8 +103,7 @@ impl PpuSprite {
                 } else {
                     1
                 }
-            }
-            else {
+            } else {
                 if (scanline - self.y) < 8 {
                     1
                 } else {
@@ -115,8 +115,7 @@ impl PpuSprite {
         };
         if (self.attribute & 0x80) == 0 {
             (adder + calc) * 0x10
-        }
-        else {
+        } else {
             (adder + calc) * 0x10 - 1
         }
     }
@@ -1204,7 +1203,7 @@ impl NesPpu {
             let attribute = bus.ppu_peek(base_address + offset);
 
             let table = self.background_patterntable_base();
-            let base = table as u16;
+            let base = table;
             let offset = (nametable as u16) << 4;
             let calc = base + offset + (row as u16) % 8;
 

@@ -17,7 +17,7 @@ pub struct ApuNoiseChannel {
     /// The shift counter for random noise generation
     shift_ctr: u16,
 }
-
+/// The periods for the various noise channel settings. Units are clock cycles.
 const FREQ_TABLE: [u16; 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
 ];

@@ -23,7 +23,7 @@ impl Mapper03 {
             ppu_address: 0,
         })
     }
-
+    /// Check the mirroring bit for the ppu addressing.
     fn check_mirroring(&self, addr: u16) -> (bool, bool) {
         let a10 = if self.mirror_vertical {
             (addr & 1 << 10) != 0
@@ -32,7 +32,7 @@ impl Mapper03 {
         };
         (a10, false)
     }
-
+    /// Perform a ppu read operation
     fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
         if cart.chr_rom.is_empty() {
             return None;

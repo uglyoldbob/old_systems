@@ -128,6 +128,7 @@ pub enum CartridgeError {
     RomTooShort,
 }
 
+/// Calculate the sha256 of a chunk of data, and return it in a hex encoded string.
 fn calc_sha256(data: &[u8]) -> String {
     let mut context = ring::digest::Context::new(&ring::digest::SHA256);
     context.update(data);
@@ -279,7 +280,7 @@ impl NesCartridge {
 
         Ok(Self {
             data: rom_data,
-            mapper: mapper,
+            mapper,
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
             save: format!("{}.save", calc_sha256(rom_contents)),

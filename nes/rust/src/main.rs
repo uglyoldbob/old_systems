@@ -400,18 +400,16 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             load_state = true;
         }
 
-
         let name = if let Some(cart) = c.mb.cartridge() {
             cart.save_name()
-        }
-        else {
+        } else {
             "./state.bin".to_string()
         };
         let name = format!("./saves/{}", name);
         if save_state {
             let mut path = std::path::PathBuf::from(&name);
             path.pop();
-            std::fs::create_dir_all(path);
+            let _ = std::fs::create_dir_all(path);
             let state = Box::new(c.serialize());
             let _e = std::fs::OpenOptions::new()
                 .write(true)
@@ -472,6 +470,7 @@ mod pattern_table_dump_window;
 struct CartridgeMemoryDumpWindow {}
 
 impl CartridgeMemoryDumpWindow {
+    /// Create a request to create a new window of self.
     fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(CartridgeMemoryDumpWindow {}),
@@ -544,6 +543,7 @@ impl TrackedWindow<NesEmulatorData> for CartridgeMemoryDumpWindow {
 struct CpuMemoryDumpWindow {}
 
 impl CpuMemoryDumpWindow {
+    /// Create a request to create a new window of self.
     fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(CpuMemoryDumpWindow {}),
@@ -589,42 +589,42 @@ impl TrackedWindow<NesEmulatorData> for CpuMemoryDumpWindow {
                         let a1 = if let Some(a) = c.mb.memory_dump(i, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a2 = if let Some(a) = c.mb.memory_dump(i + 1, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a3 = if let Some(a) = c.mb.memory_dump(i + 2, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a4 = if let Some(a) = c.mb.memory_dump(i + 3, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a5 = if let Some(a) = c.mb.memory_dump(i + 4, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a6 = if let Some(a) = c.mb.memory_dump(i + 5, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a7 = if let Some(a) = c.mb.memory_dump(i + 6, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         let a8 = if let Some(a) = c.mb.memory_dump(i + 7, &c.cpu_peripherals) {
                             format!("{:02X}", a)
                         } else {
-                            format!("**")
+                            "**".to_string()
                         };
                         ui.label(format!(
                             "{:04X}: {} {} {} {}\t{} {} {} {}",
@@ -644,6 +644,7 @@ impl TrackedWindow<NesEmulatorData> for CpuMemoryDumpWindow {
 /// The structure for a debug window of the emulator.
 #[cfg(feature = "egui-multiwin")]
 struct DebugNesWindow {
+    /// The string for a new breakpoint, in hexadecimal characters.
     breakpoint: String,
 }
 
@@ -830,25 +831,22 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 let mut new_rom = None;
                 for (p, entry) in self.parser.list().elements.iter() {
-                    if let Some(r) = &entry.result {
-                        if let Ok(r) = r {
-                            if ui
-                                .add(
-                                    egui_multiwin::egui::Label::new(format!(
-                                        "{:x}: {}",
-                                        r.mapper,
-                                        p.display()
-                                    ))
-                                    .sense(Sense::click()),
-                                )
-                                .double_clicked()
-                            {
-                                new_rom = Some(
-                                    NesCartridge::load_cartridge(p.to_str().unwrap().into())
-                                        .unwrap(),
-                                );
-                                quit = true;
-                            }
+                    if let Some(Ok(r)) = &entry.result {
+                        if ui
+                            .add(
+                                egui_multiwin::egui::Label::new(format!(
+                                    "{:x}: {}",
+                                    r.mapper,
+                                    p.display()
+                                ))
+                                .sense(Sense::click()),
+                            )
+                            .double_clicked()
+                        {
+                            new_rom = Some(
+                                NesCartridge::load_cartridge(p.to_str().unwrap().into()).unwrap(),
+                            );
+                            quit = true;
                         }
                     }
                 }

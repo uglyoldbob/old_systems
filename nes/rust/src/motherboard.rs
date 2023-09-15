@@ -63,7 +63,7 @@ impl NesMotherboard {
     /// Return a reference to the cartridge if it exists
     pub fn cartridge(&self) -> Option<&NesCartridge> {
         if let Some(c) = &self.cart {
-            Some(&c)
+            Some(c)
         } else {
             None
         }
