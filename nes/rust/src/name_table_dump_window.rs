@@ -57,9 +57,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("PPU Pattern Table Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
-                c.cpu_peripherals
-                    .ppu
-                    .render_nametable(&mut self.buf, &c.mb);
+                c.cpu_peripherals.ppu.render_nametable(&mut self.buf, &c.mb);
                 let image = self.buf.to_egui();
                 if self.texture.is_none() {
                     self.texture = Some(egui.egui_ctx.load_texture(

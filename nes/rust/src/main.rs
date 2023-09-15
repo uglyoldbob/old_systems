@@ -363,7 +363,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         }
                         if ui.button("Dump Cartridge RAM").clicked() {
                             ui.close_menu();
-                            windows_to_create.push(cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new_request());
+                            windows_to_create.push(
+                                cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new_request(),
+                            );
                         }
                         if ui.button("Dump ppu pattern table").clicked() {
                             ui.close_menu();
@@ -416,7 +418,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
-                ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
+                let r = ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
+                if r.hovered() {
+                    if let Some(pos) = r.hover_pos() {
+                        //println!("Hover at {:?}", pos - r.rect.left_top());
+                    }
+                }
             }
             ui.label(format!("{:.0} FPS", self.fps));
         });
@@ -445,9 +452,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
     }
 }
 
-mod pattern_table_dump_window;
 mod cartridge_prg_ram_dump;
 mod name_table_dump_window;
+mod pattern_table_dump_window;
 
 /// The window for dumping cartridge program data
 #[cfg(feature = "egui-multiwin")]
