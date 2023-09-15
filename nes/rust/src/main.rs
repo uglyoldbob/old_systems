@@ -400,18 +400,29 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             load_state = true;
         }
 
+
+        let name = if let Some(cart) = c.mb.cartridge() {
+            cart.save_name()
+        }
+        else {
+            "./state.bin".to_string()
+        };
+        let name = format!("./saves/{}", name);
         if save_state {
+            let mut path = std::path::PathBuf::from(&name);
+            path.pop();
+            std::fs::create_dir_all(path);
             let state = Box::new(c.serialize());
             let _e = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
-                .open("./state.bin")
+                .open(&name)
                 .unwrap()
                 .write_all(&state);
         }
 
         if load_state {
-            if let Ok(a) = std::fs::read("./state.bin") {
+            if let Ok(a) = std::fs::read(&name) {
                 let _e = c.deserialize(a);
             }
         }
@@ -1076,7 +1087,6 @@ fn main() {
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let event_loop = egui_multiwin::winit::event_loop::EventLoopBuilder::with_user_event().build();
     let mut nes_data = NesEmulatorData::new();
-    nes_data.paused = true;
     let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();

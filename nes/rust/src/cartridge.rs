@@ -109,6 +109,8 @@ pub struct NesCartridge {
     mappernum: u32,
     /// Rom format loaded from
     pub rom_format: RomFormat,
+    /// The name to use for save games
+    save: String,
 }
 
 /// The types of errors that can occur when loading a rom
@@ -126,12 +128,25 @@ pub enum CartridgeError {
     RomTooShort,
 }
 
+fn calc_sha256(data: &[u8]) -> String {
+    let mut context = ring::digest::Context::new(&ring::digest::SHA256);
+    context.update(data);
+    let digest = context.finish();
+    data_encoding::HEXLOWER.encode(digest.as_ref())
+}
+
 impl NesCartridge {
     /// "Parses" an obsolete ines rom
     fn load_obsolete_ines(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
     }
 
+    /// Retrieve the save name for the cartridge
+    pub fn save_name(&self) -> String {
+        self.save.clone()
+    }
+
+    /// Retrieve the mapper number for the cartridge
     pub fn mappernum(&self) -> u32 {
         self.mappernum
     }
@@ -267,6 +282,7 @@ impl NesCartridge {
             mapper: mapper,
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
+            save: format!("{}.save", calc_sha256(rom_contents)),
         })
     }
 
@@ -358,6 +374,7 @@ impl NesCartridge {
             mapper,
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
+            save: format!("{}.save", calc_sha256(rom_contents)),
         })
     }
 

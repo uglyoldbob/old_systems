@@ -96,15 +96,29 @@ impl PpuSprite {
     pub fn tile_num(&self, scanline: u8) -> u16 {
         let calc = self.tile as u16;
         let adder: u16 = if scanline > self.y {
-            if (scanline - self.y) < 8 {
-                0
-            } else {
-                1
+            if (self.attribute & 0x80) == 0 {
+                if (scanline - self.y) < 8 {
+                    0
+                } else {
+                    1
+                }
+            }
+            else {
+                if (scanline - self.y) < 8 {
+                    1
+                } else {
+                    0
+                }
             }
         } else {
             0
         };
-        (adder + calc) * 0x10
+        if (self.attribute & 0x80) == 0 {
+            (adder + calc) * 0x10
+        }
+        else {
+            (adder + calc) * 0x10 - 1
+        }
     }
 
     /// Returns the line number to render of the sprite, given the scanline being rendered
@@ -906,10 +920,10 @@ impl NesPpu {
                 let cycle = (self.scanline_cycle - 1) as u8;
                 let bg_pixel = if self.should_render_background(cycle) {
                     let prev_tile = ((self.scrollx & 7) + (cycle & 7)) > 7;
-                    if self.scanline_number == 71 && cycle == 200 {
-                        println!("testing");
-                    }
                     let index = 7 - ((cycle.wrapping_add(self.scrollx)) % 8);
+                    if cycle == 48 && self.scanline_number == 48 && self.frame_odd {
+                        println!("scroll is {},{}", self.scrollx, self.scrolly);
+                    }
                     let pt = if !prev_tile {
                         self.patterntable_shift[0].to_le_bytes()
                     } else {
@@ -1174,6 +1188,8 @@ impl NesPpu {
                 (true, false) => 2,
                 (false, false) => 3,
             };
+            let row = row % 240;
+
             let base_address = 0x2000 + 0x400 * quadrant;
             let offset = (row as u16 / 8) << 5 | (col as u16 / 8);
             let nametable = bus.ppu_peek(base_address + offset);
@@ -1191,9 +1207,7 @@ impl NesPpu {
             let base = table as u16;
             let offset = (nametable as u16) << 4;
             let calc = base + offset + (row as u16) % 8;
-            if i < 512 {
-                println!("Address {:x} -> {:x}", i, calc);
-            }
+
             let data_low = bus.ppu_peek(calc);
             let data_high = bus.ppu_peek(calc + 8);
 
