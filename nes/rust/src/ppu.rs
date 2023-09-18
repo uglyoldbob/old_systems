@@ -48,7 +48,7 @@ impl RgbImage {
 
 /// The various modes of evaluating sprites for a scanline
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 enum PpuSpriteEvalMode {
     /// Look for sprites on the current scanline
     Normal,
@@ -95,7 +95,7 @@ impl PpuSprite {
 
     /// Returns the tile number to fetch for this sprite.
     pub fn tile_num(&self, scanline: u8) -> u16 {
-        let calc = self.tile as u16;
+        let calc = self.tile as u16 & 0xFE;
         let adder: u16 = if scanline > self.y {
             if (self.attribute & 0x80) == 0 {
                 if (scanline - self.y) < 8 {
@@ -138,7 +138,7 @@ impl PpuSprite {
 /// The structure for the nes PPU (picture processing unit)
 #[non_exhaustive]
 #[serde_with::serde_as]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct NesPpu {
     /// The registers for the ppu
     registers: [u8; 8],
@@ -611,13 +611,23 @@ impl NesPpu {
     }
 
     /// Returns the pattern table base for the sprites.
-    fn sprite_patterntable_base(&self) -> u16 {
-        if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0
+    fn sprite_patterntable_base(&self, spr: &PpuSprite) -> u16 {
+        if self.sprite_height() == 16 {
+            if (spr.tile & 1) == 0 {
+                0
+            }
+            else {
+                0x1000
+            }
+        }
+        else {
+            if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0
             || (self.registers[0] & PPU_REGISTER0_SPRITETABLE_BASE) == 0
-        {
-            0
-        } else {
-            0x1000
+            {
+                0
+            } else {
+                0x1000
+            }
         }
     }
 
@@ -797,8 +807,8 @@ impl NesPpu {
                             PpuSpriteEvalMode::Normal => {
                                 //range check
                                 if row < 240
-                                    && row >= self.oamdata
-                                    && row < (self.oamdata + self.sprite_height())
+                                    && row > self.oamdata
+                                    && row <= (self.oamdata + self.sprite_height())
                                 {
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
@@ -1026,6 +1036,7 @@ impl NesPpu {
                 //sprite rendering data to be fetched
                 let cycle = self.scanline_cycle - 257;
                 let sprite_num = cycle / 8;
+                let row = self.scanline_number;
                 if cycle > 0 {
                     if self.should_render_sprites(cycle as u8) {
                         match (cycle / 2) % 4 {
@@ -1033,7 +1044,7 @@ impl NesPpu {
                                 if (cycle & 1) == 0 {
                                     //nametable byte
                                     let x = cycle as u8 / 8;
-                                    let y = (self.scanline_number / 8) as u8;
+                                    let y = (row / 8) as u8;
                                     let base = self.nametable_base();
                                     let offset = y << 5 | x;
                                     bus.ppu_cycle_1(base + offset as u16); //TODO verify this calculation
@@ -1046,8 +1057,9 @@ impl NesPpu {
                             1 => {
                                 if (cycle & 1) == 0 {
                                     //nametable byte
+                                    let cycle = cycle & !2;
                                     let x = cycle as u8 / 8;
-                                    let y = (self.scanline_number / 8) as u8;
+                                    let y = (row / 8) as u8;
                                     let base = self.nametable_base();
                                     let offset = y << 5 | x;
                                     bus.ppu_cycle_1(base + offset as u16); //TODO verify this calculation
@@ -1060,11 +1072,11 @@ impl NesPpu {
                             2 => {
                                 //pattern table tile low
                                 if (cycle & 1) == 0 {
-                                    let base = self.sprite_patterntable_base();
+                                    let base = self.sprite_patterntable_base(&self.sprites[sprite_num as usize]);
                                     let offset = self.sprites[sprite_num as usize]
-                                        .tile_num(self.scanline_number as u8);
+                                        .tile_num(row as u8);
                                     let o2 = self.sprites[sprite_num as usize]
-                                        .line_number(self.scanline_number as u8)
+                                        .line_number(row as u8)
                                         as u16;
                                     let calc = base + offset + o2;
                                     bus.ppu_cycle_1(calc);
@@ -1079,11 +1091,11 @@ impl NesPpu {
                             3 => {
                                 //pattern table tile high
                                 if (cycle & 1) == 0 {
-                                    let base = self.sprite_patterntable_base();
+                                    let base = self.sprite_patterntable_base(&self.sprites[sprite_num as usize]);
                                     let offset = self.sprites[sprite_num as usize]
-                                        .tile_num(self.scanline_number as u8);
+                                        .tile_num(row as u8);
                                     let o2 = self.sprites[sprite_num as usize]
-                                        .line_number(self.scanline_number as u8)
+                                        .line_number(row as u8)
                                         as u16;
                                     let calc = 8 + base + offset + o2;
                                     bus.ppu_cycle_1(calc);
@@ -1172,6 +1184,22 @@ impl NesPpu {
     /// Returns a reference to the frame data stored in the ppu.
     pub fn get_frame(&mut self) -> &[u8; 256 * 240 * 3] {
         &self.frame_data
+    }
+
+    /// Renders all sprites
+    pub fn render_sprites(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
+        for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
+            let row = i / (16 * 128);
+            let column = (i % 128) / 8;
+            let spritex = column & 7;
+            let spritey = column & 15;
+            // zero out pixel first, in case sprite height changes
+            pixel[0] = 0;
+            pixel[1] = 0;
+            pixel[2] = 0;
+
+
+        }
     }
 
     /// Renders the entire nametable into the given buffer
