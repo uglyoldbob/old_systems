@@ -96,7 +96,7 @@ impl PpuSprite {
     /// Returns the tile number to fetch for this sprite.
     pub fn tile_num(&self, scanline: u8) -> u16 {
         let calc = self.tile as u16;
-        let adder: u16 = if scanline > self.y {
+        let adder: u16 = if scanline >= self.y {
             if (self.attribute & 0x80) == 0 {
                 if (scanline - self.y) < 8 {
                     0
