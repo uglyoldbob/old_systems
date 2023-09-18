@@ -95,7 +95,7 @@ impl PpuSprite {
 
     /// Returns the tile number to fetch for this sprite.
     pub fn tile_num(&self, scanline: u8) -> u16 {
-        let calc = self.tile as u16 & 0xFE;
+        let calc = self.tile as u16;
         let adder: u16 = if scanline > self.y {
             if (self.attribute & 0x80) == 0 {
                 if (scanline - self.y) < 8 {
@@ -113,11 +113,7 @@ impl PpuSprite {
         } else {
             0
         };
-        if (self.attribute & 0x80) == 0 {
-            (adder + calc) * 0x10
-        } else {
-            (adder + calc) * 0x10 - 1
-        }
+        (adder + calc) * 0x10
     }
 
     /// Returns the line number to render of the sprite, given the scanline being rendered
@@ -1188,17 +1184,51 @@ impl NesPpu {
 
     /// Renders all sprites
     pub fn render_sprites(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
+        let allsprites = self.get_64_sprites();
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
-            let row = i / (16 * 128);
-            let column = (i % 128) / 8;
-            let spritex = column & 7;
-            let spritey = column & 15;
+            let trow: u16 = (i as u16 / 128) as u16;
+            let tcolumn: u8 = ((i % 128) / 8) as u8;
+            let spritex: u8 = (i & 7) as u8;
+            let spritey: u8 = (trow & 15) as u8;
+            let spritenum: u8 = (tcolumn) + ((trow / 16) * 16) as u8;
+            let sprite = allsprites[spritenum as usize];
             // zero out pixel first, in case sprite height changes
             pixel[0] = 0;
             pixel[1] = 0;
             pixel[2] = 0;
 
+            let base = self.sprite_patterntable_base(&sprite);
+            let offset = sprite
+                .tile_num(sprite.y + spritey as u8);
+            let o2 = sprite
+                .line_number(sprite.y + spritey as u8)
+                as u16;
+            let calc = base + offset + o2;
+            let pattern_low = bus.ppu_peek(calc);
+            let pattern_high = bus.ppu_peek(8 + calc);
 
+
+            let index2 = if (sprite.attribute & 0x40) == 0 {
+                7 - spritex
+            } else {
+                spritex
+            };
+            let upper_bit = (pattern_high >> index2) & 1;
+            let lower_bit = (pattern_low >> index2) & 1;
+
+            if upper_bit != 0 || lower_bit != 0 {
+                let mut palette_entry =
+                    sprite.pallete() | ((upper_bit << 1) | lower_bit) as u16;
+                if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                    palette_entry &= 0x30;
+                }
+                let pixel_entry =
+                    bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
+                let p = PPU_PALETTE[pixel_entry as usize];
+                pixel[0] = p[0];
+                pixel[1] = p[1];
+                pixel[2] = p[2];
+            }
         }
     }
 
