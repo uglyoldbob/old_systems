@@ -577,11 +577,11 @@ impl NesPpu {
         let mut base = self.nametable_base();
         let (x, ox) = x.overflowing_add(self.scrollx);
         if ox {
-            base += 0x400;
+            base ^= 0x400;
         }
         let y = y as u16 + self.scrolly as u16;
         if y > 240 {
-            base += 0x800;
+            base ^= 0x800;
         }
         (base, x, (y % 240) as u8)
     }
@@ -601,11 +601,11 @@ impl NesPpu {
         let mut base = self.attributetable_base();
         let (x, ox) = x.overflowing_add(self.scrollx);
         if ox {
-            base += 0x400;
+            base ^= 0x400;
         }
         let y = y as u16 + self.scrolly as u16;
         if y > 240 {
-            base += 0x800;
+            base ^= 0x800;
         }
         (base, x, (y % 240) as u8)
     }
@@ -695,7 +695,7 @@ impl NesPpu {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
                     let calc =
-                        base + offset + ((self.scanline_number + self.scrolly as u16) % 240) % 8;
+                        base + offset + ((y as u16 + self.scrolly as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -713,7 +713,7 @@ impl NesPpu {
                     let calc = 8
                         + base
                         + offset
-                        + ((self.scanline_number + self.scrolly as u16) % 240) % 8;
+                        + ((y as u16 + self.scrolly as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
