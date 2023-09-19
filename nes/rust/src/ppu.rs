@@ -23,7 +23,7 @@ impl RgbImage {
     /// Create a blank rgb image of the specified dimensions.
     pub fn new(w: u16, h: u16) -> Self {
         let cap = w as usize * h as usize * 3;
-        let m = vec![0;cap];
+        let m = vec![0; cap];
         Self {
             data: m,
             width: w,
@@ -88,14 +88,20 @@ impl PpuSprite {
         }
     }
 
+    /// Returns the tile data for the sprite.
+    pub fn tile(&self) -> u8 {
+        self.tile
+    }
+
     /// Returns the pallete for the sprite
     pub fn pallete(&self) -> u16 {
         ((self.attribute & 3) as u16) << 2
     }
 
     /// Returns the tile number to fetch for this sprite.
-    pub fn tile_num(&self, scanline: u8) -> u16 {
-        let calc = self.tile as u16;
+    pub fn tile_num(&self, scanline: u8, height: u8) -> u16 {
+        let mask = if height == 16 { 0xFE } else { 0xFF };
+        let calc = self.tile as u16 & mask;
         let adder: u16 = if scanline >= self.y {
             if (self.attribute & 0x80) == 0 {
                 if (scanline - self.y) < 8 {
@@ -611,14 +617,12 @@ impl NesPpu {
         if self.sprite_height() == 16 {
             if (spr.tile & 1) == 0 {
                 0
-            }
-            else {
+            } else {
                 0x1000
             }
-        }
-        else {
+        } else {
             if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0
-            || (self.registers[0] & PPU_REGISTER0_SPRITETABLE_BASE) == 0
+                || (self.registers[0] & PPU_REGISTER0_SPRITETABLE_BASE) == 0
             {
                 0
             } else {
@@ -700,8 +704,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc =
-                        base + offset + ((y as u16 + self.scrolly as u16) % 240) % 8;
+                    let calc = base + offset + ((y as u16 + self.scrolly as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -716,10 +719,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8
-                        + base
-                        + offset
-                        + ((y as u16 + self.scrolly as u16) % 240) % 8;
+                    let calc = 8 + base + offset + ((y as u16 + self.scrolly as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -1068,9 +1068,11 @@ impl NesPpu {
                             2 => {
                                 //pattern table tile low
                                 if (cycle & 1) == 0 {
-                                    let base = self.sprite_patterntable_base(&self.sprites[sprite_num as usize]);
+                                    let base = self.sprite_patterntable_base(
+                                        &self.sprites[sprite_num as usize],
+                                    );
                                     let offset = self.sprites[sprite_num as usize]
-                                        .tile_num(row as u8);
+                                        .tile_num(row as u8, self.sprite_height());
                                     let o2 = self.sprites[sprite_num as usize]
                                         .line_number(row as u8)
                                         as u16;
@@ -1087,9 +1089,11 @@ impl NesPpu {
                             3 => {
                                 //pattern table tile high
                                 if (cycle & 1) == 0 {
-                                    let base = self.sprite_patterntable_base(&self.sprites[sprite_num as usize]);
+                                    let base = self.sprite_patterntable_base(
+                                        &self.sprites[sprite_num as usize],
+                                    );
                                     let offset = self.sprites[sprite_num as usize]
-                                        .tile_num(row as u8);
+                                        .tile_num(row as u8, self.sprite_height());
                                     let o2 = self.sprites[sprite_num as usize]
                                         .line_number(row as u8)
                                         as u16;
@@ -1198,15 +1202,11 @@ impl NesPpu {
             pixel[2] = 0;
 
             let base = self.sprite_patterntable_base(&sprite);
-            let offset = sprite
-                .tile_num(sprite.y + spritey as u8);
-            let o2 = sprite
-                .line_number(sprite.y + spritey as u8)
-                as u16;
+            let offset = sprite.tile_num(sprite.y + spritey as u8, self.sprite_height());
+            let o2 = sprite.line_number(sprite.y + spritey as u8) as u16;
             let calc = base + offset + o2;
             let pattern_low = bus.ppu_peek(calc);
             let pattern_high = bus.ppu_peek(8 + calc);
-
 
             let index2 = if (sprite.attribute & 0x40) == 0 {
                 7 - spritex
@@ -1217,13 +1217,11 @@ impl NesPpu {
             let lower_bit = (pattern_low >> index2) & 1;
 
             if upper_bit != 0 || lower_bit != 0 {
-                let mut palette_entry =
-                    sprite.pallete() | ((upper_bit << 1) | lower_bit) as u16;
+                let mut palette_entry = sprite.pallete() | ((upper_bit << 1) | lower_bit) as u16;
                 if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                     palette_entry &= 0x30;
                 }
-                let pixel_entry =
-                    bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
+                let pixel_entry = bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
                 let p = PPU_PALETTE[pixel_entry as usize];
                 pixel[0] = p[0];
                 pixel[1] = p[1];

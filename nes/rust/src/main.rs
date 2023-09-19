@@ -379,8 +379,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         }
                         if ui.button("Dump ppu sprites").clicked() {
                             ui.close_menu();
-                            windows_to_create
-                                .push(sprite_dump_window::DumpWindow::new_request());
+                            windows_to_create.push(sprite_dump_window::DumpWindow::new_request());
                         }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();
