@@ -72,13 +72,36 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                     t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
                 }
                 if let Some(t) = &self.texture {
-                    ui.image(
+                    let zoom = 1.0;
+                    let r = ui.image(
                         t,
                         egui_multiwin::egui::Vec2 {
-                            x: 1.0 * self.buf.width as f32,
-                            y: 1.0 * self.buf.height as f32,
+                            x: zoom * self.buf.width as f32,
+                            y: zoom * self.buf.height as f32,
                         },
                     );
+
+                    if r.hovered() {
+                        if let Some(cursor) = r.hover_pos() {
+                            let pos = cursor - r.rect.left_top();
+                            if pos.x >= 0.0 && pos.y >= 0.0 {
+                                let x = (pos.x / (8.0 * zoom)).floor() as usize;
+                                let y = (pos.y / (8.0 * zoom)).floor() as usize;
+                                let left = x < 32;
+                                let top = y < 30;
+                                let col = x & 0x1f;
+                                let row = y % 30;
+                                let table = match (left, top) {
+                                    (true, true) => 0,
+                                    (false, true) => 0x400,
+                                    (true, false) => 0x800,
+                                    (false, false) => 0xc00,
+                                };
+                                let index = col + row * 32;
+                                ui.label(format!("Coordinate {:x} {:x}", index, table));
+                            }
+                        }
+                    }
                 }
             });
         });
