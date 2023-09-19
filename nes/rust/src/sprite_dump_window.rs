@@ -88,13 +88,17 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                 let x = (pos.x / (8.0 * zoom)).floor() as usize;
                                 let y = (pos.y / (16.0 * zoom)).floor() as usize;
                                 let col = x & 15;
-                                let second = (x & !0xF) != 0;
-                                let row = y;
-                                let num = col + row * 16 + if second { 256 } else { 0 };
+                                let row = y & 7;
+                                let num = col + row * 16;
 
                                 ui.label(format!("Sprite number is {:x}", num));
                                 let sprites = c.cpu_peripherals.ppu.get_64_sprites();
                                 ui.label(format!("Sprite tile is {:x}", sprites[num].tile()));
+                                ui.label(format!(
+                                    "Location is {},{}",
+                                    sprites[num].x(),
+                                    sprites[num].y()
+                                ));
                             }
                         }
                     }

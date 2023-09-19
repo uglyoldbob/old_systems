@@ -88,6 +88,16 @@ impl PpuSprite {
         }
     }
 
+    /// Returns the x coordinate
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    /// Returns the y coordinate
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
     /// Returns the tile data for the sprite.
     pub fn tile(&self) -> u8 {
         self.tile
@@ -803,8 +813,8 @@ impl NesPpu {
                             PpuSpriteEvalMode::Normal => {
                                 //range check
                                 if row < 240
-                                    && row > self.oamdata
-                                    && row <= (self.oamdata + self.sprite_height())
+                                    && row >= self.oamdata
+                                    && row < (self.oamdata + self.sprite_height())
                                 {
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
@@ -858,8 +868,6 @@ impl NesPpu {
                     }
                 }
                 257..=320 => {
-                    //TODO load sprite units with data
-                    //y, tile, attribute, then x for each sprite of the secondary oam
                     let cycle = self.scanline_cycle - 257;
                     let sprite = cycle / 4;
                     let index = cycle % 4;
