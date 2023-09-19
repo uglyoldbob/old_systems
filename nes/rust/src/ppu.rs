@@ -192,6 +192,8 @@ pub struct NesPpu {
     pend_vram_read: Option<u16>,
     /// The vram address for accessing ppu vram (different from oam)
     vram_address: u16,
+    /// The temporary vram address used in the scrolling algorithm
+    temporary_vram_address: u16,
     /// The frame number of the ppu, used for testing and debugging purposes.
     #[cfg(any(test, feature = "debugger"))]
     frame_number: u64,
@@ -218,10 +220,8 @@ pub struct NesPpu {
     sprite_eval_mode: PpuSpriteEvalMode,
     /// Indicates that the first half of the ppu memory cycle has been completed.
     cycle1_done: bool,
-    /// The horizontal scroll amount, in pixels
+    /// The fine horizontal scroll amount, in pixels
     scrollx: u8,
-    /// The vertical scroll amount, in pixels
-    scrolly: u8,
 }
 
 /// The flags that set the nametable base
@@ -366,6 +366,7 @@ impl NesPpu {
             pend_vram_write: None,
             pend_vram_read: None,
             vram_address: 0,
+            temporary_vram_address: 0,
             #[cfg(any(test, feature = "debugger"))]
             frame_number: 0,
             ppudata_buffer: 0,
@@ -380,7 +381,6 @@ impl NesPpu {
             oamaddress: 0,
             cycle1_done: false,
             scrollx: 0,
-            scrolly: 0,
         }
     }
 
@@ -510,20 +510,29 @@ impl NesPpu {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
                     match addr {
+                        0 => {
+                            self.registers[0] = data;
+                            self.temporary_vram_address = (self.temporary_vram_address & 0x73FF) | (data as u16 & 3)<<10;
+                        }
                         5 => {
                             if !self.address_bit {
-                                self.scrollx = data;
+                                self.temporary_vram_address = (self.temporary_vram_address & !0x1F) | (data as u16)>>3;
+                                self.scrollx = data & 7;
                             } else {
-                                self.scrolly = data;
+                                let t1 = (data as u16 & 7)<<12;
+                                let t2 = (data as u16 & 0xF8)<<5;
+                                self.temporary_vram_address = (self.temporary_vram_address & 0x0C1F) | t1 | t2;
                             }
                             self.address_bit = !self.address_bit;
                         }
                         6 => {
                             if !self.address_bit {
                                 self.registers[addr as usize] = data;
+                                self.temporary_vram_address = (self.temporary_vram_address & 0xFF) | (data as u16 & 0x3F)<<8;
                                 self.address_bit = !self.address_bit;
                             } else {
-                                self.vram_address = (self.registers[6] as u16) << 8 | data as u16;
+                                self.temporary_vram_address = (self.temporary_vram_address & 0x7F00) | data as u16;
+                                self.vram_address = self.temporary_vram_address;
                                 self.address_bit = !self.address_bit;
                             }
                         }
@@ -552,8 +561,74 @@ impl NesPpu {
         }
     }
 
+    /// Increment the vram address by a horizontal ammount of 1
+    fn increment_horizontal_position(&mut self) {
+        if (self.vram_address & 0x1F) == 0x1F {
+            self.vram_address = (self.vram_address & !0x1F) ^ 0x400;
+        }
+        else {
+            self.vram_address += 1;
+        }
+    }
+
+    /// Increment the vram address by a vertical amount of 1
+    fn increment_vertical_position(&mut self) {
+        if (self.vram_address & 0x7000) != 0x7000 {
+            self.vram_address += 0x1000;
+        }
+        else {
+            self.vram_address &= !0x7000;
+            let cy = (self.vram_address & 0x3E0) >> 5;
+            let y = if cy == 29 {
+                self.vram_address ^= 0x800;
+                0
+            } else if cy == 31 {
+                0
+            }
+            else {
+                cy + 1
+            };
+            self.vram_address = (self.vram_address & !0x3E0) | (y as u16) << 5;
+        }
+    }
+
+    /// Copy horizontal information from temporary to actual vram address
+    fn transfer_horizontal_position(&mut self) {
+        let mask = 0x41F;
+        self.vram_address = (self.vram_address & !mask) | (self.temporary_vram_address & mask);
+    }
+
+    /// Copy vertical information from temporary to actual vram address
+    fn transfer_vertical_position(&mut self) {
+        let mask = 0x7BE0;
+        self.vram_address = (self.vram_address & !mask) | (self.temporary_vram_address & mask);
+    }
+
     /// This increments the scanline cycle machine, sweeping across every scanline, and down every row sequentially.
     fn increment_scanline_cycle(&mut self) {
+        if self.should_render_background() {
+            if self.scanline_number < 240 || self.scanline_number == 261 {
+                match self.scanline_cycle {
+                    256 => {
+                        self.increment_vertical_position();
+                    }
+                    257 => {
+                        self.transfer_horizontal_position();
+                    }
+                    _ => {}
+                }
+                if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256) && self.scanline_cycle != 0 {
+                    if (self.scanline_cycle & 7) == 0 {
+                        self.increment_horizontal_position();
+                    }
+                }
+            }
+            if self.scanline_number == 261 {
+                if (280..=304).contains(&self.scanline_cycle) {
+                    self.transfer_vertical_position();
+                }
+            }
+        }
         self.scanline_cycle += 1;
         if self.scanline_cycle == 341 {
             self.scanline_cycle = 0;
@@ -591,7 +666,7 @@ impl NesPpu {
         if ox {
             base ^= 0x400;
         }
-        let y = y as u16 + self.scrolly as u16;
+        let y = y as u16;
         if y > 240 {
             base ^= 0x800;
         }
@@ -615,7 +690,7 @@ impl NesPpu {
         if ox {
             base ^= 0x400;
         }
-        let y = y as u16 + self.scrolly as u16;
+        let y = y as u16;
         if y > 240 {
             base ^= 0x800;
         }
@@ -650,8 +725,14 @@ impl NesPpu {
         }
     }
 
-    /// Returns true when the background should be rendered.
-    fn should_render_background(&self, cycle: u8) -> bool {
+    /// Returns true when any part of the background should be rendered
+    fn should_render_background(&self) -> bool {
+        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0 || 
+        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
+    }
+
+    /// Returns true when the background should be rendered on the given cycle.
+    fn should_render_background_cycle(&self, cycle: u8) -> bool {
         if cycle < 8 {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
         } else {
@@ -688,7 +769,9 @@ impl NesPpu {
                     //nametable byte
                     let (base, x, y) = self.nametable_coordinates(x, y);
                     let offset = (y as u16 / 8) << 5 | (x as u16 / 8);
-                    bus.ppu_cycle_1(base + offset);
+                    let calc = base + offset;
+                    let calc2 = 0x2000 | (self.vram_address & 0xFFF);
+                    bus.ppu_cycle_1(calc2);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.prev_nametable_data = self.nametable_data;
@@ -714,7 +797,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = base + offset + ((y as u16 + self.scrolly as u16) % 240) % 8;
+                    let calc = base + offset + ((y as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -729,7 +812,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + ((y as u16 + self.scrolly as u16) % 240) % 8;
+                    let calc = 8 + base + offset + ((y as u16) % 240) % 8;
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -916,8 +999,7 @@ impl NesPpu {
 
         if self.should_render_sprites(0)
             || self.should_render_sprites(8)
-            || self.should_render_background(0)
-            || self.should_render_background(8)
+            || self.should_render_background()
         {
             self.sprite_eval();
         }
@@ -931,12 +1013,9 @@ impl NesPpu {
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
                 let cycle = (self.scanline_cycle - 1) as u8;
-                let bg_pixel = if self.should_render_background(cycle) {
+                let bg_pixel = if self.should_render_background_cycle(cycle) {
                     let prev_tile = ((self.scrollx & 7) + (cycle & 7)) > 7;
                     let index = 7 - ((cycle.wrapping_add(self.scrollx)) % 8);
-                    if cycle == 48 && self.scanline_number == 48 && self.frame_odd {
-                        println!("scroll is {},{}", self.scrollx, self.scrolly);
-                    }
                     let pt = if !prev_tile {
                         self.patterntable_shift[0].to_le_bytes()
                     } else {
@@ -947,7 +1026,7 @@ impl NesPpu {
 
                     let modx = (((cycle as u16 + self.scrollx as u16) / 16) & 1) as u8;
                     let mody =
-                        ((((self.scanline_number + self.scrolly as u16) % 240) / 16) & 1) as u8;
+                        ((((self.scanline_number) % 240) / 16) & 1) as u8;
                     let combined = (mody << 1) | modx;
                     let attribute = if !prev_tile {
                         self.attributetable_shift[0]
@@ -975,7 +1054,7 @@ impl NesPpu {
                 } else {
                     None
                 };
-                if self.should_render_background(cycle) || self.should_render_background(8) {
+                if self.should_render_background() {
                     self.background_fetch(bus, cycle);
                 } else {
                     self.idle_operation(bus, cycle as u16);
