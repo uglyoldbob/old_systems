@@ -93,12 +93,16 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                 let row = y % 30;
                                 let table = match (left, top) {
                                     (true, true) => 0,
-                                    (false, true) => 0x400,
-                                    (true, false) => 0x800,
-                                    (false, false) => 0xc00,
+                                    (false, true) => 1,
+                                    (true, false) => 2,
+                                    (false, false) => 3,
                                 };
-                                let index = col + row * 32;
-                                ui.label(format!("Coordinate {:x} {:x}", index, table));
+                                let pix_x = (((pos.x / (zoom)).floor() as usize) & 0xFF) as u8;
+                                let pix_y = (((pos.y / (zoom)).floor() as usize) % 240) as u8;
+                                ui.label(format!("Coordinate {},{} {:x}", pix_x,pix_y, table));
+                                let addr = c.cpu_peripherals.ppu.render_nametable_pixel_address(table, pix_x, pix_y, &c.mb);
+                                let pixel_entry = c.mb.ppu_palette_read(addr) & 63;
+                                ui.label(format!("Address is {:x} {:x}", addr, pixel_entry));
                             }
                         }
                     }
