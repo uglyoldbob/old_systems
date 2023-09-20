@@ -36,7 +36,7 @@ impl NesCpuPeripherals {
     }
 
     /// Run a ppu write cycle
-    pub fn ppu_write(&mut self, addr: u16, data: u8, palette: &mut [u8;32]) {
+    pub fn ppu_write(&mut self, addr: u16, data: u8, palette: &mut [u8; 32]) {
         self.ppu.write(addr, data, palette);
     }
 

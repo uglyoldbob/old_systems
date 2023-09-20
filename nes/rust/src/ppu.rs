@@ -473,11 +473,6 @@ impl NesPpu {
                 let a = match self.vram_address & 0x3fff {
                     0..=0x3eff => {
                         self.pend_vram_read = Some(self.vram_address);
-                        if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
-                            self.vram_address = self.vram_address.wrapping_add(1);
-                        } else {
-                            self.vram_address = self.vram_address.wrapping_add(32);
-                        }
                         self.last_cpu_data = self.ppudata_buffer;
                         self.last_cpu_counter[0] = 893420;
                         self.last_cpu_counter[1] = 893420;
@@ -494,11 +489,14 @@ impl NesPpu {
                             _ => addr,
                         };
                         let palette_data = palette[addr2 as usize];
-                        self.increment_vram();
                         Some(palette_data | self.last_cpu_data & 0xC0)
                     }
                 };
-                println!("Read address {:x} as {:x}", self.vram_address, a.unwrap());
+                if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
+                    self.vram_address = self.vram_address.wrapping_add(1);
+                } else {
+                    self.vram_address = self.vram_address.wrapping_add(32);
+                }
                 a
             }
             _ => {
@@ -516,7 +514,7 @@ impl NesPpu {
     }
 
     /// Perform writes done by the cpu.
-    pub fn write(&mut self, addr: u16, data: u8, palette: &mut [u8;32]) {
+    pub fn write(&mut self, addr: u16, data: u8, palette: &mut [u8; 32]) {
         self.last_cpu_data = data;
         self.last_cpu_counter[0] = 893420;
         self.last_cpu_counter[1] = 893420;
@@ -571,8 +569,7 @@ impl NesPpu {
             7 => {
                 if let 0..=0x3eff = self.vram_address {
                     self.pend_vram_write = Some(data);
-                }
-                else {
+                } else {
                     let addr = self.vram_address & 0x1f;
                     let addr2 = match addr {
                         0x10 => 0,
@@ -616,7 +613,7 @@ impl NesPpu {
             } else {
                 cy + 1
             };
-            self.vram_address = (self.vram_address & !0x3E0) | (y as u16) << 5;
+            self.vram_address = (self.vram_address & !0x3E0) | ((y as u16) << 5);
         }
     }
 
@@ -636,6 +633,13 @@ impl NesPpu {
     fn increment_scanline_cycle(&mut self) {
         if self.should_render_background() {
             if self.scanline_number < 240 || self.scanline_number == 261 {
+                if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256)
+                    && self.scanline_cycle != 0
+                {
+                    if (self.scanline_cycle & 7) == 0 {
+                        self.increment_horizontal_position();
+                    }
+                }
                 match self.scanline_cycle {
                     256 => {
                         self.increment_vertical_position();
@@ -644,13 +648,6 @@ impl NesPpu {
                         self.transfer_horizontal_position();
                     }
                     _ => {}
-                }
-                if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256)
-                    && self.scanline_cycle != 0
-                {
-                    if (self.scanline_cycle & 7) == 0 {
-                        self.increment_horizontal_position();
-                    }
                 }
             }
             if self.scanline_number == 261 {
@@ -797,9 +794,6 @@ impl NesPpu {
             0 => {
                 if (cycle & 1) == 0 {
                     //nametable byte
-                    let (base, x, y) = self.nametable_coordinates(x, y);
-                    let offset = (y as u16 / 8) << 5 | (x as u16 / 8);
-                    let calc = base + offset;
                     let calc2 = 0x2000 | (self.vram_address & 0xFFF);
                     bus.ppu_cycle_1(calc2);
                     self.cycle1_done = true;
@@ -1068,8 +1062,7 @@ impl NesPpu {
 
                     let mut palette_entry = if lower_bits == 0 {
                         0
-                    }
-                    else {
+                    } else {
                         ((extra_palette_bits << 2) | lower_bits) as u16
                     };
                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
@@ -1351,7 +1344,13 @@ impl NesPpu {
     }
 
     /// Renders a nametable pixel, returning the palette entry
-    pub fn render_nametable_pixel_address(&self, nametable: u8, x: u8, y: u8, bus: &NesMotherboard) -> u16 {
+    pub fn render_nametable_pixel_address(
+        &self,
+        nametable: u8,
+        x: u8,
+        y: u8,
+        bus: &NesMotherboard,
+    ) -> u16 {
         let quadrant = nametable;
         let row = y;
         let col = x;
@@ -1388,8 +1387,7 @@ impl NesPpu {
 
         let mut palette_entry = if lower_bits == 0 {
             0
-        }
-        else {
+        } else {
             ((extra_palette_bits << 2) | lower_bits) as u16
         };
         if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
