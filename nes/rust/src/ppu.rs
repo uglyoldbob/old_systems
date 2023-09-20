@@ -512,26 +512,31 @@ impl NesPpu {
                     match addr {
                         0 => {
                             self.registers[0] = data;
-                            self.temporary_vram_address = (self.temporary_vram_address & 0x73FF) | (data as u16 & 3)<<10;
+                            self.temporary_vram_address =
+                                (self.temporary_vram_address & 0x73FF) | (data as u16 & 3) << 10;
                         }
                         5 => {
                             if !self.address_bit {
-                                self.temporary_vram_address = (self.temporary_vram_address & !0x1F) | (data as u16)>>3;
+                                self.temporary_vram_address =
+                                    (self.temporary_vram_address & !0x1F) | (data as u16) >> 3;
                                 self.scrollx = data & 7;
                             } else {
-                                let t1 = (data as u16 & 7)<<12;
-                                let t2 = (data as u16 & 0xF8)<<5;
-                                self.temporary_vram_address = (self.temporary_vram_address & 0x0C1F) | t1 | t2;
+                                let t1 = (data as u16 & 7) << 12;
+                                let t2 = (data as u16 & 0xF8) << 5;
+                                self.temporary_vram_address =
+                                    (self.temporary_vram_address & 0x0C1F) | t1 | t2;
                             }
                             self.address_bit = !self.address_bit;
                         }
                         6 => {
                             if !self.address_bit {
                                 self.registers[addr as usize] = data;
-                                self.temporary_vram_address = (self.temporary_vram_address & 0xFF) | (data as u16 & 0x3F)<<8;
+                                self.temporary_vram_address = (self.temporary_vram_address & 0xFF)
+                                    | (data as u16 & 0x3F) << 8;
                                 self.address_bit = !self.address_bit;
                             } else {
-                                self.temporary_vram_address = (self.temporary_vram_address & 0x7F00) | data as u16;
+                                self.temporary_vram_address =
+                                    (self.temporary_vram_address & 0x7F00) | data as u16;
                                 self.vram_address = self.temporary_vram_address;
                                 self.address_bit = !self.address_bit;
                             }
@@ -565,8 +570,7 @@ impl NesPpu {
     fn increment_horizontal_position(&mut self) {
         if (self.vram_address & 0x1F) == 0x1F {
             self.vram_address = (self.vram_address & !0x1F) ^ 0x400;
-        }
-        else {
+        } else {
             self.vram_address += 1;
         }
     }
@@ -575,8 +579,7 @@ impl NesPpu {
     fn increment_vertical_position(&mut self) {
         if (self.vram_address & 0x7000) != 0x7000 {
             self.vram_address += 0x1000;
-        }
-        else {
+        } else {
             self.vram_address &= !0x7000;
             let cy = (self.vram_address & 0x3E0) >> 5;
             let y = if cy == 29 {
@@ -584,8 +587,7 @@ impl NesPpu {
                 0
             } else if cy == 31 {
                 0
-            }
-            else {
+            } else {
                 cy + 1
             };
             self.vram_address = (self.vram_address & !0x3E0) | (y as u16) << 5;
@@ -617,7 +619,9 @@ impl NesPpu {
                     }
                     _ => {}
                 }
-                if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256) && self.scanline_cycle != 0 {
+                if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256)
+                    && self.scanline_cycle != 0
+                {
                     if (self.scanline_cycle & 7) == 0 {
                         self.increment_horizontal_position();
                     }
@@ -727,8 +731,8 @@ impl NesPpu {
 
     /// Returns true when any part of the background should be rendered
     fn should_render_background(&self) -> bool {
-        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0 || 
-        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
+        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
+            || (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
     }
 
     /// Returns true when the background should be rendered on the given cycle.
@@ -750,18 +754,18 @@ impl NesPpu {
     }
 
     /// Computes the xy coordinates to be used by the background fetcher.
-    fn compute_xy(&self, cycle: u8, offset: u8) -> (u8, u8) {
-        let (cycle2, ox) = cycle.overflowing_add(offset);
+    fn compute_xy(&self, cycle: u16, offset: u8) -> (u8, u8) {
+        let (cycle2, ox) = cycle.overflowing_add(offset as u16);
         let mut scanline = self.scanline_number;
         if ox {
             scanline = (scanline + 1) % 240;
         }
 
-        (cycle2, scanline as u8)
+        ((cycle2 & 0xFF) as u8, scanline as u8)
     }
 
     /// Performs fetches for the background data of the ppu.
-    fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u8) {
+    fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u16) {
         let (x, y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
             0 => {
@@ -771,24 +775,49 @@ impl NesPpu {
                     let offset = (y as u16 / 8) << 5 | (x as u16 / 8);
                     let calc = base + offset;
                     let calc2 = 0x2000 | (self.vram_address & 0xFFF);
+                    if self.scanline_number == 0 {
+                        println!(
+                            "Fetch nametable at cycle {}: {:X}",
+                            self.scanline_cycle, calc2
+                        );
+                    }
                     bus.ppu_cycle_1(calc2);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.prev_nametable_data = self.nametable_data;
                     self.nametable_data = bus.ppu_cycle_2_read();
+                    if self.scanline_number == 0 {
+                        println!(
+                            "Fetch nametable data at cycle {}: {:X}",
+                            self.scanline_cycle, self.nametable_data
+                        );
+                    }
                     self.cycle1_done = false;
                 }
             }
             1 => {
                 //attribute table byte
                 if (cycle & 1) == 0 {
-                    let x = x & !2;
-                    let (base, x, y) = self.attributetable_coordinates(x, y);
-                    let offset = (y as u16 / 32) << 3 | (x as u16 / 32);
-                    bus.ppu_cycle_1(base + offset);
+                    let calc2 = 0x23C0
+                        | (self.vram_address & 0x0C00)
+                        | ((self.vram_address >> 4) & 0x38)
+                        | ((self.vram_address >> 2) & 0x07);
+                    if self.scanline_number == 0 {
+                        println!(
+                            "Fetch attributes at cycle {}: {:x}",
+                            self.scanline_cycle, calc2
+                        );
+                    }
+                    bus.ppu_cycle_1(calc2);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.attributetable_data = bus.ppu_cycle_2_read();
+                    if self.scanline_number == 0 {
+                        println!(
+                            "Fetch attributes data at cycle {}: {:x}",
+                            self.scanline_cycle, self.attributetable_data
+                        );
+                    }
                     self.cycle1_done = false;
                 }
             }
@@ -1025,8 +1054,7 @@ impl NesPpu {
                     let lower_bit = (pt[0] >> index) & 1;
 
                     let modx = (((cycle as u16 + self.scrollx as u16) / 16) & 1) as u8;
-                    let mody =
-                        ((((self.scanline_number) % 240) / 16) & 1) as u8;
+                    let mody = ((((self.scanline_number) % 240) / 16) & 1) as u8;
                     let combined = (mody << 1) | modx;
                     let attribute = if !prev_tile {
                         self.attributetable_shift[0]
@@ -1055,7 +1083,7 @@ impl NesPpu {
                     None
                 };
                 if self.should_render_background() {
-                    self.background_fetch(bus, cycle);
+                    self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
                 }
@@ -1126,6 +1154,12 @@ impl NesPpu {
                             0 => {
                                 if (cycle & 1) == 0 {
                                     //nametable byte
+                                    if self.scanline_number == 0 {
+                                        println!(
+                                            "Fetch nametable wasted byte at {}",
+                                            self.scanline_cycle
+                                        );
+                                    }
                                     let x = cycle as u8 / 8;
                                     let y = (row / 8) as u8;
                                     let base = self.nametable_base();
@@ -1206,10 +1240,8 @@ impl NesPpu {
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
-                if cycle > 0 {
-                    //self.background_fetch(bus, cycle);
-                    self.idle_operation(bus, self.scanline_cycle - 1);
-                }
+                self.background_fetch(bus, self.scanline_cycle - 1);
+                //self.idle_operation(bus, self.scanline_cycle - 1);
                 self.increment_scanline_cycle();
             } else {
                 //do nothing
