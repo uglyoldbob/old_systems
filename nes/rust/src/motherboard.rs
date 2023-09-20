@@ -193,26 +193,8 @@ impl NesMotherboard {
             }
             0x2000..=0x3fff => {
                 let addr = addr & 7;
-                if let Some(r) = per.ppu_read(addr) {
+                if let Some(r) = per.ppu_read(addr, &self.ppu_palette_ram) {
                     response = r;
-                    if addr == 7 {
-                        let a = per.ppu.vram_address();
-                        if a >= 0x3f00 {
-                            let addr = a & 0x1f;
-                            let addr2 = match addr {
-                                0x10 => 0,
-                                0x14 => 4,
-                                0x18 => 8,
-                                0x1c => 0xc,
-                                _ => addr,
-                            };
-                            let palette_data = self.ppu_palette_ram[addr2 as usize];
-                            per.ppu.provide_palette_data(palette_data);
-                            response |= palette_data;
-                            self.last_cpu_data = response;
-                            per.ppu.increment_vram();
-                        }
-                    }
                 } else {
                     //TODO open bus implementation
                 }
@@ -293,22 +275,7 @@ impl NesMotherboard {
             0x2000..=0x3fff => {
                 let addr = addr & 7;
                 //ppu registers
-                per.ppu_write(addr, data);
-                if addr == 7 {
-                    let a = per.ppu.vram_address();
-                    if a >= 0x3f00 {
-                        let addr = a & 0x1f;
-                        let addr2 = match addr {
-                            0x10 => 0,
-                            0x14 => 4,
-                            0x18 => 8,
-                            0x1c => 0xc,
-                            _ => addr,
-                        };
-                        self.ppu_palette_ram[addr2 as usize] = data;
-                        per.ppu.increment_vram();
-                    }
-                }
+                per.ppu_write(addr, data, &mut self.ppu_palette_ram);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                 }

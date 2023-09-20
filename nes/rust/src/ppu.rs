@@ -456,7 +456,7 @@ impl NesPpu {
     }
 
     /// Perform reads done by the cpu.
-    pub fn read(&mut self, addr: u16) -> Option<u8> {
+    pub fn read(&mut self, addr: u16, palette: &[u8; 32]) -> Option<u8> {
         match addr {
             0 | 1 | 3 | 5 | 6 => Some(self.last_cpu_data),
             4 => {
@@ -469,24 +469,38 @@ impl NesPpu {
                 }
                 Some(data)
             }
-            7 => match self.vram_address {
-                0..=0x3eff => {
-                    self.pend_vram_read = Some(self.vram_address);
-                    if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
-                        self.vram_address = self.vram_address.wrapping_add(1);
-                    } else {
-                        self.vram_address = self.vram_address.wrapping_add(32);
+            7 => {
+                let a = match self.vram_address & 0x3fff {
+                    0..=0x3eff => {
+                        self.pend_vram_read = Some(self.vram_address);
+                        if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
+                            self.vram_address = self.vram_address.wrapping_add(1);
+                        } else {
+                            self.vram_address = self.vram_address.wrapping_add(32);
+                        }
+                        self.last_cpu_data = self.ppudata_buffer;
+                        self.last_cpu_counter[0] = 893420;
+                        self.last_cpu_counter[1] = 893420;
+                        Some(self.ppudata_buffer)
                     }
-                    self.last_cpu_data = self.ppudata_buffer;
-                    self.last_cpu_counter[0] = 893420;
-                    self.last_cpu_counter[1] = 893420;
-                    Some(self.ppudata_buffer)
-                }
-                _ => {
-                    self.pend_vram_read = Some(self.vram_address);
-                    Some(self.last_cpu_data & 0xC0)
-                }
-            },
+                    _ => {
+                        self.pend_vram_read = Some(self.vram_address & 0x2FFF);
+                        let addr = self.vram_address & 0x1f;
+                        let addr2 = match addr {
+                            0x10 => 0,
+                            0x14 => 4,
+                            0x18 => 8,
+                            0x1c => 0xc,
+                            _ => addr,
+                        };
+                        let palette_data = palette[addr2 as usize];
+                        self.increment_vram();
+                        Some(palette_data | self.last_cpu_data & 0xC0)
+                    }
+                };
+                println!("Read address {:x} as {:x}", self.vram_address, a.unwrap());
+                a
+            }
             _ => {
                 let mut val = self.registers[addr as usize];
                 if addr == 2 {
@@ -502,7 +516,7 @@ impl NesPpu {
     }
 
     /// Perform writes done by the cpu.
-    pub fn write(&mut self, addr: u16, data: u8) {
+    pub fn write(&mut self, addr: u16, data: u8, palette: &mut [u8;32]) {
         self.last_cpu_data = data;
         self.last_cpu_counter[0] = 893420;
         self.last_cpu_counter[1] = 893420;
@@ -557,6 +571,18 @@ impl NesPpu {
             7 => {
                 if let 0..=0x3eff = self.vram_address {
                     self.pend_vram_write = Some(data);
+                }
+                else {
+                    let addr = self.vram_address & 0x1f;
+                    let addr2 = match addr {
+                        0x10 => 0,
+                        0x14 => 4,
+                        0x18 => 8,
+                        0x1c => 0xc,
+                        _ => addr,
+                    };
+                    palette[addr2 as usize] = data;
+                    self.increment_vram();
                 }
             }
             2 => {}
@@ -842,7 +868,7 @@ impl NesPpu {
                 bus.ppu_cycle_1(self.vram_address);
                 self.cycle1_done = true;
             } else if let Some(a) = self.pend_vram_read {
-                bus.ppu_cycle_1(a & 0x2fff);
+                bus.ppu_cycle_1(a & 0x3fff);
                 self.cycle1_done = true;
             }
         } else if self.cycle1_done {
@@ -1057,7 +1083,7 @@ impl NesPpu {
                         != 0
                     {
                         //TODO implement color emphasis
-                        println!("TODO: implement color emphasis");
+                        //println!("TODO: implement color emphasis");
                     }
                     Some(pixel_entry)
                 } else {

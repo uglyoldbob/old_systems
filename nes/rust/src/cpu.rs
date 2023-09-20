@@ -31,13 +31,13 @@ impl NesCpuPeripherals {
     }
 
     /// Run a ppu read cycle
-    pub fn ppu_read(&mut self, addr: u16) -> Option<u8> {
-        self.ppu.read(addr)
+    pub fn ppu_read(&mut self, addr: u16, palette: &[u8; 32]) -> Option<u8> {
+        self.ppu.read(addr, palette)
     }
 
     /// Run a ppu write cycle
-    pub fn ppu_write(&mut self, addr: u16, data: u8) {
-        self.ppu.write(addr, data);
+    pub fn ppu_write(&mut self, addr: u16, data: u8, palette: &mut [u8;32]) {
+        self.ppu.write(addr, data, palette);
     }
 
     /// Returns true when the frame has ended. USed for synchronizing the emulator to the appropriate frame rate
