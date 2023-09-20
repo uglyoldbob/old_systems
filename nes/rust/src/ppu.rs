@@ -775,23 +775,11 @@ impl NesPpu {
                     let offset = (y as u16 / 8) << 5 | (x as u16 / 8);
                     let calc = base + offset;
                     let calc2 = 0x2000 | (self.vram_address & 0xFFF);
-                    if self.scanline_number == 0 {
-                        println!(
-                            "Fetch nametable at cycle {}: {:X}",
-                            self.scanline_cycle, calc2
-                        );
-                    }
                     bus.ppu_cycle_1(calc2);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.prev_nametable_data = self.nametable_data;
                     self.nametable_data = bus.ppu_cycle_2_read();
-                    if self.scanline_number == 0 {
-                        println!(
-                            "Fetch nametable data at cycle {}: {:X}",
-                            self.scanline_cycle, self.nametable_data
-                        );
-                    }
                     self.cycle1_done = false;
                 }
             }
@@ -802,22 +790,10 @@ impl NesPpu {
                         | (self.vram_address & 0x0C00)
                         | ((self.vram_address >> 4) & 0x38)
                         | ((self.vram_address >> 2) & 0x07);
-                    if self.scanline_number == 0 {
-                        println!(
-                            "Fetch attributes at cycle {}: {:x}",
-                            self.scanline_cycle, calc2
-                        );
-                    }
                     bus.ppu_cycle_1(calc2);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.attributetable_data = bus.ppu_cycle_2_read();
-                    if self.scanline_number == 0 {
-                        println!(
-                            "Fetch attributes data at cycle {}: {:x}",
-                            self.scanline_cycle, self.attributetable_data
-                        );
-                    }
                     self.cycle1_done = false;
                 }
             }
@@ -826,7 +802,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = base + offset + ((y as u16) % 240) % 8;
+                    let calc = base + offset + ((7 + (self.vram_address) >> 12) & 7);
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -841,7 +817,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + ((y as u16) % 240) % 8;
+                    let calc = 8 + base + offset + ((7 + (self.vram_address) >> 12) & 7);
                     bus.ppu_cycle_1(calc);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
@@ -1154,12 +1130,6 @@ impl NesPpu {
                             0 => {
                                 if (cycle & 1) == 0 {
                                     //nametable byte
-                                    if self.scanline_number == 0 {
-                                        println!(
-                                            "Fetch nametable wasted byte at {}",
-                                            self.scanline_cycle
-                                        );
-                                    }
                                     let x = cycle as u8 / 8;
                                     let y = (row / 8) as u8;
                                     let base = self.nametable_base();
