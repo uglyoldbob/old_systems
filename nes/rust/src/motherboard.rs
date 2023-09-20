@@ -18,8 +18,6 @@ pub struct NesMotherboard {
     /// The ppu vram, physically outside the ppu, so this makes perfect sense.
     #[serde_as(as = "Bytes")]
     vram: [u8; 2048],
-    /// The palette ram for the ppu, technically belongs in the ppu.
-    ppu_palette_ram: [u8; 32],
     /// The vram address fromm the last ppu address cycle
     vram_address: Option<u16>,
     /// Used for detecting sequence problems in the ppu
@@ -44,15 +42,10 @@ impl NesMotherboard {
             *i = rand::random();
         }
 
-        let mut pram: [u8; 32] = [0; 32];
-        for i in pram.iter_mut() {
-            *i = rand::random();
-        }
         Self {
             cart: None,
             ram: main_ram,
             vram,
-            ppu_palette_ram: pram,
             vram_address: None,
             last_ppu_cycle: 2,
             last_cpu_data: 0,
@@ -114,21 +107,7 @@ impl NesMotherboard {
                 let addr = addr & 7;
                 if let Some(r) = per.ppu_dump(addr) {
                     response = Some(r);
-                    if addr == 7 {
-                        let a = per.ppu.vram_address();
-                        if a >= 0x3f00 {
-                            let addr = a & 0x1f;
-                            let addr2 = match addr {
-                                0x10 => 0,
-                                0x14 => 4,
-                                0x18 => 8,
-                                0x1c => 0xc,
-                                _ => addr,
-                            };
-                            let palette_data = self.ppu_palette_ram[addr2 as usize];
-                            response = Some(r | palette_data)
-                        }
-                    }
+                    //todo palette peek
                 } else {
                     //TODO open bus implementation
                 }
@@ -195,24 +174,6 @@ impl NesMotherboard {
                 let addr = addr & 7;
                 if let Some(r) = per.ppu_read(addr) {
                     response = r;
-                    if addr == 7 {
-                        let a = per.ppu.vram_address();
-                        if a >= 0x3f00 {
-                            let addr = a & 0x1f;
-                            let addr2 = match addr {
-                                0x10 => 0,
-                                0x14 => 4,
-                                0x18 => 8,
-                                0x1c => 0xc,
-                                _ => addr,
-                            };
-                            let palette_data = self.ppu_palette_ram[addr2 as usize];
-                            per.ppu.provide_palette_data(palette_data);
-                            response |= palette_data;
-                            self.last_cpu_data = response;
-                            per.ppu.increment_vram();
-                        }
-                    }
                 } else {
                     //TODO open bus implementation
                 }
@@ -296,18 +257,6 @@ impl NesMotherboard {
                 per.ppu_write(addr, data);
                 if addr == 7 {
                     let a = per.ppu.vram_address();
-                    if a >= 0x3f00 {
-                        let addr = a & 0x1f;
-                        let addr2 = match addr {
-                            0x10 => 0,
-                            0x14 => 4,
-                            0x18 => 8,
-                            0x1c => 0xc,
-                            _ => addr,
-                        };
-                        self.ppu_palette_ram[addr2 as usize] = data;
-                        per.ppu.increment_vram();
-                    }
                 }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
@@ -367,17 +316,6 @@ impl NesMotherboard {
                         let addr2 = addr & 0x7ff;
                         self.vram[addr2 as usize]
                     }
-                    0x3f00..=0x3fff => {
-                        let mut addr2 = addr & 0x1F;
-                        addr2 = match addr2 {
-                            0x10 => 0,
-                            0x14 => 4,
-                            0x18 => 8,
-                            0x1c => 0xc,
-                            _ => addr2,
-                        };
-                        self.ppu_palette_ram[addr2 as usize]
-                    }
                     _ => 42,
                 }
             } else if let Some(cart) = &self.cart {
@@ -426,17 +364,6 @@ impl NesMotherboard {
                     let addr2 = addr & 0x7ff;
                     self.vram[addr2 as usize] = data;
                 }
-                0x3f00..=0x3fff => {
-                    let mut addr2 = addr & 0x1F;
-                    addr2 = match addr2 {
-                        0x10 => 0,
-                        0x14 => 4,
-                        0x18 => 8,
-                        0x1c => 0xc,
-                        _ => addr2,
-                    };
-                    self.ppu_palette_ram[addr2 as usize] = data;
-                }
                 _ => {}
             }
         } else if let Some(cart) = &mut self.cart {
@@ -456,17 +383,6 @@ impl NesMotherboard {
                     let addr2 = addr & 0x7ff;
                     self.vram[addr2 as usize]
                 }
-                0x3f00..=0x3fff => {
-                    let mut addr2 = addr & 0x1F;
-                    addr2 = match addr2 {
-                        0x10 => 0,
-                        0x14 => 4,
-                        0x18 => 8,
-                        0x1c => 0xc,
-                        _ => addr2,
-                    };
-                    self.ppu_palette_ram[addr2 as usize]
-                }
                 _ => 42,
             }
         } else if let Some(cart) = &mut self.cart {
@@ -474,11 +390,5 @@ impl NesMotherboard {
         } else {
             42
         }
-    }
-
-    /// Read a palette address
-    pub fn ppu_palette_read(&self, addr: u16) -> u8 {
-        let addr2: usize = (addr as usize) & 0x1f;
-        self.ppu_palette_ram[addr2]
     }
 }

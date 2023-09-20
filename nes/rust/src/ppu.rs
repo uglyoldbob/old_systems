@@ -222,6 +222,8 @@ pub struct NesPpu {
     cycle1_done: bool,
     /// The fine horizontal scroll amount, in pixels
     scrollx: u8,
+    /// The palette ram for the ppu.
+    ppu_palette_ram: [u8; 32],
 }
 
 /// The flags that set the nametable base
@@ -346,6 +348,11 @@ impl NesPpu {
         for i in &mut oam2 {
             *i = rand::random();
         }
+
+        let mut pram: [u8; 32] = [0; 32];
+        for i in pram.iter_mut() {
+            *i = rand::random();
+        }
         Self {
             scanline_number: 0,
             scanline_cycle: 0,
@@ -381,6 +388,7 @@ impl NesPpu {
             oamaddress: 0,
             cycle1_done: false,
             scrollx: 0,
+            ppu_palette_ram: pram,
         }
     }
 
@@ -405,16 +413,37 @@ impl NesPpu {
         self.vram_address
     }
 
-    /// Increment the vram address, ignoring any wrapping
-    pub fn increment_vram(&mut self) {
-        self.vram_address = self.vram_address.wrapping_add(1);
+    /// Read from the palette ram
+    pub fn ppu_palette_read(&self, a: u16) -> u8 {
+        if a >= 0x3f00 {
+            let addr = a & 0x1f;
+            let addr2 = match addr {
+                0x10 => 0,
+                0x14 => 4,
+                0x18 => 8,
+                0x1c => 0xc,
+                _ => addr,
+            };
+            let palette_data = self.ppu_palette_ram[addr2 as usize];
+            palette_data
+        }
+        else {
+            42
+        }
     }
 
-    /// Allows providing palette data directly to the ppu
-    pub fn provide_palette_data(&mut self, data: u8) {
-        let data2 = data & 0x3f;
-        self.last_cpu_data = data2;
-        self.last_cpu_counter[1] = 893420;
+    fn ppu_palette_write(&mut self, a: u16, val: u8) {
+        if a >= 0x3f00 {
+            let addr = a & 0x1f;
+            let addr2 = match addr {
+                0x10 => 0,
+                0x14 => 4,
+                0x18 => 8,
+                0x1c => 0xc,
+                _ => addr,
+            };
+            self.ppu_palette_ram[addr2 as usize] = val;
+        }
     }
 
     /// Returns a copy of the sprites in the ppu memory
@@ -472,19 +501,13 @@ impl NesPpu {
             7 => match self.vram_address {
                 0..=0x3eff => {
                     self.pend_vram_read = Some(self.vram_address);
-                    if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
-                        self.vram_address = self.vram_address.wrapping_add(1);
-                    } else {
-                        self.vram_address = self.vram_address.wrapping_add(32);
-                    }
                     self.last_cpu_data = self.ppudata_buffer;
                     self.last_cpu_counter[0] = 893420;
                     self.last_cpu_counter[1] = 893420;
                     Some(self.ppudata_buffer)
                 }
                 _ => {
-                    self.pend_vram_read = Some(self.vram_address);
-                    Some(self.last_cpu_data & 0xC0)
+                    Some((self.last_cpu_data & 0xC0) | self.ppu_palette_read(self.vram_address))
                 }
             },
             _ => {
@@ -557,6 +580,9 @@ impl NesPpu {
             7 => {
                 if let 0..=0x3eff = self.vram_address {
                     self.pend_vram_write = Some(data);
+                }
+                else {
+                    self.ppu_palette_write(self.vram_address, data);
                 }
             }
             2 => {}
@@ -842,23 +868,23 @@ impl NesPpu {
                 bus.ppu_cycle_1(self.vram_address);
                 self.cycle1_done = true;
             } else if let Some(a) = self.pend_vram_read {
-                bus.ppu_cycle_1(a & 0x2fff);
+                bus.ppu_cycle_1(a & 0x3fff);
                 self.cycle1_done = true;
             }
         } else if self.cycle1_done {
             if let Some(a) = self.pend_vram_write {
                 bus.ppu_cycle_2_write(a);
                 self.cycle1_done = false;
-                if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
-                    self.vram_address = self.vram_address.wrapping_add(1);
-                } else {
-                    self.vram_address = self.vram_address.wrapping_add(32);
-                }
                 self.pend_vram_write = None;
             } else if let Some(_a) = self.pend_vram_read {
                 self.ppudata_buffer = bus.ppu_cycle_2_read();
                 self.cycle1_done = false;
                 self.pend_vram_read = None;
+            }
+            if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
+                self.vram_address = self.vram_address.wrapping_add(1);
+            } else {
+                self.vram_address = self.vram_address.wrapping_add(32);
             }
         }
     }
@@ -1049,7 +1075,7 @@ impl NesPpu {
                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                         palette_entry &= 0x30;
                     }
-                    let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
+                    let pixel_entry = self.ppu_palette_read(0x3f00 + palette_entry) & 63;
                     if (self.registers[1]
                         & (PPU_REGISTER1_EMPHASIZE_BLUE
                             | PPU_REGISTER1_EMPHASIZE_GREEN
@@ -1057,7 +1083,7 @@ impl NesPpu {
                         != 0
                     {
                         //TODO implement color emphasis
-                        println!("TODO: implement color emphasis");
+                        //println!("TODO: implement color emphasis");
                     }
                     Some(pixel_entry)
                 } else {
@@ -1088,7 +1114,7 @@ impl NesPpu {
                                         palette_entry &= 0x30;
                                     }
                                     let pixel_entry =
-                                        bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
+                                        self.ppu_palette_read(0x3f10 | palette_entry) & 63;
                                     Some((index, pixel_entry))
                                 } else {
                                     None
@@ -1315,7 +1341,7 @@ impl NesPpu {
                 if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                     palette_entry &= 0x30;
                 }
-                let pixel_entry = bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
+                let pixel_entry = self.ppu_palette_read(0x3f10 | palette_entry) & 63;
                 let p = PPU_PALETTE[pixel_entry as usize];
                 pixel[0] = p[0];
                 pixel[1] = p[1];
@@ -1388,7 +1414,7 @@ impl NesPpu {
             let row = row % 240;
 
             let address = self.render_nametable_pixel_address(quadrant, col as u8, row as u8, bus);
-            let pixel_entry = bus.ppu_palette_read(address) & 63;
+            let pixel_entry = self.ppu_palette_read(address) & 63;
 
             let p = PPU_PALETTE[pixel_entry as usize];
             pixel[0] = p[0];
@@ -1423,7 +1449,7 @@ impl NesPpu {
             if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                 palette_entry &= 0x30;
             }
-            let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
+            let pixel_entry = self.ppu_palette_read(0x3f00 + palette_entry) & 63;
             let p = PPU_PALETTE[pixel_entry as usize];
             pixel[0] = p[0];
             pixel[1] = p[1];
