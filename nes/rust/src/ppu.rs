@@ -1339,6 +1339,78 @@ impl NesPpu {
         0x3f00 + palette_entry
     }
 
+    /// Renders a attribute table pixel, returning the palette entry
+    pub fn render_attribute_table_pixel_address(
+        &self,
+        nametable: u8,
+        x: u8,
+        y: u8,
+        bus: &NesMotherboard,
+    ) -> u16 {
+        let quadrant = nametable;
+        let row = y;
+        let col = x;
+        let base_address = 0x2000 + 0x400 * quadrant as u16;
+        let offset = (row as u16 / 8) << 5 | (col as u16 / 8);
+        let nametable = bus.ppu_peek(base_address + offset);
+
+        let base_address = match quadrant {
+            0 => 0x23c0,
+            1 => 0x27c0,
+            2 => 0x2bc0,
+            _ => 0x2fc0,
+        };
+        let offset = (row as u16 / 32) << 3 | (col as u16 / 32);
+        let attribute = bus.ppu_peek(base_address + offset);
+
+        let table = self.background_patterntable_base();
+        let base = table;
+        let offset = (nametable as u16) << 4;
+        let calc = base + offset + (row as u16) % 8;
+
+        let data_low = bus.ppu_peek(calc);
+        let data_high = bus.ppu_peek(calc + 8);
+
+        let index = 7 - (col % 8);
+        let upper_bit = (data_high >> index) & 1;
+        let lower_bit = (data_low >> index) & 1;
+
+        let modx = ((col as u8) / 16) & 1;
+        let mody = (((row as u16) / 16) & 1) as u8;
+        let combined = (mody << 1) | modx;
+        let extra_palette_bits = (attribute >> (2 * combined)) & 3;
+        match extra_palette_bits {
+            0 => 0x1d,
+            1 => 0x2d,
+            2 => 0x3d,
+            _ => 0x20,
+        }
+    }
+
+    /// Renders the entire attribute table into the given buffer
+    pub fn render_attribute_table(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
+        for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
+            let col = i & 0xFF;
+            let row = i / 512;
+            let left = (i % 512) < 256;
+            let top = (i / 512) < 240;
+            let quadrant = match (left, top) {
+                (true, true) => 0,
+                (false, true) => 1,
+                (true, false) => 2,
+                (false, false) => 3,
+            };
+            let row = row % 240;
+
+            let address = self.render_attribute_table_pixel_address(quadrant, col as u8, row as u8, bus);
+
+            let p = PPU_PALETTE[address as usize];
+            pixel[0] = p[0];
+            pixel[1] = p[1];
+            pixel[2] = p[2];
+        }
+    }
+
     /// Renders the entire nametable into the given buffer
     pub fn render_nametable(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
