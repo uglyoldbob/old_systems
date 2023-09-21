@@ -411,13 +411,6 @@ impl NesPpu {
         //println!("4VRAM = {:x}", self.vram_address);
     }
 
-    /// Allows providing palette data directly to the ppu
-    pub fn provide_palette_data(&mut self, data: u8) {
-        let data2 = data & 0x3f;
-        self.last_cpu_data = data2;
-        self.last_cpu_counter[1] = 893420;
-    }
-
     /// Returns a copy of the sprites in the ppu memory
     #[cfg(any(test, feature = "debugger"))]
     pub fn get_64_sprites(&self) -> [PpuSprite; 64] {
