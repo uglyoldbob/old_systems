@@ -534,7 +534,7 @@ impl NesPpu {
                                 self.scrollx = data & 7;
                             } else {
                                 let t1 = (data as u16 & 7) << 12;
-                                let t2 = (data as u16 & 0xF8) << 5;
+                                let t2 = (data as u16 & 0xF8) << 2;
                                 self.temporary_vram_address =
                                     (self.temporary_vram_address & 0x0C1F) | t1 | t2;
                             }
@@ -549,6 +549,7 @@ impl NesPpu {
                             } else {
                                 self.temporary_vram_address =
                                     (self.temporary_vram_address & 0x7F00) | data as u16;
+                                println!("VRAM = {:x}", self.temporary_vram_address);
                                 self.vram_address = self.temporary_vram_address;
                                 self.address_bit = !self.address_bit;
                             }
@@ -658,6 +659,9 @@ impl NesPpu {
         }
         self.scanline_cycle += 1;
         if self.scanline_cycle == 341 {
+            if self.scanline_number == 0 || self.scanline_number == 261 {
+                println!("------------------");
+            }
             self.scanline_cycle = 0;
             self.scanline_number += 1;
             if self.scanline_number == 262 {
@@ -684,44 +688,6 @@ impl NesPpu {
             2 => 0x2800,
             _ => 0x2c00,
         }
-    }
-
-    /// Calculates the coordinates for the name table, taking into account x and y scrolling
-    fn nametable_coordinates(&self, x: u8, y: u8) -> (u16, u8, u8) {
-        let mut base = self.nametable_base();
-        let (x, ox) = x.overflowing_add(self.scrollx);
-        if ox {
-            base ^= 0x400;
-        }
-        let y = y as u16;
-        if y > 240 {
-            base ^= 0x800;
-        }
-        (base, x, (y % 240) as u8)
-    }
-
-    /// Calculates the base for the attribute table, taking into account x and y scrolling
-    fn attributetable_base(&self) -> u16 {
-        match self.registers[0] & PPU_REGISTER0_NAMETABLE_BASE {
-            0 => 0x23c0,
-            1 => 0x27c0,
-            2 => 0x2bc0,
-            _ => 0x2fc0,
-        }
-    }
-
-    /// Calculates the coordinates for the attribute table, taking into account x and y scrolling
-    fn attributetable_coordinates(&self, x: u8, y: u8) -> (u16, u8, u8) {
-        let mut base = self.attributetable_base();
-        let (x, ox) = x.overflowing_add(self.scrollx);
-        if ox {
-            base ^= 0x400;
-        }
-        let y = y as u16;
-        if y > 240 {
-            base ^= 0x800;
-        }
-        (base, x, (y % 240) as u8)
     }
 
     /// Returns the pattern table base for the sprites.
@@ -776,20 +742,8 @@ impl NesPpu {
         }
     }
 
-    /// Computes the xy coordinates to be used by the background fetcher.
-    fn compute_xy(&self, cycle: u16, offset: u8) -> (u8, u8) {
-        let (cycle2, ox) = cycle.overflowing_add(offset as u16);
-        let mut scanline = self.scanline_number;
-        if ox {
-            scanline = (scanline + 1) % 240;
-        }
-
-        ((cycle2 & 0xFF) as u8, scanline as u8)
-    }
-
     /// Performs fetches for the background data of the ppu.
     fn background_fetch(&mut self, bus: &mut NesMotherboard, cycle: u16) {
-        let (x, y) = self.compute_xy(cycle, 16);
         match (cycle / 2) % 4 {
             0 => {
                 if (cycle & 1) == 0 {
