@@ -56,13 +56,13 @@ impl Mapper01 {
                     let addr2 = addr & 0x0fff;
                     let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
                     addr3 |= (self.registers[1] as u32 & 0x1F) << 12;
-                    Some(cart.chr_rom[addr3 as usize])
+                    Some(cart.chr_rom[addr3 as usize & (cart.chr_rom.len() - 1)])
                 }
                 0x1000..=0x1fff => {
                     let addr2 = addr & 0x0fff;
                     let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
                     addr3 |= (self.registers[2] as u32 & 0x1F) << 12;
-                    Some(cart.chr_rom[addr3 as usize])
+                    Some(cart.chr_rom[addr3 as usize & (cart.chr_rom.len() - 1)])
                 }
                 _ => None,
             }
