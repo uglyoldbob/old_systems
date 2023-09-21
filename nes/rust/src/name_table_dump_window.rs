@@ -30,7 +30,7 @@ impl DumpWindow {
                     width: 1024.0,
                     height: 768.0,
                 })
-                .with_title("UglyOldBob NES PPU Pattern Table Dump"),
+                .with_title("UglyOldBob NES PPU Name Table Dump"),
             options: egui_multiwin::tracked_window::TrackedWindowOptions {
                 vsync: false,
                 shader: None,
@@ -58,7 +58,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
         let windows_to_create = vec![];
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            ui.label("PPU Pattern Table Dump Window");
+            ui.label("PPU Name Table Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 c.cpu_peripherals.ppu.render_nametable(&mut self.buf, &c.mb);
                 let image = self.buf.to_egui();
@@ -105,7 +105,9 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                     .ppu
                                     .render_nametable_pixel_address(table, pix_x, pix_y, &c.mb);
                                 let pixel_entry = c.mb.ppu_palette_read(addr) & 63;
-                                ui.label(format!("Address is {:x} {:x}", addr, pixel_entry));
+                                let ntaddr = 0x2000 + 0x400 * table as usize + col as usize + row as usize *32;
+                                ui.label(format!("Palette address is {:x} {:x}", addr, pixel_entry));
+                                ui.label(format!("Tile address {},{} is {:x}", col, row, ntaddr));
                             }
                         }
                     }

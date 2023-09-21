@@ -408,6 +408,7 @@ impl NesPpu {
     /// Increment the vram address, ignoring any wrapping
     pub fn increment_vram(&mut self) {
         self.vram_address = self.vram_address.wrapping_add(1);
+        //println!("4VRAM = {:x}", self.vram_address);
     }
 
     /// Allows providing palette data directly to the ppu
@@ -497,6 +498,7 @@ impl NesPpu {
                 } else {
                     self.vram_address = self.vram_address.wrapping_add(32);
                 }
+                //println!("5VRAM = {:x}", self.vram_address);
                 a
             }
             _ => {
@@ -549,8 +551,9 @@ impl NesPpu {
                             } else {
                                 self.temporary_vram_address =
                                     (self.temporary_vram_address & 0x7F00) | data as u16;
-                                println!("VRAM = {:x}", self.temporary_vram_address);
+                                //println!("VRAM = {:x}", self.temporary_vram_address);
                                 self.vram_address = self.temporary_vram_address;
+                                //println!("7VRAM = {:x}", self.vram_address);
                                 self.address_bit = !self.address_bit;
                             }
                         }
@@ -622,12 +625,14 @@ impl NesPpu {
     fn transfer_horizontal_position(&mut self) {
         let mask = 0x41F;
         self.vram_address = (self.vram_address & !mask) | (self.temporary_vram_address & mask);
+        //println!("1VRAM = {:x}", self.vram_address);
     }
 
     /// Copy vertical information from temporary to actual vram address
     fn transfer_vertical_position(&mut self) {
         let mask = 0x7BE0;
         self.vram_address = (self.vram_address & !mask) | (self.temporary_vram_address & mask);
+        //println!("2VRAM = {:x}", self.vram_address);
     }
 
     /// This increments the scanline cycle machine, sweeping across every scanline, and down every row sequentially.
@@ -828,6 +833,7 @@ impl NesPpu {
                 } else {
                     self.vram_address = self.vram_address.wrapping_add(32);
                 }
+                //println!("3VRAM = {:x}", self.vram_address);
                 self.pend_vram_write = None;
             } else if let Some(_a) = self.pend_vram_read {
                 self.ppudata_buffer = bus.ppu_cycle_2_read();
@@ -1387,9 +1393,6 @@ impl NesPpu {
             let base = table as u16;
             let offset = (pattern as u16) << 4;
             let calc = base + offset + (irow as u16) % 8;
-            if i < 512 {
-                println!("Address {:x} -> {:x}", i, calc);
-            }
             let data_low = bus.ppu_peek(calc);
             let data_high = bus.ppu_peek(calc + 8);
 
