@@ -992,7 +992,7 @@ impl NesPpu {
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
 
-                    let modx = (((cycle as u16 + self.scrollx as u16) / 16) & 1) as u8;
+                    let modx = (((cycle as u16) / 16) & 1) as u8;
                     let mody = ((self.vram_address>>5) & 1) as u8;
                     let combined = (mody << 1) | modx;
                     let attribute = if !prev_tile {
@@ -1177,20 +1177,19 @@ impl NesPpu {
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
-                self.background_fetch(bus, self.scanline_cycle - 1);
-                //self.idle_operation(bus, self.scanline_cycle - 1);
+                if self.should_render_background() {
+                    self.background_fetch(bus, cycle as u16);
+                } else {
+                    self.idle_operation(bus, cycle as u16);
+                }
                 self.increment_scanline_cycle();
             } else {
                 //do nothing
                 let cycle = self.scanline_cycle - 337;
-                if (cycle & 1) == 0 {
-                    let base = 0; //TODO calculate this correctly
-                    let offset = cycle % 8; //TODO calculate this value correctly
-                    bus.ppu_cycle_1(base + offset);
-                    self.cycle1_done = true;
-                } else if self.cycle1_done {
-                    bus.ppu_cycle_2_read();
-                    self.cycle1_done = false;
+                if self.should_render_background() {
+                    self.background_fetch(bus, cycle as u16);
+                } else {
+                    self.idle_operation(bus, cycle as u16);
                 }
                 self.increment_scanline_cycle();
             }
@@ -1202,6 +1201,7 @@ impl NesPpu {
         } else if self.scanline_number <= 260 {
             //vblank lines
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
+                println!("Set vblank");
                 self.registers[2] |= 0x80;
                 self.frame_end = true;
                 #[cfg(any(test, feature = "debugger"))]
@@ -1215,6 +1215,7 @@ impl NesPpu {
             self.increment_scanline_cycle();
         } else {
             if self.scanline_number == 261 && self.scanline_cycle == 1 {
+                println!("Clear vblank");
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
             if self.scanline_cycle > 0 {

@@ -34,7 +34,7 @@ impl DumpWindow {
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 1024.0,
+                    width: 1048.0,
                     height: 768.0,
                 })
                 .with_title("UglyOldBob NES PPU Name Table Dump"),
@@ -148,12 +148,12 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                 if let Some(cursor) = r.hover_pos() {
                                     let pos = cursor - r.rect.left_top();
                                     if pos.x >= 0.0 && pos.y >= 0.0 {
-                                        let x = (pos.x / (8.0 * zoom)).floor() as usize;
-                                        let y = (pos.y / (8.0 * zoom)).floor() as usize;
+                                        let x = (pos.x / (16.0 * zoom)).floor() as usize;
+                                        let y = (pos.y / (16.0 * zoom)).floor() as usize;
                                         let left = x < 32;
                                         let top = y < 30;
-                                        let col = x & 0x1f;
-                                        let row = y % 30;
+                                        let col = x & 0xf;
+                                        let row = y % 16;
                                         let table = match (left, top) {
                                             (true, true) => 0,
                                             (false, true) => 1,
@@ -167,6 +167,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                             .cpu_peripherals
                                             .ppu
                                             .render_nametable_pixel_address(table, pix_x, pix_y, &c.mb);
+                                        let ntaddr = 0x23C0 + 0x400 * table as usize + col as usize + row as usize;
+                                        ui.label(format!("Tile address {},{} is {:x}", col, row, ntaddr));
                                     }
                                 }
                             }
