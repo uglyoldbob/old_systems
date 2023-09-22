@@ -72,29 +72,29 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                         c.wait_for_frame_end = true;
                         c.paused = false;
                     }
-                    if ui.button("Reset").clicked() {
-                        c.reset();
-                    }
                 } else if ui.button("Pause").clicked() {
                     c.single_step = true;
                     c.paused = true;
+                }
+                if ui.button("Reset").clicked() {
+                    c.reset();
                 }
                 if let Some(cart) = c.mb.cartridge() {
                     ui.label(format!("ROM format: {:?}", cart.rom_format));
                 }
                 ui.horizontal(|ui| {
-                    ui.label(format!("Address: 0x{:x}", c.cpu.get_pc()));
+                    ui.label(format!("Address: 0x{:x}", c.cpu.debugger.pc));
                     if let Some(t) = c.cpu.disassemble() {
                         ui.label(t);
                     }
                 });
                 ui.label(format!(
                     "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
-                    c.cpu.get_a(),
-                    c.cpu.get_x(),
-                    c.cpu.get_y(),
-                    c.cpu.get_p(),
-                    c.cpu.get_sp(),
+                    c.cpu.debugger.a,
+                    c.cpu.debugger.x,
+                    c.cpu.debugger.y,
+                    c.cpu.debugger.p,
+                    c.cpu.debugger.s,
                 ));
                 ui.label(format!(
                     "Frame number {}",
