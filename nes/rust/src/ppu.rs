@@ -222,6 +222,9 @@ pub struct NesPpu {
     cycle1_done: bool,
     /// The fine horizontal scroll amount, in pixels
     scrollx: u8,
+    #[cfg(feature = "debugger")]
+    /// For debugging pixel generation of the background
+    pub bg_debug: Option<(u8,u8)>,
 }
 
 /// The flags that set the nametable base
@@ -381,6 +384,8 @@ impl NesPpu {
             oamaddress: 0,
             cycle1_done: false,
             scrollx: 0,
+            #[cfg(feature = "debugger")]
+            bg_debug: None,
         }
     }
 
@@ -1010,15 +1015,8 @@ impl NesPpu {
                     let lower_bit = (pt[0] >> index) & 1;
                     let scrollx =
                         (((self.vram_address & 0x1f) << 3) - 0x10) & 0xFF | self.scrollx as u16;
-                    let calc3 = scrollx >> 5;
-                    /*println!(
-                        "PIXEL:{} {:x} {:x} ({:x})",
-                        cycle,
-                        scrollx,
-                        calc3,
-                        ((scrollx & 15) + (cycle as u16 & 15)),
-                    );*/
-                    let modx = ((calc3) & 1) as u8 ^ 1;
+                    let calc3 = scrollx >> 4;
+                    let modx = ((calc3) & 1) as u8;
                     let mody = ((self.vram_address >> 6) & 1) as u8;
                     let combined = (mody << 1) | modx;
                     //let prev_tile = (((scrollx & 15) + (cycle as u16 & 15))) > 15;
@@ -1028,6 +1026,19 @@ impl NesPpu {
                         self.attributetable_shift[1]
                     };
                     let extra_palette_bits = (attribute >> (2 * combined)) & 3;
+
+                    if let Some((x,y)) = self.bg_debug {
+                        if cycle == x && self.scanline_number == y as u16 {
+                            println!(
+                                "PIXEL:{} {:x} {} {:x} {:x}",
+                                cycle,
+                                scrollx,
+                                2*combined,
+                                attribute,
+                                extra_palette_bits,
+                            );
+                        }
+                    }
                     let lower_bits = (upper_bit << 1) | lower_bit;
 
                     let mut palette_entry = if lower_bits == 0 {

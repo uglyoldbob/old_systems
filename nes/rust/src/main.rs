@@ -319,7 +319,8 @@ fn main() {
         None
     };
 
-    let root_window = windows::main::MainNesWindow::new_request(sound_rate, sound_producer, sound_stream);
+    let root_window =
+        windows::main::MainNesWindow::new_request(sound_rate, sound_producer, sound_stream);
 
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());

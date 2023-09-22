@@ -384,6 +384,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 let r = ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
                 if r.hovered() {
                     if let Some(pos) = r.hover_pos() {
+                        let coord = pos - r.rect.left_top();
+                        c.cpu_peripherals.ppu.bg_debug = Some((coord.x as u8, coord.y as u8));
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     }
                 }
