@@ -561,6 +561,10 @@ impl NesPpu {
             }
             7 => {
                 if let 0..=0x3eff = self.vram_address {
+                    println!("VRAM PEND WRITE {:x}={:x} {} {},{}", self.vram_address, data, self.registers[1] & 0x1E, self.scanline_cycle, self.scanline_number);
+                    if self.pend_vram_write.is_some() {
+                        println!("Failed to write some VRAM {:X} {:x} {},{}", self.vram_address, self.registers[1] & 0x1E, self.scanline_cycle, self.scanline_number);
+                    }
                     self.pend_vram_write = Some(data);
                 } else {
                     let addr = self.vram_address & 0x1f;
@@ -624,7 +628,7 @@ impl NesPpu {
 
     /// This increments the scanline cycle machine, sweeping across every scanline, and down every row sequentially.
     fn increment_scanline_cycle(&mut self) {
-        if self.should_render_background() {
+        if self.should_render_background_cycle(self.scanline_cycle) {
             if self.scanline_number < 240 || self.scanline_number == 261 {
                 if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256)
                     && self.scanline_cycle != 0
@@ -714,7 +718,7 @@ impl NesPpu {
     }
 
     /// Returns true when the background should be rendered on the given cycle.
-    fn should_render_background_cycle(&self, cycle: u8) -> bool {
+    fn should_render_background_cycle(&self, cycle: u16) -> bool {
         if cycle < 8 {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
         } else {
@@ -981,7 +985,7 @@ impl NesPpu {
             } else if self.scanline_cycle <= 256 {
                 //each cycle here renders a single pixel
                 let cycle = (self.scanline_cycle - 1) as u8;
-                let bg_pixel = if self.should_render_background_cycle(cycle) {
+                let bg_pixel = if self.should_render_background_cycle(cycle as u16) {
                     let prev_tile = ((self.scrollx & 7) + (cycle & 7)) > 7;
                     let index = 7 - ((cycle.wrapping_add(self.scrollx)) % 8);
                     let pt = if !prev_tile {
@@ -1025,7 +1029,7 @@ impl NesPpu {
                 } else {
                     None
                 };
-                if self.should_render_background() {
+                if self.should_render_background_cycle(cycle as u16) {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
@@ -1177,7 +1181,7 @@ impl NesPpu {
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
-                if self.should_render_background() {
+                if self.should_render_background_cycle(self.scanline_cycle) {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
