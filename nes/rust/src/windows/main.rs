@@ -1,8 +1,8 @@
 //! The main window of the emulator
-//! 
+//!
 use std::io::Write;
 
-use crate::{NesEmulatorData, controller::NesControllerTrait, ppu::NesPpu};
+use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
 use egui_multiwin::{
     egui,
     egui_glow::EguiGlow,

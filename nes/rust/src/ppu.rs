@@ -561,9 +561,22 @@ impl NesPpu {
             }
             7 => {
                 if let 0..=0x3eff = self.vram_address {
-                    println!("VRAM PEND WRITE {:x}={:x} {} {},{}", self.vram_address, data, self.registers[1] & 0x1E, self.scanline_cycle, self.scanline_number);
+                    println!(
+                        "VRAM PEND WRITE {:x}={:x} {} {},{}",
+                        self.vram_address,
+                        data,
+                        self.registers[1] & 0x1E,
+                        self.scanline_cycle,
+                        self.scanline_number
+                    );
                     if self.pend_vram_write.is_some() {
-                        println!("Failed to write some VRAM {:X} {:x} {},{}", self.vram_address, self.registers[1] & 0x1E, self.scanline_cycle, self.scanline_number);
+                        println!(
+                            "Failed to write some VRAM {:X} {:x} {},{}",
+                            self.vram_address,
+                            self.registers[1] & 0x1E,
+                            self.scanline_cycle,
+                            self.scanline_number
+                        );
                     }
                     self.pend_vram_write = Some(data);
                 } else {
@@ -995,10 +1008,20 @@ impl NesPpu {
                     };
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
-
-                    let modx = (((cycle as u16) / 16) & 1) as u8;
-                    let mody = ((self.vram_address>>5) & 1) as u8;
+                    let scrollx =
+                        (((self.vram_address & 0x1f) << 3) - 0x10) & 0xFF | self.scrollx as u16;
+                    let calc3 = scrollx >> 5;
+                    /*println!(
+                        "PIXEL:{} {:x} {:x} ({:x})",
+                        cycle,
+                        scrollx,
+                        calc3,
+                        ((scrollx & 15) + (cycle as u16 & 15)),
+                    );*/
+                    let modx = ((calc3) & 1) as u8 ^ 1;
+                    let mody = ((self.vram_address >> 6) & 1) as u8;
                     let combined = (mody << 1) | modx;
+                    //let prev_tile = (((scrollx & 15) + (cycle as u16 & 15))) > 15;
                     let attribute = if !prev_tile {
                         self.attributetable_shift[0]
                     } else {
@@ -1407,7 +1430,8 @@ impl NesPpu {
             };
             let row = row % 240;
 
-            let address = self.render_attribute_table_pixel_address(quadrant, col as u8, row as u8, bus);
+            let address =
+                self.render_attribute_table_pixel_address(quadrant, col as u8, row as u8, bus);
 
             let p = PPU_PALETTE[address as usize];
             pixel[0] = p[0];

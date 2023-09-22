@@ -1,10 +1,11 @@
 //! The module for finding nes roms
 
-use crate::{NesEmulatorData, cartridge::NesCartridge};
+use crate::{cartridge::NesCartridge, NesEmulatorData};
 use egui_multiwin::{
+    egui::Sense,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow}, egui::Sense,
+    tracked_window::{RedrawResponse, TrackedWindow},
 };
 
 /// The structure for a window that helps a user select a rom to load.

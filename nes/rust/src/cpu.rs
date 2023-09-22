@@ -3411,7 +3411,8 @@ impl NesCpu {
                 },
                 //ldx immediate
                 0xa2 => {
-                    self.temp = self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
+                    self.temp =
+                        self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
                     #[cfg(feature = "debugger")]
                     {
                         self.copy_debugger(format!("LDX #${:02x}", self.temp));
@@ -3636,7 +3637,8 @@ impl NesCpu {
                 },
                 //ldy load y immediate
                 0xa0 => {
-                    self.temp = self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
+                    self.temp =
+                        self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
                     #[cfg(feature = "debugger")]
                     {
                         self.copy_debugger(format!("LDY #${:02x}", self.temp));
@@ -3799,7 +3801,8 @@ impl NesCpu {
                 },
                 //lda immediate
                 0xa9 => {
-                    self.temp = self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
+                    self.temp =
+                        self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
                     #[cfg(feature = "debugger")]
                     {
                         self.copy_debugger(format!("LDA #${:02x}", self.temp));

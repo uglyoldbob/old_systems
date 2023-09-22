@@ -68,7 +68,9 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
             ui.label("PPU Name Table Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 c.cpu_peripherals.ppu.render_nametable(&mut self.buf, &c.mb);
-                c.cpu_peripherals.ppu.render_attribute_table(&mut self.buf2, &c.mb);
+                c.cpu_peripherals
+                    .ppu
+                    .render_attribute_table(&mut self.buf2, &c.mb);
                 let image = self.buf.to_egui();
                 let image2 = self.buf2.to_egui();
                 if self.texture.is_none() {
@@ -100,7 +102,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                     y: zoom * self.buf.height as f32,
                                 },
                             );
-        
+
                             if r.hovered() {
                                 if let Some(cursor) = r.hover_pos() {
                                     let pos = cursor - r.rect.left_top();
@@ -117,17 +119,60 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                             (true, false) => 2,
                                             (false, false) => 3,
                                         };
-                                        let pix_x = (((pos.x / (zoom)).floor() as usize) & 0xFF) as u8;
-                                        let pix_y = (((pos.y / (zoom)).floor() as usize) % 240) as u8;
-                                        ui.label(format!("Coordinate {},{} {:x}", pix_x, pix_y, table));
-                                        let addr = c
-                                            .cpu_peripherals
-                                            .ppu
-                                            .render_nametable_pixel_address(table, pix_x, pix_y, &c.mb);
+                                        let pix_x =
+                                            (((pos.x / (zoom)).floor() as usize) & 0xFF) as u8;
+                                        let pix_y =
+                                            (((pos.y / (zoom)).floor() as usize) % 240) as u8;
+                                        ui.label(format!(
+                                            "Coordinate {},{} {:x}",
+                                            pix_x, pix_y, table
+                                        ));
+                                        let addr =
+                                            c.cpu_peripherals.ppu.render_nametable_pixel_address(
+                                                table, pix_x, pix_y, &c.mb,
+                                            );
                                         let pixel_entry = c.mb.ppu_palette_read(addr) & 63;
-                                        let ntaddr = 0x2000 + 0x400 * table as usize + col as usize + row as usize *32;
-                                        ui.label(format!("Palette address is {:x} {:x}", addr, pixel_entry));
-                                        ui.label(format!("Tile address {},{} is {:x}", col, row, ntaddr));
+                                        let ntaddr = 0x2000
+                                            + 0x400 * table as usize
+                                            + col as usize
+                                            + row as usize * 32;
+                                        ui.label(format!(
+                                            "Palette address is {:x} {:x}",
+                                            addr, pixel_entry
+                                        ));
+                                        ui.label(format!(
+                                            "Tile address {},{} is {:x}",
+                                            col, row, ntaddr
+                                        ));
+
+                                        let x = (pos.x / (32.0 * zoom)).floor() as usize;
+                                        let y = (pos.y / (32.0 * zoom)).floor() as usize;
+                                        let left = x < 32;
+                                        let top = y < 30;
+                                        let col = x & 0x7;
+                                        let row = y % 8;
+                                        let table = match (left, top) {
+                                            (true, true) => 0,
+                                            (false, true) => 1,
+                                            (true, false) => 2,
+                                            (false, false) => 3,
+                                        };
+                                        let pix_x =
+                                            (((pos.x / (zoom)).floor() as usize) & 0xFF) as u8;
+                                        let pix_y =
+                                            (((pos.y / (zoom)).floor() as usize) % 240) as u8;
+                                        ui.label(format!(
+                                            "Coordinate {},{} {:x}",
+                                            pix_x, pix_y, table
+                                        ));
+                                        let ntaddr = 0x23C0
+                                            + 0x400 * table as usize
+                                            + col as usize
+                                            + row as usize * 8;
+                                        ui.label(format!(
+                                            "Attribute address {},{} is {:x}",
+                                            col, row, ntaddr
+                                        ));
                                     }
                                 }
                             }
@@ -143,32 +188,43 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                     y: zoom * self.buf.height as f32,
                                 },
                             );
-        
+
                             if r.hovered() {
                                 if let Some(cursor) = r.hover_pos() {
                                     let pos = cursor - r.rect.left_top();
                                     if pos.x >= 0.0 && pos.y >= 0.0 {
-                                        let x = (pos.x / (16.0 * zoom)).floor() as usize;
-                                        let y = (pos.y / (16.0 * zoom)).floor() as usize;
+                                        let x = (pos.x / (32.0 * zoom)).floor() as usize;
+                                        let y = (pos.y / (32.0 * zoom)).floor() as usize;
                                         let left = x < 32;
                                         let top = y < 30;
-                                        let col = x & 0xf;
-                                        let row = y % 16;
+                                        let col = x & 0x7;
+                                        let row = y % 8;
                                         let table = match (left, top) {
                                             (true, true) => 0,
                                             (false, true) => 1,
                                             (true, false) => 2,
                                             (false, false) => 3,
                                         };
-                                        let pix_x = (((pos.x / (zoom)).floor() as usize) & 0xFF) as u8;
-                                        let pix_y = (((pos.y / (zoom)).floor() as usize) % 240) as u8;
-                                        ui.label(format!("Coordinate {},{} {:x}", pix_x, pix_y, table));
-                                        let addr = c
-                                            .cpu_peripherals
-                                            .ppu
-                                            .render_nametable_pixel_address(table, pix_x, pix_y, &c.mb);
-                                        let ntaddr = 0x23C0 + 0x400 * table as usize + col as usize + row as usize;
-                                        ui.label(format!("Tile address {},{} is {:x}", col, row, ntaddr));
+                                        let pix_x =
+                                            (((pos.x / (zoom)).floor() as usize) & 0xFF) as u8;
+                                        let pix_y =
+                                            (((pos.y / (zoom)).floor() as usize) % 240) as u8;
+                                        ui.label(format!(
+                                            "Coordinate {},{} {:x}",
+                                            pix_x, pix_y, table
+                                        ));
+                                        let addr =
+                                            c.cpu_peripherals.ppu.render_nametable_pixel_address(
+                                                table, pix_x, pix_y, &c.mb,
+                                            );
+                                        let ntaddr = 0x23C0
+                                            + 0x400 * table as usize
+                                            + col as usize
+                                            + row as usize * 8;
+                                        ui.label(format!(
+                                            "Tile address {},{} is {:x}",
+                                            col, row, ntaddr
+                                        ));
                                     }
                                 }
                             }

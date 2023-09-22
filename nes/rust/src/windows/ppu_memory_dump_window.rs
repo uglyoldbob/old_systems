@@ -56,13 +56,13 @@ impl TrackedWindow<NesEmulatorData> for PpuMemoryDumpWindow {
                 {
                     for i in (0..=0x3FFF).step_by(8) {
                         let a1 = format!("{:02X}", c.mb.ppu_peek(i));
-                        let a2 = format!("{:02X}", c.mb.ppu_peek(i+1));
-                        let a3 = format!("{:02X}", c.mb.ppu_peek(i+2));
-                        let a4 = format!("{:02X}", c.mb.ppu_peek(i+3));
-                        let a5 = format!("{:02X}", c.mb.ppu_peek(i+4));
-                        let a6 = format!("{:02X}", c.mb.ppu_peek(i+5));
-                        let a7 = format!("{:02X}", c.mb.ppu_peek(i+6));
-                        let a8 = format!("{:02X}", c.mb.ppu_peek(i+7));
+                        let a2 = format!("{:02X}", c.mb.ppu_peek(i + 1));
+                        let a3 = format!("{:02X}", c.mb.ppu_peek(i + 2));
+                        let a4 = format!("{:02X}", c.mb.ppu_peek(i + 3));
+                        let a5 = format!("{:02X}", c.mb.ppu_peek(i + 4));
+                        let a6 = format!("{:02X}", c.mb.ppu_peek(i + 5));
+                        let a7 = format!("{:02X}", c.mb.ppu_peek(i + 6));
+                        let a8 = format!("{:02X}", c.mb.ppu_peek(i + 7));
                         ui.label(format!(
                             "{:04X}: {} {} {} {}\t{} {} {} {}",
                             i, a1, a2, a3, a4, a5, a6, a7, a8,
