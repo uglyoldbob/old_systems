@@ -70,8 +70,8 @@ impl MainNesWindow {
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 300.0,
+                    width: 640.0,
+                    height: 600.0,
                 })
                 .with_title("UglyOldBob NES Emulator"),
             options: egui_multiwin::tracked_window::TrackedWindowOptions {
@@ -381,11 +381,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
-                let r = ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0, y: 240.0 });
+                let zoom = 2.0;
+                let r = ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0 * zoom, y: 240.0 * zoom });
                 if r.hovered() {
                     if let Some(pos) = r.hover_pos() {
                         let coord = pos - r.rect.left_top();
-                        c.cpu_peripherals.ppu.bg_debug = Some((coord.x as u8, coord.y as u8));
+                        c.cpu_peripherals.ppu.bg_debug = Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     }
                 }

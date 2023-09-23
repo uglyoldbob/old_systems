@@ -566,14 +566,6 @@ impl NesPpu {
             }
             7 => {
                 if let 0..=0x3eff = self.vram_address {
-                    println!(
-                        "VRAM PEND WRITE {:x}={:x} {} {},{}",
-                        self.vram_address,
-                        data,
-                        self.registers[1] & 0x1E,
-                        self.scanline_cycle,
-                        self.scanline_number
-                    );
                     if self.pend_vram_write.is_some() {
                         println!(
                             "Failed to write some VRAM {:X} {:x} {},{}",
@@ -1239,7 +1231,6 @@ impl NesPpu {
         } else if self.scanline_number <= 260 {
             //vblank lines
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
-                println!("Set vblank");
                 self.registers[2] |= 0x80;
                 self.frame_end = true;
                 #[cfg(any(test, feature = "debugger"))]
@@ -1253,7 +1244,6 @@ impl NesPpu {
             self.increment_scanline_cycle();
         } else {
             if self.scanline_number == 261 && self.scanline_cycle == 1 {
-                println!("Clear vblank");
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
             if self.scanline_cycle > 0 {

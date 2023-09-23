@@ -391,7 +391,6 @@ impl NesMotherboard {
             match addr {
                 0..=0x3eff => {
                     let addr2 = addr & 0x7ff;
-                    println!("VRAM {:X} = {:X}", addr, data);
                     self.vram[addr2 as usize] = data;
                 }
                 0x3f00..=0x3fff => {
