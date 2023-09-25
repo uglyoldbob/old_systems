@@ -855,12 +855,19 @@ impl NesPpu {
     fn sprite_eval(&mut self) {
         if self.scanline_number < 240 {
             let row = (self.scanline_number + 1) as u8;
+            let mut reset = ||{
+                self.oamaddress = 0;
+                self.secondaryoamaddress = 0;
+                self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+            };
+            if self.frame_odd && self.scanline_number == 0 {
+                //TODO: trigger bug that occurs when oamaddress is nonzero
+                //it copies 8 bytes of sprite data
+                reset();
+            }
             match self.scanline_cycle {
                 0 => {
-                    //TODO: trigger bug that occurs when oamaddress is nonzero
-                    //it copies 8 bytes of sprite data
-                    self.oamaddress = 0;
-                    self.secondaryoamaddress = 0;
+                    reset();
                 }
                 1..=64 => {
                     if (self.scanline_cycle & 1) == 0 {
