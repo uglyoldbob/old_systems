@@ -137,6 +137,7 @@ impl NesEmulatorData {
         &mut self,
         sound: &mut Option<rb::Producer<f32>>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
+        filter2: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
@@ -148,7 +149,7 @@ impl NesEmulatorData {
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
             self.prev_irq = irq;
-            self.cpu_peripherals.apu.clock_slow(sound, filter);
+            self.cpu_peripherals.apu.clock_slow(sound, filter, filter2);
         }
 
         self.ppu_clock_counter += 1;

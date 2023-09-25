@@ -69,6 +69,16 @@ impl NesMotherboard {
         }
     }
 
+    /// The master clock for the system
+    pub fn master_clock(&self) -> f32 {
+        236.25e6 / 11.0
+    }
+
+    /// The number of cpu cycles per frame
+    pub fn cpu_cycles_per_frame(&self) -> f32 {
+        29780.5
+    }
+
     /// Remove any cartridge that may exist in the system.
     pub fn remove_cartridge(&mut self) {
         self.cart = None;
