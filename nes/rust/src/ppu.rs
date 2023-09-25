@@ -1021,13 +1021,7 @@ impl NesPpu {
                     let extra_palette_bits = (attribute >> (2 * combined)) & 3;
 
                     if let Some((x,y)) = self.bg_debug {
-                        if self.scanline_number == y as u16 {
-                            if cycle < 240 {
-                                print!("{:X} ", subcalc);
-                            }
-                            else {
-                                println!("");
-                            }
+                        if cycle == x && self.scanline_number == y as u16 {
                         }
                     }
                     let lower_bits = (upper_bit << 1) | lower_bit;
@@ -1041,9 +1035,6 @@ impl NesPpu {
                         palette_entry &= 0x30;
                     }
 
-                    if combined == 3 && self.frame_odd {
-                        palette_entry = 0;
-                    }
                     let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
                     if (self.registers[1]
                         & (PPU_REGISTER1_EMPHASIZE_BLUE
@@ -1058,7 +1049,7 @@ impl NesPpu {
                 } else {
                     None
                 };
-                if self.should_render_background_cycle(cycle as u16) {
+                if self.should_render_background_cycle(8+cycle as u16) {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
@@ -1210,7 +1201,7 @@ impl NesPpu {
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
-                if self.should_render_background_cycle(self.scanline_cycle) {
+                if self.should_render_background_cycle(cycle) {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
@@ -1219,11 +1210,7 @@ impl NesPpu {
             } else {
                 //do nothing
                 let cycle = self.scanline_cycle - 337;
-                if self.should_render_background() {
-                    self.background_fetch(bus, cycle as u16);
-                } else {
-                    self.idle_operation(bus, cycle as u16);
-                }
+                self.idle_operation(bus, cycle as u16);
                 self.increment_scanline_cycle();
             }
         } else if self.scanline_number == 240 {
