@@ -381,6 +381,8 @@ impl NesCartridge {
 
     /// Load a cartridge, returning an error or the new cartridge
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
+        #[cfg(test)]
+        println!("Opening rom {}", name);
         let rom_contents = std::fs::read(name);
         if let Err(e) = rom_contents {
             return Err(CartridgeError::FsError(e.kind().to_string()));

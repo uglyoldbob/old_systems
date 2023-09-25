@@ -877,9 +877,9 @@ impl NesPpu {
                         match self.sprite_eval_mode {
                             PpuSpriteEvalMode::Normal => {
                                 //range check
-                                if row < 240
-                                    && row >= self.oamdata
-                                    && row < (self.oamdata + self.sprite_height())
+                                if row <= 240
+                                    && row > self.oamdata
+                                    && row <= (self.oamdata + self.sprite_height())
                                 {
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
@@ -894,9 +894,9 @@ impl NesPpu {
                                 }
                             }
                             PpuSpriteEvalMode::Sprites8 => {
-                                if row < 240
-                                    && row >= self.oamdata
-                                    && row < (self.oamdata + self.sprite_height())
+                                if row <= 240
+                                    && row > self.oamdata
+                                    && row <= (self.oamdata + self.sprite_height())
                                 {
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     self.registers[2] |= 0x20; //the sprite overflow flag
@@ -1006,7 +1006,7 @@ impl NesPpu {
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
                     let scrollx =
-                        (((self.vram_address & 0x1f) << 3) - 0x10) & 0xFF | self.scrollx as u16;
+                        (((self.vram_address & 0x1f) << 3).wrapping_sub(0x10)) & 0xFF | self.scrollx as u16;
                     let subcalc = (scrollx & 0xFF) + (cycle as u16 & 7);
                     let calc3 = subcalc>>4;
                     let modx = ((calc3) & 1) as u8;
