@@ -193,6 +193,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 }
             }
         });
+        if self.index >= c.roms.elements.len() {
+            self.index = 0;
+            self.want_status = None;
+        }
         RedrawResponse {
             quit,
             new_windows: windows_to_create,
