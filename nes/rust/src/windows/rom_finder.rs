@@ -11,8 +11,6 @@ use egui_multiwin::{
 /// The structure for a window that helps a user select a rom to load.
 #[cfg(feature = "egui-multiwin")]
 pub struct RomFinder {
-    /// The element responsible for parsing the list of roms known by the emulator.
-    parser: crate::romlist::RomListParser,
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -21,7 +19,6 @@ impl RomFinder {
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(RomFinder {
-                parser: crate::romlist::RomListParser::new(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -56,14 +53,14 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
         let windows_to_create = vec![];
 
         //scan for roms if needed
-        self.parser.find_roms("./roms");
+        c.parser.find_roms("./roms");
         //process to see if any new roms need to be checked
-        self.parser.process_roms();
+        c.parser.process_roms();
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 let mut new_rom = None;
-                for (p, entry) in self.parser.list().elements.iter() {
+                for (p, entry) in c.parser.list().elements.iter() {
                     if let Some(Ok(r)) = &entry.result {
                         if ui
                             .add(
@@ -84,7 +81,7 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
                     }
                 }
                 ui.label("Unsupported roms below here");
-                for (p, entry) in self.parser.list().elements.iter() {
+                for (p, entry) in c.parser.list().elements.iter() {
                     if let Some(Err(r)) = &entry.result {
                         ui.label(format!("Rom: {}: {:?}", p.display(), r));
                     }

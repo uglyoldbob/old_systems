@@ -9,3 +9,6 @@ pub mod pattern_table_dump_window;
 pub mod ppu_memory_dump_window;
 pub mod rom_finder;
 pub mod sprite_dump_window;
+
+#[cfg(feature = "rom_status")]
+pub mod rom_checker;

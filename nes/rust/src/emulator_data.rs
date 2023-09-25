@@ -45,6 +45,12 @@ pub struct NesEmulatorData {
     prev_irq: bool,
     /// The list of roms for the emulator
     pub roms: RomList,
+    /// The parser for known roms
+    #[serde(skip)]
+    pub parser: crate::romlist::RomListParser,
+    #[cfg(feature = "rom_status")]
+    #[serde(skip)]
+    pub rom_test: crate::rom_status::RomListTestParser,
 }
 
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
@@ -82,6 +88,9 @@ impl NesEmulatorData {
             nmi: [false; 3],
             prev_irq: false,
             roms: RomList::load_list(),
+            parser: crate::romlist::RomListParser::new(),
+            #[cfg(feature = "rom_status")]
+            rom_test: crate::rom_status::RomListTestParser::new(),
         }
     }
 

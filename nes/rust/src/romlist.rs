@@ -64,6 +64,12 @@ pub struct RomListParser {
     update_complete: bool,
 }
 
+impl Default for RomListParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RomListParser {
     /// Create a new rom list parser object. It loads the file that lists previously parsed roms.
     pub fn new() -> Self {

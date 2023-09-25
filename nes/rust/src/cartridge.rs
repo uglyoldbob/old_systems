@@ -109,8 +109,12 @@ pub struct NesCartridge {
     mappernum: u32,
     /// Rom format loaded from
     pub rom_format: RomFormat,
+    /// The hash of the rom contents
+    hash: String,
     /// The name to use for save games
     save: String,
+    /// The convenience name of the rom
+    rom_name: String,
 }
 
 /// The types of errors that can occur when loading a rom
@@ -138,8 +142,18 @@ fn calc_sha256(data: &[u8]) -> String {
 
 impl NesCartridge {
     /// "Parses" an obsolete ines rom
-    fn load_obsolete_ines(_rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_obsolete_ines(name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
+    }
+
+    /// Retrieve the hash of the rom contents
+    pub fn hash(&self) -> String {
+        self.hash.to_owned()
+    }
+
+    /// Retrieve the convenience name
+    pub fn rom_name(&self) -> String {
+        self.rom_name.clone()
     }
 
     /// Retrieve the save name for the cartridge
@@ -166,7 +180,7 @@ impl NesCartridge {
     }
 
     /// Parses an ines1 format rom
-    fn load_ines1(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_ines1(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         if rom_contents[0] != b'N'
             || rom_contents[1] != b'E'
             || rom_contents[2] != b'S'
@@ -198,7 +212,6 @@ impl NesCartridge {
         };
 
         let mut prg_rom = Vec::with_capacity(prg_rom_size);
-        println!("Prg rom is at {:x}, len {:x}", file_offset, prg_rom_size);
         for i in 0..prg_rom_size {
             if rom_contents.len() <= (file_offset + i) {
                 return Err(CartridgeError::RomTooShort);
@@ -246,11 +259,6 @@ impl NesCartridge {
             rom_contents[8] as usize * 8192
         };
         let mut prg_ram = Vec::with_capacity(ram_size);
-        if ram_size > 0 {
-            println!("Initializing prg_ram with random data");
-        } else {
-            println!("No prg_ram");
-        }
         for _i in 0..ram_size {
             let v = rand::random();
             prg_ram.push(v);
@@ -277,18 +285,20 @@ impl NesCartridge {
                 file_offset
             );
         }
-
+        let hash = calc_sha256(rom_contents);
         Ok(Self {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
-            save: format!("{}.save", calc_sha256(rom_contents)),
+            hash: hash.to_owned(),
+            save: format!("{}.save", hash),
+            rom_name: name.to_owned(),
         })
     }
 
     /// Parses an ines2 format rom
-    fn load_ines2(rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_ines2(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         if rom_contents[0] != b'N'
             || rom_contents[1] != b'E'
             || rom_contents[2] != b'S'
@@ -320,7 +330,6 @@ impl NesCartridge {
         };
 
         let mut prg_rom = Vec::with_capacity(prg_rom_size);
-        println!("Prg rom is at {:x}, len {:x}", file_offset, prg_rom_size);
         for i in 0..prg_rom_size {
             if rom_contents.len() <= (file_offset + i) {
                 return Err(CartridgeError::RomTooShort);
@@ -370,12 +379,15 @@ impl NesCartridge {
 
         let mapper = NesCartridge::get_mapper(mappernum as u32, &rom_data)?;
 
+        let hash = calc_sha256(rom_contents);
         Ok(Self {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
-            save: format!("{}.save", calc_sha256(rom_contents)),
+            hash: hash.to_owned(),
+            save: format!("{}.save", hash),
+            rom_name: name.to_owned(),
         })
     }
 
@@ -383,12 +395,11 @@ impl NesCartridge {
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
         #[cfg(test)]
         println!("Opening rom {}", name);
-        let rom_contents = std::fs::read(name);
+        let rom_contents = std::fs::read(name.clone());
         if let Err(e) = rom_contents {
             return Err(CartridgeError::FsError(e.kind().to_string()));
         }
         let rom_contents = rom_contents.unwrap();
-        println!("Rom length is {:x}", rom_contents.len());
         if rom_contents.len() < 16 {
             return Err(CartridgeError::InvalidRom);
         }
@@ -400,19 +411,19 @@ impl NesCartridge {
             return Err(CartridgeError::InvalidRom);
         }
         if (rom_contents[7] & 0xC) == 8 {
-            Self::load_ines2(&rom_contents)
+            Self::load_ines2(name, &rom_contents)
         } else if (rom_contents[7] & 0xC) == 4 {
-            Self::load_obsolete_ines(&rom_contents)
+            Self::load_obsolete_ines(name, &rom_contents)
         } else if (rom_contents[7] & 0xC) == 0
             && rom_contents[12] == 0
             && rom_contents[13] == 0
             && rom_contents[14] == 0
             && rom_contents[15] == 0
         {
-            Self::load_ines1(&rom_contents)
+            Self::load_ines1(name, &rom_contents)
         } else {
             //or ines 0.7
-            Self::load_obsolete_ines(&rom_contents)
+            Self::load_obsolete_ines(name, &rom_contents)
         }
     }
 }

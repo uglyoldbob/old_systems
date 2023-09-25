@@ -118,7 +118,7 @@ impl eframe::App for MainNesWindow {
         egui::TopBottomPanel::top("menu_bar").show(&ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    let button = egui::Button::new("Open rom?");
+                    let button = egui::Button::new("Open rom");
                     if ui.add_enabled(true, button).clicked() {
                         ui.close_menu();
                     }

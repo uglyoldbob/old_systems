@@ -31,6 +31,9 @@ use crate::ppu::NesPpu;
 const INITIAL_ROM: Option<&str> = Some("./roms/nes/Legend of Zelda, The (U) (PRG 0).nes");
 //const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
+#[cfg(feature = "rom_status")]
+pub mod rom_status;
+
 #[cfg(feature = "egui-multiwin")]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[cfg(feature = "eframe")]
@@ -342,5 +345,11 @@ fn main() {
             let _e = multi_window.add(debug_win, &event_loop);
         }
     }
+
+    #[cfg(feature = "rom_status")]
+    {
+        multi_window.add(windows::rom_checker::Window::new_request(), &event_loop);
+    }
+
     multi_window.run(event_loop, nes_data);
 }
