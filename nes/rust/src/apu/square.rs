@@ -46,6 +46,11 @@ impl ApuSquareChannel {
         }
     }
 
+    /// Reloads the sweep
+    pub fn sweep_reload(&mut self) {
+        self.sweep.reload();
+    }
+
     /// Retrieves the duty cycle mode.
     pub fn get_duty_mode(&self) -> u8 {
         self.registers[0] >> 6
@@ -73,13 +78,27 @@ impl ApuSquareChannel {
 
     /// Clock the sweep
     pub fn clock_sweep(&mut self) {
-        self.sweep.clock(&self.registers);
+        let delta = self.sweep.clock(&self.registers) as i32;
+        let mut period = (self.registers[2] as u16 | ((self.registers[3] & 0x7) as u16)<<8) as i32;
+        if delta != 0 {
+            println!("Delta is {}", delta);
+        }
+        period = period + delta;
+        let new_period = period as u16;
+        self.registers[2] = (new_period & 0xFF) as u8;
+        self.registers[3] = (self.registers[3] & 0xF8) | ((new_period>>8) & 7) as u8;
+    }
+
+    /// Operates the sweep mechanism
+    fn sweep(&mut self) -> bool {
+        false
     }
 
     /// Return the audio sample for this channel
-    pub fn audio(&self) -> f32 {
+    pub fn audio(&mut self) -> f32 {
         if self.length != 0
             && DUTY_TABLE[self.get_duty_mode() as usize][self.duty_counter as usize] != 0
+            && !self.sweep()
         {
             self.envelope.audio_output(&self.registers[..]) as f32 / 255.0
         } else {
