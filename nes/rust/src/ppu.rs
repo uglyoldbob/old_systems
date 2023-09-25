@@ -1007,7 +1007,8 @@ impl NesPpu {
                     let lower_bit = (pt[0] >> index) & 1;
                     let scrollx =
                         (((self.vram_address & 0x1f) << 3) - 0x10) & 0xFF | self.scrollx as u16;
-                    let calc3 = cycle>>3 + 1;
+                    let subcalc = (scrollx & 0xFF) + (cycle as u16 & 7);
+                    let calc3 = subcalc>>4;
                     let modx = ((calc3) & 1) as u8;
                     let mody = ((self.vram_address >> 6) & 1) as u8;
                     let combined = (mody << 1) | modx;
@@ -1020,18 +1021,13 @@ impl NesPpu {
                     let extra_palette_bits = (attribute >> (2 * combined)) & 3;
 
                     if let Some((x,y)) = self.bg_debug {
-                        if cycle == x && self.scanline_number == y as u16 {
-                            println!(
-                                "PIXEL:{} {} {:x} {} {:x} {:x} {:x} {:x}",
-                                cycle,
-                                self.scrollx,
-                                scrollx,
-                                2*combined,
-                                self.attributetable_shift[0],
-                                self.attributetable_shift[1],
-                                attribute,
-                                extra_palette_bits,
-                            );
+                        if self.scanline_number == y as u16 {
+                            if cycle < 240 {
+                                print!("{:X} ", subcalc);
+                            }
+                            else {
+                                println!("");
+                            }
                         }
                     }
                     let lower_bits = (upper_bit << 1) | lower_bit;
