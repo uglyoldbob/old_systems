@@ -1007,11 +1007,11 @@ impl NesPpu {
                     let lower_bit = (pt[0] >> index) & 1;
                     let scrollx =
                         (((self.vram_address & 0x1f) << 3) - 0x10) & 0xFF | self.scrollx as u16;
-                    let calc3 = scrollx >> 4;
+                    let calc3 = cycle>>3 + 1;
                     let modx = ((calc3) & 1) as u8;
                     let mody = ((self.vram_address >> 6) & 1) as u8;
                     let combined = (mody << 1) | modx;
-                    //let prev_tile = (((scrollx & 15) + (cycle as u16 & 15))) > 15;
+                    let prev_tile = (((scrollx & 7) + (cycle as u16 & 7))) > 7;
                     let attribute = if !prev_tile {
                         self.attributetable_shift[0]
                     } else {
@@ -1022,10 +1022,13 @@ impl NesPpu {
                     if let Some((x,y)) = self.bg_debug {
                         if cycle == x && self.scanline_number == y as u16 {
                             println!(
-                                "PIXEL:{} {:x} {} {:x} {:x}",
+                                "PIXEL:{} {} {:x} {} {:x} {:x} {:x} {:x}",
                                 cycle,
+                                self.scrollx,
                                 scrollx,
                                 2*combined,
+                                self.attributetable_shift[0],
+                                self.attributetable_shift[1],
                                 attribute,
                                 extra_palette_bits,
                             );
@@ -1040,6 +1043,10 @@ impl NesPpu {
                     };
                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
                         palette_entry &= 0x30;
+                    }
+
+                    if combined == 3 && self.frame_odd {
+                        palette_entry = 0;
                     }
                     let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
                     if (self.registers[1]
