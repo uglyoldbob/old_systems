@@ -1,5 +1,7 @@
 //! The module for the main debug window
 
+use std::io::Write;
+
 use crate::{NesEmulatorData, cartridge::NesCartridge, rom_status::RomStatus};
 use egui_multiwin::{
     egui_glow::EguiGlow,
@@ -191,6 +193,45 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 if ui.button("Restart").clicked() {
                     self.index = 0;
                     self.next_rom = None;
+                }
+                if ui.button("Create report").clicked() {
+                    let mut file = std::fs::File::create("./report.txt").unwrap();
+                    writeln!(&mut file, "Rom testing results").unwrap();
+                    let mut num_broken = 0;
+                    let mut num_bug = 0;
+                    let mut num_working = 0;
+                    let mut num_unknown = 0;
+                    for (i, (path, entry)) in c.roms.elements.iter().enumerate() {
+                        let mut rom_found = false;
+                        let mut rom_valid = false;
+                        if let Ok(cart) = crate::NesCartridge::load_cartridge(path.to_str().unwrap().into()) {
+                            rom_valid = true;
+                            for (romhash, status) in &c.rom_test.list().elements {
+                                if cart.hash() == *romhash {
+                                    rom_found = true;
+                                    match status {
+                                        RomStatus::CompletelyBroken => num_broken += 1,
+                                        RomStatus::Bug(a, _) => num_bug += 1,
+                                        RomStatus::Working => num_working += 1,
+                                    };
+                                    let pstat = match status {
+                                        RomStatus::CompletelyBroken => "Completely broken".to_string(),
+                                        RomStatus::Bug(a, _) => format!("Has bug: {}", a),
+                                        RomStatus::Working => "Working as expected".to_string(),
+                                    };
+                                    writeln!(&mut file, "{}: Rom is {}\n\tstatus {}", i, path.display(), pstat).unwrap();
+                                }
+                            }
+                        }
+                        if !rom_found && rom_valid {
+                            writeln!(&mut file, "{}: Rom is {}\n\tstatus unknown", i, path.display()).unwrap();
+                            num_unknown += 1;
+                        }
+                    }
+                    writeln!(&mut file, "Number of completely broken roms: {}", num_broken).unwrap();
+                    writeln!(&mut file, "Number of buggy roms: {}", num_bug).unwrap();
+                    writeln!(&mut file, "Number of working roms: {}", num_working).unwrap();
+                    writeln!(&mut file, "Number of unknown roms: {}", num_unknown).unwrap();
                 }
                 if let Some(nc) = new_rom {
                     c.remove_cartridge();

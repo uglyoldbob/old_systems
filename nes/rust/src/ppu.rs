@@ -888,6 +888,9 @@ impl NesPpu {
                                     && row > self.oamdata
                                     && row <= (self.oamdata + self.sprite_height())
                                 {
+                                    if self.secondaryoamaddress == 32 {
+                                        println!("BUG: mode {:?}\n\trow {}\n\toamaddress: {:x}", self.sprite_eval_mode, row, self.oamaddress);
+                                    }
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
@@ -1029,7 +1032,11 @@ impl NesPpu {
 
                     if let Some((x,y)) = self.bg_debug {
                         if cycle == x && self.scanline_number == y as u16 {
+                            //println!("PIXEL {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
                         }
+                    }
+                    if cycle == 8 {
+                        //println!("PIXEL2 {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
                     }
                     let lower_bits = (upper_bit << 1) | lower_bit;
 
@@ -1104,7 +1111,10 @@ impl NesPpu {
                     (self.sprites[index].attribute & 0x20) == 0);
                 if let Some((index, spr)) = spr_pixel {
                     if bg_pixel.is_some() && index == 0 {
-                        self.registers[2] |= 0x40; //sprite 0 hit
+                        let ignore_first_8 = cycle < 8 && (self.registers[1] & 6) != 6;
+                        if !ignore_first_8 && cycle < 255 {
+                            self.registers[2] |= 0x40; //sprite 0 hit
+                        }
                     }
                 }
 
