@@ -283,7 +283,7 @@ impl NesApu {
     }
 
     /// Build an audio sample and run the audio filter
-    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>, filter2: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
+    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
@@ -291,12 +291,6 @@ impl NesApu {
             + self.dmc.audio();
         if let Some(filter) = filter {
             let e = filter.run(audio / 2.5 - 1.0);
-            let e = if let Some(filter2) = filter2 {
-                filter2.run(e)
-            }
-            else {
-                e
-            };
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
                 self.output_index -= self.sample_interval;
@@ -317,7 +311,6 @@ impl NesApu {
         &mut self,
         sound: &mut Option<rb::Producer<f32>>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
-        filter2: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.frame_sequencer_clock();
         if self.clock {
@@ -335,7 +328,7 @@ impl NesApu {
         } else if self.sound_disabled_clock == 2048 {
             self.sound_disabled = false;
         }
-        if let Some(sample) = self.build_audio_sample(filter, filter2) {
+        if let Some(sample) = self.build_audio_sample(filter) {
             if let Some(p) = sound {
                 let data: [f32; 1] = [sample];
                 let _e = p.write(&data);

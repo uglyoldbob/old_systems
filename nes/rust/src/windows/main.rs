@@ -27,8 +27,6 @@ pub struct MainNesWindow {
     pub texture: Option<egui::TextureHandle>,
     /// The filter used for audio playback, filtering out high frequency noise, increasing the quality of audio playback.
     filter: Option<biquad::DirectForm1<f32>>,
-    /// The filter used for audio, to filter out low frequency noise.
-    filter2: Option<biquad::DirectForm1<f32>>,
     /// The interval between sound samples based on the sample rate used in the stream
     sound_sample_interval: f32,
     /// The stream used for audio playback during emulation
@@ -66,7 +64,6 @@ impl MainNesWindow {
                 sound: producer,
                 texture: None,
                 filter: None,
-                filter2: None,
                 sound_sample_interval: 0.0,
                 sound_stream: stream,
             }),
@@ -188,7 +185,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         if self.filter.is_none() && self.sound_stream.is_some() {
             let rf = self.sound_rate as f32;
-            let sampling_frequency = c.mb.master_clock() / 12.0;
+            let sampling_frequency = 21.47727e6 / 12.0;
             let filter_coeff = biquad::Coefficients::<f32>::from_params(
                 biquad::Type::LowPass,
                 biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
@@ -201,17 +198,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             c.cpu_peripherals
                 .apu
                 .set_audio_interval(self.sound_sample_interval);
-        }
-        if self.filter2.is_none() && self.sound_stream.is_some() {
-            let sampling_frequency = c.mb.master_clock() / 12.0;
-            let filter_coeff = biquad::Coefficients::<f32>::from_params(
-                biquad::Type::HighPass,
-                biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
-                biquad::Hertz::<f32>::from_hz(60.0).unwrap(),
-                biquad::Q_BUTTERWORTH_F32,
-            )
-            .unwrap();
-            self.filter2 = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
         }
 
         let quit = false;
@@ -232,7 +218,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             #[cfg(feature = "debugger")]
             {
                 if !c.paused {
-                    c.cycle_step(&mut self.sound, &mut self.filter, &mut self.filter2);
+                    c.cycle_step(&mut self.sound, &mut self.filter);
                     if c.cpu_clock_counter == 0
                         && c.cpu.breakpoint_option()
                         && (c.cpu.breakpoint() || c.single_step)
@@ -405,15 +391,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     }
                 }
             }
-            ui.label(format!("{:.2} FPS", self.fps));
+            ui.label(format!("{:.0} FPS", self.fps));
         });
 
         let time_now = std::time::SystemTime::now();
         let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
-        let fps = c.mb.master_clock() / (12.0 * c.mb.cpu_cycles_per_frame());
-        let spf = 1.0 / fps;
-        let nanos = 1000000000.0 * spf;
-        let desired_frame_length = std::time::Duration::from_nanos(nanos as u64);
+        let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         if frame_time < desired_frame_length {
             let st = desired_frame_length - frame_time;
             spin_sleep::sleep(st);
