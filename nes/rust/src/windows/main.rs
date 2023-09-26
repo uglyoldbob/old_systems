@@ -373,6 +373,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             let _e = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(&name)
                 .unwrap()
                 .write_all(&state);
