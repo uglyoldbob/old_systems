@@ -3300,6 +3300,8 @@ impl NesCpu {
                         self.subcycle = 3;
                     }
                     3 => {
+                        let temp = self.temp.wrapping_add(self.x);
+                        self.memory_cycle_read((self.temp2 as u16)<<8 | temp as u16, bus, cpu_peripherals);
                         self.subcycle = 4;
                     }
                     _ => {
@@ -3399,6 +3401,8 @@ impl NesCpu {
                         self.subcycle = 4;
                     }
                     4 => {
+                        let temp2 = self.temp2.wrapping_add(self.y);
+                        self.memory_cycle_read((self.temp as u16)<<8 | temp2 as u16, bus, cpu_peripherals);
                         self.subcycle = 5;
                     }
                     _ => {
@@ -3970,7 +3974,7 @@ impl NesCpu {
                     }
                     3 => {
                         let mut addr = (self.temp2 as u16) << 8 | (self.temp as u16);
-                        let (_val, overflow) = self.temp.overflowing_add(self.x);
+                        let (val, overflow) = self.temp.overflowing_add(self.x);
                         if !overflow {
                             addr = addr.wrapping_add(self.x as u16);
                             self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
@@ -3984,6 +3988,7 @@ impl NesCpu {
                             self.pc = self.pc.wrapping_add(3);
                             self.end_instruction();
                         } else {
+                            self.memory_cycle_read((addr & 0xFF00) | val as u16, bus, cpu_peripherals);
                             self.subcycle = 4;
                         }
                     }
@@ -4082,7 +4087,7 @@ impl NesCpu {
                     }
                     4 => {
                         let mut addr = (self.temp as u16) << 8 | (self.temp2 as u16);
-                        let (_val, overflow) = self.temp2.overflowing_add(self.y);
+                        let (val, overflow) = self.temp2.overflowing_add(self.y);
                         if !overflow {
                             addr = addr.wrapping_add(self.y as u16);
                             self.a = self.memory_cycle_read(addr, bus, cpu_peripherals);
@@ -4096,6 +4101,7 @@ impl NesCpu {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         } else {
+                            self.memory_cycle_read((self.temp as u16) << 8 | (val as u16), bus, cpu_peripherals);
                             self.subcycle = 5;
                         }
                     }
