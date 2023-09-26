@@ -79,6 +79,9 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                 if ui.button("Reset").clicked() {
                     c.reset();
                 }
+                if ui.button("Power cycle").clicked() {
+                    c.power_cycle();
+                }
                 if let Some(cart) = c.mb.cartridge() {
                     ui.label(format!("ROM format: {:?}", cart.rom_format));
                 }

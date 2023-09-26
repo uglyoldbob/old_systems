@@ -1,5 +1,7 @@
 //! This is the main implementation of the nes emulator. It provides most of the functionality of the emulator.
 
+use std::io::Write;
+
 use crate::{
     apu::NesApu,
     cartridge::NesCartridge,
@@ -12,6 +14,79 @@ use crate::{
 #[cfg(feature = "eframe")]
 use eframe::egui;
 use egui_multiwin::multi_window::CommonEventHandler;
+
+/// Persistent configuration for the emulator
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct EmulatorConfiguration {
+    /// Should a rom be persistent from one run to another?
+    sticky_rom: bool,
+    /// What is the startup rom for the emulator?
+    start_rom: Option<String>,
+    #[serde(skip)]
+    /// The path for saving and loading
+    path: String,
+}
+
+impl Default for EmulatorConfiguration {
+    fn default() -> Self {
+        Self {
+            sticky_rom: true,
+            start_rom: None,
+            path: "".to_string(),
+        }
+    }
+}
+
+impl EmulatorConfiguration {
+    /// Update startup rom if necessary
+    pub fn set_startup(&mut self, name: String) {
+        if self.sticky_rom {
+            self.start_rom = Some(name);
+            self.save();
+        }
+    }
+
+    ///Load a configuration file
+    pub fn load(name: String) -> Self {
+        let mut result = Self::default();
+        if let Ok(a) = std::fs::read(&name) {
+            if let Ok(buf) = std::str::from_utf8(&a) {
+                match toml::from_str(buf) {
+                    Ok(p) => {
+                        result = p;
+                    }
+                    Err(e) => {
+                        println!("Failed to load config file: {}", e);
+                    }
+                }
+            }
+        }
+        result.path = name;
+        result
+    }
+
+    /// Save results to disk
+    pub fn save(&self) {
+        let data = toml::to_string(self).unwrap();
+
+        let mut path = std::path::PathBuf::from(&self.path);
+        path.pop();
+        let _ = std::fs::create_dir_all(path);
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&self.path)
+            .unwrap();
+        let _e = f.write_all(data.as_bytes());
+    }
+
+    ///Retrieve the start rom
+    pub fn start_rom(&self) -> Option<String> {
+        self.start_rom.to_owned()
+    }
+}
 
 /// The main struct for the nes emulator.
 #[non_exhaustive]
@@ -51,6 +126,8 @@ pub struct NesEmulatorData {
     #[cfg(feature = "rom_status")]
     #[serde(skip)]
     pub rom_test: crate::rom_status::RomListTestParser,
+    #[serde(skip)]
+    pub configuration: EmulatorConfiguration,
 }
 
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
@@ -91,6 +168,7 @@ impl NesEmulatorData {
             parser: crate::romlist::RomListParser::new(),
             #[cfg(feature = "rom_status")]
             rom_test: crate::rom_status::RomListTestParser::new(),
+            configuration: EmulatorConfiguration::load("./config.toml".to_string()),
         }
     }
 
@@ -117,13 +195,38 @@ impl NesEmulatorData {
         self.cpu_peripherals.apu.reset();
     }
 
-    /// Remove a cartridge from the motherboard, throwing it away.
-    pub fn remove_cartridge(&mut self) {
-        self.mb.remove_cartridge();
+    /// Effectively power cycles the emulator. Technically throws away the current system and builds a new one.
+    pub fn power_cycle(&mut self) {
+        let cart = self.remove_cartridge();
+        let mb: NesMotherboard = NesMotherboard::new();
+        let ppu = NesPpu::new();
+        let apu = NesApu::new();
+
+        self.cpu = NesCpu::new();
+        self.cpu_peripherals = NesCpuPeripherals::new(ppu, apu);
+        self.mb = mb;
+
+        self.cpu_clock_counter = rand::random::<u8>() % 16;
+        self.ppu_clock_counter = rand::random::<u8>() % 4;
+        self.last_frame_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        self.nmi = [false; 3];
+        self.prev_irq = false;
+        if let Some(cart) = cart {
+            self.insert_cartridge(cart);
+        }
+    }
+
+    /// Remove a cartridge from the motherboard, returning it to the caller.
+    pub fn remove_cartridge(&mut self) -> Option<NesCartridge> {
+        self.mb.remove_cartridge()
     }
 
     /// Insert a cartridge into the motherboard.
     pub fn insert_cartridge(&mut self, cart: NesCartridge) {
+        self.configuration.set_startup(cart.rom_name().to_owned());
         self.mb.insert_cartridge(cart);
     }
 

@@ -10,16 +10,14 @@ use egui_multiwin::{
 
 /// The structure for a window that helps a user select a rom to load.
 #[cfg(feature = "egui-multiwin")]
-pub struct RomFinder {
-}
+pub struct RomFinder {}
 
 #[cfg(feature = "egui-multiwin")]
 impl RomFinder {
     /// Create a new request to make a RomFinder window.
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
-            window_state: Box::new(RomFinder {
-            }),
+            window_state: Box::new(RomFinder {}),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
@@ -53,7 +51,7 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
         let windows_to_create = vec![];
 
         //scan for roms if needed
-        c.parser.find_roms("./roms");
+        c.parser.find_roms("./nes/test_roms");
         //process to see if any new roms need to be checked
         c.parser.process_roms();
 
@@ -89,7 +87,7 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
                 if let Some(nc) = new_rom {
                     c.remove_cartridge();
                     c.insert_cartridge(nc);
-                    c.reset();
+                    c.power_cycle();
                 }
             });
         });

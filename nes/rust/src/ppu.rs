@@ -224,7 +224,7 @@ pub struct NesPpu {
     scrollx: u8,
     #[cfg(feature = "debugger")]
     /// For debugging pixel generation of the background
-    pub bg_debug: Option<(u8,u8)>,
+    pub bg_debug: Option<(u8, u8)>,
 }
 
 /// The flags that set the nametable base
@@ -855,7 +855,7 @@ impl NesPpu {
     fn sprite_eval(&mut self) {
         if self.scanline_number < 240 {
             let row = (self.scanline_number + 1) as u8;
-            let mut reset = ||{
+            let mut reset = || {
                 self.oamaddress = 0;
                 self.secondaryoamaddress = 0;
                 self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
@@ -889,7 +889,10 @@ impl NesPpu {
                                     && row <= (self.oamdata + self.sprite_height())
                                 {
                                     if self.secondaryoamaddress == 32 {
-                                        println!("BUG: mode {:?}\n\trow {}\n\toamaddress: {:x}", self.sprite_eval_mode, row, self.oamaddress);
+                                        println!(
+                                            "BUG: mode {:?}\n\trow {}\n\toamaddress: {:x}",
+                                            self.sprite_eval_mode, row, self.oamaddress
+                                        );
                                     }
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
                                         self.oamdata;
@@ -1015,14 +1018,14 @@ impl NesPpu {
                     };
                     let upper_bit = (pt[1] >> index) & 1;
                     let lower_bit = (pt[0] >> index) & 1;
-                    let scrollx =
-                        (((self.vram_address & 0x1f) << 3).wrapping_sub(0x10)) & 0xFF | self.scrollx as u16;
+                    let scrollx = (((self.vram_address & 0x1f) << 3).wrapping_sub(0x10)) & 0xFF
+                        | self.scrollx as u16;
                     let subcalc = (scrollx & 0xFF) + (cycle as u16 & 7);
-                    let calc3 = subcalc>>4;
+                    let calc3 = subcalc >> 4;
                     let modx = ((calc3) & 1) as u8;
                     let mody = ((self.vram_address >> 6) & 1) as u8;
                     let combined = (mody << 1) | modx;
-                    let prev_tile = (((scrollx & 7) + (cycle as u16 & 7))) > 7;
+                    let prev_tile = ((scrollx & 7) + (cycle as u16 & 7)) > 7;
                     let attribute = if !prev_tile {
                         self.attributetable_shift[0]
                     } else {
@@ -1030,7 +1033,7 @@ impl NesPpu {
                     };
                     let extra_palette_bits = (attribute >> (2 * combined)) & 3;
 
-                    if let Some((x,y)) = self.bg_debug {
+                    if let Some((x, y)) = self.bg_debug {
                         if cycle == x && self.scanline_number == y as u16 {
                             //println!("PIXEL {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
                         }
@@ -1061,14 +1064,13 @@ impl NesPpu {
                     }
                     if lower_bits == 0 {
                         None
-                    }
-                    else {
+                    } else {
                         Some(pixel_entry)
                     }
                 } else {
                     None
                 };
-                if self.should_render_background_cycle(8+cycle as u16) {
+                if self.should_render_background_cycle(8 + cycle as u16) {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
@@ -1107,8 +1109,9 @@ impl NesPpu {
                     None
                 };
 
-                let priority = spr_pixel.map_or(true, |(index, _spr)|
-                    (self.sprites[index].attribute & 0x20) == 0);
+                let priority = spr_pixel.map_or(true, |(index, _spr)| {
+                    (self.sprites[index].attribute & 0x20) == 0
+                });
                 if let Some((index, spr)) = spr_pixel {
                     if bg_pixel.is_some() && index == 0 {
                         let ignore_first_8 = cycle < 8 && (self.registers[1] & 6) != 6;

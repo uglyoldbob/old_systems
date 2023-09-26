@@ -70,8 +70,8 @@ impl NesMotherboard {
     }
 
     /// Remove any cartridge that may exist in the system.
-    pub fn remove_cartridge(&mut self) {
-        self.cart = None;
+    pub fn remove_cartridge(&mut self) -> Option<NesCartridge> {
+        self.cart.take()
     }
 
     /// Insert a cartridge into the system, but only if one is not already present

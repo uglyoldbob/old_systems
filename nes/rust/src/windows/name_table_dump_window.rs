@@ -145,7 +145,10 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                         ));
                                         ui.label(format!(
                                             "Tile address {},{} is {:x}={:x}",
-                                            col, row, ntaddr, c.mb.ppu_peek(ntaddr as u16),
+                                            col,
+                                            row,
+                                            ntaddr,
+                                            c.mb.ppu_peek(ntaddr as u16),
                                         ));
 
                                         let x = (pos.x / (32.0 * zoom)).floor() as usize;

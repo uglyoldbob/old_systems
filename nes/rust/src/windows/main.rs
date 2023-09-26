@@ -42,6 +42,7 @@ impl MainNesWindow {
         )
         .unwrap();
         nes_data.insert_cartridge(nc);
+        nes_data.power_cycle();
         Self {
             last_frame_time: std::time::SystemTime::now(),
             c: nes_data,
@@ -335,6 +336,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             ui.close_menu();
                             c.reset();
                         }
+                        if ui.button("Power cycle").clicked() {
+                            ui.close_menu();
+                            c.power_cycle();
+                        }
                     });
                 }
             });
@@ -382,11 +387,18 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
                 let zoom = 2.0;
-                let r = ui.image(t, egui_multiwin::egui::Vec2 { x: 256.0 * zoom, y: 240.0 * zoom });
+                let r = ui.image(
+                    t,
+                    egui_multiwin::egui::Vec2 {
+                        x: 256.0 * zoom,
+                        y: 240.0 * zoom,
+                    },
+                );
                 if r.hovered() {
                     if let Some(pos) = r.hover_pos() {
                         let coord = pos - r.rect.left_top();
-                        c.cpu_peripherals.ppu.bg_debug = Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
+                        c.cpu_peripherals.ppu.bg_debug =
+                            Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     }
                 }

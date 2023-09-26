@@ -15,21 +15,12 @@ mod romlist;
 #[cfg(test)]
 mod utility;
 
-use std::io::Write;
-
-use controller::NesControllerTrait;
-use egui_multiwin::egui::Sense;
 use emulator_data::NesEmulatorData;
 
 #[cfg(test)]
 mod tests;
 
 use crate::cartridge::NesCartridge;
-use crate::ppu::NesPpu;
-
-/// The initial rom that the emulator will load. Only for developmment of the beta version (0.1.x)
-const INITIAL_ROM: Option<&str> = Some("./roms/nes/Legend of Zelda, The (U) (PRG 0).nes");
-//const INITIAL_ROM: Option<&str> = Some("./nes/roms/USA/Spelunker (U) [!].nes");
 
 #[cfg(feature = "rom_status")]
 pub mod rom_status;
@@ -39,13 +30,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[cfg(feature = "eframe")]
 use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui_glow::EguiGlow;
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui,
-    multi_window::{MultiWindow, NewWindowRequest},
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
+use egui_multiwin::multi_window::MultiWindow;
 
 #[cfg(feature = "sdl2")]
 use sdl2::event::Event;
@@ -300,7 +285,7 @@ fn main() {
             println!("output format is {:?}", format);
             let config = config.config();
 
-            let rb = rb::SpscRb::new((config.sample_rate.0 as f32 * 0.1) as usize);
+            let rb = rb::SpscRb::new((config.sample_rate.0 as f32 * 0.2) as usize);
             let (producer, consumer) = (rb.producer(), rb.consumer());
             let mut stream = d
                 .build_output_stream(
@@ -332,7 +317,7 @@ fn main() {
     println!("Current dir is {}", wdir.display());
     nes_data.mb.controllers[0] = Some(controller::StandardController::new());
 
-    if let Some(c) = INITIAL_ROM {
+    if let Some(c) = nes_data.configuration.start_rom() {
         let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();
         nes_data.insert_cartridge(nc);
     }

@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use crate::{NesEmulatorData, cartridge::NesCartridge, rom_status::RomStatus};
+use crate::{cartridge::NesCartridge, rom_status::RomStatus, NesEmulatorData};
 use egui_multiwin::{
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
@@ -72,7 +72,8 @@ impl TrackedWindow<NesEmulatorData> for Window {
             if let Some(rom) = c.mb.cartridge() {
                 ui.label(format!("Current rom is {}", rom.rom_name()));
                 ui.label(format!("HASH of current rom is {}", rom.hash()));
-                if let Some((_hash, result)) = c.rom_test.list().elements.get_key_value(&rom.hash()) {
+                if let Some((_hash, result)) = c.rom_test.list().elements.get_key_value(&rom.hash())
+                {
                     match result {
                         RomStatus::CompletelyBroken => {
                             ui.label("Rom is completely broken");
@@ -92,14 +93,21 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     c.rom_test.put_entry(rom.hash(), RomStatus::Working);
                 }
                 if ui.button("Set status to completely broken").clicked() {
-                    c.rom_test.put_entry(rom.hash(), RomStatus::CompletelyBroken);
+                    c.rom_test
+                        .put_entry(rom.hash(), RomStatus::CompletelyBroken);
                 }
                 ui.text_edit_multiline(&mut self.bug);
                 if ui.button("Set status to has a bug").clicked() {
-                    c.rom_test.put_entry(rom.hash(), RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())));
+                    c.rom_test.put_entry(
+                        rom.hash(),
+                        RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())),
+                    );
                 }
             }
-            ui.label(format!("There are {} known roms", c.parser.list().elements.len()));
+            ui.label(format!(
+                "There are {} known roms",
+                c.parser.list().elements.len()
+            ));
             if let Some(state) = save_state {
                 let _e = c.deserialize(state);
             }
@@ -107,7 +115,9 @@ impl TrackedWindow<NesEmulatorData> for Window {
             if self.next_rom.is_none() {
                 println!("Next rom is none");
                 if let Some((path, _romentry)) = c.roms.elements.iter().skip(self.index).next() {
-                    if let Ok(cart) = crate::NesCartridge::load_cartridge(path.to_str().unwrap().into()) {
+                    if let Ok(cart) =
+                        crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
+                    {
                         let hash = cart.hash();
                         match c.rom_test.list().elements.get_key_value(&hash) {
                             Some((_hash, status)) => {
@@ -116,18 +126,15 @@ impl TrackedWindow<NesEmulatorData> for Window {
                                         if status.match_category(desired) {
                                             println!("Found next status rom: {}", cart.rom_name());
                                             self.next_rom = Some(cart);
-                                        }
-                                        else {
+                                        } else {
                                             println!("Looking for status rom");
                                             self.index += 1;
                                         }
-                                    }
-                                    else {
+                                    } else {
                                         println!("Looking for unlisted rom");
                                         self.index += 1;
                                     }
-                                }
-                                else {
+                                } else {
                                     println!("Found next rom");
                                     self.next_rom = Some(cart);
                                 }
@@ -137,25 +144,21 @@ impl TrackedWindow<NesEmulatorData> for Window {
                                     if desired.is_some() {
                                         println!("Looking for status rom");
                                         self.index += 1;
-                                    }
-                                    else {
+                                    } else {
                                         println!("Found next status rom: {}", cart.rom_name());
                                         self.next_rom = Some(cart);
                                     }
-                                }
-                                else {
+                                } else {
                                     println!("Found next rom");
                                     self.next_rom = Some(cart);
                                 }
                             }
                         }
-                    }
-                    else {
+                    } else {
                         println!("Looking for next valid rom");
                         self.index += 1;
                     }
-                }
-                else {
+                } else {
                     println!("No roms?");
                 }
             }
@@ -204,7 +207,9 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     for (i, (path, entry)) in c.roms.elements.iter().enumerate() {
                         let mut rom_found = false;
                         let mut rom_valid = false;
-                        if let Ok(cart) = crate::NesCartridge::load_cartridge(path.to_str().unwrap().into()) {
+                        if let Ok(cart) =
+                            crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
+                        {
                             rom_valid = true;
                             for (romhash, status) in &c.rom_test.list().elements {
                                 if cart.hash() == *romhash {
@@ -215,20 +220,40 @@ impl TrackedWindow<NesEmulatorData> for Window {
                                         RomStatus::Working => num_working += 1,
                                     };
                                     let pstat = match status {
-                                        RomStatus::CompletelyBroken => "Completely broken".to_string(),
+                                        RomStatus::CompletelyBroken => {
+                                            "Completely broken".to_string()
+                                        }
                                         RomStatus::Bug(a, _) => format!("Has bug: {}", a),
                                         RomStatus::Working => "Working as expected".to_string(),
                                     };
-                                    writeln!(&mut file, "{}: Rom is {}\n\tstatus {}", i, path.display(), pstat).unwrap();
+                                    writeln!(
+                                        &mut file,
+                                        "{}: Rom is {}\n\tstatus {}",
+                                        i,
+                                        path.display(),
+                                        pstat
+                                    )
+                                    .unwrap();
                                 }
                             }
                         }
                         if !rom_found && rom_valid {
-                            writeln!(&mut file, "{}: Rom is {}\n\tstatus unknown", i, path.display()).unwrap();
+                            writeln!(
+                                &mut file,
+                                "{}: Rom is {}\n\tstatus unknown",
+                                i,
+                                path.display()
+                            )
+                            .unwrap();
                             num_unknown += 1;
                         }
                     }
-                    writeln!(&mut file, "Number of completely broken roms: {}", num_broken).unwrap();
+                    writeln!(
+                        &mut file,
+                        "Number of completely broken roms: {}",
+                        num_broken
+                    )
+                    .unwrap();
                     writeln!(&mut file, "Number of buggy roms: {}", num_bug).unwrap();
                     writeln!(&mut file, "Number of working roms: {}", num_working).unwrap();
                     writeln!(&mut file, "Number of unknown roms: {}", num_unknown).unwrap();
@@ -236,7 +261,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 if let Some(nc) = new_rom {
                     c.remove_cartridge();
                     c.insert_cartridge(nc);
-                    c.reset();
+                    c.power_cycle();
                     self.index += 1;
                 }
             }

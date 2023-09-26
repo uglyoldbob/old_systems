@@ -27,7 +27,8 @@ struct ApuSweep {
 impl ApuSweep {
     /// Create a new apu sweep
     fn new(math: ApuSweepAddition) -> Self {
-        Self { mode: math,
+        Self {
+            mode: math,
             counter: 0,
             reload: false,
         }
@@ -44,19 +45,17 @@ impl ApuSweep {
         let enabled = (data[1] & 0x80) != 0;
         let negative = (data[1] & 8) != 0;
         let shift = data[1] & 7;
-        let period = (data[1]>>4) & 7;
+        let period = (data[1] >> 4) & 7;
         let square_period = data[2] as u16 | (data[3] as u16 & 0x7) << 8;
 
         if self.reload {
             self.counter = period;
-            self.reload= false;
+            self.reload = false;
             0
-        }
-        else if self.counter > 0 {
+        } else if self.counter > 0 {
             self.counter -= 1;
             0
-        }
-        else {
+        } else {
             self.counter = period;
             if enabled {
                 let mut delta = (square_period >> shift) as i16;
