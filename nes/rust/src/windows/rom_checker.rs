@@ -66,6 +66,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("Rom checking window");
+            let mut save_state = None;
             if let Some(rom) = c.mb.cartridge() {
                 ui.label(format!("Current rom is {}", rom.rom_name()));
                 ui.label(format!("HASH of current rom is {}", rom.hash()));
@@ -74,8 +75,11 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         RomStatus::CompletelyBroken => {
                             ui.label("Rom is completely broken");
                         }
-                        RomStatus::Bug(b) => {
+                        RomStatus::Bug(b, state) => {
                             ui.label(format!("ROM affected by bug\n{}", b));
+                            if ui.button("Load save state").clicked() {
+                                save_state = state.clone();
+                            }
                         }
                         RomStatus::Working => {
                             ui.label("Rom is working so far");
@@ -90,10 +94,13 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 }
                 ui.text_edit_multiline(&mut self.bug);
                 if ui.button("Set status to has a bug").clicked() {
-                    c.rom_test.put_entry(rom.hash(), RomStatus::Bug(self.bug.to_owned()));
+                    c.rom_test.put_entry(rom.hash(), RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())));
                 }
             }
             ui.label(format!("There are {} known roms", c.parser.list().elements.len()));
+            if let Some(state) = save_state {
+                let _e = c.deserialize(state);
+            }
 
             if self.next_rom.is_none() {
                 println!("Next rom is none");
@@ -166,7 +173,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 }
                 if ui.button("Find next bug").clicked() {
                     println!("Find next bug");
-                    self.want_status = Some(Some(RomStatus::Bug("".to_string())));
+                    self.want_status = Some(Some(RomStatus::Bug("".to_string(), None)));
                     self.index += 1;
                     self.next_rom = None;
                 }

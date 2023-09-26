@@ -1052,7 +1052,12 @@ impl NesPpu {
                         //TODO implement color emphasis
                         //println!("TODO: implement color emphasis");
                     }
-                    Some(pixel_entry)
+                    if lower_bits == 0 {
+                        None
+                    }
+                    else {
+                        Some(pixel_entry)
+                    }
                 } else {
                     None
                 };
@@ -1095,15 +1100,30 @@ impl NesPpu {
                     None
                 };
 
-                let pixel_entry = if let Some((index, spr)) = spr_pixel {
+                let priority = spr_pixel.map_or(true, |(index, _spr)|
+                    (self.sprites[index].attribute & 0x20) == 0);
+                if let Some((index, spr)) = spr_pixel {
                     if bg_pixel.is_some() && index == 0 {
                         self.registers[2] |= 0x40; //sprite 0 hit
                     }
-                    spr
-                } else if let Some(bg) = bg_pixel {
-                    bg
+                }
+
+                let pixel_entry = if priority {
+                    if let Some((_index, spr)) = spr_pixel {
+                        spr
+                    } else if let Some(bg) = bg_pixel {
+                        bg
+                    } else {
+                        bus.ppu_palette_read(0x3f00) & 63
+                    }
                 } else {
-                    0x0d
+                    if let Some(bg) = bg_pixel {
+                        bg
+                    } else if let Some((_index, spr)) = spr_pixel {
+                        spr
+                    } else {
+                        bus.ppu_palette_read(0x3f00) & 63
+                    }
                 };
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];

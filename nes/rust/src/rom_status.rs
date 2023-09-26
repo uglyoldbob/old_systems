@@ -10,7 +10,7 @@ pub enum RomStatus {
     /// The rom is completely unusable
     CompletelyBroken,
     /// There is a bug affecting the rom
-    Bug(String),
+    Bug(String, Option<Vec<u8>>),
     /// No known bugs for the rom
     Working,
 }
@@ -39,9 +39,9 @@ impl RomStatus {
                     }
                 }
             }
-            RomStatus::Bug(_b) => {
+            RomStatus::Bug(_b, _save) => {
                 match s {
-                    RomStatus::Bug(_c) => {
+                    RomStatus::Bug(_c, _save) => {
                         true
                     }
                     _ => {
