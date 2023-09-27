@@ -25,10 +25,25 @@ pub struct Window {
 #[cfg(feature = "egui-multiwin")]
 impl Window {
     /// Create a new request for a Debug window.
-    pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
+    pub fn new_request(data: &NesEmulatorData) -> NewWindowRequest<NesEmulatorData> {
+        let mut index = 0;
+        let mut max_i = 0;
+        for (i, (path, _entry)) in data.roms.elements.iter().enumerate() {
+            if let Some(a) = data.mb.cartridge().map(|p| p.rom_name()) {
+                if a == path.display().to_string() {
+                    index = i+1;
+                }
+            }
+            max_i = i;
+        }
+
+        if index >= max_i {
+            index = 0;
+        }
+
         NewWindowRequest {
             window_state: Box::new(Window {
-                index: 0,
+                index,
                 next_rom: None,
                 bug: "".to_string(),
                 want_status: None,

@@ -271,6 +271,7 @@ fn main() {
     egui_multiwin::winit::platform::x11::EventLoopBuilderExtX11::with_x11(&mut event_loop);
     let event_loop = event_loop.build();
     let mut nes_data = NesEmulatorData::new();
+    nes_data.parser.find_roms("./roms");
     let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();
@@ -333,7 +334,7 @@ fn main() {
 
     #[cfg(feature = "rom_status")]
     {
-        multi_window.add(windows::rom_checker::Window::new_request(), &event_loop);
+        multi_window.add(windows::rom_checker::Window::new_request(&nes_data), &event_loop);
     }
 
     multi_window.run(event_loop, nes_data);

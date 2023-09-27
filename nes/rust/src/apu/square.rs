@@ -81,9 +81,6 @@ impl ApuSquareChannel {
         let delta = self.sweep.clock(&self.registers) as i32;
         let mut period =
             (self.registers[2] as u16 | ((self.registers[3] & 0x7) as u16) << 8) as i32;
-        if delta != 0 {
-            println!("Delta is {}", delta);
-        }
         period = period + delta;
         let new_period = period as u16;
         self.registers[2] = (new_period & 0xFF) as u8;

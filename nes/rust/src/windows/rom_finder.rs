@@ -51,7 +51,7 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
         let windows_to_create = vec![];
 
         //scan for roms if needed
-        c.parser.find_roms("./nes/test_roms");
+        c.parser.find_roms("./roms");
         //process to see if any new roms need to be checked
         c.parser.process_roms();
 

@@ -403,6 +403,14 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     }
                 }
+                let c1 = c.mb.controllers[0].is_none();
+                let c2 = c.mb.controllers[1].is_none();
+                if c1 {
+                    ui.label("No p1 controller");
+                }
+                if c2 {
+                    ui.label("No p2 controller");
+                }
             }
             ui.label(format!("{:.0} FPS", self.fps));
         });
