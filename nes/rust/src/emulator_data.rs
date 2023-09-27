@@ -198,13 +198,23 @@ impl NesEmulatorData {
     /// Effectively power cycles the emulator. Technically throws away the current system and builds a new one.
     pub fn power_cycle(&mut self) {
         let cart = self.remove_cartridge();
+        let controller1 = self.mb.controllers[0].take();
+        let controller2 = self.mb.controllers[1].take();
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
-        let apu = NesApu::new();
+        let mut apu = NesApu::new();
+
+        let audio_interval = self.cpu_peripherals
+            .apu
+            .get_audio_interval();
+        apu.set_audio_interval(audio_interval);
 
         self.cpu = NesCpu::new();
         self.cpu_peripherals = NesCpuPeripherals::new(ppu, apu);
         self.mb = mb;
+
+        self.mb.controllers[0] = controller1;
+        self.mb.controllers[1] = controller2;
 
         self.cpu_clock_counter = rand::random::<u8>() % 16;
         self.ppu_clock_counter = rand::random::<u8>() % 4;
@@ -215,7 +225,11 @@ impl NesEmulatorData {
         self.nmi = [false; 3];
         self.prev_irq = false;
         if let Some(cart) = cart {
-            self.insert_cartridge(cart);
+            let name = cart.rom_name();
+            let cart = NesCartridge::load_cartridge(name);
+            if let Ok(cart) = cart {
+                self.insert_cartridge(cart);
+            }
         }
     }
 

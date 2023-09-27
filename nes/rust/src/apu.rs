@@ -276,6 +276,11 @@ impl NesApu {
         }
     }
 
+    /// Get the interval between audio samples
+    pub fn get_audio_interval(&self) -> f32 {
+        self.sample_interval
+    }
+
     /// Set the interval between audio samples
     pub fn set_audio_interval(&mut self, interval: f32) {
         self.sample_interval = interval;
