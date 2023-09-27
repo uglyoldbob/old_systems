@@ -132,6 +132,8 @@ pub struct NesCpu {
     nmi_detected: bool,
     /// Shift register for the interrupt detection routine
     interrupt_shift: [(bool, bool); 2],
+    /// The polled irq enable flag
+    polled_irq_flag: bool,
     /// Indicates the type of interrupt, true for nmi, false for irq
     interrupt_type: bool,
     /// Indicates that the cpu is currently interrupting with an interrupt
@@ -198,6 +200,7 @@ impl NesCpu {
             prev_nmi: false,
             nmi_detected: false,
             interrupt_shift: [(false, false); 2],
+            polled_irq_flag: false,
             interrupt_type: false,
             interrupting: false,
             oamdma: None,
@@ -217,6 +220,7 @@ impl NesCpu {
         self.debugger.s = self.s;
         self.debugger.p = self.p;
         self.debugger.pc = self.pc;
+        //println!("I: {}", s);
         self.debugger.disassembly = s;
     }
 
@@ -284,6 +288,7 @@ impl NesCpu {
 
     /// signal the end of a cpu instruction
     fn end_instruction(&mut self) {
+        self.polled_irq_flag = (self.p & CPU_FLAG_INT_DISABLE) == 0;
         self.subcycle = 0;
         self.opcode = None;
     }
@@ -484,10 +489,11 @@ impl NesCpu {
                 }
             }
         } else if self.opcode.is_none() {
-            if (self.interrupt_shift[0].0 && ((self.p & CPU_FLAG_INT_DISABLE) == 0))
+            if (self.interrupt_shift[0].0 && self.polled_irq_flag)
                 || self.interrupt_shift[0].1
                 || self.interrupting
             {
+                self.polled_irq_flag = false;
                 match self.subcycle {
                     0 => {
                         self.interrupting = true;
@@ -5235,8 +5241,7 @@ impl NesCpu {
                     }
                     self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
                     self.pc = self.pc.wrapping_add(1);
-                    self.subcycle = 0;
-                    self.opcode = None;
+                    self.end_instruction();
                 }
                 //special nop
                 0x82 | 0xc2 | 0xe2 => {
@@ -5275,8 +5280,7 @@ impl NesCpu {
                     }
                     _ => {
                         self.pc = self.pc.wrapping_add(2);
-                        self.subcycle = 0;
-                        self.opcode = None;
+                        self.end_instruction();
                     }
                 },
                 //extra nop
@@ -5296,8 +5300,7 @@ impl NesCpu {
                     }
                     _ => {
                         self.pc = self.pc.wrapping_add(3);
-                        self.subcycle = 0;
-                        self.opcode = None;
+                        self.end_instruction();
                     }
                 },
                 //extra nop
@@ -5316,8 +5319,7 @@ impl NesCpu {
                     }
                     _ => {
                         self.pc = self.pc.wrapping_add(2);
-                        self.subcycle = 0;
-                        self.opcode = None;
+                        self.end_instruction();
                     }
                 },
                 //extra nop
@@ -5361,8 +5363,7 @@ impl NesCpu {
                     }
                     self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
                     self.pc = self.pc.wrapping_add(2);
-                    self.subcycle = 0;
-                    self.opcode = None;
+                    self.end_instruction();
                 }
                 //clv, clear overflow flag
                 0xb8 => {
@@ -5396,9 +5397,9 @@ impl NesCpu {
                         self.done_fetching = true;
                     }
                     self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
-                    self.p |= CPU_FLAG_INT_DISABLE;
                     self.pc = self.pc.wrapping_add(1);
                     self.end_instruction();
+                    self.p |= CPU_FLAG_INT_DISABLE;
                 }
                 //sed set decimal flag
                 0xf8 => {
@@ -5444,9 +5445,9 @@ impl NesCpu {
                         self.done_fetching = true;
                     }
                     self.memory_cycle_read(self.pc.wrapping_add(1), bus, cpu_peripherals);
+                    self.end_instruction();
                     self.p &= !CPU_FLAG_INT_DISABLE;
                     self.pc = self.pc.wrapping_add(1);
-                    self.end_instruction();
                 }
                 //beq, branch if equal (zero flag set)
                 0xf0 => match self.subcycle {
@@ -5845,10 +5846,7 @@ impl NesCpu {
                             self.done_fetching = true;
                         }
                         self.s = self.s.wrapping_add(1);
-                        self.p =
-                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
-                        self.p &= !CPU_FLAG_B1;
-                        self.p |= CPU_FLAG_B2;
+                        self.temp = self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
                         self.subcycle = 2;
                     }
                     2 => {
@@ -5857,6 +5855,9 @@ impl NesCpu {
                     _ => {
                         self.pc = self.pc.wrapping_add(1);
                         self.end_instruction();
+                        self.p = self.temp;
+                        self.p &= !CPU_FLAG_B1;
+                        self.p |= CPU_FLAG_B2;
                     }
                 },
                 //pla, pull accumulator
