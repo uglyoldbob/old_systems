@@ -236,6 +236,7 @@ impl NesMapperTrait for Mapper01 {
                 let addr2 = self.ppu_address & 0x1fff;
                 let mut addr3 = addr2 as u32 % cart.chr_rom.len() as u32;
                 addr3 |= (self.registers[1] as u32 & 0x1E) << 12;
+                addr3 &= (cart.chr_rom.len() - 1) as u32;
                 cart.chr_rom[addr3 as usize] = data;
             }
         }
