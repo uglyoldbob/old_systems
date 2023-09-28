@@ -13,6 +13,8 @@ pub struct Mapper03 {
     mirror_vertical: bool,
     /// The ppu address for ppu addressing
     ppu_address: u16,
+    /// The bank select register
+    bank: u8,
 }
 
 impl Mapper03 {
@@ -21,6 +23,7 @@ impl Mapper03 {
         NesMapper::from(Self {
             mirror_vertical: d.mirroring,
             ppu_address: 0,
+            bank: 0,
         })
     }
     /// Check the mirroring bit for the ppu addressing.
@@ -37,7 +40,8 @@ impl Mapper03 {
         if cart.chr_rom.is_empty() {
             return None;
         }
-        Some(cart.chr_rom[addr as usize])
+        let addr2 = (addr | (self.bank as u16 * 0x2000)) & (cart.chr_rom.len() - 1) as u16;
+        Some(cart.chr_rom[addr2 as usize])
     }
 }
 
@@ -46,6 +50,7 @@ impl NesMapperTrait for Mapper03 {
         let mut hm = BTreeMap::new();
         hm.insert("Mirror".to_string(), self.mirror_vertical as u8);
         hm.insert("Mapper".to_string(), 3);
+        hm.insert("PPU BANK".to_string(), self.bank);
         hm
     }
 
@@ -91,7 +96,11 @@ impl NesMapperTrait for Mapper03 {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
+    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {
+        if addr >= 0x8000 {
+            self.bank = data;
+        }
+    }
 
     fn ppu_peek_address(&self, addr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);
