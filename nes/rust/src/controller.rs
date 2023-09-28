@@ -17,6 +17,8 @@ pub trait NesControllerTrait {
     fn read_data(&mut self) -> u8;
     /// Provides an egui input state to update the controller state.
     fn provide_egui_ref(&mut self, data: &egui::InputState);
+    /// Convert controller state to a string
+    fn to_string(&self) -> String;
 }
 
 /// A generic implementation of a NES controller
@@ -85,6 +87,19 @@ impl NesControllerTrait for StandardController {
         data | 0x1e
     }
 
+    fn to_string(&self) -> String {
+        format!("{}{}{}{} {}{} {}{}",
+            if (self.controller_buttons & BUTTON_LEFT) == 0 { "<" } else { "" },
+            if (self.controller_buttons & BUTTON_UP) == 0 { "^" } else { "" },
+            if (self.controller_buttons & BUTTON_DOWN) == 0 { "V" } else { "" },
+            if (self.controller_buttons & BUTTON_RIGHT) == 0 { ">" } else { "" },
+            if (self.controller_buttons & BUTTON_SELECT) == 0 { "Se" } else { "" },
+            if (self.controller_buttons & BUTTON_START) == 0 { "St" } else { "" },
+            if (self.controller_buttons & BUTTON_A) == 0 { "A" } else { "" },
+            if (self.controller_buttons & BUTTON_B) == 0 { "B" } else { "" },
+        )
+    }
+
     fn read_data(&mut self) -> u8 {
         self.check_strobe();
         let data = self.shift_register & 1;
@@ -138,6 +153,9 @@ impl NesControllerTrait for DummyController {
     fn update_latch_bits(&mut self, _data: [bool; 3]) {}
     fn dump_data(&self) -> u8 {
         0x1f
+    }
+    fn to_string(&self) -> String {
+        "".to_string()
     }
     fn read_data(&mut self) -> u8 {
         0x1f
