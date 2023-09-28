@@ -129,7 +129,6 @@ impl TrackedWindow<NesEmulatorData> for Window {
             }
 
             if self.next_rom.is_none() {
-                println!("Next rom is none");
                 if let Some((path, _romentry)) = c.roms.elements.iter().skip(self.index).next() {
                     if let Ok(cart) =
                         crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
@@ -140,38 +139,30 @@ impl TrackedWindow<NesEmulatorData> for Window {
                                 if let Some(desired) = &self.want_status {
                                     if let Some(desired) = desired {
                                         if status.match_category(desired) {
-                                            println!("Found next status rom: {}", cart.rom_name());
                                             self.next_rom = Some(cart);
                                         } else {
-                                            println!("Looking for status rom");
                                             self.index += 1;
                                         }
                                     } else {
-                                        println!("Looking for unlisted rom");
                                         self.index += 1;
                                     }
                                 } else {
-                                    println!("Found next rom");
                                     self.next_rom = Some(cart);
                                 }
                             }
                             None => {
                                 if let Some(desired) = &self.want_status {
                                     if desired.is_some() {
-                                        println!("Looking for status rom");
                                         self.index += 1;
                                     } else {
-                                        println!("Found next status rom: {}", cart.rom_name());
                                         self.next_rom = Some(cart);
                                     }
                                 } else {
-                                    println!("Found next rom");
                                     self.next_rom = Some(cart);
                                 }
                             }
                         }
                     } else {
-                        println!("Looking for next valid rom");
                         self.index += 1;
                     }
                 } else {
@@ -188,18 +179,15 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     self.want_status = None;
                 }
                 if ui.button("Load next rom").clicked() {
-                    println!("Load next rom");
                     new_rom = self.next_rom.take();
                     self.index += 1;
                 }
                 if ui.button("Find next bug").clicked() {
-                    println!("Find next bug");
                     self.want_status = Some(Some(RomStatus::Bug("".to_string(), None)));
                     self.index += 1;
                     self.next_rom = None;
                 }
                 if ui.button("Find next completely broken").clicked() {
-                    println!("Find next borken");
                     self.want_status = Some(Some(RomStatus::CompletelyBroken));
                     self.index += 1;
                     self.next_rom = None;

@@ -374,22 +374,15 @@ impl NesCpu {
         bus.memory_cycle_write(addr, data, self.outs, [true; 2], cpu_peripherals);
     }
 
-    /// Check all breakpoints to see if a break needs to occur
-    #[cfg(feature = "debugger")]
-    fn check_breakpoints(&mut self) {
-        for b in &self.breakpoints {
-            if self.pc == *b {
-                self.subcycle = 1;
-            }
-        }
-    }
-
     /// Returns true when a breakpoint is active
     pub fn breakpoint(&self) -> bool {
         let mut b = false;
-        for v in &self.breakpoints {
-            if self.pc == *v {
-                b = true;
+        if self.done_fetching {
+            for v in &self.breakpoints {
+                if self.debugger.pc == *v {
+                    println!("subcycle for breakpoint is {}", self.subcycle);
+                    b = true;
+                }
             }
         }
         b
@@ -591,8 +584,7 @@ impl NesCpu {
                 }
             } else {
                 self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
-                #[cfg(feature = "debugger")]
-                self.check_breakpoints();
+                //TODO set done fetching and call copy_debugger for single byte opcodes
                 self.subcycle = 1;
             }
         } else if let Some(o) = self.opcode {

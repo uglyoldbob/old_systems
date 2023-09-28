@@ -81,11 +81,20 @@ impl EmulatorConfiguration {
         let mut path = std::path::PathBuf::from(&self.path);
         path.pop();
         let _ = std::fs::create_dir_all(path);
-        let mut f = std::fs::OpenOptions::new()
+        let mut options = std::fs::OpenOptions::new();
+        if std::path::Path::new(&self.path).exists() {
+            options
             .write(true)
             .create(true)
-            .truncate(true)
-            .open(&self.path)
+            .truncate(true);
+        }
+        else {
+            options
+            .write(true)
+            .create_new(true)
+            .truncate(true);
+        }
+        let mut f = options.open(&self.path)
             .unwrap();
         let _e = f.write_all(data.as_bytes());
     }
@@ -215,7 +224,10 @@ impl NesEmulatorData {
         let audio_interval = self.cpu_peripherals.apu.get_audio_interval();
         apu.set_audio_interval(audio_interval);
 
+        let breakpoints = self.cpu.breakpoints.clone();
         self.cpu = NesCpu::new();
+        self.cpu.breakpoints = breakpoints;
+
         self.cpu_peripherals = NesCpuPeripherals::new(ppu, apu);
         self.mb = mb;
 
