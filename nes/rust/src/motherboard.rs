@@ -370,12 +370,12 @@ impl NesMotherboard {
         if self.last_ppu_cycle != 2 {
             println!(
                 "ERROR PPU CYCLING a @ {},{} from {:?}",
-                ppu.row(),
                 ppu.column(),
+                ppu.row(),
                 self.last_ppu_coordinates
             );
         }
-        self.last_ppu_coordinates = (ppu.row(), ppu.column());
+        self.last_ppu_coordinates = (ppu.column(), ppu.row());
         self.last_ppu_cycle = 1;
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
@@ -396,12 +396,12 @@ impl NesMotherboard {
         if self.last_ppu_cycle != 1 {
             println!(
                 "ERROR PPU CYCLING b @ {},{} from {:?}",
-                ppu.row(),
                 ppu.column(),
+                ppu.row(),
                 self.last_ppu_coordinates
             );
         }
-        self.last_ppu_coordinates = (ppu.row(), ppu.column());
+        self.last_ppu_coordinates = (ppu.column(), ppu.row());
         self.last_ppu_cycle = 2;
         if let Some(addr) = self.vram_address {
             match addr {
@@ -432,12 +432,12 @@ impl NesMotherboard {
         if self.last_ppu_cycle != 1 {
             println!(
                 "ERROR PPU CYCLING c @ {},{} from {:?}",
-                ppu.row(),
                 ppu.column(),
+                ppu.row(),
                 self.last_ppu_coordinates
             );
         }
-        self.last_ppu_coordinates = (ppu.row(), ppu.column());
+        self.last_ppu_coordinates = (ppu.column(), ppu.row());
         self.last_ppu_cycle = 2;
         if let Some(addr) = self.vram_address {
             match addr {
