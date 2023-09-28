@@ -389,6 +389,16 @@ impl NesPpu {
         }
     }
 
+    /// Return the operating row
+    pub fn row(&self) -> u16 {
+        self.scanline_number
+    }
+
+    /// Return the operating column
+    pub fn column(&self) -> u16 {
+        self.scanline_cycle
+    }
+
     /// Return the frame number of the ppu, mostly used for testing and debugging the ppu
     #[cfg(any(test, feature = "debugger"))]
     pub fn frame_number(&self) -> u64 {
@@ -752,11 +762,11 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     //nametable byte
                     let calc2 = 0x2000 | (self.vram_address & 0xFFF);
-                    bus.ppu_cycle_1(calc2);
+                    bus.ppu_cycle_1(calc2, self);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     self.prev_nametable_data = self.nametable_data;
-                    self.nametable_data = bus.ppu_cycle_2_read();
+                    self.nametable_data = bus.ppu_cycle_2_read(self);
                     self.cycle1_done = false;
                 }
             }
@@ -767,10 +777,10 @@ impl NesPpu {
                         | (self.vram_address & 0x0C00)
                         | ((self.vram_address >> 4) & 0x38)
                         | ((self.vram_address >> 2) & 0x07);
-                    bus.ppu_cycle_1(calc2);
+                    bus.ppu_cycle_1(calc2, self);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
-                    self.attributetable_data = bus.ppu_cycle_2_read();
+                    self.attributetable_data = bus.ppu_cycle_2_read(self);
                     self.cycle1_done = false;
                 }
             }
@@ -780,11 +790,11 @@ impl NesPpu {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
                     let calc = base + offset + ((7 + (self.vram_address) >> 12) & 7);
-                    bus.ppu_cycle_1(calc);
+                    bus.ppu_cycle_1(calc, self);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     let mut pt = self.patterntable_tile.to_le_bytes();
-                    pt[0] = bus.ppu_cycle_2_read();
+                    pt[0] = bus.ppu_cycle_2_read(self);
                     self.patterntable_tile = u16::from_le_bytes(pt);
                     self.cycle1_done = false;
                 }
@@ -795,11 +805,11 @@ impl NesPpu {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
                     let calc = 8 + base + offset + ((7 + (self.vram_address) >> 12) & 7);
-                    bus.ppu_cycle_1(calc);
+                    bus.ppu_cycle_1(calc, self);
                     self.cycle1_done = true;
                 } else if self.cycle1_done {
                     let mut pt = self.patterntable_tile.to_le_bytes();
-                    pt[1] = bus.ppu_cycle_2_read();
+                    pt[1] = bus.ppu_cycle_2_read(self);
                     self.cycle1_done = false;
                     self.patterntable_tile = u16::from_le_bytes(pt);
                     self.attributetable_shift[0] = self.attributetable_shift[1];
@@ -816,15 +826,15 @@ impl NesPpu {
     fn idle_operation(&mut self, bus: &mut NesMotherboard, cycle: u16) {
         if (cycle & 1) == 0 {
             if let Some(_a) = self.pend_vram_write {
-                bus.ppu_cycle_1(self.vram_address);
+                bus.ppu_cycle_1(self.vram_address, self);
                 self.cycle1_done = true;
             } else if let Some(a) = self.pend_vram_read {
-                bus.ppu_cycle_1(a & 0x3fff);
+                bus.ppu_cycle_1(a & 0x3fff, self);
                 self.cycle1_done = true;
             }
         } else if self.cycle1_done {
             if let Some(a) = self.pend_vram_write {
-                bus.ppu_cycle_2_write(a);
+                bus.ppu_cycle_2_write(a, self);
                 self.cycle1_done = false;
                 if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
                     self.vram_address = self.vram_address.wrapping_add(1);
@@ -833,7 +843,7 @@ impl NesPpu {
                 }
                 self.pend_vram_write = None;
             } else if let Some(_a) = self.pend_vram_read {
-                self.ppudata_buffer = bus.ppu_cycle_2_read();
+                self.ppudata_buffer = bus.ppu_cycle_2_read(self);
                 self.cycle1_done = false;
                 self.pend_vram_read = None;
             }
@@ -1165,10 +1175,10 @@ impl NesPpu {
                                     let y = (row / 8) as u8;
                                     let base = self.nametable_base();
                                     let offset = y << 5 | x;
-                                    bus.ppu_cycle_1(base + offset as u16); //TODO verify this calculation
+                                    bus.ppu_cycle_1(base + offset as u16, self); //TODO verify this calculation
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
-                                    bus.ppu_cycle_2_read();
+                                    bus.ppu_cycle_2_read(self);
                                     self.cycle1_done = false;
                                 }
                             }
@@ -1180,10 +1190,10 @@ impl NesPpu {
                                     let y = (row / 8) as u8;
                                     let base = self.nametable_base();
                                     let offset = y << 5 | x;
-                                    bus.ppu_cycle_1(base + offset as u16); //TODO verify this calculation
+                                    bus.ppu_cycle_1(base + offset as u16, self); //TODO verify this calculation
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
-                                    bus.ppu_cycle_2_read();
+                                    bus.ppu_cycle_2_read(self);
                                     self.cycle1_done = false;
                                 }
                             }
@@ -1199,11 +1209,11 @@ impl NesPpu {
                                         .line_number(row as u8)
                                         as u16;
                                     let calc = base + offset + o2;
-                                    bus.ppu_cycle_1(calc);
+                                    bus.ppu_cycle_1(calc, self);
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
                                     let mut pt = self.patterntable_tile.to_le_bytes();
-                                    pt[0] = bus.ppu_cycle_2_read();
+                                    pt[0] = bus.ppu_cycle_2_read(self);
                                     self.patterntable_tile = u16::from_le_bytes(pt);
                                     self.cycle1_done = false;
                                 }
@@ -1220,11 +1230,11 @@ impl NesPpu {
                                         .line_number(row as u8)
                                         as u16;
                                     let calc = 8 + base + offset + o2;
-                                    bus.ppu_cycle_1(calc);
+                                    bus.ppu_cycle_1(calc, self);
                                     self.cycle1_done = true;
                                 } else if self.cycle1_done {
                                     let mut pt = self.patterntable_tile.to_le_bytes();
-                                    pt[1] = bus.ppu_cycle_2_read();
+                                    pt[1] = bus.ppu_cycle_2_read(self);
                                     self.cycle1_done = false;
                                     self.patterntable_tile = u16::from_le_bytes(pt);
                                     self.sprites[sprite_num as usize].patterntable_data =

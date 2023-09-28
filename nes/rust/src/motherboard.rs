@@ -2,6 +2,7 @@
 
 use crate::controller::NesController;
 use crate::controller::NesControllerTrait;
+use crate::ppu::NesPpu;
 use crate::{cartridge::NesCartridge, cpu::NesCpuPeripherals};
 use serde_with::Bytes;
 
@@ -24,6 +25,8 @@ pub struct NesMotherboard {
     vram_address: Option<u16>,
     /// Used for detecting sequence problems in the ppu
     last_ppu_cycle: u8,
+    /// The last coordinates for ppu access
+    last_ppu_coordinates: (u16, u16),
     /// Used for open bus implementation of the cpu memory bus
     last_cpu_data: u8,
     /// The controllers for the system
@@ -56,6 +59,7 @@ impl NesMotherboard {
             vram_address: None,
             last_ppu_cycle: 2,
             last_cpu_data: 0,
+            last_ppu_coordinates: (0, 0),
             controllers: [None, None],
         }
     }
@@ -362,10 +366,16 @@ impl NesMotherboard {
     }
 
     /// Perform the address part of a ppu memory cycle
-    pub fn ppu_cycle_1(&mut self, addr: u16) {
+    pub fn ppu_cycle_1(&mut self, addr: u16, ppu: &NesPpu) {
         if self.last_ppu_cycle != 2 {
-            println!("ERROR PPU CYCLING a");
+            println!(
+                "ERROR PPU CYCLING a @ {},{} from {:?}",
+                ppu.row(),
+                ppu.column(),
+                self.last_ppu_coordinates
+            );
         }
+        self.last_ppu_coordinates = (ppu.row(), ppu.column());
         self.last_ppu_cycle = 1;
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
@@ -382,10 +392,16 @@ impl NesMotherboard {
     }
 
     /// Perform the write portion of a ppu memory cycle
-    pub fn ppu_cycle_2_write(&mut self, data: u8) {
+    pub fn ppu_cycle_2_write(&mut self, data: u8, ppu: &NesPpu) {
         if self.last_ppu_cycle != 1 {
-            println!("ERROR PPU CYCLING b");
+            println!(
+                "ERROR PPU CYCLING b @ {},{} from {:?}",
+                ppu.row(),
+                ppu.column(),
+                self.last_ppu_coordinates
+            );
         }
+        self.last_ppu_coordinates = (ppu.row(), ppu.column());
         self.last_ppu_cycle = 2;
         if let Some(addr) = self.vram_address {
             match addr {
@@ -412,10 +428,16 @@ impl NesMotherboard {
     }
 
     /// Perform the read portion of a ppu memory cycle
-    pub fn ppu_cycle_2_read(&mut self) -> u8 {
+    pub fn ppu_cycle_2_read(&mut self, ppu: &NesPpu) -> u8 {
         if self.last_ppu_cycle != 1 {
-            println!("ERROR PPU CYCLING c");
+            println!(
+                "ERROR PPU CYCLING c @ {},{} from {:?}",
+                ppu.row(),
+                ppu.column(),
+                self.last_ppu_coordinates
+            );
         }
+        self.last_ppu_coordinates = (ppu.row(), ppu.column());
         self.last_ppu_cycle = 2;
         if let Some(addr) = self.vram_address {
             match addr {

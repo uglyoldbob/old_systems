@@ -5846,7 +5846,8 @@ impl NesCpu {
                             self.done_fetching = true;
                         }
                         self.s = self.s.wrapping_add(1);
-                        self.temp = self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
+                        self.temp =
+                            self.memory_cycle_read(0x100 + self.s as u16, bus, cpu_peripherals);
                         self.subcycle = 2;
                     }
                     2 => {
@@ -8360,14 +8361,17 @@ impl NesCpu {
                         self.subcycle = 3;
                     }
                     3 => {
-                        let addr = (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
+                        let addr =
+                            (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
                         self.memory_cycle_read(addr, bus, cpu_peripherals);
                         self.subcycle = 4;
                     }
                     _ => {
-                        let addr = ((self.temp2 as u16) << 8 | (self.temp as u16)).wrapping_add(self.x as u16);
-                        let t1 = ((self.temp2 as u16) << 8 | (self.temp as u16)).wrapping_add(self.x as u16);
-                        let val = (t1>>8) as u8 & self.y;
+                        let addr = ((self.temp2 as u16) << 8 | (self.temp as u16))
+                            .wrapping_add(self.x as u16);
+                        let t1 = ((self.temp2 as u16) << 8 | (self.temp as u16))
+                            .wrapping_add(self.x as u16);
+                        let val = (t1 >> 8) as u8 & self.y;
                         self.memory_cycle_write(addr, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);
@@ -8393,14 +8397,17 @@ impl NesCpu {
                         self.subcycle = 3;
                     }
                     3 => {
-                        let addr = (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
+                        let addr =
+                            (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
                         self.memory_cycle_read(addr, bus, cpu_peripherals);
                         self.subcycle = 4;
                     }
                     _ => {
-                        let addr = ((self.temp2 as u16) << 8 | (self.temp as u16)).wrapping_add(self.x as u16);
-                        let t1 = ((self.temp2 as u16) << 8 | (self.temp as u16)).wrapping_add(self.x as u16);
-                        let val = (t1>>8) as u8 & self.y;
+                        let addr = ((self.temp2 as u16) << 8 | (self.temp as u16))
+                            .wrapping_add(self.x as u16);
+                        let t1 = ((self.temp2 as u16) << 8 | (self.temp as u16))
+                            .wrapping_add(self.x as u16);
+                        let val = (t1 >> 8) as u8 & self.y;
                         self.memory_cycle_write(addr, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);

@@ -334,7 +334,10 @@ fn main() {
 
     #[cfg(feature = "rom_status")]
     {
-        multi_window.add(windows::rom_checker::Window::new_request(&nes_data), &event_loop);
+        multi_window.add(
+            windows::rom_checker::Window::new_request(&nes_data),
+            &event_loop,
+        );
     }
 
     multi_window.run(event_loop, nes_data);

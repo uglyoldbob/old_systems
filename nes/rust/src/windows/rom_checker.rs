@@ -31,7 +31,7 @@ impl Window {
         for (i, (path, _entry)) in data.roms.elements.iter().enumerate() {
             if let Some(a) = data.mb.cartridge().map(|p| p.rom_name()) {
                 if a == path.display().to_string() {
-                    index = i+1;
+                    index = i + 1;
                 }
             }
             max_i = i;
