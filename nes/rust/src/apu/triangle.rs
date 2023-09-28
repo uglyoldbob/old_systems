@@ -2,7 +2,7 @@
 
 /// A triangle channel for the apu
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ApuTriangleChannel {
     /// The channel registers
     pub registers: [u8; 4],

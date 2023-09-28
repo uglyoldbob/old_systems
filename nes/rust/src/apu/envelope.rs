@@ -2,7 +2,7 @@
 
 /// An envelope sequencer for the apu
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ApuEnvelope {
     /// Initiates reload of the timers
     startflag: bool,

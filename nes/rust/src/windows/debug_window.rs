@@ -99,6 +99,7 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                     c.cpu.debugger.p,
                     c.cpu.debugger.s,
                 ));
+                ui.label(format!("APU: {:?}", c.cpu_peripherals.apu));
                 ui.label(format!(
                     "Frame number {}",
                     c.cpu_peripherals.ppu_frame_number()

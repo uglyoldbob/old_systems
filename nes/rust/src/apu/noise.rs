@@ -4,7 +4,7 @@ use super::ApuEnvelope;
 
 /// A noise channel for the apu
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ApuNoiseChannel {
     /// The channel registers
     pub registers: [u8; 4],

@@ -2,7 +2,7 @@
 
 /// A dmc channel for the apu
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ApuDmcChannel {
     /// The channel registers
     pub registers: [u8; 4],

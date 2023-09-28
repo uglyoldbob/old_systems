@@ -4,7 +4,7 @@ use biquad::Biquad;
 use rb::RbProducer;
 
 ///The modes that the sweep can operate in
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub enum ApuSweepAddition {
     /// The math uses ones complement numbers
     OnesComplement,
@@ -14,7 +14,7 @@ pub enum ApuSweepAddition {
 
 /// An sweep unit for the square channels of the apu
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 struct ApuSweep {
     /// The math mode for the sweep unit
     mode: ApuSweepAddition,
@@ -90,7 +90,7 @@ use dmc::ApuDmcChannel;
 
 /// The nes apu
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct NesApu {
     /// Used to divide the input clock by 2
     clock: bool,
