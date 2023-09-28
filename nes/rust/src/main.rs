@@ -271,7 +271,7 @@ fn main() {
     egui_multiwin::winit::platform::x11::EventLoopBuilderExtX11::with_x11(&mut event_loop);
     let event_loop = event_loop.build();
     let mut nes_data = NesEmulatorData::new();
-    nes_data.parser.find_roms("./roms");
+    nes_data.parser.find_roms(nes_data.configuration.get_rom_path());
     let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();

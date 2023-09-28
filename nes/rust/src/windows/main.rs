@@ -362,7 +362,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let name = if let Some(cart) = c.mb.cartridge() {
             cart.save_name()
         } else {
-            "./state.bin".to_string()
+            "state.bin".to_string()
         };
         let name = format!("./saves/{}", name);
         if save_state {

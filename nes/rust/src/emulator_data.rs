@@ -26,6 +26,8 @@ pub struct EmulatorConfiguration {
     #[serde(skip)]
     /// The path for saving and loading
     path: String,
+    /// The root path for all roms
+    rom_path: String,
 }
 
 impl Default for EmulatorConfiguration {
@@ -34,6 +36,7 @@ impl Default for EmulatorConfiguration {
             sticky_rom: true,
             start_rom: None,
             path: "".to_string(),
+            rom_path: "./roms".to_string(),
         }
     }
 }
@@ -45,6 +48,11 @@ impl EmulatorConfiguration {
             self.start_rom = Some(name);
             self.save();
         }
+    }
+
+    /// Retrieve the root path for roms.
+    pub fn get_rom_path(&self) -> &str {
+        &self.rom_path
     }
 
     ///Load a configuration file
