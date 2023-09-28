@@ -10,6 +10,8 @@ pub struct ApuNoiseChannel {
     pub registers: [u8; 4],
     /// The length of the channel
     pub length: u8,
+    /// Set when length loading should be active
+    pub length_enabled: bool,
     /// The counter for the channel
     counter: u16,
     /// The envelope for sound generation
@@ -28,6 +30,7 @@ impl ApuNoiseChannel {
         Self {
             registers: [0; 4],
             length: 0,
+            length_enabled: false,
             counter: 0,
             envelope: ApuEnvelope::new(),
             shift_ctr: 1,

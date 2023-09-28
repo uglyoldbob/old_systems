@@ -120,6 +120,8 @@ pub struct NesApu {
     output_index: f32,
     /// The number of slow clock cycles between audio samples
     sample_interval: f32,
+    /// Inhibits clocking the length counters when set
+    inhibit_length_clock: bool,
 }
 
 impl NesApu {
@@ -143,6 +145,7 @@ impl NesApu {
             timing_clock: 0,
             output_index: 0.0,
             sample_interval: 100.0,
+            inhibit_length_clock: false,
         }
     }
 
@@ -254,24 +257,24 @@ impl NesApu {
     fn half_frame(&mut self) {
         //first square length counter
         let halt = (self.squares[0].registers[0] & 0x20) != 0;
-        if !halt && self.squares[0].length > 0 {
+        if !self.inhibit_length_clock && !halt && self.squares[0].length > 0 {
             self.squares[0].length -= 1;
         }
         self.squares[0].clock_sweep();
         //second square length counter
         let halt = (self.squares[1].registers[0] & 0x20) != 0;
-        if !halt && self.squares[1].length > 0 {
+        if !self.inhibit_length_clock && !halt && self.squares[1].length > 0 {
             self.squares[1].length -= 1;
         }
         self.squares[1].clock_sweep();
         //triangle channel length counter
         let halt = (self.triangle.registers[0] & 0x80) != 0;
-        if !halt && self.triangle.length > 0 {
+        if !self.inhibit_length_clock && !halt && self.triangle.length > 0 {
             self.triangle.length -= 1;
         }
         //noise channel length counter
         let halt = (self.noise.registers[0] & 0x20) != 0;
-        if !halt && self.noise.length > 0 {
+        if !self.inhibit_length_clock && !halt && self.noise.length > 0 {
             self.noise.length -= 1;
         }
     }
@@ -317,6 +320,7 @@ impl NesApu {
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.frame_sequencer_clock();
+        self.inhibit_length_clock = false;
         if self.clock {
             self.timing_clock = self.timing_clock.wrapping_add(1);
             self.squares[0].cycle();
@@ -353,54 +357,35 @@ impl NesApu {
 
     /// Write to an apu register
     pub fn write(&mut self, addr: u16, data: u8) {
-        let addr2 = addr % 24;
-        let mut halt = false;
-        match addr2 {
-            0 | 4 | 12 => {
-                if (data & 0x20) != 0 {
-                    //println!("Halt channel");
-                    halt = true;
-                }
-            }
-            8 => {
-                if (data & 0x80) != 0 {
-                    //println!("Halt triangle channel");
-                    halt = true;
-                }
-            }
-            0x10..=0x13 => {
-                //println!("DMC write {:x} with {:x}", addr, data);
-            }
-            _ => {}
-        }
-        if halt {
-            //println!("Halted at {} {}", self.frame_sequencer_clock, self.clock);
-        }
         match addr {
             3 => {
                 let length = data >> 3;
-                if (self.status & (1 << 0)) != 0 {
+                if (self.status & (1 << 0)) != 0 && self.squares[0].length_enabled {
                     self.squares[0].length = NesApu::LENGTH_TABLE[length as usize];
+                    self.inhibit_length_clock = true;
                 }
                 self.squares[0].envelope.restart();
             }
             7 => {
                 let length = data >> 3;
-                if (self.status & (1 << 1)) != 0 {
+                if (self.status & (1 << 1)) != 0  && self.squares[1].length_enabled {
                     self.squares[1].length = NesApu::LENGTH_TABLE[length as usize];
+                    self.inhibit_length_clock = true;
                 }
                 self.squares[1].envelope.restart();
             }
             0xb => {
                 let length = data >> 3;
-                if (self.status & (1 << 2)) != 0 {
+                if (self.status & (1 << 2)) != 0 && self.triangle.length_enabled {
                     self.triangle.length = NesApu::LENGTH_TABLE[length as usize];
+                    self.inhibit_length_clock = true;
                 }
             }
             0xf => {
                 let length = data >> 3;
-                if (self.status & (1 << 3)) != 0 {
+                if (self.status & (1 << 3)) != 0 && self.noise.length_enabled {
                     self.noise.length = NesApu::LENGTH_TABLE[length as usize];
+                    self.inhibit_length_clock = true;
                 }
                 self.noise.envelope.restart();
             }
@@ -422,15 +407,19 @@ impl NesApu {
             }
             0x15 => {
                 let data2 = (self.status & 0x60) | (data & 0x1f);
+                self.squares[0].length_enabled = (data2 & 1) != 0;
                 if (data2 & 1) == 0 {
                     self.squares[0].length = 0;
                 }
+                self.squares[1].length_enabled = (data2 & 2) != 0;
                 if (data2 & 2) == 0 {
                     self.squares[1].length = 0;
                 }
+                self.triangle.length_enabled = (data2 & 4) != 0;
                 if (data2 & 4) == 0 {
                     self.triangle.length = 0;
                 }
+                self.noise.length_enabled = (data2 & 8) != 0;
                 if (data2 & 8) == 0 {
                     self.noise.length = 0;
                 }

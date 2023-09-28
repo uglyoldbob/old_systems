@@ -12,6 +12,8 @@ pub struct ApuSquareChannel {
     pub registers: [u8; 4],
     /// The length of the channel for playback
     pub length: u8,
+    /// Set when length loading should be active
+    pub length_enabled: bool,
     /// The counter for the channel
     counter: u8,
     /// The envelope for sound generation
@@ -37,6 +39,7 @@ impl ApuSquareChannel {
     pub fn new(math: ApuSweepAddition) -> Self {
         Self {
             registers: [0; 4],
+            length_enabled: false,
             sweep: ApuSweep::new(math),
             length: 0,
             counter: 0,

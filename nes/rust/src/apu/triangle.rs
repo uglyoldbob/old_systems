@@ -8,6 +8,8 @@ pub struct ApuTriangleChannel {
     pub registers: [u8; 4],
     /// The length of the channel for playback
     pub length: u8,
+    /// Set when length loading should be active
+    pub length_enabled: bool,
     /// The main counter for the channel
     counter: u16,
     /// The index into the sequencer
@@ -26,6 +28,7 @@ impl ApuTriangleChannel {
         Self {
             registers: [0; 4],
             length: 0,
+            length_enabled: false,
             counter: 0,
             sequence_index: 0,
         }
