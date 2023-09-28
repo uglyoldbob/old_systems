@@ -45,6 +45,7 @@ impl NesMapperTrait for Mapper03 {
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         let mut hm = BTreeMap::new();
         hm.insert("Mirror".to_string(), self.mirror_vertical as u8);
+        hm.insert("Mapper".to_string(), 3);
         hm
     }
 

@@ -86,7 +86,6 @@ impl TrackedWindow<NesEmulatorData> for Window {
             let mut save_state = None;
             if let Some(rom) = c.mb.cartridge() {
                 ui.label(format!("Current rom is {}", rom.rom_name()));
-                ui.label(format!("HASH of current rom is {}", rom.hash()));
                 if let Some((_hash, result)) = c.rom_test.list().elements.get_key_value(&rom.hash())
                 {
                     match result {

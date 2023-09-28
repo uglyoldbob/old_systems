@@ -88,6 +88,7 @@ impl NesMapperTrait for Mapper01 {
         hm.insert("Chr0".to_string(), self.registers[1]);
         hm.insert("Chr1".to_string(), self.registers[2]);
         hm.insert("prg bank".to_string(), self.registers[3]);
+        hm.insert("Mapper".to_string(), 1);
         hm
     }
 

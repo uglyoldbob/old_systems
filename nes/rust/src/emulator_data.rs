@@ -58,11 +58,13 @@ impl EmulatorConfiguration {
     ///Load a configuration file
     pub fn load(name: String) -> Self {
         let mut result = Self::default();
+        result.path = name.to_owned();
         if let Ok(a) = std::fs::read(&name) {
             if let Ok(buf) = std::str::from_utf8(&a) {
                 match toml::from_str(buf) {
                     Ok(p) => {
                         result = p;
+                        result.path = name.to_owned();
                     }
                     Err(e) => {
                         println!("Failed to load config file: {}", e);
@@ -70,7 +72,9 @@ impl EmulatorConfiguration {
                 }
             }
         }
-        result.path = name;
+        else {
+            result.save();
+        }
         result
     }
 
@@ -82,20 +86,17 @@ impl EmulatorConfiguration {
         path.pop();
         let _ = std::fs::create_dir_all(path);
         let mut options = std::fs::OpenOptions::new();
-        if std::path::Path::new(&self.path).exists() {
+        let mut f = if std::path::Path::new(&self.path).exists() {
             options
             .write(true)
             .create(true)
-            .truncate(true);
+            .truncate(true).open(&self.path).unwrap()
         }
         else {
             options
             .write(true)
-            .create_new(true)
-            .truncate(true);
-        }
-        let mut f = options.open(&self.path)
-            .unwrap();
+            .create_new(true).open(&self.path).unwrap()
+        };
         let _e = f.write_all(data.as_bytes());
     }
 
