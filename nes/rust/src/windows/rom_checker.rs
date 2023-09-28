@@ -117,6 +117,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         rom.hash(),
                         RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())),
                     );
+                    self.bug = "".to_string();
                 }
             }
             ui.label(format!(

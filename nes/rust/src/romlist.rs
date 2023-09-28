@@ -88,7 +88,6 @@ impl RomListParser {
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
     pub fn find_roms(&mut self, dir: &str) {
         if !self.scan_complete {
-            println!("Searching in {} for roms", dir);
             for entry in walkdir::WalkDir::new(dir)
                 .into_iter()
                 .filter_map(Result::ok)
@@ -98,7 +97,6 @@ impl RomListParser {
                 if meta.is_ok() {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
-                    println!("Checking2 {}", name);
                     let cart = NesCartridge::load_cartridge(name.clone());
                     match cart {
                         Ok(_cart) => {
@@ -130,7 +128,6 @@ impl RomListParser {
                     let modified = metadata.modified().unwrap_or(std::time::SystemTime::now());
                     let last_modified = entry.modified.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                     if modified > last_modified {
-                        println!("Checking {}", p.display());
                         let romcheck = NesCartridge::load_cartridge(
                             p.as_os_str().to_str().unwrap().to_string(),
                         );

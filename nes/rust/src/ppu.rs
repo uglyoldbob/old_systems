@@ -912,7 +912,7 @@ impl NesPpu {
                 }
                 65..=256 => {
                     if self.scanline_cycle == 65 {
-                        self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+                        reset();
                     }
                     if (self.scanline_cycle & 1) == 1 {
                         self.oamdata = self.oam[self.oamaddress as usize];
@@ -926,8 +926,8 @@ impl NesPpu {
                                 {
                                     if self.secondaryoamaddress == 32 {
                                         println!(
-                                            "BUG: mode {:?}\n\trow {}\n\toamaddress: {:x}",
-                                            self.sprite_eval_mode, row, self.oamaddress
+                                            "BUG: mode {:?}\n\trow {}\n\tcolumn {}\n\toamaddress: {:x}",
+                                            self.sprite_eval_mode, row, self.scanline_cycle, self.oamaddress
                                         );
                                     }
                                     self.secondary_oam[self.secondaryoamaddress as usize] =
