@@ -11,9 +11,14 @@ use egui_multiwin::{
 pub struct DumpWindow {
     /// The image to use for the dump
     buf: Box<RgbImage>,
+    /// The image for the palette dump
+    palette: Box<RgbImage>,
     /// The texture used for rendering the image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     texture: Option<egui_multiwin::egui::TextureHandle>,
+    /// The texture for the palette
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
+    texture2: Option<egui_multiwin::egui::TextureHandle>,
 }
 
 impl DumpWindow {
@@ -22,7 +27,9 @@ impl DumpWindow {
         NewWindowRequest {
             window_state: Box::new(DumpWindow {
                 buf: Box::new(RgbImage::new(128, 64)),
+                palette: Box::new(RgbImage::new(16, 2)),
                 texture: None,
+                texture2: None,
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -61,6 +68,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
             ui.label("PPU Sprite Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 c.cpu_peripherals.ppu.render_sprites(&mut self.buf, &c.mb);
+                c.cpu_peripherals.ppu.render_palette(&mut self.palette, &c.mb);
                 let image = self.buf.to_egui();
                 if self.texture.is_none() {
                     self.texture = Some(egui.egui_ctx.load_texture(
@@ -71,16 +79,38 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                 } else if let Some(t) = &mut self.texture {
                     t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
                 }
+                let image2 = self.palette.to_egui();
+                if self.texture2.is_none() {
+                    self.texture2 = Some(egui.egui_ctx.load_texture(
+                        "NES_PPU_PALETTE",
+                        image2,
+                        egui_multiwin::egui::TextureOptions::NEAREST,
+                    ));
+                } else if let Some(t) = &mut self.texture2 {
+                    t.set_partial([0, 0], image2, egui_multiwin::egui::TextureOptions::NEAREST);
+                }
+                let mut r = None;
+                let zoom = 5.0;
                 if let Some(t) = &self.texture {
-                    let zoom = 5.0;
-                    let r = ui.image(
+                    r = Some(ui.image(
                         t,
                         egui_multiwin::egui::Vec2 {
                             x: zoom * self.buf.width as f32,
                             y: zoom * self.buf.height as f32,
                         },
+                    ));
+                }
+                if let Some(t) = &self.texture2 {
+                    let zoom = 16.0;
+                    let r = ui.image(
+                        t,
+                        egui_multiwin::egui::Vec2 {
+                            x: zoom * self.palette.width as f32,
+                            y: zoom * self.palette.height as f32,
+                        },
                     );
-
+                }
+                if let Some(r) = r {
                     if r.hovered() {
                         if let Some(cursor) = r.hover_pos() {
                             let pos = cursor - r.rect.left_top();
@@ -88,12 +118,15 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                 let x = (pos.x / (8.0 * zoom)).floor() as usize;
                                 let y = (pos.y / (16.0 * zoom)).floor() as usize;
                                 let col = x & 15;
-                                let row = y & 7;
+                                let row = y & 3;
                                 let num = col + row * 16;
 
                                 ui.label(format!("Sprite number is {:x}", num));
                                 let sprites = c.cpu_peripherals.ppu.get_64_sprites();
-                                ui.label(format!("Sprite tile is {:x}", sprites[num].tile()));
+                                ui.label(format!("Sprite tile is {:x}, attribute is {:x}", 
+                                    sprites[num].tile(),
+                                    sprites[num].attribute(),
+                                ));
                                 ui.label(format!(
                                     "Location is {},{}",
                                     sprites[num].x(),

@@ -8,26 +8,26 @@ apu_reset
  - all pass
 
 apu_test
- - all except dmc_rates pass
+ - all pass
 
 blargg_apu_2005.07.30
  - all pass
 
 blargg_litewall
- - causes a lot of ppu cycling errors
+ - passes ?
 
 blargg_nes_cpu_test5
  - does not seem to make progress after printing Running tests
  - maybe uses sprites?
 
 blargg_ppu_tests_2005.09.15b
- - all pass
+ - powerup palette fails
 
 branch_timing_tests
  - all pass
 
 cpu_dummy_reads
- - requires mapper 3
+ - all pass
 
 cpu_dummy_writes
  - all pass

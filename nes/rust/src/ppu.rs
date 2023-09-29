@@ -114,6 +114,11 @@ impl PpuSprite {
         self.tile
     }
 
+    /// Returns the attribute of the sprite
+    pub fn attribute(&self) -> u8 {
+        self.attribute
+    }
+
     /// Returns the pallete for the sprite
     pub fn pallete(&self) -> u16 {
         ((self.attribute & 3) as u16) << 2
@@ -1488,6 +1493,17 @@ impl NesPpu {
             1 => 0x2d,
             2 => 0x3d,
             _ => 0x20,
+        }
+    }
+
+    /// Render the entire palette
+    pub fn render_palette(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
+        for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
+            let pixel_entry = bus.ppu_palette_read(0x3f00 + i as u16) & 63;
+            let p = PPU_PALETTE[pixel_entry as usize];
+            pixel[0] = p[0];
+            pixel[1] = p[1];
+            pixel[2] = p[2];
         }
     }
 
