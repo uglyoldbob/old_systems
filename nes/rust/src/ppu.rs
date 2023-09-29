@@ -224,6 +224,10 @@ pub struct NesPpu {
     secondary_oam: [u8; 32],
     /// The sprites for the current scanline being rendered
     sprites: [PpuSprite; 8],
+    /// Was sprite 0 in range on the sprite evaluation line?
+    sprite0_eval: bool,
+    /// Is sprite 0 in range for the current line?
+    sprite0_current: bool,
     /// The address to use for secondary oam access
     secondaryoamaddress: u8,
     /// The data retrieved from the oam
@@ -394,6 +398,8 @@ impl NesPpu {
             oam,
             secondary_oam: oam2,
             sprites: [PpuSprite::new(); 8],
+            sprite0_current: false,
+            sprite0_eval: false,
             secondaryoamaddress: 0,
             oamdata: 0,
             sprite_eval_mode: PpuSpriteEvalMode::Normal,
@@ -898,6 +904,7 @@ impl NesPpu {
                 self.oamaddress = 0;
                 self.secondaryoamaddress = 0;
                 self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
+                self.sprite0_eval = false;
             };
             if self.frame_odd && self.scanline_number == 0 {
                 //TODO: trigger bug that occurs when oamaddress is nonzero
@@ -963,6 +970,9 @@ impl NesPpu {
                             PpuSpriteEvalMode::CopyCurrentSprite => {
                                 self.secondary_oam[self.secondaryoamaddress as usize] =
                                     self.oamdata;
+                                if self.oamaddress == 1 {
+                                    self.sprite0_eval = true;
+                                }
                                 self.oamaddress = self.oamaddress.wrapping_add(1);
                                 self.secondaryoamaddress += 1;
                                 if (self.secondaryoamaddress & 3) == 0 {
@@ -985,6 +995,7 @@ impl NesPpu {
                     }
                 }
                 257..=320 => {
+                    self.sprite0_current = self.sprite0_eval;
                     let cycle = self.scanline_cycle - 257;
                     let sprite = cycle / 4;
                     let index = cycle % 4;
@@ -1127,7 +1138,9 @@ impl NesPpu {
                                 let upper_bit = (pt[1] >> index2) & 1;
                                 let lower_bit = (pt[0] >> index2) & 1;
 
-                                if upper_bit != 0 || lower_bit != 0 {
+                                if upper_bit == 0 && lower_bit == 0 {
+                                    None
+                                } else {
                                     let mut palette_entry =
                                         e.pallete() | ((upper_bit << 1) | lower_bit) as u16;
                                     if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
@@ -1136,8 +1149,6 @@ impl NesPpu {
                                     let pixel_entry =
                                         bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
                                     Some((index, pixel_entry))
-                                } else {
-                                    None
                                 }
                             } else {
                                 None
@@ -1151,8 +1162,8 @@ impl NesPpu {
                 let priority = spr_pixel.map_or(true, |(index, _spr)| {
                     (self.sprites[index].attribute & 0x20) == 0
                 });
-                if let Some((index, spr)) = spr_pixel {
-                    if bg_pixel.is_some() && index == 0 {
+                if let Some((index, _spr)) = spr_pixel {
+                    if bg_pixel.is_some() && index == 0 && self.sprite0_current {
                         let ignore_first_8 = cycle < 8 && (self.registers[1] & 6) != 6;
                         if !ignore_first_8 && cycle < 255 {
                             self.registers[2] |= 0x40; //sprite 0 hit
