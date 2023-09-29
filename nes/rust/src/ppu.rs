@@ -771,7 +771,7 @@ impl NesPpu {
 
     /// Returns true when sprites should be rendered.
     fn should_render_sprites(&self, cycle: u8) -> bool {
-        if cycle == 0 {
+        if cycle < 8 {
             (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN) != 0
         } else {
             (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0
@@ -932,8 +932,9 @@ impl NesPpu {
                                 //range check
                                 if row <= 240
                                     && row > self.oamdata
-                                    && row <= (self.oamdata + self.sprite_height())
+                                    && (row as u16) <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
+                                    println!("Sprite in range at {},{}", self.scanline_cycle, row);
                                     if self.secondaryoamaddress == 32 {
                                         println!(
                                             "BUG: mode {:?}\n\trow {}\n\tcolumn {}\n\toamaddress: {:x}",
@@ -955,7 +956,7 @@ impl NesPpu {
                             PpuSpriteEvalMode::Sprites8 => {
                                 if row <= 240
                                     && row > self.oamdata
-                                    && row <= (self.oamdata + self.sprite_height())
+                                    && (row as u16) <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     self.registers[2] |= 0x20; //the sprite overflow flag
@@ -1128,7 +1129,7 @@ impl NesPpu {
                 let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) {
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
-                            if cycle >= e.x && (cycle < (e.x.wrapping_add(8))) && e.y < 240 {
+                            if cycle >= e.x && ((cycle as u16) < ((e.x as u16).wrapping_add(8))) && e.y < 240 {
                                 let index2 = if (e.attribute & 0x40) == 0 {
                                     7 - (cycle - e.x)
                                 } else {
@@ -1164,8 +1165,10 @@ impl NesPpu {
                 });
                 if let Some((index, _spr)) = spr_pixel {
                     if bg_pixel.is_some() && index == 0 && self.sprite0_current {
-                        let ignore_first_8 = cycle < 8 && (self.registers[1] & 6) != 6;
-                        if !ignore_first_8 && cycle < 255 {
+                        if cycle < 255 {
+                            println!("SPR0 hit at {},{}", 
+                                self.scanline_cycle, 
+                                self.scanline_number);
                             self.registers[2] |= 0x40; //sprite 0 hit
                         }
                     }
@@ -1206,7 +1209,7 @@ impl NesPpu {
                 let sprite_num = cycle / 8;
                 let row = self.scanline_number;
                 if cycle > 0 {
-                    if self.should_render_sprites(cycle as u8) || self.mode == Some(PpuMode::Sprite)
+                    if self.should_render_sprites(0) || self.should_render_sprites(8) || self.mode == Some(PpuMode::Sprite)
                     {
                         match (cycle / 2) % 4 {
                             0 => {
@@ -1376,9 +1379,10 @@ impl NesPpu {
             pixel[2] = 0;
 
             let base = self.sprite_patterntable_base(&sprite);
-            let offset = sprite.tile_num(sprite.y + spritey as u8, self.sprite_height());
-            let o2 = sprite.line_number(sprite.y + spritey as u8) as u16;
+            let offset = sprite.tile_num(sprite.y.wrapping_add(spritey), self.sprite_height());
+            let o2 = sprite.line_number(sprite.y.wrapping_add(spritey)) as u16;
             let calc = base + offset + o2;
+
             let pattern_low = bus.ppu_peek(calc);
             let pattern_high = bus.ppu_peek(8 + calc);
 

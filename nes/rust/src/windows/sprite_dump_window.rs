@@ -123,8 +123,9 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
 
                                 ui.label(format!("Sprite number is {:x}", num));
                                 let sprites = c.cpu_peripherals.ppu.get_64_sprites();
-                                ui.label(format!("Sprite tile is {:x}, attribute is {:x}", 
-                                    sprites[num].tile(),
+                                ui.label(format!("Sprite tile is {:x} {:x}, attribute is {:x}", 
+                                    sprites[num].tile_num(sprites[num].y(), 16),
+                                    sprites[num].tile_num(sprites[num].y() + 8, 16),
                                     sprites[num].attribute(),
                                 ));
                                 ui.label(format!(
