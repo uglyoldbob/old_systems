@@ -934,7 +934,6 @@ impl NesPpu {
                                     && row > self.oamdata
                                     && (row as u16) <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
-                                    println!("Sprite ({}) in range at {},{}", self.oamdata, self.scanline_cycle, row);
                                     if self.secondaryoamaddress == 32 {
                                         println!(
                                             "BUG: mode {:?}\n\trow {}\n\tcolumn {}\n\toamaddress: {:x}",
@@ -1003,8 +1002,6 @@ impl NesPpu {
                     if sprite < 8 {
                         match index {
                             0 => {
-                                println!("Write sprites {} with {} @ ({},{})", sprite, self.secondary_oam[cycle as usize], self.scanline_cycle, 
-                                self.scanline_number);
                                 self.sprites[sprite as usize].y = self.secondary_oam[cycle as usize];
                             }
                             1 => {
@@ -1168,9 +1165,6 @@ impl NesPpu {
                 if let Some((index, _spr)) = spr_pixel {
                     if bg_pixel.is_some() && index == 0 && self.sprite0_current {
                         if cycle < 255 {
-                            println!("SPR0 hit at {},{}", 
-                                self.scanline_cycle, 
-                                self.scanline_number);
                             self.registers[2] |= 0x40; //sprite 0 hit
                         }
                     }
