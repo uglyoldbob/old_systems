@@ -199,7 +199,9 @@ impl NesEmulatorData {
     pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<bincode::ErrorKind>> {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
+                let config_path = self.configuration.path.to_owned();
                 *self = r;
+                self.configuration.path = config_path;
                 Ok(())
             }
             Err(e) => Err(e),
