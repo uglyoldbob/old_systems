@@ -129,18 +129,16 @@ impl PpuSprite {
         let mask = if height == 16 { 0xFE } else { 0xFF };
         let calc = self.tile as u16 & mask;
         let adder: u16 = if scanline >= self.y {
-            if (self.attribute & 0x80) == 0 {
-                if (scanline - self.y) < 8 {
-                    0
-                } else {
-                    1
-                }
+            let a = if (scanline - self.y) < 8 {
+                0
             } else {
-                if (scanline - self.y) < 8 {
-                    1
-                } else {
-                    0
-                }
+                1
+            };
+            if height == 16 && (self.attribute & 0x80) != 0 {
+                a ^ 1
+            }
+            else {
+                a
             }
         } else {
             0
