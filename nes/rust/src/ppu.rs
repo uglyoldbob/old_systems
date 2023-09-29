@@ -934,7 +934,7 @@ impl NesPpu {
                                     && row > self.oamdata
                                     && (row as u16) <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
-                                    println!("Sprite in range at {},{}", self.scanline_cycle, row);
+                                    println!("Sprite ({}) in range at {},{}", self.oamdata, self.scanline_cycle, row);
                                     if self.secondaryoamaddress == 32 {
                                         println!(
                                             "BUG: mode {:?}\n\trow {}\n\tcolumn {}\n\toamaddress: {:x}",
@@ -1003,18 +1003,20 @@ impl NesPpu {
                     if sprite < 8 {
                         match index {
                             0 => {
-                                self.sprites[sprite as usize].y = self.secondary_oam[cycle as usize]
+                                println!("Write sprites {} with {} @ ({},{})", sprite, self.secondary_oam[cycle as usize], self.scanline_cycle, 
+                                self.scanline_number);
+                                self.sprites[sprite as usize].y = self.secondary_oam[cycle as usize];
                             }
                             1 => {
                                 self.sprites[sprite as usize].tile =
-                                    self.secondary_oam[cycle as usize]
+                                    self.secondary_oam[cycle as usize];
                             }
                             2 => {
                                 self.sprites[sprite as usize].attribute =
-                                    self.secondary_oam[cycle as usize]
+                                    self.secondary_oam[cycle as usize];
                             }
                             3 => {
-                                self.sprites[sprite as usize].x = self.secondary_oam[cycle as usize]
+                                self.sprites[sprite as usize].x = self.secondary_oam[cycle as usize];
                             }
                             _ => {}
                         }
@@ -1126,7 +1128,7 @@ impl NesPpu {
                 } else {
                     self.idle_operation(bus, cycle as u16);
                 }
-                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) {
+                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) && self.scanline_number > 0 {
                     let mut sprite_pixels =
                         self.sprites.iter().enumerate().filter_map(|(index, e)| {
                             if cycle >= e.x && ((cycle as u16) < ((e.x as u16).wrapping_add(8))) && e.y < 240 {
