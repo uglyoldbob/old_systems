@@ -754,16 +754,10 @@ impl NesPpu {
         }
     }
 
-    /// Returns true when any part of the background should be rendered
-    fn should_render_background(&self) -> bool {
-        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
-            || (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
-    }
-
     /// Returns true when the background should be rendered on the given cycle.
     fn should_render_background_cycle(&self, cycle: u16) -> bool {
         if cycle < 8 {
-            (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
+            (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0 && (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
         } else {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
         }
@@ -776,6 +770,22 @@ impl NesPpu {
         } else {
             (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0
         }
+    }
+
+    /// Returns true when sprites should be fetched.
+    fn should_fetch_sprites(&self) -> bool {
+        (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0
+    }
+
+    /// Returns true when sprites should be evaulated.
+    fn should_eval_sprites(&self) -> bool {
+        (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0 ||
+        (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN) != 0
+    }
+
+    /// Returns true when any part of the background should be fetched
+    fn should_fetch_background(&self) -> bool {
+        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
     }
 
     /// Performs fetches for the background data of the ppu.
@@ -1042,9 +1052,7 @@ impl NesPpu {
             self.last_cpu_data &= 0x1f;
         }
 
-        if self.should_render_sprites(0)
-            || self.should_render_sprites(8)
-            || self.should_render_background()
+        if self.should_eval_sprites()
         {
             self.sprite_eval();
         }
@@ -1120,7 +1128,7 @@ impl NesPpu {
                 } else {
                     None
                 };
-                if self.should_render_background_cycle(8 + cycle as u16) || Some(PpuMode::Background) == self.mode {
+                if self.should_fetch_background() || Some(PpuMode::Background) == self.mode {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
@@ -1205,7 +1213,7 @@ impl NesPpu {
                 let sprite_num = cycle / 8;
                 let row = self.scanline_number;
                 if cycle > 0 {
-                    if self.should_render_sprites(0) || self.should_render_sprites(8) || self.mode == Some(PpuMode::Sprite)
+                    if self.should_fetch_sprites() || self.mode == Some(PpuMode::Sprite)
                     {
                         match (cycle / 2) % 4 {
                             0 => {
@@ -1299,7 +1307,7 @@ impl NesPpu {
             } else if self.scanline_cycle <= 336 {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
-                if self.should_render_background_cycle(cycle) || Some(PpuMode::Background) == self.mode {
+                if self.should_fetch_background() || Some(PpuMode::Background) == self.mode {
                     self.background_fetch(bus, cycle as u16);
                 } else {
                     self.idle_operation(bus, cycle as u16);
