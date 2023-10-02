@@ -233,6 +233,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 }
                 if c.cpu_peripherals.ppu_frame_end() {
                     if c.wait_for_frame_end {
+                        println!("End of frame for debugger");
                         c.paused = true;
                         c.wait_for_frame_end = false;
                     }

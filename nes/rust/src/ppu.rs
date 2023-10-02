@@ -1001,7 +1001,7 @@ impl NesPpu {
                                 }
                             }
                             PpuSpriteEvalMode::Done => {
-                                self.oamaddress = self.oamaddress.wrapping_add(4);
+                                self.oamaddress = 0;
                             }
                         }
                     }
@@ -1181,10 +1181,6 @@ impl NesPpu {
                     if bg_pixel.is_some() && index == 0 && self.sprite0_current {
                         if cycle < 255 {
                             self.registers[2] |= 0x40; //sprite 0 hit
-                            println!(
-                                "Sprite 0 hit @ {},{}",
-                                self.scanline_cycle, self.scanline_number
-                            );
                         }
                     }
                 }
