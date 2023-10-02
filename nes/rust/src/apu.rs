@@ -368,7 +368,7 @@ impl NesApu {
             }
             7 => {
                 let length = data >> 3;
-                if (self.status & (1 << 1)) != 0  && self.squares[1].length_enabled {
+                if (self.status & (1 << 1)) != 0 && self.squares[1].length_enabled {
                     self.squares[1].length = NesApu::LENGTH_TABLE[length as usize];
                     self.inhibit_length_clock = true;
                 }

@@ -71,8 +71,7 @@ impl EmulatorConfiguration {
                     }
                 }
             }
-        }
-        else {
+        } else {
             result.save();
         }
         result
@@ -88,14 +87,17 @@ impl EmulatorConfiguration {
         let mut options = std::fs::OpenOptions::new();
         let mut f = if std::path::Path::new(&self.path).exists() {
             options
-            .write(true)
-            .create(true)
-            .truncate(true).open(&self.path).unwrap()
-        }
-        else {
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&self.path)
+                .unwrap()
+        } else {
             options
-            .write(true)
-            .create_new(true).open(&self.path).unwrap()
+                .write(true)
+                .create_new(true)
+                .open(&self.path)
+                .unwrap()
         };
         let _e = f.write_all(data.as_bytes());
     }

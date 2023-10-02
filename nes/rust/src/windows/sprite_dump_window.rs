@@ -68,7 +68,9 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
             ui.label("PPU Sprite Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 c.cpu_peripherals.ppu.render_sprites(&mut self.buf, &c.mb);
-                c.cpu_peripherals.ppu.render_palette(&mut self.palette, &c.mb);
+                c.cpu_peripherals
+                    .ppu
+                    .render_palette(&mut self.palette, &c.mb);
                 let image = self.buf.to_egui();
                 if self.texture.is_none() {
                     self.texture = Some(egui.egui_ctx.load_texture(

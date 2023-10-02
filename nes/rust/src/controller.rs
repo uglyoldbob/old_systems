@@ -88,15 +88,48 @@ impl NesControllerTrait for StandardController {
     }
 
     fn to_string(&self) -> String {
-        format!("{}{}{}{} {}{} {}{}",
-            if (self.controller_buttons & BUTTON_LEFT) == 0 { "<" } else { "" },
-            if (self.controller_buttons & BUTTON_UP) == 0 { "^" } else { "" },
-            if (self.controller_buttons & BUTTON_DOWN) == 0 { "V" } else { "" },
-            if (self.controller_buttons & BUTTON_RIGHT) == 0 { ">" } else { "" },
-            if (self.controller_buttons & BUTTON_SELECT) == 0 { "Se" } else { "" },
-            if (self.controller_buttons & BUTTON_START) == 0 { "St" } else { "" },
-            if (self.controller_buttons & BUTTON_A) == 0 { "A" } else { "" },
-            if (self.controller_buttons & BUTTON_B) == 0 { "B" } else { "" },
+        format!(
+            "{}{}{}{} {}{} {}{}",
+            if (self.controller_buttons & BUTTON_LEFT) == 0 {
+                "<"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_UP) == 0 {
+                "^"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_DOWN) == 0 {
+                "V"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_RIGHT) == 0 {
+                ">"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_SELECT) == 0 {
+                "Se"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_START) == 0 {
+                "St"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_A) == 0 {
+                "A"
+            } else {
+                ""
+            },
+            if (self.controller_buttons & BUTTON_B) == 0 {
+                "B"
+            } else {
+                ""
+            },
         )
     }
 

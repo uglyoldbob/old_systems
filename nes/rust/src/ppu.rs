@@ -129,15 +129,10 @@ impl PpuSprite {
         let mask = if height == 16 { 0xFE } else { 0xFF };
         let calc = self.tile as u16 & mask;
         let adder: u16 = if scanline >= self.y {
-            let a = if (scanline - self.y) < 8 {
-                0
-            } else {
-                1
-            };
+            let a = if (scanline - self.y) < 8 { 0 } else { 1 };
             if height == 16 && (self.attribute & 0x80) != 0 {
                 a ^ 1
-            }
-            else {
+            } else {
                 a
             }
         } else {
@@ -757,7 +752,8 @@ impl NesPpu {
     /// Returns true when the background should be rendered on the given cycle.
     fn should_render_background_cycle(&self, cycle: u16) -> bool {
         if cycle < 8 {
-            (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0 && (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
+            (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN) != 0
+                && (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
         } else {
             (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
         }
@@ -779,8 +775,12 @@ impl NesPpu {
 
     /// Returns true when sprites should be evaulated.
     fn should_eval_sprites(&self) -> bool {
-        (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0 ||
-        (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN) != 0
+        (self.registers[1]
+            & (PPU_REGISTER1_DRAW_SPRITES
+                | PPU_REGISTER1_DRAW_SPRITES_FIRST_COLUMN
+                | PPU_REGISTER1_DRAW_BACKGROUND
+                | PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN))
+            != 0
     }
 
     /// Returns true when any part of the background should be fetched
@@ -942,7 +942,8 @@ impl NesPpu {
                                 //range check
                                 if row <= 240
                                     && row > self.oamdata
-                                    && (row as u16) <= ((self.oamdata as u16) + self.sprite_height() as u16)
+                                    && (row as u16)
+                                        <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
                                     if self.secondaryoamaddress == 32 {
                                         println!(
@@ -965,7 +966,8 @@ impl NesPpu {
                             PpuSpriteEvalMode::Sprites8 => {
                                 if row <= 240
                                     && row > self.oamdata
-                                    && (row as u16) <= ((self.oamdata as u16) + self.sprite_height() as u16)
+                                    && (row as u16)
+                                        <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
                                     self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     self.registers[2] |= 0x20; //the sprite overflow flag
@@ -1012,7 +1014,8 @@ impl NesPpu {
                     if sprite < 8 {
                         match index {
                             0 => {
-                                self.sprites[sprite as usize].y = self.secondary_oam[cycle as usize];
+                                self.sprites[sprite as usize].y =
+                                    self.secondary_oam[cycle as usize];
                             }
                             1 => {
                                 self.sprites[sprite as usize].tile =
@@ -1023,7 +1026,8 @@ impl NesPpu {
                                     self.secondary_oam[cycle as usize];
                             }
                             3 => {
-                                self.sprites[sprite as usize].x = self.secondary_oam[cycle as usize];
+                                self.sprites[sprite as usize].x =
+                                    self.secondary_oam[cycle as usize];
                             }
                             _ => {}
                         }
@@ -1052,8 +1056,7 @@ impl NesPpu {
             self.last_cpu_data &= 0x1f;
         }
 
-        if self.should_eval_sprites()
-        {
+        if self.should_eval_sprites() {
             self.sprite_eval();
         }
 
@@ -1133,39 +1136,43 @@ impl NesPpu {
                 } else {
                     self.idle_operation(bus, cycle as u16);
                 }
-                let spr_pixel: Option<(usize, u8)> = if self.should_render_sprites(cycle) && self.scanline_number > 0 {
-                    let mut sprite_pixels =
-                        self.sprites.iter().enumerate().filter_map(|(index, e)| {
-                            if cycle >= e.x && ((cycle as u16) < ((e.x as u16).wrapping_add(8))) && e.y < 240 {
-                                let index2 = if (e.attribute & 0x40) == 0 {
-                                    7 - (cycle - e.x)
-                                } else {
-                                    cycle - e.x
-                                };
-                                let pt = e.patterntable_data.to_le_bytes();
-                                let upper_bit = (pt[1] >> index2) & 1;
-                                let lower_bit = (pt[0] >> index2) & 1;
+                let spr_pixel: Option<(usize, u8)> =
+                    if self.should_render_sprites(cycle) && self.scanline_number > 0 {
+                        let mut sprite_pixels =
+                            self.sprites.iter().enumerate().filter_map(|(index, e)| {
+                                if cycle >= e.x
+                                    && ((cycle as u16) < ((e.x as u16).wrapping_add(8)))
+                                    && e.y < 240
+                                {
+                                    let index2 = if (e.attribute & 0x40) == 0 {
+                                        7 - (cycle - e.x)
+                                    } else {
+                                        cycle - e.x
+                                    };
+                                    let pt = e.patterntable_data.to_le_bytes();
+                                    let upper_bit = (pt[1] >> index2) & 1;
+                                    let lower_bit = (pt[0] >> index2) & 1;
 
-                                if upper_bit == 0 && lower_bit == 0 {
-                                    None
-                                } else {
-                                    let mut palette_entry =
-                                        e.pallete() | ((upper_bit << 1) | lower_bit) as u16;
-                                    if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
-                                        palette_entry &= 0x30;
+                                    if upper_bit == 0 && lower_bit == 0 {
+                                        None
+                                    } else {
+                                        let mut palette_entry =
+                                            e.pallete() | ((upper_bit << 1) | lower_bit) as u16;
+                                        if (self.registers[1] & PPU_REGISTER1_GREYSCALE) != 0 {
+                                            palette_entry &= 0x30;
+                                        }
+                                        let pixel_entry =
+                                            bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
+                                        Some((index, pixel_entry))
                                     }
-                                    let pixel_entry =
-                                        bus.ppu_palette_read(0x3f10 | palette_entry) & 63;
-                                    Some((index, pixel_entry))
+                                } else {
+                                    None
                                 }
-                            } else {
-                                None
-                            }
-                        });
-                    sprite_pixels.next()
-                } else {
-                    None
-                };
+                            });
+                        sprite_pixels.next()
+                    } else {
+                        None
+                    };
 
                 let priority = spr_pixel.map_or(true, |(index, _spr)| {
                     (self.sprites[index].attribute & 0x20) == 0
@@ -1174,6 +1181,10 @@ impl NesPpu {
                     if bg_pixel.is_some() && index == 0 && self.sprite0_current {
                         if cycle < 255 {
                             self.registers[2] |= 0x40; //sprite 0 hit
+                            println!(
+                                "Sprite 0 hit @ {},{}",
+                                self.scanline_cycle, self.scanline_number
+                            );
                         }
                     }
                 }
@@ -1213,8 +1224,7 @@ impl NesPpu {
                 let sprite_num = cycle / 8;
                 let row = self.scanline_number;
                 if cycle > 0 {
-                    if self.should_fetch_sprites() || self.mode == Some(PpuMode::Sprite)
-                    {
+                    if self.should_fetch_sprites() || self.mode == Some(PpuMode::Sprite) {
                         match (cycle / 2) % 4 {
                             0 => {
                                 if (cycle & 1) == 0 {
