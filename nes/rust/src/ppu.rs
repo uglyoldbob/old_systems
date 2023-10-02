@@ -519,9 +519,9 @@ impl NesPpu {
                     }
                 };
                 if (self.registers[0] & PPU_REGISTER0_VRAM_ADDRESS_INCREMENT) == 0 {
-                    self.vram_address = self.vram_address.wrapping_add(1);
+                    self.vram_address = self.vram_address.wrapping_add(1) & 0x3fff;
                 } else {
-                    self.vram_address = self.vram_address.wrapping_add(32);
+                    self.vram_address = self.vram_address.wrapping_add(32) & 0x3fff;
                 }
                 a
             }
