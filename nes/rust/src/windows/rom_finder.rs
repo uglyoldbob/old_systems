@@ -60,17 +60,21 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
                 let mut new_rom = None;
                 for (p, entry) in c.parser.list().elements.iter() {
                     if let Some(Ok(r)) = &entry.result {
-                        if ui
-                            .add(
-                                egui_multiwin::egui::Label::new(format!(
-                                    "{:x}: {}",
-                                    r.mapper,
-                                    p.display()
-                                ))
-                                .sense(Sense::click()),
-                            )
-                            .double_clicked()
-                        {
+                        let resp = ui.add(
+                            egui_multiwin::egui::Label::new(format!(
+                                "{:x}: {}",
+                                r.mapper,
+                                p.display()
+                            ))
+                            .sense(Sense::click()),
+                        );
+                        if let Some(cart) = c.mb.cartridge() {
+                            if p.display().to_string() == cart.rom_name() {
+                                resp.scroll_to_me(Some(egui_multiwin::egui::Align::TOP));
+                            }
+                        }
+
+                        if resp.double_clicked() {
                             new_rom = Some(
                                 NesCartridge::load_cartridge(p.to_str().unwrap().into()).unwrap(),
                             );

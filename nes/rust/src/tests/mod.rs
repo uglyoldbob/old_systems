@@ -564,8 +564,14 @@ fn cpu_dma_test3() {
             }
         }
     }
-    assert!(nes_data.mb.check_vram(225, "159A7A8F".to_string().as_bytes()) ||
-        nes_data.mb.check_vram(225, "5E3DF9C4".to_string().as_bytes()));
+    assert!(
+        nes_data
+            .mb
+            .check_vram(225, "159A7A8F".to_string().as_bytes())
+            || nes_data
+                .mb
+                .check_vram(225, "5E3DF9C4".to_string().as_bytes())
+    );
 }
 
 #[test]
@@ -605,10 +611,20 @@ fn cpu_dma_test5() {
             }
         }
     }
-    assert!(nes_data.mb.check_vram(225, "85CFD627".to_string().as_bytes()) ||
-        nes_data.mb.check_vram(225, "F018C287".to_string().as_bytes()) || 
-        nes_data.mb.check_vram(225, "440EF923".to_string().as_bytes()) ||
-        nes_data.mb.check_vram(225, "E52F41A5".to_string().as_bytes()));
+    assert!(
+        nes_data
+            .mb
+            .check_vram(225, "85CFD627".to_string().as_bytes())
+            || nes_data
+                .mb
+                .check_vram(225, "F018C287".to_string().as_bytes())
+            || nes_data
+                .mb
+                .check_vram(225, "440EF923".to_string().as_bytes())
+            || nes_data
+                .mb
+                .check_vram(225, "E52F41A5".to_string().as_bytes())
+    );
 }
 
 #[test]
@@ -1323,10 +1339,8 @@ fn cpu_test_interrupts() {
 #[test]
 fn cpu_misc_instruction() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/instr_misc/instr_misc.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/instr_misc/instr_misc.nes".to_string()).unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1343,10 +1357,8 @@ fn cpu_misc_instruction() {
 #[test]
 fn cpu_misc_instruction2() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/instr_test-v3/all_instrs.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/instr_test-v3/all_instrs.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1363,10 +1375,9 @@ fn cpu_misc_instruction2() {
 #[test]
 fn cpu_misc_instruction3() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/instr_test-v3/official_only.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/instr_test-v3/official_only.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1383,10 +1394,8 @@ fn cpu_misc_instruction3() {
 #[test]
 fn cpu_misc_instruction4() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/instr_test-v5/all_instrs.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/instr_test-v5/all_instrs.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1403,10 +1412,9 @@ fn cpu_misc_instruction4() {
 #[test]
 fn cpu_misc_instruction5() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/instr_test-v5/official_only.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/instr_test-v5/official_only.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1423,10 +1431,8 @@ fn cpu_misc_instruction5() {
 #[test]
 fn cpu_misc_instruction6() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/01-implied.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/01-implied.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1443,10 +1449,9 @@ fn cpu_misc_instruction6() {
 #[test]
 fn cpu_misc_instruction7() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/02-immediate.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/nes_instr_test/02-immediate.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1463,10 +1468,9 @@ fn cpu_misc_instruction7() {
 #[test]
 fn cpu_misc_instruction8() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/03-zero_page.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/nes_instr_test/03-zero_page.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1483,10 +1487,8 @@ fn cpu_misc_instruction8() {
 #[test]
 fn cpu_misc_instruction9() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/04-zp_xy.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/04-zp_xy.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1503,10 +1505,9 @@ fn cpu_misc_instruction9() {
 #[test]
 fn cpu_misc_instruction10() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/05-absolute.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/nes_instr_test/05-absolute.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1523,10 +1524,8 @@ fn cpu_misc_instruction10() {
 #[test]
 fn cpu_misc_instruction11() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/06-abs_xy.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/06-abs_xy.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1543,10 +1542,8 @@ fn cpu_misc_instruction11() {
 #[test]
 fn cpu_misc_instruction12() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/07-ind_x.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/07-ind_x.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1563,10 +1560,8 @@ fn cpu_misc_instruction12() {
 #[test]
 fn cpu_misc_instruction13() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/08-ind_y.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/08-ind_y.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1583,10 +1578,9 @@ fn cpu_misc_instruction13() {
 #[test]
 fn cpu_misc_instruction14() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/09-branches.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/nes_instr_test/09-branches.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1603,10 +1597,8 @@ fn cpu_misc_instruction14() {
 #[test]
 fn cpu_misc_instruction15() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/10-stack.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/10-stack.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1623,10 +1615,8 @@ fn cpu_misc_instruction15() {
 #[test]
 fn cpu_misc_instruction16() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/nes_instr_test/11-special.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/nes_instr_test/11-special.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1736,7 +1726,6 @@ fn cpu_timing_test2() {
         .check_vram(65, "All 2 tests passed".to_string().as_bytes()));
 }
 
-
 #[test]
 fn ppu_sprite_test_1() {
     let mut nes_data = NesEmulatorData::new();
@@ -1798,9 +1787,10 @@ fn ppu_sprite_test_3() {
 #[test]
 fn ppu_sprite_test_4() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_overflow_tests/4.Obscure.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_overflow_tests/4.Obscure.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1817,9 +1807,10 @@ fn ppu_sprite_test_4() {
 #[test]
 fn ppu_sprite_test_5() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_overflow_tests/5.Emulator.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_overflow_tests/5.Emulator.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1833,13 +1824,13 @@ fn ppu_sprite_test_5() {
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
 }
 
-
 #[test]
 fn ppu_sprite_test_6() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/01.basics.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/01.basics.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1856,9 +1847,10 @@ fn ppu_sprite_test_6() {
 #[test]
 fn ppu_sprite_test_7() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/02.alignment.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/02.alignment.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1875,9 +1867,10 @@ fn ppu_sprite_test_7() {
 #[test]
 fn ppu_sprite_test_8() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/03.corners.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/03.corners.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1894,9 +1887,10 @@ fn ppu_sprite_test_8() {
 #[test]
 fn ppu_sprite_test_9() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/04.flip.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/04.flip.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1913,9 +1907,10 @@ fn ppu_sprite_test_9() {
 #[test]
 fn ppu_sprite_test_10() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/05.left_clip.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/05.left_clip.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1932,9 +1927,10 @@ fn ppu_sprite_test_10() {
 #[test]
 fn ppu_sprite_test_11() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/06.right_edge.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/06.right_edge.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1951,9 +1947,10 @@ fn ppu_sprite_test_11() {
 #[test]
 fn ppu_sprite_test_12() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/07.screen_bottom.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/07.screen_bottom.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1970,9 +1967,10 @@ fn ppu_sprite_test_12() {
 #[test]
 fn ppu_sprite_test_13() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/08.double_height.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/08.double_height.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -1989,9 +1987,10 @@ fn ppu_sprite_test_13() {
 #[test]
 fn ppu_sprite_test_14() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/09.timing_basics.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/09.timing_basics.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2008,9 +2007,10 @@ fn ppu_sprite_test_14() {
 #[test]
 fn ppu_sprite_test_15() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/10.timing_order.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/10.timing_order.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2027,9 +2027,10 @@ fn ppu_sprite_test_15() {
 #[test]
 fn ppu_sprite_test_16() {
     let mut nes_data = NesEmulatorData::new();
-    let nc =
-        NesCartridge::load_cartridge("../test_roms/sprite_hit_tests_2005.10.05/11.edge_timing.nes".to_string())
-            .unwrap();
+    let nc = NesCartridge::load_cartridge(
+        "../test_roms/sprite_hit_tests_2005.10.05/11.edge_timing.nes".to_string(),
+    )
+    .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2066,8 +2067,9 @@ fn cpu_test1() {
 #[test]
 fn cpu_test2() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge("../test_roms/blargg_nes_cpu_test5/official.nes".to_string())
-        .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/blargg_nes_cpu_test5/official.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2086,10 +2088,8 @@ fn cpu_test2() {
 #[test]
 fn ppu_nmi() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/ppu_vbl_nmi/ppu_vbl_nmi.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/ppu_vbl_nmi/ppu_vbl_nmi.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2106,10 +2106,8 @@ fn ppu_nmi() {
 #[test]
 fn controller1() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/read_joy3/count_errors.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/count_errors.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2126,10 +2124,9 @@ fn controller1() {
 #[test]
 fn controller2() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/read_joy3/count_errors_fast.nes".to_string(),
-    )
-    .unwrap();
+    let nc =
+        NesCartridge::load_cartridge("../test_roms/read_joy3/count_errors_fast.nes".to_string())
+            .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2146,10 +2143,8 @@ fn controller2() {
 #[test]
 fn controller3() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/read_joy3/test_buttons.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/test_buttons.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2167,10 +2162,8 @@ fn controller3() {
 #[test]
 fn controller4() {
     let mut nes_data = NesEmulatorData::new();
-    let nc = NesCartridge::load_cartridge(
-        "../test_roms/read_joy3/thorough_test.nes".to_string(),
-    )
-    .unwrap();
+    let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/thorough_test.nes".to_string())
+        .unwrap();
     nes_data.insert_cartridge(nc);
 
     loop {
