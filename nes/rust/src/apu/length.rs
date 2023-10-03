@@ -3,8 +3,12 @@
 /// The length counter
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ApuLength {
+    /// The length of the counter
     length: u8,
-    pend_load: Option<u8>,
+    /// The halt flag for the counter
+    halt: bool,
+    /// Indicates a pending change in the halt flag
+    pend_halt: Option<bool>,
 }
 
 /// A lookup table for setting the length of the audio channels
@@ -18,23 +22,31 @@ impl ApuLength {
     pub fn new() -> Self {
         Self {
             length: 0,
-            pend_load: None,
+            halt: false,
+            pend_halt: None,
         }
     }
 
     /// Clock the length counter
     pub fn clock(&mut self) {
-        if self.length > 0 {
+        if self.length > 0 && !self.halt {
             self.length -= 1;
-        }
-        if let Some(l) = self.pend_load.take() {
-            self.length = l;
+            if self.length == 0 {
+                println!("Length ended");
+            }
         }
     }
 
     /// Set the length of the counter with a lookup
     pub fn set_length(&mut self, index: u8) {
         self.length = LENGTH_TABLE[index as usize];
+        println!("Load length with {}", self.length);
+    }
+
+    /// Sets the halt flag
+    pub fn set_halt(&mut self, h: bool) {
+        self.pend_halt = Some(h);
+        self.halt = h;
     }
 
     /// Returns true if the length counter is running

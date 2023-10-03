@@ -260,25 +260,21 @@ impl NesApu {
     /// The half frame, as determined by the frame sequencer
     fn half_frame(&mut self) {
         //first square length counter
-        let halt = (self.squares[0].registers[0] & 0x20) != 0;
-        if !self.inhibit_length_clock && !halt {
+        if !self.inhibit_length_clock {
             self.squares[0].length.clock();
         }
         self.squares[0].clock_sweep();
         //second square length counter
-        let halt = (self.squares[1].registers[0] & 0x20) != 0;
-        if !self.inhibit_length_clock && !halt {
+        if !self.inhibit_length_clock {
             self.squares[1].length.clock();
         }
         self.squares[1].clock_sweep();
         //triangle channel length counter
-        let halt = (self.triangle.registers[0] & 0x80) != 0;
-        if !self.inhibit_length_clock && !halt {
+        if !self.inhibit_length_clock {
             self.triangle.length.clock();
         }
         //noise channel length counter
-        let halt = (self.noise.registers[0] & 0x20) != 0;
-        if !self.inhibit_length_clock && !halt {
+        if !self.inhibit_length_clock {
             self.noise.length.clock();
         }
     }
@@ -348,12 +344,6 @@ impl NesApu {
         }
     }
 
-    /// A lookup table for setting the length of the audio channels
-    const LENGTH_TABLE: [u8; 32] = [
-        10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96,
-        22, 192, 24, 72, 26, 16, 28, 32, 30,
-    ];
-
     /// A lookup table for setting the dmc rates
     const DMC_RATE_TABLE: [u16; 16] = [
         428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54,
@@ -361,6 +351,21 @@ impl NesApu {
 
     /// Write to an apu register
     pub fn write(&mut self, addr: u16, data: u8) {
+        match addr {
+            0 => {
+                self.squares[0].length.set_halt((data & 0x20) != 0);
+            }
+            4 => {
+                self.squares[1].length.set_halt((data & 0x20) != 0);
+            }
+            8 => {
+                self.triangle.length.set_halt((data & 0x80) != 0);
+            }
+            12 => {
+                self.noise.length.set_halt((data & 0x20) != 0);
+            }
+            _ => {}
+        }
         match addr {
             3 => {
                 let length = data >> 3;
