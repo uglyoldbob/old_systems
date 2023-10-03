@@ -1,6 +1,7 @@
 //! The square channel module for the nes apu
 
 use super::ApuEnvelope;
+use super::ApuLength;
 use super::ApuSweep;
 use super::ApuSweepAddition;
 
@@ -11,7 +12,7 @@ pub struct ApuSquareChannel {
     /// The channel registers
     pub registers: [u8; 4],
     /// The length of the channel for playback
-    pub length: u8,
+    pub length: ApuLength,
     /// Set when length loading should be active
     pub length_enabled: bool,
     /// The counter for the channel
@@ -41,7 +42,7 @@ impl ApuSquareChannel {
             registers: [0; 4],
             length_enabled: false,
             sweep: ApuSweep::new(math),
-            length: 0,
+            length: ApuLength::new(),
             counter: 0,
             envelope: ApuEnvelope::new(),
             duty_counter: 0,
@@ -97,7 +98,7 @@ impl ApuSquareChannel {
 
     /// Return the audio sample for this channel
     pub fn audio(&mut self) -> f32 {
-        if self.length != 0
+        if self.length.running()
             && DUTY_TABLE[self.get_duty_mode() as usize][self.duty_counter as usize] != 0
             && !self.sweep()
         {

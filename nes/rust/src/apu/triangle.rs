@@ -1,5 +1,7 @@
 //! The module for the nes apu triangle channel
 
+use super::ApuLength;
+
 /// A triangle channel for the apu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -7,7 +9,7 @@ pub struct ApuTriangleChannel {
     /// The channel registers
     pub registers: [u8; 4],
     /// The length of the channel for playback
-    pub length: u8,
+    pub length: ApuLength,
     /// Set when length loading should be active
     pub length_enabled: bool,
     /// The main counter for the channel
@@ -27,7 +29,7 @@ impl ApuTriangleChannel {
     pub fn new() -> Self {
         Self {
             registers: [0; 4],
-            length: 0,
+            length: ApuLength::new(),
             length_enabled: false,
             counter: 0,
             sequence_index: 0,
@@ -37,7 +39,7 @@ impl ApuTriangleChannel {
     /// Clock the channel
     pub fn cycle(&mut self) {
         let timer = (self.registers[2] as u16) | ((self.registers[3] & 7) as u16) << 8;
-        if self.length != 0 && timer != 0 {
+        if self.length.running() && timer != 0 {
             if self.counter > 0 {
                 self.counter -= 1;
             } else {

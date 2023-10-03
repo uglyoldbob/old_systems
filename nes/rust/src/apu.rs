@@ -73,6 +73,9 @@ impl ApuSweep {
     }
 }
 
+mod length;
+use length::ApuLength;
+
 mod envelope;
 use envelope::ApuEnvelope;
 
@@ -152,6 +155,7 @@ impl NesApu {
     /// Reset the apu
     pub fn reset(&mut self) {
         self.status = 0;
+        self.fclock = 0;
         self.sound_disabled = true;
         self.sound_disabled_clock = 0;
         self.frame_sequencer_reset = 2;
@@ -257,25 +261,25 @@ impl NesApu {
     fn half_frame(&mut self) {
         //first square length counter
         let halt = (self.squares[0].registers[0] & 0x20) != 0;
-        if !self.inhibit_length_clock && !halt && self.squares[0].length > 0 {
-            self.squares[0].length -= 1;
+        if !self.inhibit_length_clock && !halt {
+            self.squares[0].length.clock();
         }
         self.squares[0].clock_sweep();
         //second square length counter
         let halt = (self.squares[1].registers[0] & 0x20) != 0;
-        if !self.inhibit_length_clock && !halt && self.squares[1].length > 0 {
-            self.squares[1].length -= 1;
+        if !self.inhibit_length_clock && !halt {
+            self.squares[1].length.clock();
         }
         self.squares[1].clock_sweep();
         //triangle channel length counter
         let halt = (self.triangle.registers[0] & 0x80) != 0;
-        if !self.inhibit_length_clock && !halt && self.triangle.length > 0 {
-            self.triangle.length -= 1;
+        if !self.inhibit_length_clock && !halt {
+            self.triangle.length.clock();
         }
         //noise channel length counter
         let halt = (self.noise.registers[0] & 0x20) != 0;
-        if !self.inhibit_length_clock && !halt && self.noise.length > 0 {
-            self.noise.length -= 1;
+        if !self.inhibit_length_clock && !halt {
+            self.noise.length.clock();
         }
     }
 
@@ -361,7 +365,7 @@ impl NesApu {
             3 => {
                 let length = data >> 3;
                 if (self.status & (1 << 0)) != 0 && self.squares[0].length_enabled {
-                    self.squares[0].length = NesApu::LENGTH_TABLE[length as usize];
+                    self.squares[0].length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
                 self.squares[0].envelope.restart();
@@ -369,7 +373,7 @@ impl NesApu {
             7 => {
                 let length = data >> 3;
                 if (self.status & (1 << 1)) != 0 && self.squares[1].length_enabled {
-                    self.squares[1].length = NesApu::LENGTH_TABLE[length as usize];
+                    self.squares[1].length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
                 self.squares[1].envelope.restart();
@@ -377,14 +381,14 @@ impl NesApu {
             0xb => {
                 let length = data >> 3;
                 if (self.status & (1 << 2)) != 0 && self.triangle.length_enabled {
-                    self.triangle.length = NesApu::LENGTH_TABLE[length as usize];
+                    self.triangle.length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
             }
             0xf => {
                 let length = data >> 3;
                 if (self.status & (1 << 3)) != 0 && self.noise.length_enabled {
-                    self.noise.length = NesApu::LENGTH_TABLE[length as usize];
+                    self.noise.length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
                 self.noise.envelope.restart();
@@ -409,19 +413,19 @@ impl NesApu {
                 let data2 = (self.status & 0x60) | (data & 0x1f);
                 self.squares[0].length_enabled = (data2 & 1) != 0;
                 if (data2 & 1) == 0 {
-                    self.squares[0].length = 0;
+                    self.squares[0].length.stop();
                 }
                 self.squares[1].length_enabled = (data2 & 2) != 0;
                 if (data2 & 2) == 0 {
-                    self.squares[1].length = 0;
+                    self.squares[1].length.stop();
                 }
                 self.triangle.length_enabled = (data2 & 4) != 0;
                 if (data2 & 4) == 0 {
-                    self.triangle.length = 0;
+                    self.triangle.length.stop();
                 }
                 self.noise.length_enabled = (data2 & 8) != 0;
                 if (data2 & 8) == 0 {
-                    self.noise.length = 0;
+                    self.noise.length.stop();
                 }
                 if (data2 & 0x10) == 0 {
                     self.dmc.length = 0;
@@ -471,16 +475,16 @@ impl NesApu {
             data |= 0x80;
         }
 
-        if self.squares[0].length > 0 {
+        if self.squares[0].length.running() {
             data |= 1;
         }
-        if self.squares[1].length > 0 {
+        if self.squares[1].length.running() {
             data |= 1 << 1;
         }
-        if self.triangle.length > 0 {
+        if self.triangle.length.running() {
             data |= 1 << 2;
         }
-        if self.noise.length > 0 {
+        if self.noise.length.running() {
             data |= 1 << 3;
         }
         if self.dmc.length > 0 {

@@ -1,6 +1,7 @@
 //! The noise module for the nes apu
 
 use super::ApuEnvelope;
+use super::ApuLength;
 
 /// A noise channel for the apu
 #[non_exhaustive]
@@ -9,7 +10,7 @@ pub struct ApuNoiseChannel {
     /// The channel registers
     pub registers: [u8; 4],
     /// The length of the channel
-    pub length: u8,
+    pub length: ApuLength,
     /// Set when length loading should be active
     pub length_enabled: bool,
     /// The counter for the channel
@@ -29,7 +30,7 @@ impl ApuNoiseChannel {
     pub fn new() -> Self {
         Self {
             registers: [0; 4],
-            length: 0,
+            length: ApuLength::new(),
             length_enabled: false,
             counter: 0,
             envelope: ApuEnvelope::new(),
@@ -63,7 +64,7 @@ impl ApuNoiseChannel {
 
     /// Return the audio sample for this channel
     pub fn audio(&self) -> f32 {
-        if ((self.shift_ctr & 1) == 0) && self.length != 0 {
+        if ((self.shift_ctr & 1) == 0) && self.length.running() {
             self.envelope.audio_output(&self.registers[..]) as f32 / 255.0
         } else {
             0.0
