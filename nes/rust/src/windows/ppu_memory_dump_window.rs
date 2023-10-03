@@ -55,18 +55,21 @@ impl TrackedWindow<NesEmulatorData> for PpuMemoryDumpWindow {
                 #[cfg(feature = "debugger")]
                 {
                     for i in (0..=0x3FFF).step_by(8) {
-                        let a1 = format!("{:02X}", c.mb.ppu_peek(i));
-                        let a2 = format!("{:02X}", c.mb.ppu_peek(i + 1));
-                        let a3 = format!("{:02X}", c.mb.ppu_peek(i + 2));
-                        let a4 = format!("{:02X}", c.mb.ppu_peek(i + 3));
-                        let a5 = format!("{:02X}", c.mb.ppu_peek(i + 4));
-                        let a6 = format!("{:02X}", c.mb.ppu_peek(i + 5));
-                        let a7 = format!("{:02X}", c.mb.ppu_peek(i + 6));
-                        let a8 = format!("{:02X}", c.mb.ppu_peek(i + 7));
-                        ui.label(format!(
-                            "{:04X}: {} {} {} {}\t{} {} {} {}",
-                            i, a1, a2, a3, a4, a5, a6, a7, a8,
-                        ));
+                        let d: [u8;8] = [c.mb.ppu_peek(i), 
+                            c.mb.ppu_peek(i + 1),
+                            c.mb.ppu_peek(i + 2),
+                            c.mb.ppu_peek(i + 3),
+                            c.mb.ppu_peek(i + 4),
+                            c.mb.ppu_peek(i + 5),
+                            c.mb.ppu_peek(i + 6),
+                            c.mb.ppu_peek(i + 7)];
+                        let a: [String; 8] = d.map(|d| format!("{:02X}", d));
+                        let b = String::from_utf8_lossy(&d);
+                        let display = format!(
+                            "{:04X}: {} {} {} {}\t{} {} {} {}\t{}",
+                            i, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], b,
+                        );
+                        ui.label(egui_multiwin::egui::RichText::new(display).font(egui_multiwin::egui::FontId::monospace(12.0)));
                     }
                 }
             });

@@ -2,7 +2,7 @@
  - require mappers 2 and 34
 
 apu_mixer
- - apu mixer not implemented yet
+ - manual testing required
 
 apu_reset
  - all pass
@@ -14,11 +14,11 @@ blargg_apu_2005.07.30
  - all pass
 
 blargg_litewall
- - passes ?
+ - manual testing required, all seem ok
 
 blargg_nes_cpu_test5
- - does not seem to make progress after printing Running tests
- - maybe uses sprites?
+ - cpu does not quite pass yet
+ - official passes
 
 blargg_ppu_tests_2005.09.15b
  - powerup palette fails
@@ -52,10 +52,10 @@ dmc_dma_during_read4
  - read_write_2007 - fail
 
 dmc_tests
- - no idea how status is reported
+ - all broken?
 
 dpcmletterbox
- - requires sprite implementation in ppu
+ - broken
 
 exram
  - requires mapper 5
@@ -64,7 +64,7 @@ full_palette
  - not sure how to interpret results
 
 instr_misc
- - fails dummy_reads_apu, missing reads in cpu
+ - hangs on undocumented instruction
 
 instr_test-v3
  - appears to not work?
@@ -73,43 +73,43 @@ instr_test-v5
  - appears to not work?
 
 instr_timing
- - pass
+ - hang
 
 m22chrbankingtest
- - ines2 rom, not currently supported
+ - requires mapper 22
 
 mmc1_a12
- - crashes by accessing out of range ppu memory on the cartridge
+ - manual test required
 
 mmc3_irq_tests
- - requires mapper 3?
+ - requires mapper 4
 
 mmc3_test
- - requires mapper 3?
+ - requires mapper 4
 
 mmc3_test_2
- - requires mapper 3?
+ - requires mapper 4
 
 mmc5test
- - requires mapper 5?
+ - requires mapper 5
 
 mmc5test_v2
- - requires mapper 5?
+ - requires mapper 5
 
 nes_instr_test
- - untested
+ - pass?
 
 nes15-1.0.0
- - not really a test rom
+ - manual testing required
 
 nmi_sync
- - ntsc versions creates ppu cycling errors
+ - manual testing required
 
 nrom368
- - unknown results
+ - appears broken
 
 ny2011
- - not sure how to determine pass/fail
+ - hangs near start, manual testing required
 
 oamread
  - pass
@@ -136,31 +136,31 @@ ppu_vbl_nmi
  - fail #3, test 1
 
 read_joy3
- - they all require mapper 3
+ - pass?
 
 scanline
- - appears to fail
+ - appears to fail, manual test required
 
 scanline-a1
- - appears to fail
+ - appears to fail, manual test required
 
 scrolltest
- - no video output, fail
+ - requires reset, manual test required
 
 soundtest
- - controller not implemented
+ - manual test required
 
 sprdma_and_dmc_dma
- - fail, unsure why
+ - fail
 
 sprite_hit_tests_2005.10.05
- - sprites not implemented
+ - pass?
 
 sprite_overflow_tests
- - sprites not implemented
+ - pass?
 
 spritecans-2011
- - requires sprites and apu
+ - manual test required
 
 stars_se
  - not really a test
@@ -172,10 +172,10 @@ stress
  - requires controller controller input
 
 tutor
- - no video output
+ - appears broken
 
 tvpassfail
- - requires controller input
+ - manual test required
 
 vaus-test
  - requires implementation for vaus controller
@@ -184,7 +184,7 @@ vbl_nmi_timing
  - all pass
 
 volume_tests
- - require apu implementation and controller implementation
+ - broken?
 
 window5
- - ntsc version creates ppu cycling errors
+ - unsure of results

@@ -21,8 +21,8 @@ impl RomFinder {
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
+                    width: 480.0,
+                    height: 300.0,
                 })
                 .with_title("UglyOldBob NES Rom Select"),
             options: egui_multiwin::tracked_window::TrackedWindowOptions {
