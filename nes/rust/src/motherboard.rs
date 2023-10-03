@@ -379,6 +379,7 @@ impl NesMotherboard {
         self.last_ppu_cycle = 1;
         if let Some(cart) = &mut self.cart {
             let (a10, vram_enable) = cart.ppu_cycle_1(addr);
+            let addr = addr & !0x400;
             self.vram_address = if !vram_enable {
                 if (0x2000..=0x3fff).contains(&addr) {
                     Some(addr | ((a10 as u16) << 10))
