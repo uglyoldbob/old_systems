@@ -10,14 +10,17 @@ use egui_multiwin::{
 
 /// The structure for a window that helps a user select a rom to load.
 #[cfg(feature = "egui-multiwin")]
-pub struct RomFinder {}
+pub struct RomFinder {
+    /// Set when the initial scroll to the currently loaded rom has occurred
+    scrolled: bool,
+}
 
 #[cfg(feature = "egui-multiwin")]
 impl RomFinder {
     /// Create a new request to make a RomFinder window.
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
-            window_state: Box::new(RomFinder {}),
+            window_state: Box::new(RomFinder { scrolled: false }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
@@ -69,8 +72,9 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
                             .sense(Sense::click()),
                         );
                         if let Some(cart) = c.mb.cartridge() {
-                            if p.display().to_string() == cart.rom_name() {
+                            if p.display().to_string() == cart.rom_name() && !self.scrolled {
                                 resp.scroll_to_me(Some(egui_multiwin::egui::Align::TOP));
+                                self.scrolled = true;
                             }
                         }
 
@@ -95,6 +99,8 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
                 }
             });
         });
+
+        self.scrolled = true;
 
         RedrawResponse {
             quit,
