@@ -125,6 +125,10 @@ pub struct NesApu {
     sample_interval: f32,
     /// Inhibits clocking the length counters when set
     inhibit_length_clock: bool,
+    /// The audio buffer
+    buffer: Vec<f32>,
+    /// The index into the audio buffer
+    buffer_index: usize,
 }
 
 impl NesApu {
@@ -149,7 +153,23 @@ impl NesApu {
             output_index: 0.0,
             sample_interval: 100.0,
             inhibit_length_clock: false,
+            buffer: vec![],
+            buffer_index: 0,
         }
+    }
+
+    /// Returns the length of the audio buffer
+    pub fn get_audio_buffer_length(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Initialize the audio buffer
+    pub fn set_audio_buffer(&mut self, size: usize) {
+        let mut buffer = Vec::with_capacity(size);
+        for _ in 0..size {
+            buffer.push(0.0);
+        }
+        self.buffer = buffer;
     }
 
     /// Reset the apu
@@ -289,8 +309,22 @@ impl NesApu {
         self.sample_interval = interval;
     }
 
+    fn fill_audio_buffer(&mut self, sample: f32) -> Option<&[f32]> {
+        self.buffer[self.buffer_index] = sample;
+        if self.buffer_index < (self.buffer.len() - 1) {
+            self.buffer_index += 1;
+            None
+        } else {
+            self.buffer_index = 0;
+            Some(&self.buffer)
+        }
+    }
+
     /// Build an audio sample and run the audio filter
-    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
+    fn build_audio_sample(
+        &mut self,
+        filter: &mut Option<biquad::DirectForm1<f32>>,
+    ) -> Option<&[f32]> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
@@ -301,7 +335,7 @@ impl NesApu {
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
                 self.output_index -= self.sample_interval;
-                Some(e)
+                self.fill_audio_buffer(e)
             } else {
                 None
             }
@@ -338,8 +372,7 @@ impl NesApu {
         }
         if let Some(sample) = self.build_audio_sample(filter) {
             if let Some(p) = sound {
-                let data: [f32; 1] = [sample];
-                let _e = p.write(&data);
+                let _e = p.write(sample);
             }
         }
     }

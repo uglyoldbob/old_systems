@@ -3,6 +3,7 @@
 use std::io::Write;
 
 use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
+use cpal::traits::StreamTrait;
 use egui_multiwin::{
     egui,
     egui_glow::EguiGlow,
@@ -164,6 +165,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         true
     }
 
+    fn can_quit(&self, _c: &mut NesEmulatorData) -> bool {
+        if let Some(sound) = &self.sound_stream {
+            sound.pause();
+        }
+        true
+    }
+
     fn set_root(&mut self, _root: bool) {}
 
     fn redraw(
@@ -185,6 +193,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         puffin::profile_scope!("frame rendering");
 
         if self.filter.is_none() && self.sound_stream.is_some() {
+            println!("Initializing with sample rate {}", self.sound_rate);
             let rf = self.sound_rate as f32;
             let sampling_frequency = 21.47727e6 / 12.0;
             let filter_coeff = biquad::Coefficients::<f32>::from_params(

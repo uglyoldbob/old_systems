@@ -31,16 +31,12 @@ impl ApuLength {
     pub fn clock(&mut self) {
         if self.length > 0 && !self.halt {
             self.length -= 1;
-            if self.length == 0 {
-                println!("Length ended");
-            }
         }
     }
 
     /// Set the length of the counter with a lookup
     pub fn set_length(&mut self, index: u8) {
         self.length = LENGTH_TABLE[index as usize];
-        println!("Load length with {}", self.length);
     }
 
     /// Sets the halt flag

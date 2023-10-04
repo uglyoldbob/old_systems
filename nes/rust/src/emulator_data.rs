@@ -227,7 +227,9 @@ impl NesEmulatorData {
         let mut apu = NesApu::new();
 
         let audio_interval = self.cpu_peripherals.apu.get_audio_interval();
+        let buffer_len = self.cpu_peripherals.apu.get_audio_buffer_length();
         apu.set_audio_interval(audio_interval);
+        apu.set_audio_buffer(buffer_len);
 
         let breakpoints = self.cpu.breakpoints.clone();
         self.cpu = NesCpu::new();

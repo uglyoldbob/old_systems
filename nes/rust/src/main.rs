@@ -283,20 +283,45 @@ fn main() {
     let sound_stream = if let Some(d) = &device {
         let ranges = d.supported_output_configs();
         if let Ok(mut r) = ranges {
-            let config = r.next().unwrap().with_max_sample_rate();
-            let format = config.sample_format();
+            let supportedconfig = r.next().unwrap().with_max_sample_rate();
+            let format = supportedconfig.sample_format();
             println!("output format is {:?}", format);
-            let config = config.config();
+            let mut config = supportedconfig.config();
+            let num_samples = (config.sample_rate.0 as f32 * 0.1) as usize;
+            let sbs = supportedconfig.buffer_size();
+            let num_samples_buffer = if let cpal::SupportedBufferSize::Range{min,max} = sbs {
+                if num_samples > *max as usize {
+                    cpal::BufferSize::Fixed(*max as cpal::FrameCount)
+                }
+                else if num_samples < *min as usize {
+                    cpal::BufferSize::Fixed(*min as cpal::FrameCount)
+                }
+                else {
+                    cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
+                }
+            }
+            else {
+                //TODO maybe do somethind else when buffer size is unknown
+                cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
+            };
+            config.buffer_size = num_samples_buffer;
+            println!("SBS IS {:?}", sbs);
 
-            let rb = rb::SpscRb::new((config.sample_rate.0 as f32 * 0.2) as usize);
+            println!("audio config is {:?}", config);
+
+            nes_data.cpu_peripherals.apu.set_audio_buffer(num_samples);
+            println!("Audio buffer size is {} elements, sample rate is {}", num_samples, config.sample_rate.0);
+            let rb = rb::SpscRb::new(num_samples);
             let (producer, consumer) = (rb.producer(), rb.consumer());
             let mut stream = d
                 .build_output_stream(
                     &config,
-                    move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                        let _e = rb::RbConsumer::read(&consumer, data);
+                    move |data: &mut [f32], cb: &cpal::OutputCallbackInfo| {
+                        let e = rb::RbConsumer::read_blocking(&consumer, data);
                     },
-                    move |_err| {},
+                    move |err| {
+                        println!("Stream error {:?}", err);
+                    },
                     None,
                 )
                 .ok();
