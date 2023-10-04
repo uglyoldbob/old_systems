@@ -1114,15 +1114,6 @@ impl NesPpu {
                     }
 
                     let pixel_entry = bus.ppu_palette_read(0x3f00 + palette_entry) & 63;
-                    if (self.registers[1]
-                        & (PPU_REGISTER1_EMPHASIZE_BLUE
-                            | PPU_REGISTER1_EMPHASIZE_GREEN
-                            | PPU_REGISTER1_EMPHASIZE_RED))
-                        != 0
-                    {
-                        //TODO implement color emphasis
-                        //println!("TODO: implement color emphasis");
-                    }
                     if lower_bits == 0 {
                         None
                     } else {
@@ -1191,7 +1182,11 @@ impl NesPpu {
                     } else if let Some(bg) = bg_pixel {
                         bg
                     } else {
-                        bus.ppu_palette_read(0x3f00) & 63
+                        bus.ppu_palette_read(if (0x3f00..=0x3fff).contains(&self.vram_address) {
+                            self.vram_address
+                        } else {
+                            0x3f00
+                        }) & 63
                     }
                 } else {
                     if let Some(bg) = bg_pixel {
@@ -1199,9 +1194,23 @@ impl NesPpu {
                     } else if let Some((_index, spr)) = spr_pixel {
                         spr
                     } else {
-                        bus.ppu_palette_read(0x3f00) & 63
+                        bus.ppu_palette_read(if (0x3f00..=0x3fff).contains(&self.vram_address) {
+                            self.vram_address
+                        } else {
+                            0x3f00
+                        }) & 63
                     }
                 };
+
+                if (self.registers[1]
+                    & (PPU_REGISTER1_EMPHASIZE_BLUE
+                        | PPU_REGISTER1_EMPHASIZE_GREEN
+                        | PPU_REGISTER1_EMPHASIZE_RED))
+                    != 0
+                {
+                    //TODO implement color emphasis
+                    //println!("TODO: implement color emphasis");
+                }
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];
                 self.frame_data
