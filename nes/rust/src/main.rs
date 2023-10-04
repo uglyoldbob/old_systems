@@ -289,18 +289,15 @@ fn main() {
             let mut config = supportedconfig.config();
             let num_samples = (config.sample_rate.0 as f32 * 0.1) as usize;
             let sbs = supportedconfig.buffer_size();
-            let num_samples_buffer = if let cpal::SupportedBufferSize::Range{min,max} = sbs {
+            let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
                     cpal::BufferSize::Fixed(*max as cpal::FrameCount)
-                }
-                else if num_samples < *min as usize {
+                } else if num_samples < *min as usize {
                     cpal::BufferSize::Fixed(*min as cpal::FrameCount)
-                }
-                else {
+                } else {
                     cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
                 }
-            }
-            else {
+            } else {
                 //TODO maybe do somethind else when buffer size is unknown
                 cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
             };
@@ -310,7 +307,10 @@ fn main() {
             println!("audio config is {:?}", config);
 
             nes_data.cpu_peripherals.apu.set_audio_buffer(num_samples);
-            println!("Audio buffer size is {} elements, sample rate is {}", num_samples, config.sample_rate.0);
+            println!(
+                "Audio buffer size is {} elements, sample rate is {}",
+                num_samples, config.sample_rate.0
+            );
             let rb = rb::SpscRb::new(num_samples);
             let (producer, consumer) = (rb.producer(), rb.consumer());
             let mut stream = d

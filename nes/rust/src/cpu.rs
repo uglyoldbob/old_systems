@@ -601,22 +601,24 @@ impl NesCpu {
                         self.subcycle = 2;
                     }
                     2 => {
-                        let pc = self.pc.to_le_bytes();
+                        let temp = self.pc.wrapping_add(2);
+                        let pc = temp.to_le_bytes();
                         self.memory_cycle_write(0x100 + self.s as u16, pc[1], bus, cpu_peripherals);
                         self.s = self.s.wrapping_sub(1);
                         self.subcycle = 3;
                     }
                     3 => {
-                        let pc = self.pc.to_le_bytes();
+                        let temp = self.pc.wrapping_add(2);
+                        let pc = temp.to_le_bytes();
                         self.memory_cycle_write(0x100 + self.s as u16, pc[0], bus, cpu_peripherals);
                         self.s = self.s.wrapping_sub(1);
                         self.subcycle = 4;
                     }
                     4 => {
-                        self.p |= CPU_FLAG_B1;
+                        //self.p |= CPU_FLAG_B1;
                         self.memory_cycle_write(
                             0x100 + self.s as u16,
-                            self.p,
+                            self.p | CPU_FLAG_B1,
                             bus,
                             cpu_peripherals,
                         );
@@ -8407,7 +8409,7 @@ impl NesCpu {
                     }
                 },
                 _ => {
-                    println!("Instruction {:X} at {:X} not implemented", o, self.pc);
+                    //println!("Instruction {:X} at {:X} not implemented", o, self.pc);
                     //unimplemented!();
                 }
             }

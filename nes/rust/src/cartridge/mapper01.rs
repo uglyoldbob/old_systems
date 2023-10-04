@@ -19,6 +19,10 @@ pub struct Mapper01 {
     registers: [u8; 4],
     /// The ppu address for ppu cycles
     ppu_address: u16,
+    /// Extended bank select for prg rom, starts at bit 14
+    rom_bank: u8,
+    /// Extended bank select for prg ram, starts at bit 13
+    ram_bank: u8,
 }
 
 impl Mapper01 {
@@ -30,6 +34,8 @@ impl Mapper01 {
             shift_locked: false,
             registers: [0x0c, 0, 0, 0],
             ppu_address: 0,
+            rom_bank: 0,
+            ram_bank: 0,
         })
     }
 
@@ -89,6 +95,8 @@ impl NesMapperTrait for Mapper01 {
         hm.insert("Chr1".to_string(), self.registers[2]);
         hm.insert("prg bank".to_string(), self.registers[3]);
         hm.insert("Mapper".to_string(), 1);
+        hm.insert("Extended Prg rom bank".to_string(), self.rom_bank);
+        hm.insert("Extended Prg ram bank".to_string(), self.ram_bank);
         hm
     }
 
@@ -97,7 +105,7 @@ impl NesMapperTrait for Mapper01 {
             0x6000..=0x7fff => {
                 let mut addr2 = addr & 0x1fff;
                 if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
+                    addr2 |= (self.ram_bank as u16)<<13;
                     Some(cart.prg_ram[addr2 as usize & (cart.prg_ram.len() - 1)])
                 } else {
                     None
@@ -109,7 +117,7 @@ impl NesMapperTrait for Mapper01 {
                         //32kb bankswitch
                         let addr2 = addr & 0x7fff;
                         let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                        let addr4 = (self.registers[3] as u32 & 0xC) << 14;
+                        let addr4 = (self.rom_bank as u32 | (self.registers[3] as u32 & 0xC)) << 14;
                         let addr5 = addr3 | addr4;
                         Some(cart.prg_rom[addr5 as usize & (cart.prg_rom.len() - 1)])
                     }
@@ -119,13 +127,15 @@ impl NesMapperTrait for Mapper01 {
                             //fixed to first bank
                             let addr2 = addr & 0x3fff;
                             let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
+                            let addr4 = (self.rom_bank as u32)<<14 | addr3;
+                            Some(cart.prg_rom[addr4 as usize & (cart.prg_rom.len() - 1)])
                         } else {
                             //switched
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
-                            Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
+                            addr3 |= (self.registers[3] as u32 & 0xF) << 14;
+                            let addr4 = (self.rom_bank as u32)<<14 | addr3;
+                            Some(cart.prg_rom[addr4 as usize & (cart.prg_rom.len() - 1)])
                         }
                     }
                     _ => {
@@ -133,14 +143,15 @@ impl NesMapperTrait for Mapper01 {
                         if addr < 0xc000 {
                             //switched
                             let addr2 = addr & 0x3fff;
-                            let mut addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                            addr3 |= (self.registers[3] as u32 & 0xF) * 16384;
+                            let mut addr3 = addr2 as u32;
+                            addr3 |= (self.rom_bank as u32 | self.registers[3] as u32 & 0xF) << 14;
                             Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         } else {
                             //fixed to last bank
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32;
                             addr3 |= ((cart.prg_rom.len() - 1) & !0x3fff) as u32;
+                            addr3 |= (self.rom_bank as u32)<<14;
                             Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         }
                     }
@@ -176,6 +187,30 @@ impl NesMapperTrait for Mapper01 {
             if self.shift_counter == 5 {
                 let adr_select = (addr & 0x6000) >> 13;
                 self.update_register(adr_select as u8, self.shift_register);
+                let chr = if adr_select == 2 && (self.registers[0] & 0x10) == 0x10 {
+                    self.registers[2]
+                } else {
+                    self.registers[1]
+                };
+                let ram_a13 = if cart.prg_ram.len() == 32768 {
+                    (chr & 4) >> 2
+                } else if cart.prg_ram.len() == 16384 {
+                    (chr & 8) >> 3
+                }else {
+                    0
+                };
+                let ram_a14 = if cart.prg_ram.len() == 32768 {
+                    (chr & 8) >> 2
+                } else {
+                    0
+                };
+                let rom_a18 = if cart.prg_rom.len() == (512*1024) {
+                    chr & 0x10
+                } else {
+                    0
+                };
+                self.rom_bank = rom_a18;
+                self.ram_bank = ram_a13 | (ram_a14<<1);
                 self.shift_counter = 0;
                 self.shift_register = 0;
             }
