@@ -8365,7 +8365,6 @@ impl NesCpu {
                             .wrapping_add(self.x as u16);
                         let mask = (self.y as u16) << 8 | 0xFF;
                         let val = self.temp2 & self.y;
-                        println!("SHY WRITE {:X} with {:X}", addr, val);
                         self.memory_cycle_write(addr & mask, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);
@@ -8401,7 +8400,6 @@ impl NesCpu {
                             .wrapping_add(self.y as u16);
                         let mask = (self.x as u16) << 8 | 0xFF;
                         let val = self.temp2 & self.x;
-                        println!("SHY WRITE {:X} with {:X}", addr, val);
                         self.memory_cycle_write(addr & mask, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);

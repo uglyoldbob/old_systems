@@ -57,85 +57,91 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("Debug window");
-            #[cfg(feature = "debugger")]
-            {
-                if c.paused {
-                    if ui.button("Unpause").clicked() {
-                        c.paused = false;
-                        c.single_step = false;
-                    }
-                    if ui.button("Single step").clicked() {
+            egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                #[cfg(feature = "debugger")]
+                {
+                    if c.paused {
+                        if ui.button("Unpause").clicked() {
+                            c.paused = false;
+                            c.single_step = false;
+                        }
+                        if ui.button("Single step").clicked() {
+                            c.single_step = true;
+                            c.paused = false;
+                        }
+                        if ui.button("Advance frame").clicked() {
+                            c.wait_for_frame_end = true;
+                            c.paused = false;
+                        }
+                    } else if ui.button("Pause").clicked() {
                         c.single_step = true;
-                        c.paused = false;
+                        c.paused = true;
                     }
-                    if ui.button("Advance frame").clicked() {
-                        c.wait_for_frame_end = true;
-                        c.paused = false;
+                    if ui.button("Reset").clicked() {
+                        c.reset();
                     }
-                } else if ui.button("Pause").clicked() {
-                    c.single_step = true;
-                    c.paused = true;
+                    if ui.button("Power cycle").clicked() {
+                        c.power_cycle();
+                    }
+                    if let Some(cart) = c.mb.cartridge() {
+                        ui.label(format!("ROM format: {:?}", cart.rom_format));
+                    }
+                    ui.horizontal(|ui| {
+                        ui.label(format!("Address: 0x{:x}", c.cpu.debugger.pc));
+                        if let Some(t) = c.cpu.disassemble() {
+                            ui.label(t);
+                        }
+                    });
+                    ui.label(format!(
+                        "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
+                        c.cpu.debugger.a,
+                        c.cpu.debugger.x,
+                        c.cpu.debugger.y,
+                        c.cpu.debugger.p,
+                        c.cpu.debugger.s,
+                    ));
+                    ui.label(format!(
+                        "Frame number {}",
+                        c.cpu_peripherals.ppu_frame_number()
+                    ));
+                    ui.label("Breakpoints");
+                    egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                        let mut found = false;
+                        let mut delete = None;
+                        for (i, b) in c.cpu.breakpoints.iter().enumerate() {
+                            found = true;
+                            ui.horizontal(|ui| {
+                                ui.label(format!("Breakpoint at {:X}", b));
+                                if ui.button("Delete").clicked() {
+                                    delete = Some(i);
+                                }
+                            });
+                        }
+                        if let Some(i) = delete {
+                            c.cpu.breakpoints.remove(i);
+                        }
+                        if !found {
+                            ui.label("No breakpoints");
+                        }
+                    });
+                    ui.text_edit_singleline(&mut self.breakpoint);
+                    if let Ok(v) = u16::from_str_radix(&self.breakpoint, 16) {
+                        if ui.button("Create breakpoint").clicked() {
+                            c.cpu.breakpoints.push(v);
+                        }
+                    }
+                    ui.label("Cartridge registers:");
+                    if let Some(c) = c.mb.cartridge() {
+                        for (n, v) in c.cartridge_registers() {
+                            ui.label(format!("{}: {:x}", n, v));
+                        }
+                    }
+                    ui.label(format!(
+                        "APU {:?}",
+                        c.cpu_peripherals.apu
+                    ));
                 }
-                if ui.button("Reset").clicked() {
-                    c.reset();
-                }
-                if ui.button("Power cycle").clicked() {
-                    c.power_cycle();
-                }
-                if let Some(cart) = c.mb.cartridge() {
-                    ui.label(format!("ROM format: {:?}", cart.rom_format));
-                }
-                ui.horizontal(|ui| {
-                    ui.label(format!("Address: 0x{:x}", c.cpu.debugger.pc));
-                    if let Some(t) = c.cpu.disassemble() {
-                        ui.label(t);
-                    }
-                });
-                ui.label(format!(
-                    "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
-                    c.cpu.debugger.a,
-                    c.cpu.debugger.x,
-                    c.cpu.debugger.y,
-                    c.cpu.debugger.p,
-                    c.cpu.debugger.s,
-                ));
-                ui.label(format!(
-                    "Frame number {}",
-                    c.cpu_peripherals.ppu_frame_number()
-                ));
-                ui.label("Breakpoints");
-                egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
-                    let mut found = false;
-                    let mut delete = None;
-                    for (i, b) in c.cpu.breakpoints.iter().enumerate() {
-                        found = true;
-                        ui.horizontal(|ui| {
-                            ui.label(format!("Breakpoint at {:X}", b));
-                            if ui.button("Delete").clicked() {
-                                delete = Some(i);
-                            }
-                        });
-                    }
-                    if let Some(i) = delete {
-                        c.cpu.breakpoints.remove(i);
-                    }
-                    if !found {
-                        ui.label("No breakpoints");
-                    }
-                });
-                ui.text_edit_singleline(&mut self.breakpoint);
-                if let Ok(v) = u16::from_str_radix(&self.breakpoint, 16) {
-                    if ui.button("Create breakpoint").clicked() {
-                        c.cpu.breakpoints.push(v);
-                    }
-                }
-                ui.label("Cartridge registers:");
-                if let Some(c) = c.mb.cartridge() {
-                    for (n, v) in c.cartridge_registers() {
-                        ui.label(format!("{}: {:x}", n, v));
-                    }
-                }
-            }
+            });
         });
         RedrawResponse {
             quit,

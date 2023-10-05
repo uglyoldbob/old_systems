@@ -338,9 +338,6 @@ impl NesApu {
         }
     }
 
-    /// Clock the apu, this used to do something, now it doesn't
-    pub fn clock_slow_pre(&mut self) {}
-
     /// Clock the apu
     pub fn clock_slow(
         &mut self,
@@ -506,7 +503,6 @@ impl NesApu {
         if self.dmc.interrupt_flag {
             data |= 0x80;
         }
-
         if self.squares[0].length.running() {
             data |= 1;
         }
