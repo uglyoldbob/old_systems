@@ -8336,7 +8336,7 @@ impl NesCpu {
                     self.pc = self.pc.wrapping_add(2);
                     self.end_instruction();
                 }
-                //SHY, undocumented (operation is incorrect)
+                //SHY, undocumented
                 0x9C => match self.subcycle {
                     1 => {
                         self.temp =
@@ -8363,16 +8363,16 @@ impl NesCpu {
                     _ => {
                         let addr = ((self.temp2 as u16) << 8 | (self.temp as u16))
                             .wrapping_add(self.x as u16);
-                        let t1 = ((self.temp2 as u16) << 8 | (self.temp as u16))
-                            .wrapping_add(self.x as u16);
-                        let val = (t1 >> 8) as u8 & self.y;
-                        self.memory_cycle_write(addr, val, bus, cpu_peripherals);
+                        let mask = (self.y as u16) << 8 | 0xFF;
+                        let val = self.temp2 & self.y;
+                        println!("SHY WRITE {:X} with {:X}", addr, val);
+                        self.memory_cycle_write(addr & mask, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);
                         self.end_instruction();
                     }
                 },
-                //SHX, undocumented (incorrect operation)
+                //SHX, undocumented
                 0x9E => match self.subcycle {
                     1 => {
                         self.temp =
@@ -8385,24 +8385,24 @@ impl NesCpu {
                         #[cfg(feature = "debugger")]
                         {
                             let temp = (self.temp2 as u16) << 8 | self.temp as u16;
-                            self.copy_debugger(format!("*SHX ${:04x},X", temp));
+                            self.copy_debugger(format!("*SHX ${:04x},Y", temp));
                             self.done_fetching = true;
                         }
                         self.subcycle = 3;
                     }
                     3 => {
                         let addr =
-                            (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.x) as u16);
+                            (self.temp2 as u16) << 8 | (self.temp.wrapping_add(self.y) as u16);
                         self.memory_cycle_read(addr, bus, cpu_peripherals);
                         self.subcycle = 4;
                     }
                     _ => {
                         let addr = ((self.temp2 as u16) << 8 | (self.temp as u16))
-                            .wrapping_add(self.x as u16);
-                        let t1 = ((self.temp2 as u16) << 8 | (self.temp as u16))
-                            .wrapping_add(self.x as u16);
-                        let val = (t1 >> 8) as u8 & self.y;
-                        self.memory_cycle_write(addr, val, bus, cpu_peripherals);
+                            .wrapping_add(self.y as u16);
+                        let mask = (self.x as u16) << 8 | 0xFF;
+                        let val = self.temp2 & self.x;
+                        println!("SHY WRITE {:X} with {:X}", addr, val);
+                        self.memory_cycle_write(addr & mask, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);
                         self.end_instruction();
