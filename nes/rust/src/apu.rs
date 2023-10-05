@@ -129,6 +129,10 @@ pub struct NesApu {
     buffer: Vec<f32>,
     /// The index into the audio buffer
     buffer_index: usize,
+    /// A clock that always runs
+    always_clock: usize,
+    /// Halt holders for the 4 channels
+    pend_halt: [Option<bool>;4],
 }
 
 impl NesApu {
@@ -155,6 +159,8 @@ impl NesApu {
             inhibit_length_clock: false,
             buffer: vec![],
             buffer_index: 0,
+            always_clock: 0,
+            pend_halt: [None; 4],
         }
     }
 
@@ -174,6 +180,7 @@ impl NesApu {
         self.sound_disabled = true;
         self.sound_disabled_clock = 0;
         self.frame_sequencer_reset = 2;
+        self.always_clock = 0;
     }
 
     /// Get the irq line for the apu
@@ -344,7 +351,20 @@ impl NesApu {
         sound: &mut Option<rb::Producer<f32>>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
+        self.always_clock = self.always_clock.wrapping_add(1);
         self.frame_sequencer_clock();
+        if let Some(h) = self.pend_halt[0].take() {
+            self.squares[0].length.set_halt(h);
+        }
+        if let Some(h) = self.pend_halt[1].take() {
+            self.squares[1].length.set_halt(h);
+        }
+        if let Some(h) = self.pend_halt[2].take() {
+            self.triangle.length.set_halt(h);
+        }
+        if let Some(h) = self.pend_halt[3].take() {
+            self.noise.length.set_halt(h);
+        }
         self.inhibit_length_clock = false;
         if self.clock {
             self.timing_clock = self.timing_clock.wrapping_add(1);
@@ -377,16 +397,16 @@ impl NesApu {
     pub fn write(&mut self, addr: u16, data: u8) {
         match addr {
             0 => {
-                self.squares[0].length.set_halt((data & 0x20) != 0);
+                self.pend_halt[0] = Some((data & 0x20) != 0);
             }
             4 => {
-                self.squares[1].length.set_halt((data & 0x20) != 0);
+                self.pend_halt[1] = Some((data & 0x20) != 0);
             }
             8 => {
-                self.triangle.length.set_halt((data & 0x80) != 0);
+                self.pend_halt[2] = Some((data & 0x80) != 0);
             }
             12 => {
-                self.noise.length.set_halt((data & 0x20) != 0);
+                self.pend_halt[3] = Some((data & 0x20) != 0);
             }
             _ => {}
         }

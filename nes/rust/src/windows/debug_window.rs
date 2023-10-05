@@ -136,10 +136,6 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                             ui.label(format!("{}: {:x}", n, v));
                         }
                     }
-                    ui.label(format!(
-                        "APU {:?}",
-                        c.cpu_peripherals.apu
-                    ));
                 }
             });
         });

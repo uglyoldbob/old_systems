@@ -7,8 +7,6 @@ pub struct ApuLength {
     length: u8,
     /// The halt flag for the counter
     halt: bool,
-    /// Indicates a pending change in the halt flag
-    pend_halt: Option<bool>,
 }
 
 /// A lookup table for setting the length of the audio channels
@@ -23,7 +21,6 @@ impl ApuLength {
         Self {
             length: 0,
             halt: false,
-            pend_halt: None,
         }
     }
 
@@ -41,7 +38,6 @@ impl ApuLength {
 
     /// Sets the halt flag
     pub fn set_halt(&mut self, h: bool) {
-        self.pend_halt = Some(h);
         self.halt = h;
     }
 
