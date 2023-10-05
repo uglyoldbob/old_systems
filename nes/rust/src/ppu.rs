@@ -816,7 +816,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = base + offset + ((7 + (self.vram_address >> 12)) & 7);
+                    let calc = base + offset + (((7 + self.vram_address) >> 12) & 7);
                     self.mode = Some(PpuMode::Background);
                     bus.ppu_cycle_1(calc, self);
                     self.cycle1_done = true;
@@ -833,7 +833,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + ((7 + (self.vram_address >> 12)) & 7);
+                    let calc = 8 + base + offset + (((7 + self.vram_address) >> 12) & 7);
                     self.mode = Some(PpuMode::Background);
                     bus.ppu_cycle_1(calc, self);
                     self.cycle1_done = true;
