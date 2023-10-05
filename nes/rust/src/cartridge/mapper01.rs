@@ -187,30 +187,28 @@ impl NesMapperTrait for Mapper01 {
             if self.shift_counter == 5 {
                 let adr_select = (addr & 0x6000) >> 13;
                 self.update_register(adr_select as u8, self.shift_register);
-                let chr = if adr_select == 2 && (self.registers[0] & 0x10) == 0x10 {
-                    self.registers[2]
-                } else {
-                    self.registers[1]
-                };
-                let ram_a13 = if cart.prg_ram.len() == 32768 {
-                    (chr & 4) >> 2
-                } else if cart.prg_ram.len() == 16384 {
-                    (chr & 8) >> 3
-                }else {
-                    0
-                };
-                let ram_a14 = if cart.prg_ram.len() == 32768 {
-                    (chr & 8) >> 2
-                } else {
-                    0
-                };
-                let rom_a18 = if cart.prg_rom.len() == (512*1024) {
-                    chr & 0x10
-                } else {
-                    0
-                };
-                self.rom_bank = rom_a18;
-                self.ram_bank = ram_a13 | (ram_a14<<1);
+                if adr_select == 2 || adr_select == 1 {
+                    let chr = self.shift_register;
+                    let ram_a13 = if cart.prg_ram.len() == 32768 {
+                        (chr & 4) >> 2
+                    } else if cart.prg_ram.len() == 16384 {
+                        (chr & 8) >> 3
+                    }else {
+                        0
+                    };
+                    let ram_a14 = if cart.prg_ram.len() == 32768 {
+                        (chr & 8) >> 2
+                    } else {
+                        0
+                    };
+                    let rom_a18 = if cart.prg_rom.len() == (512*1024) {
+                        chr & 0x10
+                    } else {
+                        0
+                    };
+                    self.rom_bank = rom_a18;
+                    self.ram_bank = ram_a13 | (ram_a14<<1);
+                }
                 self.shift_counter = 0;
                 self.shift_register = 0;
             }
