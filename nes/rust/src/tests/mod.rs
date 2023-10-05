@@ -2075,14 +2075,14 @@ fn cpu_test1() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 300 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 1035 {
                 break;
             }
         }
     }
     assert!(nes_data
         .mb
-        .check_vram(65, "All 2 tests passed".to_string().as_bytes()));
+        .check_vram(513, "All tests complete".to_string().as_bytes()));
 }
 
 #[test]
