@@ -2017,7 +2017,7 @@ fn ppu_sprite_test_14() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 150 {
                 break;
             }
         }
@@ -2037,7 +2037,7 @@ fn ppu_sprite_test_15() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 100 {
                 break;
             }
         }
