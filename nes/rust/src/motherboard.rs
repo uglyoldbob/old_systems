@@ -85,16 +85,6 @@ impl NesMotherboard {
         }
     }
 
-    /// Insert a controller into the controller 1 port, removing any existing controller
-    pub fn insert_controller1(&mut self, c: NesController) {
-        self.controllers[0] = Some(c);
-    }
-
-    /// Insert a controller into the controller 2 port, removing any existing controller
-    pub fn insert_controller2(&mut self, c: NesController) {
-        self.controllers[1] = Some(c);
-    }
-
     /// Used by testing code for automated testing.
     #[cfg(test)]
     pub fn check_vram(&self, addr: u16, check: &[u8]) -> bool {
@@ -351,14 +341,12 @@ impl NesMotherboard {
                     }
                     _ => 42,
                 }
-            } else if let Some(cart) = &self.cart {
+            } else {
                 if let Some(a) = data {
                     a
                 } else {
                     42
                 }
-            } else {
-                41
             }
         } else {
             0

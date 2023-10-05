@@ -2,7 +2,6 @@
 
 use crate::{ppu::RgbImage, NesEmulatorData};
 use egui_multiwin::{
-    egui::Pos2,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},

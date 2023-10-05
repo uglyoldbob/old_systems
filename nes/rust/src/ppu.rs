@@ -109,11 +109,6 @@ impl PpuSprite {
         self.y
     }
 
-    /// Returns the tile data for the sprite.
-    pub fn tile(&self) -> u8 {
-        self.tile
-    }
-
     /// Returns the attribute of the sprite
     pub fn attribute(&self) -> u8 {
         self.attribute
@@ -1491,9 +1486,6 @@ impl NesPpu {
         let quadrant = nametable;
         let row = y;
         let col = x;
-        let base_address = 0x2000 + 0x400 * quadrant as u16;
-        let offset = (row as u16 / 8) << 5 | (col as u16 / 8);
-        let nametable = bus.ppu_peek(base_address + offset);
 
         let base_address = match quadrant {
             0 => 0x23c0,
@@ -1503,18 +1495,6 @@ impl NesPpu {
         };
         let offset = (row as u16 / 32) << 3 | (col as u16 / 32);
         let attribute = bus.ppu_peek(base_address + offset);
-
-        let table = self.background_patterntable_base();
-        let base = table;
-        let offset = (nametable as u16) << 4;
-        let calc = base + offset + (row as u16) % 8;
-
-        let data_low = bus.ppu_peek(calc);
-        let data_high = bus.ppu_peek(calc + 8);
-
-        let index = 7 - (col % 8);
-        let upper_bit = (data_high >> index) & 1;
-        let lower_bit = (data_low >> index) & 1;
 
         let modx = ((col as u8) / 16) & 1;
         let mody = (((row as u16) / 16) & 1) as u8;

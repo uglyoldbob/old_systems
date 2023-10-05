@@ -1,8 +1,6 @@
 //! This module is for manual testing of roms
 
-use crate::cartridge::{CartridgeError, NesCartridge};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// Indicates the tested status of a rom
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -72,10 +70,6 @@ impl RomList {
 pub struct RomListTestParser {
     /// The list of roms
     list: RomList,
-    /// True when a scan has been performed on the list of roms.
-    scan_complete: bool,
-    /// True when all of the roms have been processed.
-    update_complete: bool,
 }
 
 impl Default for RomListTestParser {
@@ -89,8 +83,6 @@ impl RomListTestParser {
     pub fn new() -> Self {
         Self {
             list: RomList::load_list(),
-            scan_complete: false,
-            update_complete: false,
         }
     }
 

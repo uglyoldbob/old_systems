@@ -27,7 +27,6 @@ pub trait NesControllerTrait {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum NesController {
     StandardController,
-    DummyController,
 }
 
 /// A standard nes controller implementation
@@ -171,27 +170,3 @@ impl NesControllerTrait for StandardController {
     }
 }
 
-/// A do nothing controller
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct DummyController {}
-
-impl DummyController {
-    /// Create a new dummy controller
-    pub fn new() -> NesController {
-        NesController::from(Self {})
-    }
-}
-
-impl NesControllerTrait for DummyController {
-    fn update_latch_bits(&mut self, _data: [bool; 3]) {}
-    fn dump_data(&self) -> u8 {
-        0x1f
-    }
-    fn to_string(&self) -> String {
-        "".to_string()
-    }
-    fn read_data(&mut self) -> u8 {
-        0x1f
-    }
-    fn provide_egui_ref(&mut self, _data: &egui::InputState) {}
-}

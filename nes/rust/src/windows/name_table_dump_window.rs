@@ -219,7 +219,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                             "Coordinate {},{} {:x}",
                                             pix_x, pix_y, table
                                         ));
-                                        let addr =
+                                        let _addr =
                                             c.cpu_peripherals.ppu.render_nametable_pixel_address(
                                                 table, pix_x, pix_y, &c.mb,
                                             );

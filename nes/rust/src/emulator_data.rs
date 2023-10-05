@@ -153,7 +153,7 @@ pub struct NesEmulatorData {
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
     fn process_event(
         &mut self,
-        event: u32,
+        _event: u32,
     ) -> Vec<egui_multiwin::multi_window::NewWindowRequest<NesEmulatorData>> {
         vec![]
     }
@@ -267,11 +267,6 @@ impl NesEmulatorData {
     pub fn insert_cartridge(&mut self, cart: NesCartridge) {
         self.configuration.set_startup(cart.rom_name().to_owned());
         self.mb.insert_cartridge(cart);
-    }
-
-    /// Run a cycle for the ppu
-    pub fn ppu_step(&mut self) {
-        self.cpu_peripherals.ppu_cycle(&mut self.mb);
     }
 
     /// Run a single cycle of the cpu and ppu system, dividing the input as necessary

@@ -142,7 +142,7 @@ fn calc_sha256(data: &[u8]) -> String {
 
 impl NesCartridge {
     /// "Parses" an obsolete ines rom
-    fn load_obsolete_ines(name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_obsolete_ines(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
     }
 

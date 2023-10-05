@@ -104,7 +104,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                 }
                 if let Some(t) = &self.texture2 {
                     let zoom = 16.0;
-                    let r = ui.image(
+                    let _r = ui.image(
                         t,
                         egui_multiwin::egui::Vec2 {
                             x: zoom * self.palette.width as f32,

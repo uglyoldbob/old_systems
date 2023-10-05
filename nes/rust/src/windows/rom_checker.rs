@@ -207,7 +207,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     let mut num_bug = 0;
                     let mut num_working = 0;
                     let mut num_unknown = 0;
-                    for (i, (path, entry)) in c.roms.elements.iter().enumerate() {
+                    for (i, (path, _entry)) in c.roms.elements.iter().enumerate() {
                         let mut rom_found = false;
                         let mut rom_valid = false;
                         if let Ok(cart) =
@@ -219,7 +219,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                                     rom_found = true;
                                     match status {
                                         RomStatus::CompletelyBroken => num_broken += 1,
-                                        RomStatus::Bug(a, _) => num_bug += 1,
+                                        RomStatus::Bug(_a, _) => num_bug += 1,
                                         RomStatus::Working => num_working += 1,
                                     };
                                     let pstat = match status {

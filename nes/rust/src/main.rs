@@ -316,11 +316,10 @@ fn main() {
             let mut stream = d
                 .build_output_stream(
                     &config,
-                    move |data: &mut [f32], cb: &cpal::OutputCallbackInfo| {
-                        let e = rb::RbConsumer::read_blocking(&consumer, data);
+                    move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
+                        let _e = rb::RbConsumer::read_blocking(&consumer, data);
                     },
-                    move |err| {
-                        println!("Stream error {:?}", err);
+                    move |_err| {
                     },
                     None,
                 )
@@ -361,7 +360,7 @@ fn main() {
 
     #[cfg(feature = "rom_status")]
     {
-        multi_window.add(
+        let _e = multi_window.add(
             windows::rom_checker::Window::new_request(&nes_data),
             &event_loop,
         );
