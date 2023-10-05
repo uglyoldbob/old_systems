@@ -128,7 +128,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
             }
 
             if self.next_rom.is_none() {
-                if let Some((path, _romentry)) = c.roms.elements.iter().skip(self.index).next() {
+                if let Some((path, _romentry)) = c.roms.elements.iter().nth(self.index) {
                     if let Ok(cart) =
                         crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
                     {
@@ -169,7 +169,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 }
             }
 
-            if let Some((path, _romentry)) = c.roms.elements.iter().skip(self.index).next() {
+            if let Some((path, _romentry)) = c.roms.elements.iter().nth(self.index) {
                 ui.label(format!("The next rom is {}", path.display()));
 
                 let mut new_rom = None;

@@ -169,4 +169,3 @@ impl NesControllerTrait for StandardController {
         self.check_strobe();
     }
 }
-

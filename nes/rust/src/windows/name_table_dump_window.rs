@@ -135,10 +135,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                                 table, pix_x, pix_y, &c.mb,
                                             );
                                         let pixel_entry = c.mb.ppu_palette_read(addr) & 63;
-                                        let ntaddr = 0x2000
-                                            + 0x400 * table as usize
-                                            + col as usize
-                                            + row as usize * 32;
+                                        let ntaddr =
+                                            0x2000 + 0x400 * table as usize + col + row * 32;
                                         ui.label(format!(
                                             "Palette address is {:x} {:x}",
                                             addr, pixel_entry
@@ -171,10 +169,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                             "Coordinate {},{} {:x}",
                                             pix_x, pix_y, table
                                         ));
-                                        let ntaddr = 0x23C0
-                                            + 0x400 * table as usize
-                                            + col as usize
-                                            + row as usize * 8;
+                                        let ntaddr =
+                                            0x23C0 + 0x400 * table as usize + col + row * 8;
                                         ui.label(format!(
                                             "Attribute address {},{} is {:x}",
                                             col, row, ntaddr
@@ -223,10 +219,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                                             c.cpu_peripherals.ppu.render_nametable_pixel_address(
                                                 table, pix_x, pix_y, &c.mb,
                                             );
-                                        let ntaddr = 0x23C0
-                                            + 0x400 * table as usize
-                                            + col as usize
-                                            + row as usize * 8;
+                                        let ntaddr =
+                                            0x23C0 + 0x400 * table as usize + col + row * 8;
                                         ui.label(format!(
                                             "Tile address {},{} is {:x}",
                                             col, row, ntaddr

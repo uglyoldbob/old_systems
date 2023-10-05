@@ -643,7 +643,7 @@ impl NesPpu {
             } else {
                 cy + 1
             };
-            self.vram_address = (self.vram_address & !0x3E0) | ((y as u16) << 5);
+            self.vram_address = (self.vram_address & !0x3E0) | (y << 5);
         }
     }
 
@@ -665,10 +665,9 @@ impl NesPpu {
             if self.scanline_number < 240 || self.scanline_number == 261 {
                 if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256)
                     && self.scanline_cycle != 0
+                    && (self.scanline_cycle & 7) == 0
                 {
-                    if (self.scanline_cycle & 7) == 0 {
-                        self.increment_horizontal_position();
-                    }
+                    self.increment_horizontal_position();
                 }
                 match self.scanline_cycle {
                     256 => {
@@ -680,10 +679,8 @@ impl NesPpu {
                     _ => {}
                 }
             }
-            if self.scanline_number == 261 {
-                if (280..=304).contains(&self.scanline_cycle) {
-                    self.transfer_vertical_position();
-                }
+            if self.scanline_number == 261 && (280..=304).contains(&self.scanline_cycle) {
+                self.transfer_vertical_position();
             }
         }
         self.scanline_cycle += 1;
@@ -724,14 +721,12 @@ impl NesPpu {
             } else {
                 0x1000
             }
+        } else if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0
+            || (self.registers[0] & PPU_REGISTER0_SPRITETABLE_BASE) == 0
+        {
+            0
         } else {
-            if (self.registers[0] & PPU_REGISTER0_SPRITE_SIZE) != 0
-                || (self.registers[0] & PPU_REGISTER0_SPRITETABLE_BASE) == 0
-            {
-                0
-            } else {
-                0x1000
-            }
+            0x1000
         }
     }
 
@@ -821,7 +816,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = base + offset + ((7 + (self.vram_address) >> 12) & 7);
+                    let calc = base + offset + ((7 + (self.vram_address >> 12)) & 7);
                     self.mode = Some(PpuMode::Background);
                     bus.ppu_cycle_1(calc, self);
                     self.cycle1_done = true;
@@ -838,7 +833,7 @@ impl NesPpu {
                 if (cycle & 1) == 0 {
                     let base = self.background_patterntable_base();
                     let offset = (self.nametable_data as u16) << 4;
-                    let calc = 8 + base + offset + ((7 + (self.vram_address) >> 12) & 7);
+                    let calc = 8 + base + offset + ((7 + (self.vram_address >> 12)) & 7);
                     self.mode = Some(PpuMode::Background);
                     bus.ppu_cycle_1(calc, self);
                     self.cycle1_done = true;
@@ -1164,10 +1159,8 @@ impl NesPpu {
                     (self.sprites[index].attribute & 0x20) == 0
                 });
                 if let Some((index, _spr)) = spr_pixel {
-                    if bg_pixel.is_some() && index == 0 && self.sprite0_current {
-                        if cycle < 255 {
-                            self.registers[2] |= 0x40; //sprite 0 hit
-                        }
+                    if bg_pixel.is_some() && index == 0 && self.sprite0_current && cycle < 255 {
+                        self.registers[2] |= 0x40; //sprite 0 hit
                     }
                 }
 
@@ -1183,18 +1176,16 @@ impl NesPpu {
                             0x3f00
                         }) & 63
                     }
+                } else if let Some(bg) = bg_pixel {
+                    bg
+                } else if let Some((_index, spr)) = spr_pixel {
+                    spr
                 } else {
-                    if let Some(bg) = bg_pixel {
-                        bg
-                    } else if let Some((_index, spr)) = spr_pixel {
-                        spr
+                    bus.ppu_palette_read(if (0x3f00..=0x3fff).contains(&self.vram_address) {
+                        self.vram_address
                     } else {
-                        bus.ppu_palette_read(if (0x3f00..=0x3fff).contains(&self.vram_address) {
-                            self.vram_address
-                        } else {
-                            0x3f00
-                        }) & 63
-                    }
+                        0x3f00
+                    }) & 63
                 };
 
                 if (self.registers[1]
@@ -1318,15 +1309,15 @@ impl NesPpu {
                 //background renderer control
                 let cycle = self.scanline_cycle - 321;
                 if self.should_fetch_background() || Some(PpuMode::Background) == self.mode {
-                    self.background_fetch(bus, cycle as u16);
+                    self.background_fetch(bus, cycle);
                 } else {
-                    self.idle_operation(bus, cycle as u16);
+                    self.idle_operation(bus, cycle);
                 }
                 self.increment_scanline_cycle();
             } else {
                 //do nothing
                 let cycle = self.scanline_cycle - 337;
-                self.idle_operation(bus, cycle as u16);
+                self.idle_operation(bus, cycle);
                 self.increment_scanline_cycle();
             }
         } else if self.scanline_number == 240 {
@@ -1381,7 +1372,7 @@ impl NesPpu {
     pub fn render_sprites(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         let allsprites = self.get_64_sprites();
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
-            let trow: u16 = (i as u16 / 128) as u16;
+            let trow: u16 = i as u16 / 128;
             let tcolumn: u8 = ((i % 128) / 8) as u8;
             let spritex: u8 = (i & 7) as u8;
             let spritey: u8 = (trow & 15) as u8;
@@ -1458,7 +1449,7 @@ impl NesPpu {
         let upper_bit = (data_high >> index) & 1;
         let lower_bit = (data_low >> index) & 1;
 
-        let modx = ((col as u8) / 16) & 1;
+        let modx = (col / 16) & 1;
         let mody = (((row as u16) / 16) & 1) as u8;
         let combined = (mody << 1) | modx;
         let extra_palette_bits = (attribute >> (2 * combined)) & 3;
@@ -1496,7 +1487,7 @@ impl NesPpu {
         let offset = (row as u16 / 32) << 3 | (col as u16 / 32);
         let attribute = bus.ppu_peek(base_address + offset);
 
-        let modx = ((col as u8) / 16) & 1;
+        let modx = (col / 16) & 1;
         let mody = (((row as u16) / 16) & 1) as u8;
         let combined = (mody << 1) | modx;
         let extra_palette_bits = (attribute >> (2 * combined)) & 3;

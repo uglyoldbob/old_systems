@@ -341,12 +341,10 @@ impl NesMotherboard {
                     }
                     _ => 42,
                 }
+            } else if let Some(a) = data {
+                a
             } else {
-                if let Some(a) = data {
-                    a
-                } else {
-                    42
-                }
+                42
             }
         } else {
             0

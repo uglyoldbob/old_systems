@@ -1425,7 +1425,9 @@ fn cpu_misc_instruction5() {
             }
         }
     }
-    assert!(nes_data.mb.check_vram(65, "All 16 tests passed".to_string().as_bytes()));
+    assert!(nes_data
+        .mb
+        .check_vram(65, "All 16 tests passed".to_string().as_bytes()));
 }
 
 #[test]

@@ -319,8 +319,7 @@ fn main() {
                     move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
                         let _e = rb::RbConsumer::read_blocking(&consumer, data);
                     },
-                    move |_err| {
-                    },
+                    move |_err| {},
                     None,
                 )
                 .ok();

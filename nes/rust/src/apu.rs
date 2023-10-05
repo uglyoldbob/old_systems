@@ -165,11 +165,7 @@ impl NesApu {
 
     /// Initialize the audio buffer
     pub fn set_audio_buffer(&mut self, size: usize) {
-        let mut buffer = Vec::with_capacity(size);
-        for _ in 0..size {
-            buffer.push(0.0);
-        }
-        self.buffer = buffer;
+        self.buffer = vec![0.0; size];
     }
 
     /// Reset the apu
@@ -220,12 +216,10 @@ impl NesApu {
 
     /// Operate the frame sequencer
     fn frame_sequencer_clock(&mut self) {
-        if !self.clock {
-            if self.frame_sequencer_reset > 0 {
-                self.frame_sequencer_reset -= 1;
-                if self.frame_sequencer_reset == 0 {
-                    self.frame_sequencer_clock = 0;
-                }
+        if !self.clock && self.frame_sequencer_reset > 0 {
+            self.frame_sequencer_reset -= 1;
+            if self.frame_sequencer_reset == 0 {
+                self.frame_sequencer_clock = 0;
             }
         }
         if (self.fclock & 0x80) == 0 {
@@ -308,6 +302,7 @@ impl NesApu {
         self.sample_interval = interval;
     }
 
+    /// Fill the local audio buffer with data, returning a Some when it is full
     fn fill_audio_buffer(&mut self, sample: f32) -> Option<&[f32]> {
         self.buffer[self.buffer_index] = sample;
         if self.buffer_index < (self.buffer.len() - 1) {

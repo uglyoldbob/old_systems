@@ -57,8 +57,10 @@ impl EmulatorConfiguration {
 
     ///Load a configuration file
     pub fn load(name: String) -> Self {
-        let mut result = Self::default();
-        result.path = name.to_owned();
+        let mut result = EmulatorConfiguration {
+            path: name.to_owned(),
+            ..Default::default()
+        };
         if let Ok(a) = std::fs::read(&name) {
             if let Ok(buf) = std::str::from_utf8(&a) {
                 match toml::from_str(buf) {
@@ -143,9 +145,11 @@ pub struct NesEmulatorData {
     /// The parser for known roms
     #[serde(skip)]
     pub parser: crate::romlist::RomListParser,
+    /// This variable is for keeping track of which roms have been manually tested
     #[cfg(feature = "rom_status")]
     #[serde(skip)]
     pub rom_test: crate::rom_status::RomListTestParser,
+    /// This contains the non-volatile configuration of the emulator
     #[serde(skip)]
     pub configuration: EmulatorConfiguration,
 }
