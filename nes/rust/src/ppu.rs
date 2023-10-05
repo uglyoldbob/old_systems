@@ -906,7 +906,7 @@ impl NesPpu {
                 self.sprite_eval_mode = PpuSpriteEvalMode::Normal;
                 self.sprite0_eval = false;
             };
-            if self.frame_odd && self.scanline_number == 0 {
+            if self.frame_odd && self.scanline_number == 0 && self.scanline_cycle == 1 {
                 //TODO: trigger bug that occurs when oamaddress is nonzero
                 //it copies 8 bytes of sprite data
                 reset();
@@ -963,8 +963,11 @@ impl NesPpu {
                                     self.registers[2] |= 0x20; //the sprite overflow flag
                                     self.oamaddress = self.oamaddress.wrapping_add(1);
                                 } else {
-                                    self.oamaddress = self.oamaddress.wrapping_add(4);
-                                    if self.oamaddress < 4 {
+                                    let part1 = ((self.oamaddress & 3) + 1) & 3;
+                                    let part2 = (self.oamaddress >> 2) + 1;
+
+                                    self.oamaddress = part1 | (part2<<2);
+                                    if (self.oamaddress & 0xFC) < 4 {
                                         self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     }
                                 }

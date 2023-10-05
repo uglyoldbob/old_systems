@@ -1796,7 +1796,7 @@ fn ppu_sprite_test_3() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 150 {
                 break;
             }
         }
