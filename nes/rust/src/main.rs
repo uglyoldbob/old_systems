@@ -262,8 +262,6 @@ fn main() {
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
-    use rb::RB;
-
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let mut event_loop = egui_multiwin::winit::event_loop::EventLoopBuilder::with_user_event();
@@ -287,7 +285,7 @@ fn main() {
             let format = supportedconfig.sample_format();
             println!("output format is {:?}", format);
             let mut config = supportedconfig.config();
-            let num_samples = (config.sample_rate.0 as f32 * 0.1) as usize;
+            let num_samples = (config.sample_rate.0 as f32 * 0.05) as usize;
             let sbs = supportedconfig.buffer_size();
             let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
@@ -311,13 +309,13 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let rb = rb::SpscRb::new(num_samples);
-            let (producer, consumer) = (rb.producer(), rb.consumer());
+            let rb = ringbuf::HeapRb::new(num_samples);
+            let (producer, mut consumer) = rb.split();
             let mut stream = d
                 .build_output_stream(
                     &config,
                     move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
-                        let _e = rb::RbConsumer::read_blocking(&consumer, data);
+                        consumer.pop_slice(data);
                     },
                     move |_err| {},
                     None,

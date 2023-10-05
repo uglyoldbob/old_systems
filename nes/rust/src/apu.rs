@@ -1,7 +1,7 @@
 //! Responsible for emulating the details of the audio processing (apu) of the nes console.
 
 use biquad::Biquad;
-use rb::RbProducer;
+use ringbuf::Producer;
 
 ///The modes that the sweep can operate in
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -348,7 +348,7 @@ impl NesApu {
     /// Clock the apu
     pub fn clock_slow(
         &mut self,
-        sound: &mut Option<rb::Producer<f32>>,
+        sound: &mut Option<ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.always_clock = self.always_clock.wrapping_add(1);
@@ -383,7 +383,7 @@ impl NesApu {
         }
         if let Some(sample) = self.build_audio_sample(filter) {
             if let Some(p) = sound {
-                let _e = p.write(sample);
+                p.push_slice(sample);
             }
         }
     }
