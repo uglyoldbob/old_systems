@@ -150,7 +150,7 @@ impl NesMapperTrait for Mapper01 {
                             //fixed to last bank
                             let addr2 = addr & 0x3fff;
                             let mut addr3 = addr2 as u32;
-                            addr3 |= ((cart.prg_rom.len() - 1) & !0x3fff) as u32;
+                            addr3 |= ((cart.prg_rom.len() - 1) & 0x3c000) as u32;
                             addr3 |= (self.rom_bank as u32)<<14;
                             Some(cart.prg_rom[addr3 as usize & (cart.prg_rom.len() - 1)])
                         }
