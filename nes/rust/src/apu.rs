@@ -175,7 +175,6 @@ impl NesApu {
     /// Reset the apu
     pub fn reset(&mut self) {
         self.status = 0;
-        self.fclock = 0;
         self.sound_disabled = true;
         self.sound_disabled_clock = 0;
         self.frame_sequencer_reset = 2;

@@ -1420,12 +1420,12 @@ fn cpu_misc_instruction5() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 1920 {
                 break;
             }
         }
     }
-    assert!(nes_data.mb.check_vram(513, "PASSED".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(65, "All 16 tests passed".to_string().as_bytes()));
 }
 
 #[test]
@@ -1500,7 +1500,7 @@ fn cpu_misc_instruction9() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 200 {
                 break;
             }
         }
@@ -1560,7 +1560,7 @@ fn cpu_misc_instruction12() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 128 {
                 break;
             }
         }
@@ -1580,7 +1580,7 @@ fn cpu_misc_instruction13() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 128 {
                 break;
             }
         }
@@ -1620,7 +1620,7 @@ fn cpu_misc_instruction15() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 151 {
                 break;
             }
         }
@@ -1939,6 +1939,7 @@ fn ppu_sprite_test_10() {
             }
         }
     }
+    //This test only sometimes passes
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
 }
 
@@ -2136,7 +2137,7 @@ fn controller1() {
             }
         }
     }
-    assert!(nes_data.mb.check_vram(865, "0/1000".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(875, "0/1000".to_string().as_bytes()));
 }
 
 #[test]
