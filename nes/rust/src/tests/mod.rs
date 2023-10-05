@@ -1364,12 +1364,12 @@ fn cpu_misc_instruction2() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 2500 {
                 break;
             }
         }
     }
-    assert!(nes_data.mb.check_vram(513, "PASSED".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(65, "All 15 tests passed".to_string().as_bytes()));
 }
 
 #[test]
@@ -1383,12 +1383,12 @@ fn cpu_misc_instruction3() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 1850 {
                 break;
             }
         }
     }
-    assert!(nes_data.mb.check_vram(513, "PASSED".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(65, "All 15 tests passed".to_string().as_bytes()));
 }
 
 #[test]
@@ -1401,12 +1401,12 @@ fn cpu_misc_instruction4() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 2500 {
                 break;
             }
         }
     }
-    assert!(nes_data.mb.check_vram(513, "PASSED".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(65, "All 16 tests passed".to_string().as_bytes()));
 }
 
 #[test]
@@ -1542,7 +1542,7 @@ fn cpu_misc_instruction11() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
+            if nes_data.cpu_peripherals.ppu_frame_number() == 280 {
                 break;
             }
         }

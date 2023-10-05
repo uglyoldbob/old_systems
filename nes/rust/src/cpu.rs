@@ -8361,10 +8361,10 @@ impl NesCpu {
                         self.subcycle = 4;
                     }
                     _ => {
-                        let addr = ((self.temp2 as u16) << 8 | (self.temp as u16))
+                        let addr = ((self.temp2 as u16).wrapping_add(1) << 8 | (self.temp as u16))
                             .wrapping_add(self.x as u16);
                         let mask = (self.y as u16) << 8 | 0xFF;
-                        let val = self.temp2 & self.y;
+                        let val = self.temp2.wrapping_add(1) & self.y;
                         self.memory_cycle_write(addr & mask, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);
@@ -8396,10 +8396,10 @@ impl NesCpu {
                         self.subcycle = 4;
                     }
                     _ => {
-                        let addr = ((self.temp2 as u16) << 8 | (self.temp as u16))
+                        let addr = ((self.temp2 as u16).wrapping_add(1) << 8 | (self.temp as u16))
                             .wrapping_add(self.y as u16);
                         let mask = (self.x as u16) << 8 | 0xFF;
-                        let val = self.temp2 & self.x;
+                        let val = self.temp2.wrapping_add(1) & self.x;
                         self.memory_cycle_write(addr & mask, val, bus, cpu_peripherals);
 
                         self.pc = self.pc.wrapping_add(3);
@@ -8407,8 +8407,15 @@ impl NesCpu {
                     }
                 },
                 _ => {
-                    //println!("Instruction {:X} at {:X} not implemented", o, self.pc);
-                    //unimplemented!();
+                    match self.subcycle {
+                        1 => {
+                            self.copy_debugger(format!("*JAM ${:02x}", o));
+                            self.subcycle = 2;
+                        }
+                        _ => {
+
+                        }
+                    }
                 }
             }
         }
