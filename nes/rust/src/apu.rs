@@ -413,7 +413,7 @@ impl NesApu {
         match addr {
             3 => {
                 let length = data >> 3;
-                if (self.status & (1 << 0)) != 0 && self.squares[0].length_enabled {
+                if (self.status & (1 << 0)) != 0 && self.squares[0].length_enabled && (!self.clock || !self.squares[0].length.running()) {
                     self.squares[0].length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
@@ -421,7 +421,7 @@ impl NesApu {
             }
             7 => {
                 let length = data >> 3;
-                if (self.status & (1 << 1)) != 0 && self.squares[1].length_enabled {
+                if (self.status & (1 << 1)) != 0 && self.squares[1].length_enabled && (!self.clock || !self.squares[1].length.running())  {
                     self.squares[1].length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
@@ -429,14 +429,14 @@ impl NesApu {
             }
             0xb => {
                 let length = data >> 3;
-                if (self.status & (1 << 2)) != 0 && self.triangle.length_enabled {
+                if (self.status & (1 << 2)) != 0 && self.triangle.length_enabled && (!self.clock || !self.triangle.length.running())  {
                     self.triangle.length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
             }
             0xf => {
                 let length = data >> 3;
-                if (self.status & (1 << 3)) != 0 && self.noise.length_enabled {
+                if (self.status & (1 << 3)) != 0 && self.noise.length_enabled && (!self.clock || !self.noise.length.running())  {
                     self.noise.length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
