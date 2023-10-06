@@ -966,7 +966,7 @@ impl NesPpu {
                                     let part1 = ((self.oamaddress & 3) + 1) & 3;
                                     let part2 = (self.oamaddress >> 2) + 1;
 
-                                    self.oamaddress = part1 | (part2<<2);
+                                    self.oamaddress = part1 | (part2 << 2);
                                     if (self.oamaddress & 0xFC) < 4 {
                                         self.sprite_eval_mode = PpuSpriteEvalMode::Done;
                                     }
@@ -1173,22 +1173,32 @@ impl NesPpu {
                     } else if let Some(bg) = bg_pixel {
                         bg
                     } else {
-                        bus.ppu_palette_read(if (0x3f00..=0x3fff).contains(&self.vram_address) {
+                        let addr = if (0x3f00..=0x3fff).contains(&self.vram_address)
+                            && (self.registers[1]
+                                & (PPU_REGISTER1_DRAW_SPRITES | PPU_REGISTER1_DRAW_BACKGROUND))
+                                == 0
+                        {
                             self.vram_address
                         } else {
                             0x3f00
-                        }) & 63
+                        };
+                        bus.ppu_palette_read(addr) & 63
                     }
                 } else if let Some(bg) = bg_pixel {
                     bg
                 } else if let Some((_index, spr)) = spr_pixel {
                     spr
                 } else {
-                    bus.ppu_palette_read(if (0x3f00..=0x3fff).contains(&self.vram_address) {
+                    let addr = if (0x3f00..=0x3fff).contains(&self.vram_address)
+                        && (self.registers[1]
+                            & (PPU_REGISTER1_DRAW_SPRITES | PPU_REGISTER1_DRAW_BACKGROUND))
+                            == 0
+                    {
                         self.vram_address
                     } else {
                         0x3f00
-                    }) & 63
+                    };
+                    bus.ppu_palette_read(addr) & 63
                 };
 
                 if (self.registers[1]

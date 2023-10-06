@@ -8406,17 +8406,13 @@ impl NesCpu {
                         self.end_instruction();
                     }
                 },
-                _ => {
-                    match self.subcycle {
-                        1 => {
-                            self.copy_debugger(format!("*JAM ${:02x}", o));
-                            self.subcycle = 2;
-                        }
-                        _ => {
-
-                        }
+                _ => match self.subcycle {
+                    1 => {
+                        self.copy_debugger(format!("*JAM ${:02x}", o));
+                        self.subcycle = 2;
                     }
-                }
+                    _ => {}
+                },
             }
         }
     }

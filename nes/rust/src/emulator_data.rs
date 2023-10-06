@@ -276,7 +276,12 @@ impl NesEmulatorData {
     /// Run a single cycle of the cpu and ppu system, dividing the input as necessary
     pub fn cycle_step(
         &mut self,
-        sound: &mut Option<ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>>,
+        sound: &mut Option<
+            ringbuf::Producer<
+                f32,
+                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+            >,
+        >,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.cpu_clock_counter += 1;
