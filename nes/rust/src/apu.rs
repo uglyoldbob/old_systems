@@ -22,6 +22,8 @@ struct ApuSweep {
     counter: u8,
     /// The reload flag
     reload: bool,
+    /// The calculated mute output of the unit
+    mute: bool,
 }
 
 impl ApuSweep {
@@ -31,7 +33,13 @@ impl ApuSweep {
             mode: math,
             counter: 0,
             reload: false,
+            mute: false,
         }
+    }
+
+    /// Returns the mute flag
+    pub fn mute(&self) -> bool {
+        self.mute
     }
 
     /// Reloads the sweep unit later
@@ -40,36 +48,48 @@ impl ApuSweep {
     }
 
     /// Clock the unit
-    #[must_use]
-    fn clock(&mut self, data: &[u8]) -> i16 {
+    fn clock(&mut self, data: &[u8], permod: &mut u16) {
         let enabled = (data[1] & 0x80) != 0;
         let negative = (data[1] & 8) != 0;
         let shift = data[1] & 7;
         let period = (data[1] >> 4) & 7;
         let square_period = data[2] as u16 | (data[3] as u16 & 0x7) << 8;
 
-        if self.reload {
+        let mut new_mute = false;
+        if square_period < 8 {
+            new_mute = true;
+        }
+
+        *permod = if self.reload {
             self.counter = period;
             self.reload = false;
-            0
+            *permod
         } else if self.counter > 0 {
             self.counter -= 1;
-            0
+            *permod
         } else {
             self.counter = period;
             if enabled && shift != 0 {
-                let mut delta = (square_period >> shift) as i16;
+                let delta = (square_period >> shift) as u16;
                 if negative {
                     match self.mode {
-                        ApuSweepAddition::OnesComplement => delta = (-delta) - 1,
-                        ApuSweepAddition::TwosComplement => delta = -delta,
+                        ApuSweepAddition::OnesComplement => *permod + (delta ^ 0xFFFF),
+                        ApuSweepAddition::TwosComplement => *permod - delta,
                     }
                 }
-                delta
+                else {
+                    *permod + delta
+                }
             } else {
-                0
+                *permod
             }
+        };
+        
+        if *permod > 0x7ff {
+            new_mute = true;
         }
+
+        self.mute = new_mute;
     }
 }
 
