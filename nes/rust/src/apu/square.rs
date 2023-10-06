@@ -86,7 +86,7 @@ impl ApuSquareChannel {
         let mut period =
             (self.registers[2] as u16 | ((self.registers[3] & 0x7) as u16) << 8) as i32;
         period += delta;
-        let new_period = period as u16;
+        let new_period = if period < 0 { 0 } else { period as u16 };
         self.registers[2] = (new_period & 0xFF) as u8;
         self.registers[3] = (self.registers[3] & 0xF8) | ((new_period >> 8) & 7) as u8;
     }

@@ -57,7 +57,7 @@ impl ApuSweep {
             0
         } else {
             self.counter = period;
-            if enabled {
+            if enabled && shift != 0 {
                 let mut delta = (square_period >> shift) as i16;
                 if negative {
                     match self.mode {
