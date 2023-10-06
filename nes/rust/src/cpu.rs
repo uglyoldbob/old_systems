@@ -5520,16 +5520,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BEQ ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_ZERO) != 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5537,15 +5527,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5564,16 +5563,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BNE ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_ZERO) == 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5581,15 +5570,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5608,16 +5606,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BVS ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_OVERFLOW) != 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5625,15 +5613,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5652,16 +5649,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BVC ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_OVERFLOW) == 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5669,15 +5656,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5696,16 +5692,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BPL ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_NEGATIVE) == 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5713,15 +5699,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5740,16 +5735,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BMI ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_NEGATIVE) != 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5757,15 +5742,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5784,16 +5778,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BCS ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_CARRY) != 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5801,15 +5785,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
@@ -5828,16 +5821,6 @@ impl NesCpu {
                             self.copy_debugger(format!("BCC ${:04X}", tempaddr));
                             self.done_fetching = true;
                         }
-                        self.subcycle = 2;
-                    }
-                    2 => {
-                        self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
-                        self.subcycle = 3;
-                    }
-                    3 => {
-                        let pc = self.pc.to_le_bytes();
-                        let p2 = (pc[1] as u16) << 8 | (pc[0].wrapping_add(2) as u16);
-                        self.memory_cycle_read(p2, bus, cpu_peripherals);
                         if (self.p & CPU_FLAG_CARRY) == 0 {
                             self.pc = self.pc.wrapping_add(2);
                             let mut adjust = self.temp as u16;
@@ -5845,15 +5828,24 @@ impl NesCpu {
                                 adjust |= 0xff00;
                             }
                             self.tempaddr = self.pc.wrapping_add(adjust);
-                            self.subcycle = 4;
+                            self.subcycle = 2;
                         } else {
                             self.pc = self.pc.wrapping_add(2);
                             self.end_instruction();
                         }
                     }
-                    _ => {
+                    2 => {
                         self.memory_cycle_read(self.pc.wrapping_add(2), bus, cpu_peripherals);
+                        let pc = self.pc.to_le_bytes();
+                        let pc2 = self.tempaddr.to_le_bytes();
                         self.pc = self.tempaddr;
+                        if pc[1] != pc2[1] {
+                            self.subcycle = 3;
+                        } else {
+                            self.end_instruction();
+                        }
+                    }
+                    _ => {
                         self.end_instruction();
                     }
                 },
