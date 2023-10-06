@@ -315,7 +315,11 @@ fn main() {
                 .build_output_stream(
                     &config,
                     move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
-                        consumer.pop_slice(data);
+                        let mut index = 0;
+                        while index < data.len() {
+                            let c = consumer.pop_slice(&mut data[index..]);
+                            index += c;
+                        }
                     },
                     move |_err| {},
                     None,
