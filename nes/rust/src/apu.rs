@@ -76,15 +76,14 @@ impl ApuSweep {
                         ApuSweepAddition::OnesComplement => *permod + (delta ^ 0xFFFF),
                         ApuSweepAddition::TwosComplement => *permod - delta,
                     }
-                }
-                else {
+                } else {
                     *permod + delta
                 }
             } else {
                 *permod
             }
         };
-        
+
         if *permod > 0x7ff {
             new_mute = true;
         }
@@ -205,7 +204,7 @@ impl NesApu {
 
     /// Get the irq line for the apu
     pub fn irq(&self) -> bool {
-        (self.status & 0xc0) != 0 && (self.fclock & 0x40) == 0
+        (self.status & 0xc0) != 0 && (self.fclock & 0x40) == 0 || self.dmc.interrupt_flag
     }
 
     /// Get the dmc dma request
