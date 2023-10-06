@@ -176,9 +176,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
     }
 
     fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
-        if let Some(sound) = self.sound_stream.take() {
-            let _ = sound.pause();
-        }
+        self.sound_stream.take();
         true
     }
 

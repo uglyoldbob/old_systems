@@ -136,6 +136,7 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                             ui.label(format!("{}: {:x}", n, v));
                         }
                     }
+                    ui.label(format!("X,Y = {},{} @ {:X}", c.cpu_peripherals.ppu.column(), c.cpu_peripherals.ppu.row(), c.cpu_peripherals.ppu.vram_address()));
                 }
             });
         });

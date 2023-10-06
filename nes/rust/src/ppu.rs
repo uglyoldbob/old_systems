@@ -661,7 +661,7 @@ impl NesPpu {
 
     /// This increments the scanline cycle machine, sweeping across every scanline, and down every row sequentially.
     fn increment_scanline_cycle(&mut self) {
-        if self.should_render_background_cycle(self.scanline_cycle) {
+        if self.should_render_background_cycle(self.scanline_cycle) || self.should_render_sprites(self.scanline_cycle as u8) {
             if self.scanline_number < 240 || self.scanline_number == 261 {
                 if (self.scanline_cycle >= 328 || self.scanline_cycle <= 256)
                     && self.scanline_cycle != 0
