@@ -285,7 +285,7 @@ fn main() {
             let format = supportedconfig.sample_format();
             println!("output format is {:?}", format);
             let mut config = supportedconfig.config();
-            let num_samples = (config.sample_rate.0 as f32 * 0.05) as usize;
+            let num_samples = (config.sample_rate.0 as f32 * 0.075) as usize;
             let sbs = supportedconfig.buffer_size();
             let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
@@ -318,6 +318,9 @@ fn main() {
                         let mut index = 0;
                         while index < data.len() {
                             let c = consumer.pop_slice(&mut data[index..]);
+                            if c == 0 {
+                                break;
+                            }
                             index += c;
                         }
                     },
