@@ -578,7 +578,26 @@ impl NesCpu {
                     }
                 }
             } else if self.dma_running {
-                if let Some(addr) = self.oamdma {
+                if let Some(a) = self.dmc_dma {
+                    match self.dmc_dma_counter {
+                        0 => {
+                            self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
+                            self.dmc_dma_counter += 1;
+                        }
+                        _ => {
+                            if !cpu_peripherals.apu.get_clock() {
+                                self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
+                            }
+                            else {
+                                let t = self.memory_cycle_read(a, bus, cpu_peripherals);
+                                cpu_peripherals.apu.provide_dma_response(t);
+                                self.dmc_dma = None;
+                                self.dma_running = false;
+                                self.dmc_dma_counter = 0;
+                            }
+                        }
+                    }
+                } else if let Some(addr) = self.oamdma {
                     self.dma_count += 1;
                     if (self.dma_counter & 1) == 0 && !self.dma_cycle {
                         let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
@@ -599,32 +618,11 @@ impl NesCpu {
                         self.dma_counter = 0;
                     }
                 }
-                else if let Some(a) = self.dmc_dma {
-                    match self.dmc_dma_counter {
-                        0 => {
-                            self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
-                            self.dmc_dma_counter += 1;
-                        }
-                        1 => {
-                            if self.dma_cycle {
-                                self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
-                            }
-                            self.dmc_dma_counter += 1;
-                        }
-                        _ => {
-                            let t = self.memory_cycle_read(a, bus, cpu_peripherals);
-                            cpu_peripherals.apu.provide_dma_response(t);
-                            self.dmc_dma = None;
-                            self.dma_running = false;
-                            self.dmc_dma_counter = 0;
-                        }
-                    }
-                }
-            } else if self.oamdma.is_some() && !self.dma_running && !self.last_accesses[0] {
+            } else if self.dmc_dma.is_some() && !self.dma_running && !cpu_peripherals.apu.get_clock() && !self.last_accesses[0] {
                 self.dma_running = true;
                 self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
                 self.dma_count += 1;
-            } else if self.dmc_dma.is_some() && !self.dma_running && !self.last_accesses[0] {
+            } else if self.oamdma.is_some() && !self.dma_running && !self.last_accesses[0] {
                 self.dma_running = true;
                 self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
                 self.dma_count += 1;
