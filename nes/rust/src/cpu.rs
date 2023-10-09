@@ -148,6 +148,14 @@ pub struct NesCpu {
     dmc_dma: Option<u16>,
     /// Counter for doing dmc dma operations, since it takes more than one cycle
     dmc_dma_counter: u8,
+    /// The current cycle for the dma access (true indicates write)
+    dma_cycle: bool,
+    /// Indicates that the dma is running
+    dma_running: bool,
+    /// The memory access of the last few cycles, true indicates write)
+    last_accesses: [bool; 3],
+    /// The total number of cycles for dma
+    dma_count: u16,
 }
 
 /// The carry flag for the cpu flags register
@@ -205,9 +213,13 @@ impl NesCpu {
             interrupting: false,
             oamdma: None,
             dma_counter: 0,
+            dma_running: false,
             outs: [false; 3],
             dmc_dma: None,
             dmc_dma_counter: 0,
+            dma_cycle: false,
+            last_accesses: [false; 3],
+            dma_count: 0,
         }
     }
 
@@ -353,6 +365,9 @@ impl NesCpu {
         bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) -> u8 {
+        self.last_accesses[2] = self.last_accesses[1];
+        self.last_accesses[1] = self.last_accesses[0];
+        self.last_accesses[0] = false;
         bus.memory_cycle_read(addr, self.outs, self.calc_oe(addr), cpu_peripherals)
     }
 
@@ -364,6 +379,9 @@ impl NesCpu {
         bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
+        self.last_accesses[2] = self.last_accesses[1];
+        self.last_accesses[1] = self.last_accesses[0];
+        self.last_accesses[0] = true;
         if addr == 0x4014 {
             self.oamdma = Some(data);
         } else if addr == 0x4016 {
@@ -420,10 +438,13 @@ impl NesCpu {
         nmi: bool,
         irq: bool,
     ) {
+        self.dma_cycle = !self.dma_cycle;
+
         #[cfg(feature = "debugger")]
         {
             self.done_fetching = false;
         }
+
         self.poll_interrupt_line(irq, nmi);
         if self.reset {
             match self.subcycle {
@@ -570,18 +591,31 @@ impl NesCpu {
                         self.interrupting = false;
                     }
                 }
-            } else if let Some(addr) = self.oamdma {
-                if self.dma_counter == 512 {
-                    self.oamdma = None;
-                    self.dma_counter = 0;
-                } else if (self.dma_counter & 1) == 0 {
+            } else if self.dma_running {
+                let addr = self.oamdma.unwrap();
+                self.dma_count += 1;
+                if (self.dma_counter & 1) == 0 && !self.dma_cycle {
                     let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
                     self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
                     self.dma_counter += 1;
-                } else {
+                } else if (self.dma_counter & 1) != 0 && self.dma_cycle{
                     self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
                     self.dma_counter += 1;
                 }
+                else {
+                    self.memory_cycle_read(self.pc, bus, cpu_peripherals);
+                }
+                if self.dma_counter == 512 {
+                    self.dma_running = false;
+                    println!("DMA took {} cycles", self.dma_count);
+                    self.dma_count = 0;
+                    self.oamdma = None;
+                    self.dma_counter = 0;
+                }
+            } else if self.oamdma.is_some() && !self.dma_running && !self.last_accesses[0] {
+                self.dma_running = true;
+                self.memory_cycle_read(self.pc, bus, cpu_peripherals);
+                self.dma_count += 1;
             } else {
                 self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
                 //TODO set done fetching and call copy_debugger for single byte opcodes
@@ -5545,6 +5579,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5588,6 +5623,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5631,6 +5667,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5674,6 +5711,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5717,6 +5755,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5760,6 +5799,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5803,6 +5843,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
@@ -5846,6 +5887,7 @@ impl NesCpu {
                         }
                     }
                     _ => {
+                        self.memory_cycle_read(self.pc, bus, cpu_peripherals);
                         self.end_instruction();
                     }
                 },
