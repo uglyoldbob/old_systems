@@ -1832,6 +1832,7 @@ dependencies = [
  "biquad",
  "cpal",
  "criterion",
+ "crossbeam-channel",
  "data-encoding",
  "eframe",
  "egui-multiwin",
@@ -1841,7 +1842,6 @@ dependencies = [
  "puffin_egui",
  "rand",
  "ring",
- "ringbuf",
  "sdl2",
  "serde",
  "serde_with",
@@ -2350,15 +2350,6 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
-]
-
-[[package]]
-name = "ringbuf"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79abed428d1fd2a128201cec72c5f6938e2da607c6f3745f769fabea399d950a"
-dependencies = [
- "crossbeam-utils",
 ]
 
 [[package]]

@@ -17,10 +17,10 @@ sdl2 = ["dep:sdl2", "dep:egui_sdl2_gl"]
 [dependencies]
 biquad = "0.4.2"
 cpal = {version = "0.15.1", optional=true}
+crossbeam-channel = "0.5.8"
 data-encoding = "2.4.0"
 enum_dispatch = "0.3.11"
 rand = "0.8.5"
-ringbuf = "0.3.3"
 egui-multiwin = {version = "0.1.11", optional=true}
 eframe = { version = "0.20.1", optional=true}
 puffin = { version = "0.14.1", optional=true}
