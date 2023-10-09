@@ -156,6 +156,8 @@ pub struct NesCpu {
     last_accesses: [bool; 3],
     /// The total number of cycles for dma
     dma_count: u16,
+    /// The last read address
+    last_read: u16,
 }
 
 /// The carry flag for the cpu flags register
@@ -220,6 +222,7 @@ impl NesCpu {
             dma_cycle: false,
             last_accesses: [false; 3],
             dma_count: 0,
+            last_read: 0,
         }
     }
 
@@ -368,6 +371,7 @@ impl NesCpu {
         self.last_accesses[2] = self.last_accesses[1];
         self.last_accesses[1] = self.last_accesses[0];
         self.last_accesses[0] = false;
+        self.last_read = addr;
         bus.memory_cycle_read(addr, self.outs, self.calc_oe(addr), cpu_peripherals)
     }
 
@@ -484,24 +488,6 @@ impl NesCpu {
                     self.reset = false;
                 }
             }
-        } else if let Some(a) = self.dmc_dma {
-            match self.dmc_dma_counter {
-                0 => {
-                    self.dmc_dma_counter += 1;
-                }
-                1 => {
-                    self.dmc_dma_counter += 1;
-                }
-                2 => {
-                    self.dmc_dma_counter += 1;
-                }
-                _ => {
-                    let t = self.memory_cycle_read(a, bus, cpu_peripherals);
-                    cpu_peripherals.apu.provide_dma_response(t);
-                    self.dmc_dma = None;
-                    self.dmc_dma_counter = 0;
-                }
-            }
         } else if self.opcode.is_none() {
             if (self.interrupt_shift[0].0 && self.polled_irq_flag)
                 || self.interrupt_shift[0].1
@@ -592,31 +578,57 @@ impl NesCpu {
                     }
                 }
             } else if self.dma_running {
-                let addr = self.oamdma.unwrap();
-                self.dma_count += 1;
-                if (self.dma_counter & 1) == 0 && !self.dma_cycle {
-                    let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
-                    self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
-                    self.dma_counter += 1;
-                } else if (self.dma_counter & 1) != 0 && self.dma_cycle{
-                    self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
-                    self.dma_counter += 1;
+                if let Some(addr) = self.oamdma {
+                    self.dma_count += 1;
+                    if (self.dma_counter & 1) == 0 && !self.dma_cycle {
+                        let addr = (addr as u16) << 8 | (self.dma_counter >> 1);
+                        self.temp = self.memory_cycle_read(addr, bus, cpu_peripherals);
+                        self.dma_counter += 1;
+                    } else if (self.dma_counter & 1) != 0 && self.dma_cycle {
+                        self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
+                        self.dma_counter += 1;
+                    }
+                    else {
+                        self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
+                    }
+                    if self.dma_counter == 512 {
+                        self.dma_running = false;
+                        println!("DMA took {} cycles", self.dma_count);
+                        self.dma_count = 0;
+                        self.oamdma = None;
+                        self.dma_counter = 0;
+                    }
                 }
-                else {
-                    self.memory_cycle_read(self.pc, bus, cpu_peripherals);
-                }
-                if self.dma_counter == 512 {
-                    self.dma_running = false;
-                    println!("DMA took {} cycles", self.dma_count);
-                    self.dma_count = 0;
-                    self.oamdma = None;
-                    self.dma_counter = 0;
+                else if let Some(a) = self.dmc_dma {
+                    match self.dmc_dma_counter {
+                        0 => {
+                            self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
+                            self.dmc_dma_counter += 1;
+                        }
+                        1 => {
+                            if self.dma_cycle {
+                                self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
+                            }
+                            self.dmc_dma_counter += 1;
+                        }
+                        _ => {
+                            let t = self.memory_cycle_read(a, bus, cpu_peripherals);
+                            cpu_peripherals.apu.provide_dma_response(t);
+                            self.dmc_dma = None;
+                            self.dma_running = false;
+                            self.dmc_dma_counter = 0;
+                        }
+                    }
                 }
             } else if self.oamdma.is_some() && !self.dma_running && !self.last_accesses[0] {
                 self.dma_running = true;
-                self.memory_cycle_read(self.pc, bus, cpu_peripherals);
+                self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
                 self.dma_count += 1;
-            } else {
+            } else if self.dmc_dma.is_some() && !self.dma_running && !self.last_accesses[0] {
+                self.dma_running = true;
+                self.memory_cycle_read(self.last_read, bus, cpu_peripherals);
+                self.dma_count += 1;
+            }else {
                 self.opcode = Some(self.memory_cycle_read(self.pc, bus, cpu_peripherals));
                 //TODO set done fetching and call copy_debugger for single byte opcodes
                 self.subcycle = 1;
