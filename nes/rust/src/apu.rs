@@ -346,10 +346,7 @@ impl NesApu {
     }
 
     /// Build an audio sample and run the audio filter
-    fn build_audio_sample(
-        &mut self,
-        filter: &mut Option<biquad::DirectForm1<f32>>,
-    ) -> Option<f32> {
+    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
