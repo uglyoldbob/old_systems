@@ -8852,9 +8852,7 @@ impl NesCpu {
                     }
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
-                        let (_val, overflow) = s.temp2.overflowing_add(s.y);
-                        if !overflow {
-                            addr = addr.wrapping_add(s.y as u16);
+                        addr = addr.wrapping_add(s.y as u16);
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a = v;
@@ -8873,10 +8871,6 @@ impl NesCpu {
                                 bus,
                                 cpu_peripherals,
                             );
-                        } else {
-                            unimplemented!();
-                            s.subcycle = 5;
-                        }
                     }
                     _ => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
@@ -9412,6 +9406,8 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.tempaddr = (s.temp2 as u16) << 8 | (s.temp as u16);
+                                s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
                             s.temp2.wrapping_add(1) as u16,
@@ -9420,10 +9416,14 @@ impl NesCpu {
                         );
                     }
                     4 => {
-                        unimplemented!();
-                        s.tempaddr = (s.temp2 as u16) << 8 | (s.temp as u16);
-                        s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
-                        s.subcycle = 5;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 5;
+                            },
+                            (s.temp2 as u16) << 8 | (s.temp.wrapping_add(s.y) as u16),
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     5 => {
                         s.memory_cycle_read(
