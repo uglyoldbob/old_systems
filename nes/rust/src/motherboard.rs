@@ -188,9 +188,6 @@ impl NesMotherboard {
             0x2000..=0x3fff => {
                 let addr = addr & 7;
                 if let Some(r) = per.ppu_read(addr, &self.ppu_palette_ram) {
-                    if addr == 7 {
-                        println!("0x2007 read as {:x}", r);
-                    }
                     response = r;
                 } else {
                     //TODO open bus implementation

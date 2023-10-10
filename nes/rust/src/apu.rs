@@ -219,7 +219,6 @@ impl NesApu {
     /// Used by the cpu to provide the dma response from the cpu
     /// Used by the dmc channel
     pub fn provide_dma_response(&mut self, data: u8) {
-        println!("Provide dmc dma response");
         self.dmc.dma_request = None;
         self.dmc.sample_buffer = Some(data);
         self.dmc.dma_result = Some(data);
@@ -515,7 +514,6 @@ impl NesApu {
                 } else if self.dmc.length == 0 {
                     self.dmc.programmed_length = (self.dmc.registers[3] as u16) * 16 + 1;
                     self.dmc.length = self.dmc.programmed_length;
-                    println!("Set dmc length");
                     self.dmc.playing = true;
                 }
                 self.dmc.interrupt_flag = false;
