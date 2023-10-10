@@ -152,12 +152,8 @@ pub struct NesCpu {
     dma_cycle: bool,
     /// Indicates that the dma is running
     dma_running: bool,
-    /// The memory access of the last few cycles, true indicates write)
-    last_accesses: [bool; 3],
     /// The total number of cycles for dma
     dma_count: u16,
-    /// The last read address
-    last_read: u16,
 }
 
 /// The carry flag for the cpu flags register
@@ -220,9 +216,7 @@ impl NesCpu {
             dmc_dma: None,
             dmc_dma_counter: 0,
             dma_cycle: false,
-            last_accesses: [false; 3],
             dma_count: 0,
-            last_read: 0,
         }
     }
 
@@ -365,16 +359,62 @@ impl NesCpu {
     fn memory_cycle_read(
         &mut self,
         c: impl FnOnce(&mut Self, u8) -> (),
-        addr: u16,
+        address: u16,
         bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
-        self.last_accesses[2] = self.last_accesses[1];
-        self.last_accesses[1] = self.last_accesses[0];
-        self.last_accesses[0] = false;
-        self.last_read = addr;
-        let a = bus.memory_cycle_read(addr, self.outs, self.calc_oe(addr), cpu_peripherals);
-        c(self, a);
+        let oe = self.calc_oe(address);
+        if let Some(a) = self.dmc_dma {
+            match self.dmc_dma_counter {
+                0 => {
+                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                    self.dmc_dma_counter += 1;
+                }
+                1 => {
+                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                    self.dmc_dma_counter += 1;
+                }
+                2 => {
+                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                    self.dmc_dma_counter += 1;
+                }
+                _ => {
+                    let t = bus.memory_cycle_read(a, self.outs, oe, cpu_peripherals);
+                    cpu_peripherals.apu.provide_dma_response(t);
+                    self.dmc_dma = None;
+                    self.dmc_dma_counter = 0;
+                }
+            }
+        } else if self.dma_running {
+            let dmaaddr = self.oamdma.unwrap();
+                self.dma_count += 1;
+                if (self.dma_counter & 1) == 0 && !self.dma_cycle {
+                    let addr = (dmaaddr as u16) << 8 | (self.dma_counter >> 1);
+                    self.temp = bus.memory_cycle_read(addr, self.outs, oe, cpu_peripherals);
+                    self.dma_counter += 1;
+                } else if (self.dma_counter & 1) != 0 && self.dma_cycle{
+                    self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
+                    self.dma_counter += 1;
+                }
+                else {
+                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                }
+                if self.dma_counter == 512 {
+                    self.dma_running = false;
+                    println!("DMA took {} cycles", self.dma_count);
+                    self.dma_count = 0;
+                    self.oamdma = None;
+                    self.dma_counter = 0;
+                }
+        } else if self.oamdma.is_some() && !self.dma_running {
+            self.dma_running = true;
+            bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+            self.dma_count += 1;
+        }
+        else {
+            let a = bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+            c(self, a);
+        }
     }
 
     /// Convenience function for running a write cycle on the bus
@@ -385,9 +425,6 @@ impl NesCpu {
         bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
-        self.last_accesses[2] = self.last_accesses[1];
-        self.last_accesses[1] = self.last_accesses[0];
-        self.last_accesses[0] = true;
         if addr == 0x4014 {
             self.oamdma = Some(data);
         } else if addr == 0x4016 {
