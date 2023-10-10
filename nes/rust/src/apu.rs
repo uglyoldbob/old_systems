@@ -387,6 +387,7 @@ impl NesApu {
             self.noise.length.set_halt(h);
         }
         self.inhibit_length_clock = false;
+        self.dmc.dma_cycle();
         if self.clock {
             self.timing_clock = self.timing_clock.wrapping_add(1);
             self.squares[0].cycle();

@@ -64,12 +64,16 @@ impl ApuDmcChannel {
         }
     }
 
-    ///Clock the dmc channel
-    pub fn cycle(&mut self, _timing: u32) {
+    ///Check the dma stuff
+    pub fn dma_cycle(&mut self) {
         if self.sample_buffer.is_none() && self.dma_request.is_none() && self.length > 0 {
             self.dma_request = Some(self.dma_address | 0x8000);
             self.length -= 1;
         }
+    }
+
+    ///Clock the dmc channel
+    pub fn cycle(&mut self, _timing: u32) {
         if self.rate_counter > 0 {
             self.rate_counter -= 1;
         } else {

@@ -374,7 +374,7 @@ impl NesCpu {
                     }
                     _ => {
                         println!("DMC DETERMINE {}", cpu_peripherals.apu.get_clock());
-                        if cpu_peripherals.apu.get_clock() {
+                        if !cpu_peripherals.apu.get_clock() {
                             let t = bus.memory_cycle_read(a, self.outs, oe, cpu_peripherals);
                             self.dmc_dma_counter += 1;
                             cpu_peripherals.apu.provide_dma_response(t);
