@@ -795,41 +795,47 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("AND ${:02x},X", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("AND ${:02x},X", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 3;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 3;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a &= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp.wrapping_add(s.x) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a &= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //and absolute
@@ -838,50 +844,50 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("AND ${:04x}", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("AND ${:04x}", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     _ => {
                         let temp = (s.temp2 as u16) << 8 | s.temp as u16;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a &= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & s.temp & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             temp,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a &= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & s.temp & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //and absolute x
@@ -890,29 +896,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("AND ${:04x},X", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("AND ${:04x},X", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -922,28 +928,29 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a &= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -952,21 +959,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a &= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //and absolute y
@@ -975,29 +982,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("AND ${:04x},Y", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("AND ${:04x},Y", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -1007,28 +1014,29 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a &= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -1037,21 +1045,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a &= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //and indirect x
@@ -1060,64 +1068,70 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("AND (${:02x},X)", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.temp = s.temp.wrapping_add(s.x);
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("AND (${:02x},X)", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
-                        s.temp = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 4;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 4;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     4 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 5;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 5;
                     }
                     _ => {
                         let addr = (s.temp as u16) << 8 | (s.temp2 as u16);
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a &= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //and indirect y
@@ -1126,39 +1140,39 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("AND (${:02x}),Y", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("AND (${:02x}),Y", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 4;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 4;
                     }
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
@@ -1168,29 +1182,30 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a &= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+
+                                    s.pc = s.pc.wrapping_add(2);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            s.pc = s.pc.wrapping_add(2);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 5;
+                                },
                                 (s.temp as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 5;
                         }
                     }
                     _ => {
@@ -1199,21 +1214,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a &= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //ora or immediate
@@ -1221,26 +1236,26 @@ impl NesCpu {
                     s.memory_cycle_read(
                         |s, v| {
                             s.temp = v;
+                            #[cfg(feature = "debugger")]
+                            {
+                                s.copy_debugger(format!("ORA #${:02x}", s.temp));
+                                s.done_fetching = true;
+                            }
+                            s.a |= s.temp;
+                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if s.a == 0 {
+                                s.p |= CPU_FLAG_ZERO;
+                            }
+                            if (s.a & 0x80) != 0 {
+                                s.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            s.pc = s.pc.wrapping_add(2);
+                            s.end_instruction();
                         },
                         s.pc.wrapping_add(1),
                         bus,
                         cpu_peripherals,
                     );
-                    #[cfg(feature = "debugger")]
-                    {
-                        s.copy_debugger(format!("ORA #${:02x}", s.temp));
-                        s.done_fetching = true;
-                    }
-                    s.a |= s.temp;
-                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                    if s.a == 0 {
-                        s.p |= CPU_FLAG_ZERO;
-                    }
-                    if (s.a & 0x80) != 0 {
-                        s.p |= CPU_FLAG_NEGATIVE;
-                    }
-                    s.pc = s.pc.wrapping_add(2);
-                    s.end_instruction();
                 }
                 //ora zero page
                 0x05 => match s.subcycle {
@@ -1248,37 +1263,37 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ORA ${:02x}", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ORA ${:02x}", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a |= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a |= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //ora zero page x
@@ -1287,41 +1302,47 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ORA ${:02x},X", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ORA ${:02x},X", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 3;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 3;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a |= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp.wrapping_add(s.x) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a |= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //ora absolute
@@ -1330,50 +1351,50 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("ORA ${:04x}", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("ORA ${:04x}", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     _ => {
                         let temp = (s.temp2 as u16) << 8 | s.temp as u16;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a |= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             temp,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a |= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //ora absolute x
@@ -1382,29 +1403,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("ORA ${:04x},X", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("ORA ${:04x},X", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -1414,28 +1435,29 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a |= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -1444,21 +1466,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a |= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //ora absolute y
@@ -1467,29 +1489,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("ORA ${:04x},Y", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("ORA ${:04x},Y", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -1499,28 +1521,29 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a |= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -1529,21 +1552,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a |= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //ora indirect x
@@ -1552,64 +1575,70 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ORA (${:02x},X)", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ORA (${:02x},X)", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.temp = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 4;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 4;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     4 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 5;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 5;
                     }
                     _ => {
                         let addr = (s.temp as u16) << 8 | (s.temp2 as u16);
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a |= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //ora indirect y
@@ -1618,39 +1647,39 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ORA (${:02x}),Y", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ORA (${:02x}),Y", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 4;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 4;
                     }
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
@@ -1660,29 +1689,30 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a |= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+
+                                    s.pc = s.pc.wrapping_add(2);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            s.pc = s.pc.wrapping_add(2);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 5;
+                                },
                                 (s.temp as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 5;
                         }
                     }
                     _ => {
@@ -1691,21 +1721,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a |= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //eor xor immediate
@@ -1713,64 +1743,64 @@ impl NesCpu {
                     s.memory_cycle_read(
                         |s, v| {
                             s.temp = v;
+                            #[cfg(feature = "debugger")]
+                            {
+                                s.copy_debugger(format!("EOR #${:02x}", s.temp));
+                                s.done_fetching = true;
+                            }
+                            s.a ^= s.temp;
+                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                            if s.a == 0 {
+                                s.p |= CPU_FLAG_ZERO;
+                            }
+                            if (s.a & 0x80) != 0 {
+                                s.p |= CPU_FLAG_NEGATIVE;
+                            }
+                            s.pc = s.pc.wrapping_add(2);
+                            s.end_instruction();
                         },
                         s.pc.wrapping_add(1),
                         bus,
                         cpu_peripherals,
                     );
-                    #[cfg(feature = "debugger")]
-                    {
-                        s.copy_debugger(format!("EOR #${:02x}", s.temp));
-                        s.done_fetching = true;
-                    }
-                    s.a ^= s.temp;
-                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                    if s.a == 0 {
-                        s.p |= CPU_FLAG_ZERO;
-                    }
-                    if (s.a & 0x80) != 0 {
-                        s.p |= CPU_FLAG_NEGATIVE;
-                    }
-                    s.pc = s.pc.wrapping_add(2);
-                    s.end_instruction();
                 }
                 //eor zero page
                 0x45 => match s.subcycle {
                     1 => {
-                        s.subcycle = 2;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("EOR ${:02x}", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("EOR ${:02x}", s.temp));
-                            s.done_fetching = true;
-                        }
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a ^= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a ^= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //eor zero page x
@@ -1779,41 +1809,47 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("EOR ${:02x},X", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("EOR ${:02x},X", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 3;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 3;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a ^= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp.wrapping_add(s.x) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a ^= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //eor absolute
@@ -1822,50 +1858,50 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("EOR ${:04x}", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("EOR ${:04x}", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     _ => {
                         let temp = (s.temp2 as u16) << 8 | s.temp as u16;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.a ^= s.temp;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             temp,
                             bus,
                             cpu_peripherals,
                         );
-                        s.a ^= s.temp;
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //eor absolute x
@@ -1874,29 +1910,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("EOR ${:04x},X", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("EOR ${:04x},X", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -1906,28 +1942,29 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a ^= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -1936,21 +1973,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a ^= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //eor absolute y
@@ -1959,29 +1996,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("EOR ${:04x},Y", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("EOR ${:04x},Y", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -1991,28 +2028,29 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a ^= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -2021,21 +2059,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a ^= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //eor xor indirect x
@@ -2044,64 +2082,71 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("EOR (${:02x},X)", s.temp));
+                                    s.done_fetching = true;
+                                }
+
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("EOR (${:02x},X)", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
-                        s.temp = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
                             |s, v| {
+                                s.temp = s.temp.wrapping_add(s.x);
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 4;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 4;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     4 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 5;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 5;
                     }
                     _ => {
                         let addr = (s.temp as u16) << 8 | (s.temp2 as u16);
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a ^= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //eor indirect y
@@ -2110,39 +2155,39 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("EOR (${:02x}),Y", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("EOR (${:02x}),Y", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 4;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 4;
                     }
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
@@ -2152,29 +2197,30 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.a ^= v;
+                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                    if s.a == 0 {
+                                        s.p |= CPU_FLAG_ZERO;
+                                    }
+                                    if (s.a & 0x80) != 0 {
+                                        s.p |= CPU_FLAG_NEGATIVE;
+                                    }
+
+                                    s.pc = s.pc.wrapping_add(2);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                            if s.a == 0 {
-                                s.p |= CPU_FLAG_ZERO;
-                            }
-                            if (s.a & 0x80) != 0 {
-                                s.p |= CPU_FLAG_NEGATIVE;
-                            }
-
-                            s.pc = s.pc.wrapping_add(2);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 5;
+                                },
                                 (s.temp as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 5;
                         }
                     }
                     _ => {
@@ -2183,21 +2229,21 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.a ^= v;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                        if s.a == 0 {
-                            s.p |= CPU_FLAG_ZERO;
-                        }
-                        if (s.a & 0x80) != 0 {
-                            s.p |= CPU_FLAG_NEGATIVE;
-                        }
-
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //adc immediate, add with carry
@@ -2205,86 +2251,92 @@ impl NesCpu {
                     s.memory_cycle_read(
                         |s, v| {
                             s.temp = v;
+                            #[cfg(feature = "debugger")]
+                            {
+                                s.copy_debugger(format!("ADC #${:02x}", s.temp));
+                                s.done_fetching = true;
+                            }
+                            s.cpu_adc(s.temp);
+                            s.pc = s.pc.wrapping_add(2);
+                            s.end_instruction();
                         },
                         s.pc.wrapping_add(1),
                         bus,
                         cpu_peripherals,
                     );
-                    #[cfg(feature = "debugger")]
-                    {
-                        s.copy_debugger(format!("ADC #${:02x}", s.temp));
-                        s.done_fetching = true;
-                    }
-                    s.cpu_adc(s.temp);
-                    s.pc = s.pc.wrapping_add(2);
-                    s.end_instruction();
                 }
                 //adc zero page
                 0x65 => match s.subcycle {
                     1 => {
-                        s.subcycle = 2;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ADC ${:02x}", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ADC ${:02x}", s.temp));
-                            s.done_fetching = true;
-                        }
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //adc zero page x
                 0x75 => match s.subcycle {
                     1 => {
-                        s.subcycle = 2;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ADC ${:02x},X", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ADC ${:02x},X", s.temp));
-                            s.done_fetching = true;
-                        }
                     }
                     2 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 3;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 3;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp.wrapping_add(s.x) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //adc absolute
@@ -2293,43 +2345,43 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("ADC ${:04x}", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("ADC ${:04x}", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     _ => {
                         let temp = (s.temp2 as u16) << 8 | s.temp as u16;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             temp,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //adc absolute x
@@ -2338,29 +2390,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("ADC ${:04x},X", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("ADC ${:04x},X", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -2370,22 +2422,23 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.temp = v;
+                                    s.cpu_adc(s.temp);
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.cpu_adc(s.temp);
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -2394,15 +2447,15 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //adc absolute y
@@ -2411,29 +2464,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("ADC ${:04x},Y", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("ADC ${:04x},Y", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -2443,22 +2496,23 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.temp = v;
+                                    s.cpu_adc(s.temp);
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.cpu_adc(s.temp);
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -2467,15 +2521,15 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //adc adc indirect x
@@ -2484,22 +2538,23 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ADC (${:02x},X)", s.temp));
+                                    s.done_fetching = true;
+                                }
+
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ADC (${:02x},X)", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
-                        s.temp = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
                             |s, v| {
+                                s.temp = s.temp.wrapping_add(s.x);
                                 s.temp2 = v;
                             },
                             s.temp as u16,
@@ -2509,33 +2564,39 @@ impl NesCpu {
                         s.subcycle = 3;
                     }
                     3 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 4;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 4;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     4 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 5;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 5;
                     }
                     _ => {
                         let addr = (s.temp as u16) << 8 | (s.temp2 as u16);
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //adc indirect y
@@ -2544,39 +2605,39 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("ADC (${:02x}),Y", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("ADC (${:02x}),Y", s.temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                s.subcycle = 3;
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 3;
                     }
                     3 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 4;
                             },
                             s.temp.wrapping_add(1) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 4;
                     }
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
@@ -2586,22 +2647,23 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.temp = v;
+                                    s.cpu_adc(s.temp);
+                                    s.pc = s.pc.wrapping_add(2);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.cpu_adc(s.temp);
-                            s.pc = s.pc.wrapping_add(2);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 5;
+                                },
                                 (s.temp as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 5;
                         }
                     }
                     _ => {
@@ -2610,14 +2672,14 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_adc(s.temp);
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_adc(s.temp);
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //sbc immediate, subtract with carry
@@ -2625,86 +2687,92 @@ impl NesCpu {
                     s.memory_cycle_read(
                         |s, v| {
                             s.temp = v;
+                            #[cfg(feature = "debugger")]
+                            {
+                                s.copy_debugger(format!("SBC #${:02x}", s.temp));
+                                s.done_fetching = true;
+                            }
+                            s.cpu_sbc(s.temp);
+                            s.pc = s.pc.wrapping_add(2);
+                            s.end_instruction();
                         },
                         s.pc.wrapping_add(1),
                         bus,
                         cpu_peripherals,
                     );
-                    #[cfg(feature = "debugger")]
-                    {
-                        s.copy_debugger(format!("SBC #${:02x}", s.temp));
-                        s.done_fetching = true;
-                    }
-                    s.cpu_sbc(s.temp);
-                    s.pc = s.pc.wrapping_add(2);
-                    s.end_instruction();
                 }
                 //sbc zero page
                 0xe5 => match s.subcycle {
                     1 => {
-                        s.subcycle = 2;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("SBC ${:02x}", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("SBC ${:02x}", s.temp));
-                            s.done_fetching = true;
-                        }
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_sbc(s.temp);
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_sbc(s.temp);
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //sbc zero page x
                 0xf5 => match s.subcycle {
                     1 => {
-                        s.subcycle = 2;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    s.copy_debugger(format!("SBC ${:02x},X", s.temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            s.copy_debugger(format!("SBC ${:02x},X", s.temp));
-                            s.done_fetching = true;
-                        }
                     }
                     2 => {
-                        s.memory_cycle_read(|s, v| {}, s.temp as u16, bus, cpu_peripherals);
-                        s.subcycle = 3;
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.subcycle = 3;
+                            },
+                            s.temp as u16,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     _ => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_sbc(s.temp);
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
                             },
                             s.temp.wrapping_add(s.x) as u16,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_sbc(s.temp);
-                        s.pc = s.pc.wrapping_add(2);
-                        s.end_instruction();
                     }
                 },
                 //sbc absolute
@@ -2713,43 +2781,43 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("SBC ${:04x}", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("SBC ${:04x}", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     _ => {
                         let temp = (s.temp2 as u16) << 8 | s.temp as u16;
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_sbc(s.temp);
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             temp,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_sbc(s.temp);
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //sbc absolute x
@@ -2758,29 +2826,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("SBC ${:04x},X", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("SBC ${:04x},X", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -2790,22 +2858,23 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.temp = v;
+                                    s.cpu_sbc(s.temp);
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.cpu_sbc(s.temp);
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -2814,15 +2883,15 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_sbc(s.temp);
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_sbc(s.temp);
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //sbc absolute y
@@ -2831,29 +2900,29 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.subcycle = 2;
                             },
                             s.pc.wrapping_add(1),
                             bus,
                             cpu_peripherals,
                         );
-                        s.subcycle = 2;
                     }
                     2 => {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp2 = v;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let temp = (s.temp2 as u16) << 8 | s.temp as u16;
+                                    s.copy_debugger(format!("SBC ${:04x},Y", temp));
+                                    s.done_fetching = true;
+                                }
+                                s.subcycle = 3;
                             },
                             s.pc.wrapping_add(2),
                             bus,
                             cpu_peripherals,
                         );
-                        #[cfg(feature = "debugger")]
-                        {
-                            let temp = (s.temp2 as u16) << 8 | s.temp as u16;
-                            s.copy_debugger(format!("SBC ${:04x},Y", temp));
-                            s.done_fetching = true;
-                        }
-                        s.subcycle = 3;
                     }
                     3 => {
                         let mut addr = (s.temp2 as u16) << 8 | (s.temp as u16);
@@ -2863,22 +2932,23 @@ impl NesCpu {
                             s.memory_cycle_read(
                                 |s, v| {
                                     s.temp = v;
+                                    s.cpu_sbc(s.temp);
+                                    s.pc = s.pc.wrapping_add(3);
+                                    s.end_instruction();
                                 },
                                 addr,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.cpu_sbc(s.temp);
-                            s.pc = s.pc.wrapping_add(3);
-                            s.end_instruction();
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {},
+                                |s, v| {
+                                    s.subcycle = 4;
+                                },
                                 (s.temp2 as u16) << 8 | val as u16,
                                 bus,
                                 cpu_peripherals,
                             );
-                            s.subcycle = 4;
                         }
                     }
                     _ => {
@@ -2887,15 +2957,15 @@ impl NesCpu {
                         s.memory_cycle_read(
                             |s, v| {
                                 s.temp = v;
+                                s.cpu_sbc(s.temp);
+
+                                s.pc = s.pc.wrapping_add(3);
+                                s.end_instruction();
                             },
                             addr,
                             bus,
                             cpu_peripherals,
                         );
-                        s.cpu_sbc(s.temp);
-
-                        s.pc = s.pc.wrapping_add(3);
-                        s.end_instruction();
                     }
                 },
                 //sbc indirect x
