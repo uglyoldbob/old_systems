@@ -364,39 +364,44 @@ impl NesCpu {
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
         let oe = self.calc_oe(address);
-        if let Some(a) = self.dmc_dma {
-            match self.dmc_dma_counter {
-                0 => {
-                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
-                    self.dmc_dma_counter += 1;
+        if self.dma_running {
+            if let Some(a) = self.dmc_dma {
+                match self.dmc_dma_counter {
+                    0 => {
+                        println!("Read DMC {:x} @ {:X}", address, self.pc);
+                        bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                        self.dmc_dma_counter += 1;
+                    }
+                    _ => {
+                        println!("DMC DETERMINE {}", cpu_peripherals.apu.get_clock());
+                        if cpu_peripherals.apu.get_clock() {
+                            let t = bus.memory_cycle_read(a, self.outs, oe, cpu_peripherals);
+                            self.dmc_dma_counter += 1;
+                            cpu_peripherals.apu.provide_dma_response(t);
+                            println!("DMC DMA took {} cycles", self.dmc_dma_counter);
+                            self.dmc_dma = None;
+                            self.dmc_dma_counter = 0;
+                            self.dma_running = false;
+                        } else {
+                            println!("Read DMC2 {:x} @ {:X}", address, self.pc);
+                            bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                            self.dmc_dma_counter += 1;
+                        }
+                    }
                 }
-                1 => {
-                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
-                    self.dmc_dma_counter += 1;
+            } else if let Some(dmaaddr) = self.oamdma {
+                if address == 0x2007 {
+                    println!("Read DMA 0x2007 @ {:X}", self.pc);
                 }
-                2 => {
-                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
-                    self.dmc_dma_counter += 1;
-                }
-                _ => {
-                    let t = bus.memory_cycle_read(a, self.outs, oe, cpu_peripherals);
-                    cpu_peripherals.apu.provide_dma_response(t);
-                    self.dmc_dma = None;
-                    self.dmc_dma_counter = 0;
-                }
-            }
-        } else if self.dma_running {
-            let dmaaddr = self.oamdma.unwrap();
                 self.dma_count += 1;
-                if (self.dma_counter & 1) == 0 && !self.dma_cycle {
+                if (self.dma_counter & 1) == 0 && !cpu_peripherals.apu.get_clock() {
                     let addr = (dmaaddr as u16) << 8 | (self.dma_counter >> 1);
                     self.temp = bus.memory_cycle_read(addr, self.outs, oe, cpu_peripherals);
                     self.dma_counter += 1;
-                } else if (self.dma_counter & 1) != 0 && self.dma_cycle{
+                } else if (self.dma_counter & 1) != 0 && cpu_peripherals.apu.get_clock() {
                     self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
                     self.dma_counter += 1;
-                }
-                else {
+                } else {
                     bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
                 }
                 if self.dma_counter == 512 {
@@ -406,12 +411,24 @@ impl NesCpu {
                     self.oamdma = None;
                     self.dma_counter = 0;
                 }
+            }
+        } else if self.dmc_dma.is_some() && !self.dma_running {
+            self.dma_running = true;
+            if address == 0x2007 {
+                println!("Read DMC1 0x2007 @ {:X}", self.pc);
+            }
+            bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
         } else if self.oamdma.is_some() && !self.dma_running {
             self.dma_running = true;
+            if address == 0x2007 {
+                println!("Read DMA1 0x2007 @ {:X}", self.pc);
+            }
             bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
             self.dma_count += 1;
-        }
-        else {
+        } else {
+            if address == 0x2007 {
+                println!("Read 0x2007 @ {:X}", self.pc);
+            }
             let a = bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
             c(self, a);
         }
@@ -8890,24 +8907,24 @@ impl NesCpu {
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
                         addr = addr.wrapping_add(s.y as u16);
-                            s.memory_cycle_read(
-                                |s, v| {
-                                    s.a = v;
-                                    s.x = s.a;
-                                    s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
-                                    if s.a == 0 {
-                                        s.p |= CPU_FLAG_ZERO;
-                                    }
-                                    if (s.a & 0x80) != 0 {
-                                        s.p |= CPU_FLAG_NEGATIVE;
-                                    }
-                                    s.pc = s.pc.wrapping_add(2);
-                                    s.end_instruction();
-                                },
-                                addr,
-                                bus,
-                                cpu_peripherals,
-                            );
+                        s.memory_cycle_read(
+                            |s, v| {
+                                s.a = v;
+                                s.x = s.a;
+                                s.p &= !(CPU_FLAG_ZERO | CPU_FLAG_NEGATIVE);
+                                if s.a == 0 {
+                                    s.p |= CPU_FLAG_ZERO;
+                                }
+                                if (s.a & 0x80) != 0 {
+                                    s.p |= CPU_FLAG_NEGATIVE;
+                                }
+                                s.pc = s.pc.wrapping_add(2);
+                                s.end_instruction();
+                            },
+                            addr,
+                            bus,
+                            cpu_peripherals,
+                        );
                     }
                     _ => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);

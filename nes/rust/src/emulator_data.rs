@@ -283,12 +283,13 @@ impl NesEmulatorData {
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
             let nmi = self.nmi[0] && self.nmi[1] && self.nmi[2];
+            
+            self.cpu_peripherals.apu.clock_slow(sound, filter);
             let irq = self.cpu_peripherals.apu.irq();
             self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
             self.prev_irq = irq;
-            self.cpu_peripherals.apu.clock_slow(sound, filter);
         }
 
         self.ppu_clock_counter += 1;
