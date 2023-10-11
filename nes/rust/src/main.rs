@@ -300,6 +300,7 @@ fn main() {
                 cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
             };
             config.buffer_size = num_samples_buffer;
+            config.channels = 2;
             println!("SBS IS {:?}", sbs);
 
             println!("audio config is {:?}", config);
@@ -309,7 +310,7 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let (producer, mut consumer) = crossbeam_channel::bounded::<f32>(num_samples);
+            let (producer, consumer) = crossbeam_channel::bounded::<f32>(num_samples);
             let mut stream = d
                 .build_output_stream(
                     &config,

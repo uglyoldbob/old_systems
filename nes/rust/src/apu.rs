@@ -405,6 +405,7 @@ impl NesApu {
         if let Some(sample) = self.build_audio_sample(filter) {
             if let Some(sender) = sound {
                 sender.send(sample);
+                sender.send(sample);
             }
         }
     }
