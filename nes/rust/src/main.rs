@@ -310,20 +310,16 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let (producer, consumer) = crossbeam_channel::bounded::<f32>(num_samples);
+            let rb = ringbuf::HeapRb::new(num_samples);
+            let (producer, mut consumer) = rb.split();
             let mut stream = d
                 .build_output_stream(
                     &config,
                     move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
-                        for d in data {
-                            match consumer.recv_timeout(std::time::Duration::from_millis(100)) {
-                                Ok(e) => {
-                                    *d = e;
-                                }
-                                Err(e) => {
-                                    break;
-                                }
-                            }
+                        let mut index = 0;
+                        while index < data.len() {
+                            let c = consumer.pop_slice(&mut data[index..]);
+                            index += c;
                         }
                     },
                     move |_err| {},

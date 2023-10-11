@@ -1,6 +1,7 @@
 //! Responsible for emulating the details of the audio processing (apu) of the nes console.
 
 use biquad::Biquad;
+use ringbuf::Producer;
 
 ///The modes that the sweep can operate in
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -345,7 +346,10 @@ impl NesApu {
     }
 
     /// Build an audio sample and run the audio filter
-    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
+    fn build_audio_sample(
+        &mut self,
+        filter: &mut Option<biquad::DirectForm1<f32>>,
+    ) -> Option<&[f32]> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
@@ -356,7 +360,8 @@ impl NesApu {
             self.output_index += 1.0;
             if self.output_index >= self.sample_interval {
                 self.output_index -= self.sample_interval;
-                Some(e)
+                self.fill_audio_buffer(e);
+                self.fill_audio_buffer(e)
             } else {
                 None
             }
@@ -368,7 +373,12 @@ impl NesApu {
     /// Clock the apu
     pub fn clock_slow(
         &mut self,
-        sound: &mut Option<crossbeam_channel::Sender<f32>>,
+        sound: &mut Option<
+            ringbuf::Producer<
+                f32,
+                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+            >,
+        >,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.always_clock = self.always_clock.wrapping_add(1);
@@ -403,9 +413,8 @@ impl NesApu {
             self.sound_disabled = false;
         }
         if let Some(sample) = self.build_audio_sample(filter) {
-            if let Some(sender) = sound {
-                sender.send(sample);
-                sender.send(sample);
+            if let Some(p) = sound {
+                p.push_slice(sample);
             }
         }
     }
