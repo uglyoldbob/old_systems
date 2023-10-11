@@ -96,6 +96,32 @@ impl NesMotherboard {
         return true;
     }
 
+    /// Signals a change in the three outputs fromm the cpu related to the controllers
+    pub fn joy_out_signal(&mut self, out: [bool; 3]) {
+        if let Some(c) = &mut self.controllers[0] {
+            c.parallel_signal(out[0]);
+        }
+        if let Some(c) = &mut self.controllers[1] {
+            c.parallel_signal(out[0]);
+        }
+        //TODO handle expansion port here
+    }
+
+    /// Signals a change in signal for the joystick outputs. right true means the right joystick signal. signal is the actual signal level (active level is false).
+    pub fn joy_clock_signal(&mut self, right: bool, signal: bool) {
+        if !right {
+            if let Some(c) = &mut self.controllers[0] {
+                c.clock(signal);
+            }
+        }
+        else {
+            if let Some(c) = &mut self.controllers[1] {
+                c.clock(signal);
+            }
+        }
+        //TODO clock expansion port for both left and right
+    }
+
     /// Perform a read operation on the cpu memory bus, but doesn;t have any side effects like a normal read might
     pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals) -> Option<u8> {
         let mut response: Option<u8> = None;
@@ -171,7 +197,6 @@ impl NesMotherboard {
     pub fn memory_cycle_read(
         &mut self,
         addr: u16,
-        _out: [bool; 3],
         _controllers: [bool; 2],
         per: &mut NesCpuPeripherals,
     ) -> u8 {
@@ -253,7 +278,6 @@ impl NesMotherboard {
         &mut self,
         addr: u16,
         data: u8,
-        out: [bool; 3],
         _controllers: [bool; 2],
         per: &mut NesCpuPeripherals,
     ) {
@@ -276,13 +300,6 @@ impl NesMotherboard {
             }
             0x4000..=0x4017 => {
                 //apu and io
-                if addr == 0x4016 {
-                    for mut c in &mut self.controllers {
-                        if let Some(con) = &mut c {
-                            con.update_latch_bits(out);
-                        }
-                    }
-                }
                 match addr {
                     0x4014 => {}
                     _ => {

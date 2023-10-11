@@ -9,8 +9,10 @@ use egui_multiwin::egui;
 /// The trait the all controllers must implement
 #[enum_dispatch::enum_dispatch]
 pub trait NesControllerTrait {
-    /// Update the latch bits on the controller
-    fn update_latch_bits(&mut self, data: [bool; 3]);
+    /// Clock signal for the controller, must implement additional logic for edge sensitive behavior
+    fn clock(&mut self, c: bool);
+    /// Update the serial/parallel input
+    fn parallel_signal(&mut self, s: bool);
     /// Dump data from the controller. No side effects.
     fn dump_data(&self) -> u8;
     /// Read data from the controller.
@@ -38,6 +40,8 @@ pub struct StandardController {
     shift_register: u8,
     /// The strobe signal triggers loading the controller data into the shift register
     strobe: bool,
+    /// The previous clock signal
+    prevclk: bool,
 }
 
 /// Flag for the a button
@@ -64,6 +68,7 @@ impl StandardController {
             controller_buttons: 0xff,
             shift_register: 0xff,
             strobe: false,
+            prevclk: false,
         })
         .into()
     }
@@ -77,10 +82,22 @@ impl StandardController {
 }
 
 impl NesControllerTrait for StandardController {
-    fn update_latch_bits(&mut self, data: [bool; 3]) {
-        self.strobe = data[0];
+    fn parallel_signal(&mut self, s:bool) {
+        self.strobe = s;
         self.check_strobe();
     }
+
+    fn clock(&mut self, c: bool) {
+        if c ^ self.prevclk {
+            println!("Clock {}", c);
+        }
+        let active_high_edge = c && !self.prevclk;
+        if active_high_edge && !self.strobe {
+            self.shift_register >>= 1;
+        }
+        self.prevclk = c;
+    }
+
     fn dump_data(&self) -> u8 {
         let data = self.shift_register & 1;
         data | 0x1e
@@ -133,9 +150,8 @@ impl NesControllerTrait for StandardController {
     }
 
     fn read_data(&mut self) -> u8 {
-        self.check_strobe();
+        println!("Read {}", self.shift_register & 1);
         let data = self.shift_register & 1;
-        self.shift_register >>= 1;
         data | 0x1e
     }
     fn provide_egui_ref(&mut self, data: &egui::InputState) {

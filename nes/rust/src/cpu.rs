@@ -364,23 +364,25 @@ impl NesCpu {
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
         let oe = self.calc_oe(address);
+        bus.joy_clock_signal(false, oe[0]);
+        bus.joy_clock_signal(true, oe[1]);
         if self.dma_running {
             if let Some(a) = self.dmc_dma {
                 match self.dmc_dma_counter {
                     0 => {
-                        bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                        bus.memory_cycle_read(address, oe, cpu_peripherals);
                         self.dmc_dma_counter += 1;
                     }
                     _ => {
                         if !cpu_peripherals.apu.get_clock() {
-                            let t = bus.memory_cycle_read(a, self.outs, oe, cpu_peripherals);
+                            let t = bus.memory_cycle_read(a, oe, cpu_peripherals);
                             self.dmc_dma_counter += 1;
                             cpu_peripherals.apu.provide_dma_response(t);
                             self.dmc_dma = None;
                             self.dmc_dma_counter = 0;
                             self.dma_running = false;
                         } else {
-                            bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                            bus.memory_cycle_read(address, oe, cpu_peripherals);
                             self.dmc_dma_counter += 1;
                         }
                     }
@@ -389,13 +391,13 @@ impl NesCpu {
                 self.dma_count += 1;
                 if (self.dma_counter & 1) == 0 && !cpu_peripherals.apu.get_clock() {
                     let addr = (dmaaddr as u16) << 8 | (self.dma_counter >> 1);
-                    self.temp = bus.memory_cycle_read(addr, self.outs, oe, cpu_peripherals);
+                    self.temp = bus.memory_cycle_read(addr, oe, cpu_peripherals);
                     self.dma_counter += 1;
                 } else if (self.dma_counter & 1) != 0 && cpu_peripherals.apu.get_clock() {
                     self.memory_cycle_write(0x2004, self.temp, bus, cpu_peripherals);
                     self.dma_counter += 1;
                 } else {
-                    bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+                    bus.memory_cycle_read(address, oe, cpu_peripherals);
                 }
                 if self.dma_counter == 512 {
                     self.dma_running = false;
@@ -406,13 +408,13 @@ impl NesCpu {
             }
         } else if self.dmc_dma.is_some() && !self.dma_running {
             self.dma_running = true;
-            bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+            bus.memory_cycle_read(address, oe, cpu_peripherals);
         } else if self.oamdma.is_some() && !self.dma_running {
             self.dma_running = true;
-            bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+            bus.memory_cycle_read(address, oe, cpu_peripherals);
             self.dma_count += 1;
         } else {
-            let a = bus.memory_cycle_read(address, self.outs, oe, cpu_peripherals);
+            let a = bus.memory_cycle_read(address, oe, cpu_peripherals);
             c(self, a);
         }
     }
@@ -425,14 +427,17 @@ impl NesCpu {
         bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
     ) {
+        bus.joy_clock_signal(false, true);
+        bus.joy_clock_signal(true, true);
         if addr == 0x4014 {
             self.oamdma = Some(data);
         } else if addr == 0x4016 {
             self.outs[0] = (data & 1) != 0;
             self.outs[1] = (data & 2) != 0;
             self.outs[2] = (data & 4) != 0;
+            bus.joy_out_signal(self.outs);
         }
-        bus.memory_cycle_write(addr, data, self.outs, [true; 2], cpu_peripherals);
+        bus.memory_cycle_write(addr, data, [true; 2], cpu_peripherals);
     }
 
     /// Returns true when a breakpoint is active
