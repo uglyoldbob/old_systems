@@ -380,7 +380,11 @@ impl NesCpu {
                             cpu_peripherals.apu.provide_dma_response(t);
                             self.dmc_dma = None;
                             self.dmc_dma_counter = 0;
-                            self.dma_running = false;
+                            if self.dmc_dma.is_none() && self.oamdma.is_none() {
+                                bus.joy_clock_signal(false, true);
+                                bus.joy_clock_signal(true, true);
+                                self.dma_running = false;
+                            }
                         } else {
                             bus.memory_cycle_read(address, oe, cpu_peripherals);
                             self.dmc_dma_counter += 1;
@@ -400,10 +404,14 @@ impl NesCpu {
                     bus.memory_cycle_read(address, oe, cpu_peripherals);
                 }
                 if self.dma_counter == 512 {
-                    self.dma_running = false;
                     self.dma_count = 0;
                     self.oamdma = None;
                     self.dma_counter = 0;
+                    if self.dmc_dma.is_none() && self.oamdma.is_none() {
+                        bus.joy_clock_signal(false, true);
+                        bus.joy_clock_signal(true, true);
+                        self.dma_running = false;
+                    }
                 }
             }
         } else if self.dmc_dma.is_some() && !self.dma_running {
@@ -416,6 +424,8 @@ impl NesCpu {
         } else {
             let a = bus.memory_cycle_read(address, oe, cpu_peripherals);
             c(self, a);
+            bus.joy_clock_signal(false, true);
+            bus.joy_clock_signal(true, true);
         }
     }
 

@@ -88,9 +88,6 @@ impl NesControllerTrait for StandardController {
     }
 
     fn clock(&mut self, c: bool) {
-        if c ^ self.prevclk {
-            println!("Clock {}", c);
-        }
         let active_high_edge = c && !self.prevclk;
         if active_high_edge && !self.strobe {
             self.shift_register >>= 1;
@@ -150,7 +147,6 @@ impl NesControllerTrait for StandardController {
     }
 
     fn read_data(&mut self) -> u8 {
-        println!("Read {}", self.shift_register & 1);
         let data = self.shift_register & 1;
         data | 0x1e
     }

@@ -2,6 +2,7 @@ use std::io::BufRead;
 
 use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
+use crate::controller;
 use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
 use crate::motherboard::NesMotherboard;
@@ -581,6 +582,7 @@ fn cpu_dma_test4() {
         "../test_roms/dmc_dma_during_read4/dma_4016_read.nes".to_string(),
     )
     .unwrap();
+    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -591,7 +593,7 @@ fn cpu_dma_test4() {
             }
         }
     }
-    assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(129, "Passed".to_string().as_bytes()));
 }
 
 #[test]
