@@ -368,6 +368,7 @@ impl NesCpu {
         bus.joy_clock_signal(true, oe[1]);
         if self.dma_running {
             if let Some(a) = self.dmc_dma {
+                self.dma_count += 1;
                 match self.dmc_dma_counter {
                     0 => {
                         bus.memory_cycle_read(address, oe, cpu_peripherals);
@@ -383,6 +384,8 @@ impl NesCpu {
                             if self.dmc_dma.is_none() && self.oamdma.is_none() {
                                 bus.joy_clock_signal(false, true);
                                 bus.joy_clock_signal(true, true);
+                                println!("DMA took {} cycles", self.dma_count);
+                                self.dma_count = 0;
                                 self.dma_running = false;
                             }
                         } else {
@@ -404,13 +407,14 @@ impl NesCpu {
                     bus.memory_cycle_read(address, oe, cpu_peripherals);
                 }
                 if self.dma_counter == 512 {
-                    self.dma_count = 0;
                     self.oamdma = None;
                     self.dma_counter = 0;
                     if self.dmc_dma.is_none() && self.oamdma.is_none() {
                         bus.joy_clock_signal(false, true);
                         bus.joy_clock_signal(true, true);
                         self.dma_running = false;
+                        println!("DMA took {} cycles", self.dma_count);
+                        self.dma_count = 0;
                     }
                 }
             }
