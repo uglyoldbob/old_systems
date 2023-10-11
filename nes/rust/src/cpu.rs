@@ -384,7 +384,6 @@ impl NesCpu {
                             if self.dmc_dma.is_none() && self.oamdma.is_none() {
                                 bus.joy_clock_signal(false, true);
                                 bus.joy_clock_signal(true, true);
-                                println!("DMA took {} cycles", self.dma_count);
                                 self.dma_count = 0;
                                 self.dma_running = false;
                             }
@@ -413,7 +412,6 @@ impl NesCpu {
                         bus.joy_clock_signal(false, true);
                         bus.joy_clock_signal(true, true);
                         self.dma_running = false;
-                        println!("DMA took {} cycles", self.dma_count);
                         self.dma_count = 0;
                     }
                 }

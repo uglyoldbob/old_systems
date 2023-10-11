@@ -262,6 +262,9 @@ fn main() {
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
+    use rb::RB;
+    use serde_with::DurationMilliSeconds;
+
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let mut event_loop = egui_multiwin::winit::event_loop::EventLoopBuilder::with_user_event();
@@ -310,21 +313,13 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let (producer, consumer) = crossbeam_channel::bounded::<f32>(num_samples);
+            let rb = rb::SpscRb::new(num_samples*2);
+            let (producer, consumer) = (rb.producer(), rb.consumer());
             let mut stream = d
                 .build_output_stream(
                     &config,
                     move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
-                        for d in data {
-                            match consumer.recv_timeout(std::time::Duration::from_millis(100)) {
-                                Ok(e) => {
-                                    *d = e;
-                                }
-                                Err(e) => {
-                                    break;
-                                }
-                            }
-                        }
+                        rb::RbConsumer::read_blocking(&consumer, data);
                     },
                     move |_err| {},
                     None,

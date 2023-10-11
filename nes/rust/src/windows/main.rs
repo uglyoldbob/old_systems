@@ -22,7 +22,7 @@ pub struct MainNesWindow {
     /// The number of samples per second of the audio output.
     sound_rate: u32,
     /// The producing half of the ring buffer used for audio.
-    sound: Option<crossbeam_channel::Sender<f32>>,
+    sound: Option<rb::Producer<f32>>,
     /// The texture used for rendering the ppu image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
@@ -55,7 +55,7 @@ impl MainNesWindow {
     #[cfg(feature = "egui-multiwin")]
     pub fn new_request(
         rate: u32,
-        producer: Option<crossbeam_channel::Sender<f32>>,
+        producer: Option<rb::Producer<f32>>,
         stream: Option<cpal::Stream>,
     ) -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
