@@ -190,7 +190,9 @@ impl NesApu {
 
     /// Initialize the audio buffer
     pub fn set_audio_buffer(&mut self, size: usize) {
-        self.buffer = vec![0.0; size];
+        println!("Set audio buffer?");
+        self.buffer = vec![0.0; size & !1];
+        self.buffer_index = (self.buffer.len() - 2);
     }
 
     /// Reset the apu

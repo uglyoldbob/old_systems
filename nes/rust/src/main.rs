@@ -285,12 +285,14 @@ fn main() {
             let format = supportedconfig.sample_format();
             println!("output format is {:?}", format);
             let mut config = supportedconfig.config();
-            let num_samples = (config.sample_rate.0 as f32 * 0.075) as usize;
+            let mut num_samples = (config.sample_rate.0 as f32 * 0.1) as usize;
             let sbs = supportedconfig.buffer_size();
             let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
+                    num_samples = *max as usize;
                     cpal::BufferSize::Fixed(*max as cpal::FrameCount)
                 } else if num_samples < *min as usize {
+                    num_samples = *min as usize;
                     cpal::BufferSize::Fixed(*min as cpal::FrameCount)
                 } else {
                     cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
@@ -310,7 +312,7 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let rb = ringbuf::HeapRb::new(num_samples);
+            let rb = ringbuf::HeapRb::new(num_samples*2);
             let (producer, mut consumer) = rb.split();
             let mut stream = d
                 .build_output_stream(
@@ -319,6 +321,9 @@ fn main() {
                         let mut index = 0;
                         while index < data.len() {
                             let c = consumer.pop_slice(&mut data[index..]);
+                            if c == 0 {
+                                break;
+                            }
                             index += c;
                         }
                     },
