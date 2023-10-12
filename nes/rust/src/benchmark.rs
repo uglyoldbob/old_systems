@@ -8,6 +8,7 @@ mod emulator_data;
 mod motherboard;
 mod ppu;
 mod romlist;
+mod rom_status;
 mod utility;
 
 use crate::apu::NesApu;
@@ -37,7 +38,7 @@ pub fn cpu_bench(c: &mut Criterion) {
     let mut nes_data = NesEmulatorData::new();
     group.bench_function("basic 2", |b| {
         b.iter(|| 'emulator_loop: loop {
-            nes_data.ppu_step();
+            nes_data.cycle_step(&mut None, &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;
@@ -133,12 +134,9 @@ pub fn bench1(c: &mut Criterion) {
     let mut nes_data = NesEmulatorData::new();
     group.bench_function("basic 1", |b| {
         b.iter(|| 'emulator_loop: loop {
-            nes_data.ppu_step();
+            nes_data.cycle_step(&mut None, &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 let data = nes_data.cpu_peripherals.ppu_get_frame();
-                if data[0] == 0 {
-                    nes_data.ppu_step();
-                }
                 break 'emulator_loop;
             }
         });
@@ -155,7 +153,6 @@ pub fn romlist_bench(c: &mut Criterion) {
             let _e = std::fs::remove_file("./roms.bin");
             let mut list = romlist::RomListParser::new();
             list.find_roms("../test_roms");
-            println!("There are {} roms", list.count());
             list.process_roms();
         });
     });
@@ -164,7 +161,6 @@ pub fn romlist_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut list = romlist::RomListParser::new();
             list.find_roms("../test_roms");
-            println!("There are {} roms", list.count());
             list.process_roms();
         });
     });

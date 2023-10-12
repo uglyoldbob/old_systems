@@ -279,11 +279,11 @@ impl NesCartridge {
         let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
         if file_offset != rom_contents.len() {
-            println!(
+            /*println!(
                 "Expected to read {:x} bytes, read {:x}",
                 rom_contents.len(),
                 file_offset
-            );
+            );*/
         }
         let hash = calc_sha256(rom_contents);
         Ok(Self {
@@ -359,7 +359,7 @@ impl NesCartridge {
         }
 
         if file_offset < rom_contents.len() {
-            println!("Didn't use the entire rom file, I should report this as a failure");
+            //println!("Didn't use the entire rom file, I should report this as a failure");
         }
 
         let mappernum = (rom_contents[6] >> 4) as u16
@@ -393,8 +393,6 @@ impl NesCartridge {
 
     /// Load a cartridge, returning an error or the new cartridge
     pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
-        #[cfg(test)]
-        println!("Opening rom {}", name);
         let rom_contents = std::fs::read(name.clone());
         if let Err(e) = rom_contents {
             return Err(CartridgeError::FsError(e.kind().to_string()));
