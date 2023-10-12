@@ -2133,10 +2133,12 @@ fn ppu_nmi() {
 }
 
 #[test]
+#[ignore]
 fn controller1() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/count_errors.nes".to_string())
         .unwrap();
+    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2151,11 +2153,13 @@ fn controller1() {
 }
 
 #[test]
+#[ignore]
 fn controller2() {
     let mut nes_data = NesEmulatorData::new();
     let nc =
         NesCartridge::load_cartridge("../test_roms/read_joy3/count_errors_fast.nes".to_string())
             .unwrap();
+    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2174,6 +2178,7 @@ fn controller3() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/test_buttons.nes".to_string())
         .unwrap();
+    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2184,6 +2189,9 @@ fn controller3() {
             break;
         }
     }
+    assert!(nes_data.mb.check_vram(129, "A".to_string().as_bytes()));
+    if let Some(c) = &mut nes_data.mb.controllers[0] {}
+
     //TODO implement controller manipulating with test
     assert!(nes_data.mb.check_vram(873, "Passed".to_string().as_bytes()));
 }

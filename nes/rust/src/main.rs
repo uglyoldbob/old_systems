@@ -227,7 +227,7 @@ fn main() {
             break;
         }
 
-        let time_now = std::time::SystemTime::now();
+        let time_now = std::time::Instant::now();
         let frame_time = time_now.duration_since(last_frame_time).unwrap();
         let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         if frame_time < desired_frame_length {

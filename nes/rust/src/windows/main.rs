@@ -224,10 +224,16 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         {
             egui.egui_ctx.input(|i| {
                 if let Some(c) = &mut c.mb.controllers[0] {
-                    c.provide_egui_ref(i);
+                    for (i, contr) in c.get_buttons_iter_mut().enumerate() {
+                        let i = i << 1;
+                        unimplemented!();
+                    }
                 }
                 if let Some(c) = &mut c.mb.controllers[1] {
-                    c.provide_egui_ref(i);
+                    for (i, contr) in c.get_buttons_iter_mut().enumerate() {
+                        let i = 1 + i << 1;
+                        unimplemented!();
+                    }
                 }
             });
         }
@@ -420,12 +426,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     }
-                }
-                if let Some(c) = &c.mb.controllers[0] {
-                    ui.label(c.to_string());
-                }
-                if let Some(c) = &c.mb.controllers[1] {
-                    ui.label(c.to_string());
                 }
             }
             ui.label(format!("{:.0} FPS", self.fps));
