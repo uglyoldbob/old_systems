@@ -324,7 +324,7 @@ impl StandardController {
     ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register
     fn check_strobe(&mut self) {
         if self.strobe {
-            let controller_buttons = if self.combo[0].buttons[BUTTON_COMBO_A].is_none() {
+            let controller_buttons = if self.combo[0].buttons[BUTTON_COMBO_A].is_some() {
                 0
             } else {
                 BUTTON_A
