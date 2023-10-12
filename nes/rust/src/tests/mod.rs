@@ -3,6 +3,7 @@ use std::io::BufRead;
 use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
 use crate::controller;
+use crate::controller::NesControllerTrait;
 use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
 use crate::motherboard::NesMotherboard;
@@ -2181,19 +2182,65 @@ fn controller3() {
     nes_data.mb.controllers[0] = Some(controller::StandardController::new());
     nes_data.insert_cartridge(nc);
 
+    let mut frame = 100;
+
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 100
+            && nes_data.cpu_peripherals.ppu_frame_number() == frame
         {
             break;
         }
     }
-    assert!(nes_data.mb.check_vram(129, "A".to_string().as_bytes()));
-    if let Some(c) = &mut nes_data.mb.controllers[0] {}
 
-    //TODO implement controller manipulating with test
-    assert!(nes_data.mb.check_vram(873, "Passed".to_string().as_bytes()));
+    let tests = [
+        (crate::controller::BUTTON_COMBO_A, "A", 129),
+        (crate::controller::BUTTON_COMBO_B, "B", 0xC1),
+        (crate::controller::BUTTON_COMBO_SELECT, "Select", 0x101),
+        (crate::controller::BUTTON_COMBO_START, "Start", 0x141),
+        (crate::controller::BUTTON_COMBO_UP, "Up", 0x181),
+        (crate::controller::BUTTON_COMBO_DOWN, "Down", 0x1C1),
+        (crate::controller::BUTTON_COMBO_LEFT, "Left", 0x201),
+        (crate::controller::BUTTON_COMBO_RIGHT, "Right", 0x241),
+        ];
+    for (thebutton, text, vram) in tests {
+        println!("Testing {}", text);
+        assert!(nes_data.mb.check_vram(vram, text.to_string().as_bytes()));
+        if let Some(c) = &mut nes_data.mb.controllers[0] {
+            let mut buttons = c.get_buttons_iter_mut();
+            let button = buttons.next();
+            if let Some(b) = button {
+                b.set_button(thebutton, 0);
+            }
+        }
+        loop {
+            nes_data.cycle_step(&mut None, &mut None);
+            if nes_data.cpu_peripherals.ppu_frame_end()
+                && nes_data.cpu_peripherals.ppu_frame_number() == (frame + 50)
+            {
+                break;
+            }
+        }
+
+        if let Some(c) = &mut nes_data.mb.controllers[0] {
+            let mut buttons = c.get_buttons_iter_mut();
+            let button = buttons.next();
+            if let Some(b) = button {
+                b.clear_button(thebutton);
+            }
+        }
+        loop {
+            nes_data.cycle_step(&mut None, &mut None);
+            if nes_data.cpu_peripherals.ppu_frame_end()
+                && nes_data.cpu_peripherals.ppu_frame_number() == (frame + 100)
+            {
+                break;
+            }
+        }
+        frame += 150;
+    }
+
+    assert!(nes_data.mb.check_vram(0x2C1, "Passed".to_string().as_bytes()));
 }
 
 #[test]

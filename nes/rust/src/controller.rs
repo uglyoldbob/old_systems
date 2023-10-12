@@ -1,12 +1,11 @@
 //! This module is responsible for emulating controllers for the nes system.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui;
 use egui_multiwin::egui::InputState;
 
 /// The types of user input that can be accepted
@@ -153,7 +152,7 @@ impl ButtonCombination {
     }
 
     /// Set the status of a single button for a button combination. val is for the potentiometer value. Only applies for index BUTTON_COMBO_POTENTIOMETER
-    fn set_button(&mut self, i: usize, val: u16) {
+    pub fn set_button(&mut self, i: usize, val: u16) {
         match i {
             BUTTON_COMBO_A => {
                 self.buttons[BUTTON_COMBO_A] = Some(Button::A);
@@ -217,7 +216,7 @@ impl ButtonCombination {
     }
 
     /// Clear a button for a button combination.
-    fn clear_button(&mut self, i: usize) {
+    pub fn clear_button(&mut self, i: usize) {
         match i {
             BUTTON_COMBO_TURBOA => {
                 if let Some(Button::TurboA(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
