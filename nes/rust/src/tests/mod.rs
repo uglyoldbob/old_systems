@@ -1093,7 +1093,7 @@ fn apu_test15() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+            && nes_data.cpu_peripherals.ppu_frame_number() == 50
         {
             break;
         }
