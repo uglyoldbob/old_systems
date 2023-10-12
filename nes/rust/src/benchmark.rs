@@ -7,8 +7,8 @@ mod cpu;
 mod emulator_data;
 mod motherboard;
 mod ppu;
-mod romlist;
 mod rom_status;
+mod romlist;
 mod utility;
 
 use crate::apu::NesApu;

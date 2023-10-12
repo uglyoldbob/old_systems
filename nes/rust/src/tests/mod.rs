@@ -1031,7 +1031,7 @@ fn apu_test13() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+            && nes_data.cpu_peripherals.ppu_frame_number() == 50
         {
             break;
         }
@@ -1081,7 +1081,7 @@ fn apu_test15() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+            && nes_data.cpu_peripherals.ppu_frame_number() == 50
         {
             break;
         }
@@ -1093,7 +1093,7 @@ fn apu_test15() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 50
+            && nes_data.cpu_peripherals.ppu_frame_number() == 150
         {
             break;
         }
@@ -2202,7 +2202,7 @@ fn controller3() {
         (crate::controller::BUTTON_COMBO_DOWN, "Down", 0x1C1),
         (crate::controller::BUTTON_COMBO_LEFT, "Left", 0x201),
         (crate::controller::BUTTON_COMBO_RIGHT, "Right", 0x241),
-        ];
+    ];
     for (thebutton, text, vram) in tests {
         println!("Testing {}", text);
         assert!(nes_data.mb.check_vram(vram, text.to_string().as_bytes()));
@@ -2240,7 +2240,9 @@ fn controller3() {
         frame += 150;
     }
 
-    assert!(nes_data.mb.check_vram(0x2C1, "Passed".to_string().as_bytes()));
+    assert!(nes_data
+        .mb
+        .check_vram(0x2C1, "Passed".to_string().as_bytes()));
 }
 
 #[test]

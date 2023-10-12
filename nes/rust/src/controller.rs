@@ -141,8 +141,7 @@ impl ButtonCombination {
                 UserInput::Egui(b) => {
                     if i.key_down(*b) {
                         self.set_button(index, 0);
-                    }
-                    else {
+                    } else {
                         self.clear_button(index);
                     }
                 }
@@ -228,8 +227,7 @@ impl ButtonCombination {
                     self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(false, rate));
                 }
             }
-            BUTTON_COMBO_POTENTIOMETER => {
-            }
+            BUTTON_COMBO_POTENTIOMETER => {}
             _ => {
                 self.buttons[i] = None;
             }
@@ -283,10 +281,8 @@ pub struct StandardController {
     strobe: bool,
     /// The previous clock signal
     prevclk: bool,
-    /// The mask for rapid fire operation
-    rapid_fire: [bool; 3],
-    /// The time since a toggle of rapid_fire
-    rapid_time: [Duration; 3],
+    /// The mask for and time since a toggle of rapid_fire
+    rapid_fire: [(bool, Duration); 3],
 }
 
 /// Flag for the a button
@@ -314,8 +310,7 @@ impl StandardController {
             shift_register: 0xff,
             strobe: false,
             prevclk: false,
-            rapid_fire: [false; 3],
-            rapid_time: [Duration::from_millis(0); 3],
+            rapid_fire: [(false, Duration::from_millis(0)); 3],
         })
         .into()
     }
@@ -323,39 +318,78 @@ impl StandardController {
     ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register
     fn check_strobe(&mut self) {
         if self.strobe {
-            let controller_buttons = if self.combo[0].buttons[BUTTON_COMBO_A].is_some() {
-                0
-            } else {
-                BUTTON_A
-            } | if self.combo[0].buttons[BUTTON_COMBO_B].is_some() {
-                0
-            } else {
-                BUTTON_B
-            } | if self.combo[0].buttons[BUTTON_COMBO_START].is_some() {
-                0
-            } else {
-                BUTTON_START
-            } | if self.combo[0].buttons[BUTTON_COMBO_SELECT].is_some() {
-                0
-            } else {
-                BUTTON_SELECT
-            } | if self.combo[0].buttons[BUTTON_COMBO_UP].is_some() {
-                0
-            } else {
-                BUTTON_UP
-            } | if self.combo[0].buttons[BUTTON_COMBO_DOWN].is_some() {
-                0
-            } else {
-                BUTTON_DOWN
-            } | if self.combo[0].buttons[BUTTON_COMBO_LEFT].is_some() {
-                0
-            } else {
-                BUTTON_LEFT
-            } | if self.combo[0].buttons[BUTTON_COMBO_RIGHT].is_some() {
-                0
-            } else {
-                BUTTON_RIGHT
-            };
+            let rapida = self.combo[0].buttons[BUTTON_COMBO_TURBOA]
+                .as_ref()
+                .map(|c| {
+                    if let Button::TurboA(flag, _rate) = c {
+                        if *flag {
+                            self.rapid_fire[0].0
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(true);
+            let rapidb = self.combo[0].buttons[BUTTON_COMBO_TURBOB]
+                .as_ref()
+                .map(|c| {
+                    if let Button::TurboB(flag, _rate) = c {
+                        if *flag {
+                            self.rapid_fire[1].0
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false);
+            let slow = self.combo[0].buttons[BUTTON_COMBO_SLOW]
+                .as_ref()
+                .map(|c| {
+                    if let Button::Slow = c {
+                        self.rapid_fire[2].0
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false);
+            let controller_buttons =
+                if rapida || self.combo[0].buttons[BUTTON_COMBO_A].is_some() {
+                    0
+                } else {
+                    BUTTON_A
+                } | if rapidb || self.combo[0].buttons[BUTTON_COMBO_B].is_some() {
+                    0
+                } else {
+                    BUTTON_B
+                } | if slow || self.combo[0].buttons[BUTTON_COMBO_START].is_some() {
+                    0
+                } else {
+                    BUTTON_START
+                } | if self.combo[0].buttons[BUTTON_COMBO_SELECT].is_some() {
+                    0
+                } else {
+                    BUTTON_SELECT
+                } | if self.combo[0].buttons[BUTTON_COMBO_UP].is_some() {
+                    0
+                } else {
+                    BUTTON_UP
+                } | if self.combo[0].buttons[BUTTON_COMBO_DOWN].is_some() {
+                    0
+                } else {
+                    BUTTON_DOWN
+                } | if self.combo[0].buttons[BUTTON_COMBO_LEFT].is_some() {
+                    0
+                } else {
+                    BUTTON_LEFT
+                } | if self.combo[0].buttons[BUTTON_COMBO_RIGHT].is_some() {
+                    0
+                } else {
+                    BUTTON_RIGHT
+                };
             self.shift_register = controller_buttons;
         }
     }
@@ -367,7 +401,40 @@ impl NesControllerTrait for StandardController {
         self.check_strobe();
     }
 
-    fn rapid_fire(&mut self, time: Duration) {}
+    fn rapid_fire(&mut self, time: Duration) {
+        for (index, (flag, t)) in &mut self.rapid_fire.iter_mut().enumerate() {
+            *t += time;
+            let req = match index {
+                0 => {
+                    if let Some(a) = &self.combo[0].buttons[BUTTON_COMBO_TURBOA] {
+                        if let Button::TurboA(_flag, rate) = a {
+                            *rate
+                        } else {
+                            Duration::from_millis(0)
+                        }
+                    } else {
+                        Duration::from_millis(0)
+                    }
+                }
+                1 => {
+                    if let Some(a) = &self.combo[0].buttons[BUTTON_COMBO_TURBOB] {
+                        if let Button::TurboA(_flag, rate) = a {
+                            *rate
+                        } else {
+                            Duration::from_millis(0)
+                        }
+                    } else {
+                        Duration::from_millis(0)
+                    }
+                }
+                _ => Duration::from_millis(50),
+            };
+            if *t > req {
+                *t -= req;
+                *flag = !*flag;
+            }
+        }
+    }
 
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
         self.combo.iter_mut()
