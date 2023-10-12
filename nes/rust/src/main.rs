@@ -170,7 +170,7 @@ fn main() {
 
     let start_time = std::time::Instant::now();
     'main_loop: loop {
-        let frame_start = std::time::SystemTime::now();
+        let frame_start = std::time::Instant::now();
 
         egui_state.input.time = Some(start_time.elapsed().as_secs_f64());
         egui_ctx.begin_frame(egui_state.input.take());
