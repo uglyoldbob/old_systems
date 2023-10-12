@@ -312,7 +312,7 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let rb = ringbuf::HeapRb::new(num_samples*2);
+            let rb = ringbuf::HeapRb::new(num_samples * 2);
             let (producer, mut consumer) = rb.split();
             let mut stream = d
                 .build_output_stream(

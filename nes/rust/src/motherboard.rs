@@ -93,7 +93,7 @@ impl NesMotherboard {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     /// Signals a change in the three outputs fromm the cpu related to the controllers
@@ -113,11 +113,8 @@ impl NesMotherboard {
             if let Some(c) = &mut self.controllers[0] {
                 c.clock(signal);
             }
-        }
-        else {
-            if let Some(c) = &mut self.controllers[1] {
-                c.clock(signal);
-            }
+        } else if let Some(c) = &mut self.controllers[1] {
+            c.clock(signal);
         }
         //TODO clock expansion port for both left and right
     }

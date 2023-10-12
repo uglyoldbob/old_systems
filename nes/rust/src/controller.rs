@@ -82,7 +82,7 @@ impl StandardController {
 }
 
 impl NesControllerTrait for StandardController {
-    fn parallel_signal(&mut self, s:bool) {
+    fn parallel_signal(&mut self, s: bool) {
         self.strobe = s;
         self.check_strobe();
     }

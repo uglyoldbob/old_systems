@@ -358,7 +358,7 @@ impl NesCpu {
     /// convenience function for running a read cycle on the bus
     fn memory_cycle_read(
         &mut self,
-        c: impl FnOnce(&mut Self, u8) -> (),
+        c: impl FnOnce(&mut Self, u8),
         address: u16,
         bus: &mut NesMotherboard,
         cpu_peripherals: &mut NesCpuPeripherals,
@@ -511,7 +511,7 @@ impl NesCpu {
             match s.subcycle {
                 0 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             s.subcycle += 1;
                         },
                         s.pc,
@@ -521,7 +521,7 @@ impl NesCpu {
                 }
                 1 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             s.subcycle += 1;
                         },
                         s.pc.wrapping_add(1),
@@ -531,7 +531,7 @@ impl NesCpu {
                 }
                 2 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             s.subcycle += 1;
                         },
                         s.s as u16 + 0x100,
@@ -541,7 +541,7 @@ impl NesCpu {
                 }
                 3 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             s.subcycle += 1;
                         },
                         s.s as u16 + 0xff,
@@ -551,7 +551,7 @@ impl NesCpu {
                 }
                 4 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             s.subcycle += 1;
                         },
                         s.s as u16 + 0xfe,
@@ -596,7 +596,7 @@ impl NesCpu {
                 match s.subcycle {
                     0 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.interrupting = true;
                                 s.subcycle += 1;
                             },
@@ -607,7 +607,7 @@ impl NesCpu {
                     }
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle += 1;
                             },
                             s.pc.wrapping_add(1),
@@ -714,7 +714,7 @@ impl NesCpu {
                 0 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("BRK".to_string());
@@ -863,7 +863,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -998,7 +998,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -1084,7 +1084,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -1148,7 +1148,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -1253,7 +1253,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | val as u16,
@@ -1370,7 +1370,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -1505,7 +1505,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -1591,7 +1591,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -1655,7 +1655,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -1760,7 +1760,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | val as u16,
@@ -1877,7 +1877,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -2012,7 +2012,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -2098,7 +2098,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -2162,7 +2162,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -2267,7 +2267,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | val as u16,
@@ -2370,7 +2370,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -2485,7 +2485,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -2559,7 +2559,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -2617,7 +2617,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -2709,7 +2709,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | val as u16,
@@ -2805,7 +2805,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -2920,7 +2920,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -2994,7 +2994,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -3052,7 +3052,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -3144,7 +3144,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | val as u16,
@@ -3237,7 +3237,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -3368,7 +3368,7 @@ impl NesCpu {
                     3 => {
                         let val = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = (s.temp2 as u16) << 8 | (s.temp as u16);
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
@@ -3410,7 +3410,7 @@ impl NesCpu {
                 //iny, increment y
                 0xc8 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("INY".to_string());
@@ -3435,7 +3435,7 @@ impl NesCpu {
                 //inx, increment x
                 0xe8 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("INX".to_string());
@@ -3524,7 +3524,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -3655,7 +3655,7 @@ impl NesCpu {
                     3 => {
                         let val = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = (s.temp2 as u16) << 8 | (s.temp as u16);
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
@@ -3697,7 +3697,7 @@ impl NesCpu {
                 //dey, decrement y
                 0x88 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("DEY".to_string());
@@ -3722,7 +3722,7 @@ impl NesCpu {
                 //dex, decrement x
                 0xca => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("DEX".to_string());
@@ -3747,7 +3747,7 @@ impl NesCpu {
                 //tay, transfer accumulator to y
                 0xa8 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("TAY".to_string());
@@ -3772,7 +3772,7 @@ impl NesCpu {
                 //tax, transfer accumulator to x
                 0xaa => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("TAX".to_string());
@@ -3797,7 +3797,7 @@ impl NesCpu {
                 //tya, transfer y to accumulator
                 0x98 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("TYA".to_string());
@@ -3822,7 +3822,7 @@ impl NesCpu {
                 //txa, transfer x to accumulator
                 0x8a => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("TXA".to_string());
@@ -3847,7 +3847,7 @@ impl NesCpu {
                 //tsx, transfer stack pointer to x
                 0xba => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("TSX".to_string());
@@ -3872,7 +3872,7 @@ impl NesCpu {
                 //txs, transfer x to stack pointer
                 0x9a => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("TXS".to_string());
@@ -4065,7 +4065,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -4208,7 +4208,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -4301,7 +4301,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -4368,7 +4368,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -4479,7 +4479,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | val as u16,
@@ -4892,7 +4892,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -4981,7 +4981,7 @@ impl NesCpu {
                     3 => {
                         let temp = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             (s.temp2 as u16) << 8 | temp as u16,
@@ -5030,7 +5030,7 @@ impl NesCpu {
                     3 => {
                         let val = s.temp.wrapping_add(s.y);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             (s.temp2 as u16) << 8 | val as u16,
@@ -5078,7 +5078,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -5147,7 +5147,7 @@ impl NesCpu {
                     4 => {
                         let temp2 = s.temp2.wrapping_add(s.y);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 5;
                             },
                             (s.temp as u16) << 8 | temp2 as u16,
@@ -5248,7 +5248,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.y);
                                 s.subcycle = 3;
                             },
@@ -5382,7 +5382,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -5455,7 +5455,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -5595,7 +5595,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -5727,7 +5727,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -5841,7 +5841,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -5940,7 +5940,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -6046,7 +6046,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (addr & 0xFF00) | val as u16,
@@ -6132,7 +6132,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 4;
                                 },
                                 (s.temp2 as u16) << 8 | val as u16,
@@ -6228,7 +6228,7 @@ impl NesCpu {
                             );
                         } else {
                             s.memory_cycle_read(
-                                |s, v| {
+                                |s, _v| {
                                     s.subcycle = 5;
                                 },
                                 (s.temp as u16) << 8 | (val as u16),
@@ -6305,7 +6305,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -6360,7 +6360,7 @@ impl NesCpu {
                 //lsr logical shift right, accumulator
                 0x4a => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("LSR A".to_string());
@@ -6455,7 +6455,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -6592,7 +6592,7 @@ impl NesCpu {
                     3 => {
                         let val = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = (s.temp2 as u16) << 8 | s.temp as u16;
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
@@ -6637,7 +6637,7 @@ impl NesCpu {
                 //asl, arithmetic shift left accumulator
                 0x0a => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("ASL A".to_string());
@@ -6732,7 +6732,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -6869,7 +6869,7 @@ impl NesCpu {
                     3 => {
                         let val = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = (s.temp2 as u16) << 8 | s.temp as u16;
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
@@ -6914,7 +6914,7 @@ impl NesCpu {
                 //ror rotate right accumulator
                 0x6a => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("ROR A".to_string());
@@ -7017,7 +7017,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -7162,7 +7162,7 @@ impl NesCpu {
                     3 => {
                         let val = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = (s.temp2 as u16) << 8 | s.temp as u16;
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
@@ -7211,7 +7211,7 @@ impl NesCpu {
                 //rol accumulator
                 0x2a => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("ROL A".to_string());
@@ -7314,7 +7314,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -7461,7 +7461,7 @@ impl NesCpu {
                     3 => {
                         let temp = s.temp.wrapping_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             (s.temp2 as u16) << 8 | temp as u16,
@@ -7509,7 +7509,7 @@ impl NesCpu {
                 0x40 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("RTI".to_string());
@@ -7524,7 +7524,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.s = s.s.wrapping_add(1);
                                 s.subcycle = 3;
                             },
@@ -7587,7 +7587,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             0x100 + s.s as u16,
@@ -7628,7 +7628,7 @@ impl NesCpu {
                 //nop
                 0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xea | 0xfa => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("NOP".to_string());
@@ -7697,7 +7697,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.pc = s.pc.wrapping_add(2);
                                 s.end_instruction();
                             },
@@ -7739,7 +7739,7 @@ impl NesCpu {
                     _ => {
                         let addr = (s.temp2 as u16) << 8 | (s.temp as u16);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.pc = s.pc.wrapping_add(3);
                                 s.end_instruction();
                             },
@@ -7769,7 +7769,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 3;
                             },
                             s.temp as u16,
@@ -7781,7 +7781,7 @@ impl NesCpu {
                         //technically needs to have a register added to it
                         //but since it is zero page, the read has no side effects
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.pc = s.pc.wrapping_add(2);
                                 s.end_instruction();
                             },
@@ -7824,7 +7824,7 @@ impl NesCpu {
                     3 => {
                         let (_val, overflow) = s.temp.overflowing_add(s.x);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 if overflow {
                                     s.tempaddr = (s.temp2 as u16) << 8 | (s.temp as u16);
                                     s.subcycle = 4;
@@ -7840,7 +7840,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.pc = s.pc.wrapping_add(3);
                                 s.end_instruction();
                             },
@@ -7853,7 +7853,7 @@ impl NesCpu {
                 //extra nop
                 0x80 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("NOP".to_string());
@@ -7870,7 +7870,7 @@ impl NesCpu {
                 //clv, clear overflow flag
                 0xb8 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("CLV".to_string());
@@ -7888,7 +7888,7 @@ impl NesCpu {
                 //sec set carry flag
                 0x38 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("SEC".to_string());
@@ -7906,7 +7906,7 @@ impl NesCpu {
                 //sei set interrupt disable flag
                 0x78 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("SEI".to_string());
@@ -7924,7 +7924,7 @@ impl NesCpu {
                 //sed set decimal flag
                 0xf8 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("SED".to_string());
@@ -7942,7 +7942,7 @@ impl NesCpu {
                 //cld, clear decimal flag
                 0xd8 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("CLD".to_string());
@@ -7960,7 +7960,7 @@ impl NesCpu {
                 //clc clear carry flag
                 0x18 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("CLC".to_string());
@@ -7978,7 +7978,7 @@ impl NesCpu {
                 //cli clear interrupt disable
                 0x58 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
                                 s.copy_debugger("CLI".to_string());
@@ -8029,7 +8029,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8046,7 +8046,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8091,7 +8091,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8108,7 +8108,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8153,7 +8153,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8170,7 +8170,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8215,7 +8215,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8232,7 +8232,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8277,7 +8277,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8294,7 +8294,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8339,7 +8339,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8356,7 +8356,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8401,7 +8401,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8418,7 +8418,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8463,7 +8463,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 let pc = s.pc.to_le_bytes();
                                 let pc2 = s.tempaddr.to_le_bytes();
                                 s.pc = s.tempaddr;
@@ -8480,7 +8480,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.end_instruction();
                             },
                             s.pc,
@@ -8493,7 +8493,7 @@ impl NesCpu {
                 0x48 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("PHA".to_string());
@@ -8517,7 +8517,7 @@ impl NesCpu {
                 0x08 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("PHP".to_string());
@@ -8546,7 +8546,7 @@ impl NesCpu {
                 0x28 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("PLP".to_string());
@@ -8561,7 +8561,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.s = s.s.wrapping_add(1);
                                 s.subcycle = 3;
                             },
@@ -8590,7 +8590,7 @@ impl NesCpu {
                 0x68 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("PLA".to_string());
@@ -8605,7 +8605,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.s = s.s.wrapping_add(1);
                                 s.subcycle = 3;
                             },
@@ -8638,7 +8638,7 @@ impl NesCpu {
                 0x60 => match s.subcycle {
                     1 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 #[cfg(feature = "debugger")]
                                 {
                                     s.copy_debugger("RTS".to_string());
@@ -8653,7 +8653,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.s = s.s.wrapping_add(1);
                                 s.subcycle = 3;
                             },
@@ -8688,7 +8688,7 @@ impl NesCpu {
                     }
                     _ => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.pc = s.pc.wrapping_add(1);
                                 s.end_instruction();
                             },
@@ -8730,7 +8730,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -8907,7 +8907,7 @@ impl NesCpu {
                     4 => {
                         let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
                         addr = addr.wrapping_add(s.y as u16);
-                        let (val, overflow) = s.temp2.overflowing_add(s.y);
+                        let (_val, overflow) = s.temp2.overflowing_add(s.y);
 
                         s.memory_cycle_read(
                             |s, v| {
@@ -8976,7 +8976,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.y);
                                 s.subcycle = 3;
                             },
@@ -9116,7 +9116,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.temp.wrapping_add(s.x).wrapping_add(1) as u16;
                                 s.subcycle = 4;
                             },
@@ -9268,7 +9268,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             s.temp as u16,
@@ -9477,7 +9477,7 @@ impl NesCpu {
                     }
                     4 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 5;
                             },
                             (s.temp2 as u16) << 8 | (s.temp.wrapping_add(s.y) as u16),
@@ -9537,7 +9537,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp2 = s.temp2.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -9611,7 +9611,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
@@ -9685,7 +9685,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
                             },
@@ -9746,7 +9746,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -9938,7 +9938,7 @@ impl NesCpu {
                     }
                     4 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = (s.temp2 as u16) << 8 | (s.temp as u16);
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 5;
@@ -9991,7 +9991,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp2 = s.temp2.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -10056,7 +10056,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
@@ -10121,7 +10121,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
                             },
@@ -10174,7 +10174,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -10396,7 +10396,7 @@ impl NesCpu {
                     }
                     4 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 5;
                             },
@@ -10458,7 +10458,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp2 = s.temp2.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -10533,7 +10533,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
@@ -10608,7 +10608,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
                             },
@@ -10671,7 +10671,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -10905,7 +10905,7 @@ impl NesCpu {
                     }
                     4 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 5;
                             },
@@ -10971,7 +10971,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp2 = s.temp2.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -11050,7 +11050,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
@@ -11129,7 +11129,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
                             },
@@ -11196,7 +11196,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -11418,7 +11418,7 @@ impl NesCpu {
                     }
                     4 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 5;
                             },
@@ -11480,7 +11480,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp2 = s.temp2.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -11555,7 +11555,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
@@ -11630,7 +11630,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
                             },
@@ -11694,7 +11694,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp = s.temp.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -11911,7 +11911,7 @@ impl NesCpu {
                     }
                     4 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 5;
                             },
@@ -11972,7 +11972,7 @@ impl NesCpu {
                     }
                     2 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.temp2 = s.temp2.wrapping_add(s.x);
                                 s.subcycle = 3;
                             },
@@ -12045,7 +12045,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.y as u16);
                                 s.subcycle = 4;
                             },
@@ -12118,7 +12118,7 @@ impl NesCpu {
                     }
                     3 => {
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.tempaddr = s.tempaddr.wrapping_add(s.x as u16);
                                 s.subcycle = 4;
                             },
@@ -12362,7 +12362,7 @@ impl NesCpu {
                     3 => {
                         let addr = (s.temp2 as u16) << 8 | (s.temp.wrapping_add(s.x) as u16);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             addr,
@@ -12414,7 +12414,7 @@ impl NesCpu {
                     3 => {
                         let addr = (s.temp2 as u16) << 8 | (s.temp.wrapping_add(s.y) as u16);
                         s.memory_cycle_read(
-                            |s, v| {
+                            |s, _v| {
                                 s.subcycle = 4;
                             },
                             addr,

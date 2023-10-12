@@ -1,7 +1,6 @@
 //! Responsible for emulating the details of the audio processing (apu) of the nes console.
 
 use biquad::Biquad;
-use ringbuf::Producer;
 
 ///The modes that the sweep can operate in
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -70,7 +69,7 @@ impl ApuSweep {
         } else {
             self.counter = period;
             if enabled && shift != 0 {
-                let delta = (square_period >> shift) as u16;
+                let delta = square_period >> shift;
                 if negative {
                     match self.mode {
                         ApuSweepAddition::OnesComplement => *permod + (delta ^ 0xFFFF),
@@ -192,7 +191,7 @@ impl NesApu {
     pub fn set_audio_buffer(&mut self, size: usize) {
         println!("Set audio buffer?");
         self.buffer = vec![0.0; size & !1];
-        self.buffer_index = (self.buffer.len() - 2);
+        self.buffer_index = self.buffer.len() - 2;
     }
 
     /// Reset the apu

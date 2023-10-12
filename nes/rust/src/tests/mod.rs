@@ -76,29 +76,29 @@ fn basic_cpu_test() {
             let d4 = convert_hex_to_decimal(b[3] as char) as u16;
             let address = d << 12 | d2 << 8 | d3 << 4 | d4;
 
-            let reg_a: u8 = (convert_hex_to_decimal(b[50] as char) as u8) << 4
-                | convert_hex_to_decimal(b[51] as char) as u8;
+            let reg_a: u8 =
+                convert_hex_to_decimal(b[50] as char) << 4 | convert_hex_to_decimal(b[51] as char);
             assert_eq!(cpu.get_a(), reg_a);
 
-            let reg_x: u8 = (convert_hex_to_decimal(b[55] as char) as u8) << 4
-                | convert_hex_to_decimal(b[56] as char) as u8;
+            let reg_x: u8 =
+                convert_hex_to_decimal(b[55] as char) << 4 | convert_hex_to_decimal(b[56] as char);
             assert_eq!(cpu.get_x(), reg_x);
 
-            let reg_y: u8 = (convert_hex_to_decimal(b[60] as char) as u8) << 4
-                | convert_hex_to_decimal(b[61] as char) as u8;
+            let reg_y: u8 =
+                convert_hex_to_decimal(b[60] as char) << 4 | convert_hex_to_decimal(b[61] as char);
             assert_eq!(cpu.get_y(), reg_y);
 
-            let reg_p: u8 = (convert_hex_to_decimal(b[65] as char) as u8) << 4
-                | convert_hex_to_decimal(b[66] as char) as u8;
+            let reg_p: u8 =
+                convert_hex_to_decimal(b[65] as char) << 4 | convert_hex_to_decimal(b[66] as char);
             assert_eq!(cpu.get_p(), reg_p);
 
-            let reg_sp: u8 = (convert_hex_to_decimal(b[71] as char) as u8) << 4
-                | convert_hex_to_decimal(b[72] as char) as u8;
+            let reg_sp: u8 =
+                convert_hex_to_decimal(b[71] as char) << 4 | convert_hex_to_decimal(b[72] as char);
             assert_eq!(cpu.get_sp(), reg_sp);
 
             println!("Address is {:x} {:x}", address, cpu.get_pc());
             assert_eq!(cpu.get_pc(), address);
-            println!("");
+            println!();
 
             let mut logcycle: u32 = 0;
             for i in 90..95 {
@@ -123,10 +123,10 @@ fn vbl_nmi_test1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 176 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 176
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -142,10 +142,10 @@ fn vbl_nmi_test2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 156 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 156
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -162,10 +162,10 @@ fn vbl_nmi_test3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 101 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 101
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -182,10 +182,10 @@ fn vbl_nmi_test4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 119 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 119
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -202,10 +202,10 @@ fn vbl_nmi_test5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 168 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 168
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -221,10 +221,10 @@ fn vbl_nmi_test6() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 111 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 111
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -240,10 +240,10 @@ fn vbl_nmi_test7() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 111 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 111
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -260,10 +260,10 @@ fn cpu_branch_timing1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 14 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 14
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -280,10 +280,10 @@ fn cpu_branch_timing2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 16 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 16
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -300,10 +300,10 @@ fn cpu_branch_timing3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 16 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 16
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -318,10 +318,10 @@ fn ppu_open_bus() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 251 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 251
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -338,10 +338,10 @@ fn ppu_test1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 25
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
@@ -358,10 +358,10 @@ fn ppu_test2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 40
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
@@ -378,10 +378,10 @@ fn ppu_test3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 40
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
@@ -398,10 +398,10 @@ fn ppu_test4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 40
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
@@ -419,10 +419,10 @@ fn ppu_test5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 40 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 40
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01".to_string().as_bytes()));
@@ -439,10 +439,10 @@ fn cpu_test_dummy_reads() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(129, "Passed".to_string().as_bytes()));
@@ -459,10 +459,10 @@ fn cpu_test_dummy_writes_oam() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 350 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 350
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(833, "0ASSED".to_string().as_bytes()));
@@ -479,10 +479,10 @@ fn cpu_test_dummy_writes_ppu() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 250
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(769, "0ASSED".to_string().as_bytes()));
@@ -499,10 +499,10 @@ fn cpu_test_exec_space_ppu() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 48 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 48
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(641, "0ASSED".to_string().as_bytes()));
@@ -519,10 +519,10 @@ fn cpu_timing_test() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 645 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 645
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(258, "PASSED".to_string().as_bytes()));
@@ -539,10 +539,10 @@ fn cpu_dma_test2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(289, "Passed".to_string().as_bytes()));
@@ -559,10 +559,10 @@ fn cpu_dma_test3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(
@@ -587,10 +587,10 @@ fn cpu_dma_test4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(129, "Passed".to_string().as_bytes()));
@@ -607,10 +607,10 @@ fn cpu_dma_test5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(
@@ -640,10 +640,10 @@ fn cpu_dma_test6() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(193, "Passed".to_string().as_bytes()));
@@ -660,10 +660,10 @@ fn cpu_dma_test7() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 160 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 160
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
@@ -680,10 +680,10 @@ fn cpu_dma_test8() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 190 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 190
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
@@ -698,10 +698,10 @@ fn oam_test() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 33 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 33
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(673, "Passed".to_string().as_bytes()));
@@ -716,10 +716,10 @@ fn oam_stress() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 1793 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 1793
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(673, "Passed".to_string().as_bytes()));
@@ -736,10 +736,10 @@ fn apu_test1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -756,10 +756,10 @@ fn apu_test2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -776,10 +776,10 @@ fn apu_test3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -796,10 +796,10 @@ fn apu_test4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -816,10 +816,10 @@ fn apu_test5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 25
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -836,10 +836,10 @@ fn apu_test6() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 25
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -856,10 +856,10 @@ fn apu_test7() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -876,10 +876,10 @@ fn apu_test8() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -896,10 +896,10 @@ fn apu_test9() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -914,10 +914,10 @@ fn apu_test10() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -926,10 +926,10 @@ fn apu_test10() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -944,10 +944,10 @@ fn apu_test11() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 25
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -956,10 +956,10 @@ fn apu_test11() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 25
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
@@ -974,10 +974,10 @@ fn apu_test12() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -986,10 +986,10 @@ fn apu_test12() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -998,10 +998,10 @@ fn apu_test12() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1017,10 +1017,10 @@ fn apu_test13() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1029,10 +1029,10 @@ fn apu_test13() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1048,10 +1048,10 @@ fn apu_test14() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1060,10 +1060,10 @@ fn apu_test14() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1079,10 +1079,10 @@ fn apu_test15() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1091,10 +1091,10 @@ fn apu_test15() {
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1110,10 +1110,10 @@ fn apu_test16_1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1130,10 +1130,10 @@ fn apu_test16_2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1150,10 +1150,10 @@ fn apu_test16_3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1169,10 +1169,10 @@ fn apu_test16_4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1189,10 +1189,10 @@ fn apu_test16_5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 130 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 130
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1209,10 +1209,10 @@ fn apu_test16_6() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 25 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 25
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1229,10 +1229,10 @@ fn apu_test16_7() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1249,10 +1249,10 @@ fn apu_test16_8() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1269,10 +1269,10 @@ fn apu_test17() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -1289,10 +1289,10 @@ fn apu_test18() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(162, "$01 ".to_string().as_bytes()));
@@ -1309,10 +1309,10 @@ fn cpu_test_exec_space_apu() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 315 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 315
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(513, "0ASSED".to_string().as_bytes()));
@@ -1329,10 +1329,10 @@ fn cpu_test_interrupts() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 505 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 505
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(513, "0ASSED".to_string().as_bytes()));
@@ -1347,10 +1347,10 @@ fn cpu_misc_instruction() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 250 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 250
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(513, "PASSED".to_string().as_bytes()));
@@ -1365,10 +1365,10 @@ fn cpu_misc_instruction2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 2500 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 2500
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1386,10 +1386,10 @@ fn cpu_misc_instruction3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 1850 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 1850
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1406,10 +1406,10 @@ fn cpu_misc_instruction4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 2500 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 2500
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1427,10 +1427,10 @@ fn cpu_misc_instruction5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 1920 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 1920
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1449,10 +1449,10 @@ fn cpu_misc_instruction6() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1469,10 +1469,10 @@ fn cpu_misc_instruction7() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1489,10 +1489,10 @@ fn cpu_misc_instruction8() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1509,10 +1509,10 @@ fn cpu_misc_instruction9() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 200 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 200
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1529,10 +1529,10 @@ fn cpu_misc_instruction10() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1549,10 +1549,10 @@ fn cpu_misc_instruction11() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 280 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 280
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1569,10 +1569,10 @@ fn cpu_misc_instruction12() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 128 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 128
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1589,10 +1589,10 @@ fn cpu_misc_instruction13() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 128 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 128
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1609,10 +1609,10 @@ fn cpu_misc_instruction14() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1629,10 +1629,10 @@ fn cpu_misc_instruction15() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 151 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 151
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1649,10 +1649,10 @@ fn cpu_misc_instruction16() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 80 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 80
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1667,10 +1667,10 @@ fn cpu_reset() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1678,19 +1678,19 @@ fn cpu_reset() {
         .check_vram(129, "Press reset AFTER".to_string().as_bytes()));
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 145 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 145
+        {
+            break;
         }
     }
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(161, "Passed".to_string().as_bytes()));
@@ -1705,10 +1705,10 @@ fn cpu_reset2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 20 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 20
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1716,19 +1716,19 @@ fn cpu_reset2() {
         .check_vram(193, "Press reset AFTER".to_string().as_bytes()));
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 150 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 150
+        {
+            break;
         }
     }
     nes_data.reset();
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 15 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 15
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(225, "Passed".to_string().as_bytes()));
@@ -1743,10 +1743,10 @@ fn cpu_timing_test2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 300 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 300
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -1764,10 +1764,10 @@ fn ppu_sprite_test_1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1784,10 +1784,10 @@ fn ppu_sprite_test_2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1803,10 +1803,10 @@ fn ppu_sprite_test_3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 150 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 150
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1823,10 +1823,10 @@ fn ppu_sprite_test_4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1843,10 +1843,10 @@ fn ppu_sprite_test_5() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 30 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 30
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1863,10 +1863,10 @@ fn ppu_sprite_test_6() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1883,10 +1883,10 @@ fn ppu_sprite_test_7() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1903,10 +1903,10 @@ fn ppu_sprite_test_8() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1923,10 +1923,10 @@ fn ppu_sprite_test_9() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1943,10 +1943,10 @@ fn ppu_sprite_test_10() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     //This test only sometimes passes
@@ -1964,10 +1964,10 @@ fn ppu_sprite_test_11() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -1984,10 +1984,10 @@ fn ppu_sprite_test_12() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -2004,10 +2004,10 @@ fn ppu_sprite_test_13() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -2024,10 +2024,10 @@ fn ppu_sprite_test_14() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 150 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 150
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -2044,10 +2044,10 @@ fn ppu_sprite_test_15() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 100 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 100
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -2064,10 +2064,10 @@ fn ppu_sprite_test_16() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 75 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 75
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(194, "PASSED".to_string().as_bytes()));
@@ -2082,10 +2082,10 @@ fn cpu_test1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 1035 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 1035
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -2103,10 +2103,10 @@ fn cpu_test2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 700 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 700
+        {
+            break;
         }
     }
     assert!(nes_data
@@ -2123,10 +2123,10 @@ fn ppu_nmi() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 1325 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 1325
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(481, "Passed".to_string().as_bytes()));
@@ -2141,10 +2141,10 @@ fn controller1() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 112 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 112
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(875, "0/1000".to_string().as_bytes()));
@@ -2160,10 +2160,10 @@ fn controller2() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 70 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 70
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(873, "0/1000".to_string().as_bytes()));
@@ -2178,10 +2178,10 @@ fn controller3() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 100 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 100
+        {
+            break;
         }
     }
     //TODO implement controller manipulating with test
@@ -2197,10 +2197,10 @@ fn controller4() {
 
     loop {
         nes_data.cycle_step(&mut None, &mut None);
-        if nes_data.cpu_peripherals.ppu_frame_end() {
-            if nes_data.cpu_peripherals.ppu_frame_number() == 200 {
-                break;
-            }
+        if nes_data.cpu_peripherals.ppu_frame_end()
+            && nes_data.cpu_peripherals.ppu_frame_number() == 200
+        {
+            break;
         }
     }
     assert!(nes_data.mb.check_vram(129, "Passed".to_string().as_bytes()));

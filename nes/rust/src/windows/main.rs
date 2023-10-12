@@ -3,7 +3,7 @@
 use std::io::Write;
 
 use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
-use cpal::traits::StreamTrait;
+
 use egui_multiwin::{
     egui,
     egui_glow::EguiGlow,
