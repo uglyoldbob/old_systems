@@ -28,15 +28,28 @@ pub struct EmulatorConfiguration {
     path: String,
     /// The root path for all roms
     rom_path: String,
+    /// The controller configuration for all 4 possible controllers.
+    pub controller_config: [crate::controller::ControllerConfig; 4],
 }
 
 impl Default for EmulatorConfiguration {
     fn default() -> Self {
+        let mut controller = [crate::controller::ControllerConfig::new(); 4];
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_A, egui_multiwin::egui::Key::F);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_B, egui_multiwin::egui::Key::D);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_START, egui_multiwin::egui::Key::S);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_SELECT, egui_multiwin::egui::Key::A);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_UP, egui_multiwin::egui::Key::ArrowUp);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_DOWN, egui_multiwin::egui::Key::ArrowDown);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_LEFT, egui_multiwin::egui::Key::ArrowLeft);
+        controller[0].set_key_egui(crate::controller::BUTTON_COMBO_RIGHT, egui_multiwin::egui::Key::ArrowRight);
+
         Self {
             sticky_rom: true,
             start_rom: None,
             path: "".to_string(),
             rom_path: "./roms".to_string(),
+            controller_config: controller,
         }
     }
 }

@@ -7,6 +7,34 @@ use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
+use egui_multiwin::egui::InputState;
+
+/// The types of user input that can be accepted
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
+pub enum UserInput {
+    Egui(egui_multiwin::egui::Key),
+    NoInput,
+}
+
+/// Defines how inputs get from user to the ButtonCombination
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
+pub struct ControllerConfig {
+    buttons: [UserInput; 15],
+}
+
+impl ControllerConfig {
+    /// Create a new blank configuration
+    pub fn new() -> Self {
+        Self {
+            buttons: [UserInput::NoInput; 15],
+        }
+    }
+
+    /// Set the given button with egui data
+    pub fn set_key_egui(&mut self, index: usize, k: egui_multiwin::egui::Key) {
+        self.buttons[index] = UserInput::Egui(k);
+    }
+}
 
 /// The various buttons used by controllers
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -44,35 +72,35 @@ pub enum Button {
 }
 
 /// The index into the button combination array for button A
-const BUTTON_COMBO_A: usize = 0;
+pub const BUTTON_COMBO_A: usize = 0;
 /// The index into the button combination array for turbo A
-const BUTTON_COMBO_TURBOA: usize = 1;
+pub const BUTTON_COMBO_TURBOA: usize = 1;
 /// The index into the button combination array for turbo B
-const BUTTON_COMBO_TURBOB: usize = 2;
+pub const BUTTON_COMBO_TURBOB: usize = 2;
 /// The index into the button combination array for button b
-const BUTTON_COMBO_B: usize = 3;
+pub const BUTTON_COMBO_B: usize = 3;
 /// The index into the button combination array for button start
-const BUTTON_COMBO_START: usize = 4;
+pub const BUTTON_COMBO_START: usize = 4;
 /// The index into the button combination array for button slow
-const BUTTON_COMBO_SLOW: usize = 5;
+pub const BUTTON_COMBO_SLOW: usize = 5;
 /// The index into the button combination array for button select
-const BUTTON_COMBO_SELECT: usize = 6;
+pub const BUTTON_COMBO_SELECT: usize = 6;
 /// The index into the button combination array for button up
-const BUTTON_COMBO_UP: usize = 7;
+pub const BUTTON_COMBO_UP: usize = 7;
 /// The index into the button combination array for button down
-const BUTTON_COMBO_DOWN: usize = 8;
+pub const BUTTON_COMBO_DOWN: usize = 8;
 /// The index into the button combination array for button left
-const BUTTON_COMBO_LEFT: usize = 9;
+pub const BUTTON_COMBO_LEFT: usize = 9;
 /// The index into the button combination array for button right
-const BUTTON_COMBO_RIGHT: usize = 10;
+pub const BUTTON_COMBO_RIGHT: usize = 10;
 /// The index into the button combination array for fire/trigger
-const BUTTON_COMBO_FIRE: usize = 11;
+pub const BUTTON_COMBO_FIRE: usize = 11;
 /// The index into the button combination array for a light sensor
-const BUTTON_COMBO_LIGHT: usize = 12;
+pub const BUTTON_COMBO_LIGHT: usize = 12;
 /// The index into the button combination array for a potentiometer
-const BUTTON_COMBO_POTENTIOMETER: usize = 13;
+pub const BUTTON_COMBO_POTENTIOMETER: usize = 13;
 /// The extra button for the power pad
-const BUTTON_COMBO_POWERPAD: usize = 14;
+pub const BUTTON_COMBO_POWERPAD: usize = 14;
 
 /// The combination of all possible buttons on a controller.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -107,112 +135,104 @@ impl ButtonCombination {
         }
     }
 
-    /// Set the status of a single button for a button combination
-    pub fn set_button(&mut self, b: Button) {
-        match b {
-            Button::A => {
-                self.buttons[BUTTON_COMBO_A] = Some(b);
-            }
-            Button::TurboA(enabled, rate) => {
-                self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(enabled, rate));
-            }
-            Button::TurboB(enabled, rate) => {
-                self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(enabled, rate));
-            }
-            Button::B => {
-                self.buttons[BUTTON_COMBO_B] = Some(b);
-            }
-            Button::Start => {
-                self.buttons[BUTTON_COMBO_START] = Some(b);
-            }
-            Button::Slow => {
-                self.buttons[BUTTON_COMBO_SLOW] = Some(b);
-            }
-            Button::Select => {
-                self.buttons[BUTTON_COMBO_SELECT] = Some(b);
-            }
-            Button::Up => {
-                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_DOWN].is_none() {
-                    self.buttons[BUTTON_COMBO_UP] = Some(b);
+    /// Update what buttons can be updated with an egui input
+    pub fn update_egui_buttons(&mut self, i: &InputState, config: &ControllerConfig) {
+        for (index, b) in config.buttons.iter().enumerate() {
+            match b {
+                UserInput::Egui(b) => {
+                    if i.key_down(*b) {
+                        self.set_button(index, 0);
+                    }
+                    else {
+                        self.clear_button(index);
+                    }
                 }
-            }
-            Button::Down => {
-                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_UP].is_none() {
-                    self.buttons[BUTTON_COMBO_DOWN] = Some(b);
-                }
-            }
-            Button::Left => {
-                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_RIGHT].is_none() {
-                    self.buttons[BUTTON_COMBO_LEFT] = Some(b);
-                }
-            }
-            Button::Right => {
-                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_LEFT].is_none() {
-                    self.buttons[BUTTON_COMBO_RIGHT] = Some(b);
-                }
-            }
-            Button::Fire => {
-                self.buttons[BUTTON_COMBO_FIRE] = Some(b);
-            }
-            Button::LightSensor => {
-                self.buttons[BUTTON_COMBO_LIGHT] = Some(b);
-            }
-            Button::Potentiometer(val) => {
-                self.buttons[BUTTON_COMBO_POTENTIOMETER] = Some(Button::Potentiometer(val));
-            }
-            Button::PowerPad => {
-                self.buttons[BUTTON_COMBO_POWERPAD] = Some(b);
+                _ => {}
             }
         }
     }
 
-    /// Clear a button for a button combination.
-    pub fn clear_button(&mut self, b: Button) {
-        match b {
-            Button::A => {
-                self.buttons[BUTTON_COMBO_A] = None;
+    /// Set the status of a single button for a button combination. val is for the potentiometer value. Only applies for index BUTTON_COMBO_POTENTIOMETER
+    fn set_button(&mut self, i: usize, val: u16) {
+        match i {
+            BUTTON_COMBO_A => {
+                self.buttons[BUTTON_COMBO_A] = Some(Button::A);
             }
-            Button::TurboA(enabled, rate) => {
-                self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(enabled, rate));
+            BUTTON_COMBO_TURBOA => {
+                if let Some(Button::TurboA(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
+                    self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(true, rate));
+                }
             }
-            Button::TurboB(enabled, rate) => {
-                self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(enabled, rate));
+            BUTTON_COMBO_TURBOB => {
+                if let Some(Button::TurboB(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOB] {
+                    self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(true, rate));
+                }
             }
-            Button::B => {
-                self.buttons[BUTTON_COMBO_B] = None;
+            BUTTON_COMBO_B => {
+                self.buttons[BUTTON_COMBO_B] = Some(Button::B);
             }
-            Button::Start => {
-                self.buttons[BUTTON_COMBO_START] = None;
+            BUTTON_COMBO_START => {
+                self.buttons[BUTTON_COMBO_START] = Some(Button::Start);
             }
-            Button::Slow => {
-                self.buttons[BUTTON_COMBO_SLOW] = None;
+            BUTTON_COMBO_SLOW => {
+                self.buttons[BUTTON_COMBO_SLOW] = Some(Button::Slow);
             }
-            Button::Select => {
-                self.buttons[BUTTON_COMBO_SELECT] = None;
+            BUTTON_COMBO_SELECT => {
+                self.buttons[BUTTON_COMBO_SELECT] = Some(Button::Select);
             }
-            Button::Up => {
-                self.buttons[BUTTON_COMBO_UP] = None;
+            BUTTON_COMBO_UP => {
+                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_DOWN].is_none() {
+                    self.buttons[BUTTON_COMBO_UP] = Some(Button::Up);
+                }
             }
-            Button::Down => {
-                self.buttons[BUTTON_COMBO_DOWN] = None;
+            BUTTON_COMBO_DOWN => {
+                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_UP].is_none() {
+                    self.buttons[BUTTON_COMBO_DOWN] = Some(Button::Down);
+                }
             }
-            Button::Left => {
-                self.buttons[BUTTON_COMBO_LEFT] = None;
+            BUTTON_COMBO_LEFT => {
+                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_RIGHT].is_none() {
+                    self.buttons[BUTTON_COMBO_LEFT] = Some(Button::Left);
+                }
             }
-            Button::Right => {
-                self.buttons[BUTTON_COMBO_RIGHT] = None;
+            BUTTON_COMBO_RIGHT => {
+                if !self.arrow_restrict || self.buttons[BUTTON_COMBO_LEFT].is_none() {
+                    self.buttons[BUTTON_COMBO_RIGHT] = Some(Button::Right);
+                }
             }
-            Button::Fire => {
-                self.buttons[BUTTON_COMBO_FIRE] = None;
+            BUTTON_COMBO_FIRE => {
+                self.buttons[BUTTON_COMBO_FIRE] = Some(Button::Fire);
             }
-            Button::LightSensor => {
-                self.buttons[BUTTON_COMBO_LIGHT] = None;
+            BUTTON_COMBO_LIGHT => {
+                self.buttons[BUTTON_COMBO_LIGHT] = Some(Button::LightSensor);
             }
-            Button::Potentiometer(val) => {
+            BUTTON_COMBO_POTENTIOMETER => {
                 self.buttons[BUTTON_COMBO_POTENTIOMETER] = Some(Button::Potentiometer(val));
             }
-            Button::PowerPad => {
-                self.buttons[BUTTON_COMBO_POWERPAD] = None;
+            BUTTON_COMBO_POWERPAD => {
+                self.buttons[BUTTON_COMBO_POWERPAD] = Some(Button::PowerPad);
+            }
+            _ => {}
+        }
+    }
+
+    /// Clear a button for a button combination.
+    fn clear_button(&mut self, i: usize) {
+        match i {
+            BUTTON_COMBO_TURBOA => {
+                if let Some(Button::TurboA(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
+                    self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(false, rate));
+                }
+            }
+            BUTTON_COMBO_TURBOB => {
+                if let Some(Button::TurboB(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOB] {
+                    self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(false, rate));
+                }
+            }
+            BUTTON_COMBO_POTENTIOMETER => {
+            }
+            _ => {
+                self.buttons[i] = None;
             }
         }
     }
@@ -304,38 +324,38 @@ impl StandardController {
     ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register
     fn check_strobe(&mut self) {
         if self.strobe {
-            let controller_buttons = if self.combo[0].buttons[BUTTON_COMBO_A].is_some() {
+            let controller_buttons = if self.combo[0].buttons[BUTTON_COMBO_A].is_none() {
+                0
+            } else {
                 BUTTON_A
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_B].is_some() {
+                0
+            } else {
                 BUTTON_B
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_START].is_some() {
+                0
+            } else {
                 BUTTON_START
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_SELECT].is_some() {
+                0
+            } else {
                 BUTTON_SELECT
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_UP].is_some() {
+                0
+            } else {
                 BUTTON_UP
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_DOWN].is_some() {
+                0
+            } else {
                 BUTTON_DOWN
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_LEFT].is_some() {
+                0
+            } else {
                 BUTTON_LEFT
-            } else {
-                0
             } | if self.combo[0].buttons[BUTTON_COMBO_RIGHT].is_some() {
-                BUTTON_RIGHT
-            } else {
                 0
+            } else {
+                BUTTON_RIGHT
             };
             self.shift_register = controller_buttons;
         }

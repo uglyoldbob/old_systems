@@ -223,16 +223,19 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         {
             egui.egui_ctx.input(|i| {
-                if let Some(c) = &mut c.mb.controllers[0] {
-                    for (i, contr) in c.get_buttons_iter_mut().enumerate() {
-                        let i = i << 1;
-                        unimplemented!();
+                if let Some(controller) = &mut c.mb.controllers[0] {
+                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
+                        let cnum = index << 1;
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                        //unimplemented!();
                     }
                 }
-                if let Some(c) = &mut c.mb.controllers[1] {
-                    for (i, contr) in c.get_buttons_iter_mut().enumerate() {
-                        let i = 1 + i << 1;
-                        unimplemented!();
+                if let Some(controller) = &mut c.mb.controllers[1] {
+                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
+                        let cnum = 1 + index << 1;
+                        let button_config = c.configuration.controller_config[cnum];
+                        //unimplemented!();
                     }
                 }
             });
