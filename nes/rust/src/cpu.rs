@@ -8905,10 +8905,7 @@ impl NesCpu {
                         );
                     }
                     4 => {
-                        let mut addr = (s.temp as u16) << 8 | (s.temp2 as u16);
-                        addr = addr.wrapping_add(s.y as u16);
                         let (_val, overflow) = s.temp2.overflowing_add(s.y);
-
                         s.memory_cycle_read(
                             |s, v| {
                                 if !overflow {

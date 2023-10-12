@@ -84,7 +84,7 @@ impl ApuSquareChannel {
     pub fn clock_sweep(&mut self) {
         let mut period = self.registers[2] as u16 | ((self.registers[3] & 0x7) as u16) << 8;
         self.sweep.clock(&self.registers, &mut period);
-        let new_period = if period < 0 { 0 } else { period };
+        let new_period = period;
         self.registers[2] = (new_period & 0xFF) as u8;
         self.registers[3] = (self.registers[3] & 0xF8) | ((new_period >> 8) & 7) as u8;
     }
