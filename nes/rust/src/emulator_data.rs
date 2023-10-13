@@ -186,7 +186,7 @@ pub struct NesEmulatorData {
     pub last_frame_time: u128,
     /// Used for emulating the proper behavior of the cpu for the nmi interrupt
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    nmi: [bool; 3],
+    nmi: [bool; 5],
     /// Used for triggering the cpu irq line
     prev_irq: bool,
     /// The list of roms for the emulator
@@ -201,6 +201,7 @@ pub struct NesEmulatorData {
     /// This contains the non-volatile configuration of the emulator
     #[serde(skip)]
     pub configuration: EmulatorConfiguration,
+    big_counter: u64,
 }
 
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
@@ -235,13 +236,14 @@ impl NesEmulatorData {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis(),
-            nmi: [false; 3],
+            nmi: [false; 5],
             prev_irq: false,
             roms: RomList::load_list(),
             parser: crate::romlist::RomListParser::new(),
             #[cfg(feature = "rom_status")]
             rom_test: crate::rom_status::RomListTestParser::new(),
             configuration: EmulatorConfiguration::load("./config.toml".to_string()),
+            big_counter: 0,
         }
     }
 
@@ -300,7 +302,7 @@ impl NesEmulatorData {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_millis();
-        self.nmi = [false; 3];
+        self.nmi = [false; 5];
         self.prev_irq = false;
         if let Some(cart) = cart {
             let name = cart.rom_name();
@@ -333,14 +335,18 @@ impl NesEmulatorData {
         >,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
+        self.big_counter += 1;
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
-            let nmi = self.nmi[0] && self.nmi[1] && self.nmi[2];
+            let nmi = self.nmi[0] || self.nmi[1] || self.nmi[2];
 
             self.cpu_peripherals.apu.clock_slow(sound, filter);
             let irq = self.cpu_peripherals.apu.irq();
             self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
+            if nmi {
+                println!("NMI SIGNAL @ {:X} {}", self.cpu.debugger.pc, self.big_counter);
+            }
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
             self.prev_irq = irq;
@@ -352,7 +358,12 @@ impl NesEmulatorData {
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
             self.nmi[0] = self.nmi[1];
             self.nmi[1] = self.nmi[2];
-            self.nmi[2] = self.cpu_peripherals.ppu_irq();
+            self.nmi[2] = self.nmi[3];
+            self.nmi[3] = self.nmi[4];
+            if self.cpu_peripherals.ppu_irq() {
+                println!("PPU NMI DETECT @ {:x} {}", self.cpu.debugger.pc, self.big_counter);
+            }
+            self.nmi[4] = self.cpu_peripherals.ppu_irq();
         }
     }
 }

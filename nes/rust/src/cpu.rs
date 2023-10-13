@@ -4,6 +4,107 @@ use crate::apu::NesApu;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 
+/// Handles nmi detection
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Nmi {
+    /// The current detected level of the nmi signal
+    level: bool,
+    /// An edge is detected
+    edge: bool,
+    /// The nmi might trigger
+    might_trigger: bool,
+    /// Holding variable
+    holding: bool,
+}
+
+impl Nmi {
+    /// Create a new nmi object
+    fn new() -> Self {
+        Self {
+            level: false,
+            edge: false,
+            might_trigger: false,
+            holding:false,
+        }
+    }
+
+    fn prepare_data(&mut self, sig: bool) {
+        self.holding = sig;
+    }
+
+    /// Check the edge and signal if appropriate
+    fn check_edge(&mut self) {
+        self.might_trigger = self.edge;
+    }
+
+    /// Provides the nmi input for the edge detector
+    fn process_signal(&mut self) {
+        if self.holding & !self.level
+        {
+            self.edge = true;
+        }
+        self.level = self.holding;
+    }
+
+    fn level(&self) -> bool {
+        self.level
+    }
+
+    /// Indicates that the nmi should interrupt right now
+    fn should_interrupt(&self) -> bool {
+        self.might_trigger
+    }
+
+    fn handled(&mut self) {
+        println!("NMI handled");
+        self.edge = false;
+    }
+}
+
+/// Handles irq detection
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Irq {
+    /// The current detected level of the nmi signal
+    level: bool,
+    /// The nmi might trigger
+    might_trigger: bool,
+}
+
+impl Irq {
+    /// Create a new irq object
+    fn new() -> Self {
+        Self {
+            level: false,
+            might_trigger: false,
+        }
+    }
+
+    /// Check the edge and signal if appropriate
+    fn check_level(&mut self) {
+        if self.level {
+            self.might_trigger = true;
+        }
+    }
+
+    /// Provides the nmi input for the edge detector
+    fn provide_signal(&mut self, sig: bool) {
+        self.level = sig;
+    }
+
+    fn level(&self) -> bool {
+        self.level
+    }
+
+    /// Indicates that the nmi should interrupt right now
+    fn should_interrupt(&self) -> bool {
+        self.might_trigger
+    }
+
+    fn handled(&mut self) {
+        self.might_trigger = false;
+    }
+}
+
 /// The peripherals for the cpu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]

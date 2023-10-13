@@ -544,6 +544,9 @@ impl NesPpu {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
                     match addr {
                         0 => {
+                            if (data & PPU_REGISTER0_GENERATE_NMI) != 0 {
+                                println!("Enable ppu nmi");
+                            }
                             self.registers[0] = data;
                             self.temporary_vram_address =
                                 (self.temporary_vram_address & 0x73FF) | (data as u16 & 3) << 10;
@@ -1354,6 +1357,9 @@ impl NesPpu {
             self.increment_scanline_cycle();
         } else {
             if self.scanline_number == 261 && self.scanline_cycle == 1 {
+                if (self.registers[2] & 0x80) != 0 {
+                    println!("Clear vblank flag1");
+                }
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
             if self.scanline_cycle > 0 {
@@ -1363,10 +1369,17 @@ impl NesPpu {
         }
         if self.vblank_clear {
             self.vblank_clear = false;
+            if (self.registers[2] & 0x80) != 0 {
+                println!("Clear vblank flag2");
+            }
             self.registers[2] &= !0x80; //clear vblank flag
         }
-        self.vblank_nmi = ((self.registers[2] & 0x80) != 0)
+        let new_nmi = ((self.registers[2] & 0x80) != 0)
             & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
+        if new_nmi ^ self.vblank_nmi && new_nmi {
+            println!("Set nmi for ppu");
+        }
+        self.vblank_nmi = new_nmi;
     }
 
     /// Returns true if the frame has ended. Used for frame rate synchronizing.
