@@ -70,3 +70,7 @@ _xmsgs/
 *.gz
 target/*
 *.nes
+
+coverage/*
+roms/*
+saves/*

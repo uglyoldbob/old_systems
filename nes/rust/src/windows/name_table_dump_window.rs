@@ -95,13 +95,15 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                     ui.vertical(|ui| {
                         if let Some(t) = &self.texture {
                             let zoom = 1.0;
-                            let r = ui.image(
-                                t,
-                                egui_multiwin::egui::Vec2 {
-                                    x: zoom * self.buf.width as f32,
-                                    y: zoom * self.buf.height as f32,
+                            let r = ui.add(egui_multiwin::egui::Image::from_texture(
+                                egui_multiwin::egui::load::SizedTexture {
+                                    id: t.id(),
+                                    size: egui_multiwin::egui::Vec2 {
+                                        x: self.buf.width as f32 * zoom,
+                                        y: self.buf.height as f32 * zoom,
+                                    },
                                 },
-                            );
+                            ));
 
                             if r.hovered() {
                                 if let Some(cursor) = r.hover_pos() {
@@ -183,13 +185,15 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                     ui.vertical(|ui| {
                         if let Some(t) = &self.texture2 {
                             let zoom = 1.0;
-                            let r = ui.image(
-                                t,
-                                egui_multiwin::egui::Vec2 {
-                                    x: zoom * self.buf.width as f32,
-                                    y: zoom * self.buf.height as f32,
+                            let r = ui.add(egui_multiwin::egui::Image::from_texture(
+                                egui_multiwin::egui::load::SizedTexture {
+                                    id: t.id(),
+                                    size: egui_multiwin::egui::Vec2 {
+                                        x: self.buf2.width as f32 * zoom,
+                                        y: self.buf2.height as f32 * zoom,
+                                    },
                                 },
-                            );
+                            ));
 
                             if r.hovered() {
                                 if let Some(cursor) = r.hover_pos() {

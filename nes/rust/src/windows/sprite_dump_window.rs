@@ -94,23 +94,27 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                 let mut r = None;
                 let zoom = 5.0;
                 if let Some(t) = &self.texture {
-                    r = Some(ui.image(
-                        t,
-                        egui_multiwin::egui::Vec2 {
-                            x: zoom * self.buf.width as f32,
-                            y: zoom * self.buf.height as f32,
+                    r = Some(ui.add(egui_multiwin::egui::Image::from_texture(
+                        egui_multiwin::egui::load::SizedTexture {
+                            id: t.id(),
+                            size: egui_multiwin::egui::Vec2 {
+                                x: self.buf.width as f32 * zoom,
+                                y: self.buf.height as f32 * zoom,
+                            },
                         },
-                    ));
+                    )));
                 }
                 if let Some(t) = &self.texture2 {
                     let zoom = 16.0;
-                    let _r = ui.image(
-                        t,
-                        egui_multiwin::egui::Vec2 {
-                            x: zoom * self.palette.width as f32,
-                            y: zoom * self.palette.height as f32,
+                    let _r = ui.add(egui_multiwin::egui::Image::from_texture(
+                        egui_multiwin::egui::load::SizedTexture {
+                            id: t.id(),
+                            size: egui_multiwin::egui::Vec2 {
+                                x: self.palette.width as f32 * zoom,
+                                y: self.palette.height as f32 * zoom,
+                            },
                         },
-                    );
+                    ));
                 }
                 if let Some(r) = r {
                     if r.hovered() {
