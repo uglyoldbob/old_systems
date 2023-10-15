@@ -170,6 +170,8 @@ pub struct NesPpu {
     vblank_clear: bool,
     /// Flag used for generating irq signals used by the cpu.
     vblank_nmi: bool,
+    /// For triggering race condition that suppresses nmi
+    vblank_just_set: bool,
     /// Suppress nmi generation
     suppress_nmi: bool,
     /// Indicates that an odd frame is currently being rendered.
@@ -369,6 +371,7 @@ impl NesPpu {
             vblank_nmi: false,
             vblank_clear: false,
             suppress_nmi: false,
+            vblank_just_set: false,
             frame_end: false,
             frame_odd: false,
             write_ignore_counter: 0,
@@ -528,6 +531,10 @@ impl NesPpu {
                 if addr == 2 {
                     self.address_bit = false;
                     self.vblank_clear = true;
+                    if self.vblank_just_set {
+                        println!("Try to suppress nmi");
+                        self.suppress_nmi = true;
+                    }
                     val = (val & 0xE0) | self.last_cpu_data & 0x1f;
                     self.last_cpu_data = (self.last_cpu_data & 0x1f) | (val & 0xE0);
                     self.last_cpu_counter[1] = 893420;
@@ -1039,6 +1046,7 @@ impl NesPpu {
 
     /// Run a single clock cycle of the ppu
     pub fn cycle(&mut self, bus: &mut NesMotherboard) {
+        self.vblank_just_set = false;
         if self.write_ignore_counter < PPU_STARTUP_CYCLE_COUNT {
             self.write_ignore_counter += 1;
         }
@@ -1348,6 +1356,7 @@ impl NesPpu {
             //vblank lines
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
                 self.registers[2] |= 0x80;
+                self.vblank_just_set = true;
                 self.frame_end = true;
                 #[cfg(any(test, feature = "debugger"))]
                 {
@@ -1363,6 +1372,7 @@ impl NesPpu {
                 if (self.registers[2] & 0x80) != 0 {
                     println!("Clear vblank flag1");
                 }
+                self.suppress_nmi = false;
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
             if self.scanline_cycle > 0 {
@@ -1622,7 +1632,7 @@ impl NesPpu {
 
     /// Returns the irq status for the ppu
     pub fn irq(&self) -> bool {
-        self.vblank_nmi
+        self.vblank_nmi && !self.suppress_nmi
     }
 
     /// Converts the data in the given reference (from this module usually), into a form that sdl2 can use directly.

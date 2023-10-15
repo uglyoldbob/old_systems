@@ -336,6 +336,17 @@ impl NesEmulatorData {
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.big_counter += 1;
+
+        self.ppu_clock_counter += 1;
+        if self.ppu_clock_counter >= 4 {
+            self.ppu_clock_counter = 0;
+            self.cpu_peripherals.ppu_cycle(&mut self.mb);
+            self.nmi[0] = self.nmi[1];
+            self.nmi[1] = self.nmi[2];
+            self.nmi[2] = self.nmi[3];
+            self.nmi[3] = self.nmi[4];
+        }
+
         self.cpu_clock_counter += 1;
         if self.cpu_clock_counter >= 12 {
             self.cpu_clock_counter = 0;
@@ -352,17 +363,7 @@ impl NesEmulatorData {
             self.prev_irq = irq;
         }
 
-        self.ppu_clock_counter += 1;
-        if self.ppu_clock_counter >= 4 {
-            self.ppu_clock_counter = 0;
-            self.cpu_peripherals.ppu_cycle(&mut self.mb);
-            self.nmi[0] = self.nmi[1];
-            self.nmi[1] = self.nmi[2];
-            self.nmi[2] = self.nmi[3];
-            self.nmi[3] = self.nmi[4];
-            if self.cpu_peripherals.ppu_irq() {
-                println!("PPU NMI DETECT @ {:x} {}", self.cpu.debugger.pc, self.big_counter);
-            }
+        if self.ppu_clock_counter == 0 {
             self.nmi[4] = self.cpu_peripherals.ppu_irq();
         }
     }
