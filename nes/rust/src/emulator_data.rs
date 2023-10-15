@@ -202,6 +202,8 @@ pub struct NesEmulatorData {
     #[serde(skip)]
     pub configuration: EmulatorConfiguration,
     big_counter: u64,
+    /// Indicates vblank was just set
+    vblank_just_set: u8,
 }
 
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
@@ -244,6 +246,7 @@ impl NesEmulatorData {
             rom_test: crate::rom_status::RomListTestParser::new(),
             configuration: EmulatorConfiguration::load("./config.toml".to_string()),
             big_counter: 0,
+            vblank_just_set: 0,
         }
     }
 
@@ -337,14 +340,22 @@ impl NesEmulatorData {
     ) {
         self.big_counter += 1;
 
+        if self.vblank_just_set > 0 {
+            self.vblank_just_set -= 1;
+        }
+
         self.ppu_clock_counter += 1;
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
+            if self.cpu_peripherals.ppu.vblank_just_set {
+                self.vblank_just_set = 35;
+            }
             self.nmi[0] = self.nmi[1];
             self.nmi[1] = self.nmi[2];
             self.nmi[2] = self.nmi[3];
             self.nmi[3] = self.nmi[4];
+            self.nmi[4] = self.cpu_peripherals.ppu_irq();
         }
 
         self.cpu_clock_counter += 1;
@@ -355,16 +366,23 @@ impl NesEmulatorData {
             self.cpu_peripherals.apu.clock_slow(sound, filter);
             let irq = self.cpu_peripherals.apu.irq();
             self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
-            if nmi {
-                println!("NMI SIGNAL @ {:X} {}", self.cpu.debugger.pc, self.big_counter);
-            }
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
+            if self.cpu_peripherals.ppu.vblank_clear {
+                if self.vblank_just_set > 0 {
+                    self.cpu_peripherals.ppu.suppress_nmi();
+                    self.nmi[0] = false;
+                    self.nmi[1] = false;
+                    self.nmi[2] = false;
+                    self.nmi[3] = false;
+                    self.nmi[4] = false;
+                }
+            }
             self.prev_irq = irq;
         }
 
         if self.ppu_clock_counter == 0 {
-            self.nmi[4] = self.cpu_peripherals.ppu_irq();
+            
         }
     }
 }

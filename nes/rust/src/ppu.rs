@@ -167,11 +167,11 @@ pub struct NesPpu {
     /// Controls access to registers 5 and 6 for writes by the cpu
     address_bit: bool,
     /// Used for clearing the vblank flag
-    vblank_clear: bool,
+    pub vblank_clear: bool,
     /// Flag used for generating irq signals used by the cpu.
     vblank_nmi: bool,
     /// For triggering race condition that suppresses nmi
-    vblank_just_set: bool,
+    pub vblank_just_set: bool,
     /// Suppress nmi generation
     suppress_nmi: bool,
     /// Indicates that an odd frame is currently being rendered.
@@ -531,10 +531,6 @@ impl NesPpu {
                 if addr == 2 {
                     self.address_bit = false;
                     self.vblank_clear = true;
-                    if self.vblank_just_set {
-                        println!("Try to suppress nmi");
-                        self.suppress_nmi = true;
-                    }
                     val = (val & 0xE0) | self.last_cpu_data & 0x1f;
                     self.last_cpu_data = (self.last_cpu_data & 0x1f) | (val & 0xE0);
                     self.last_cpu_counter[1] = 893420;
@@ -554,9 +550,6 @@ impl NesPpu {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
                     match addr {
                         0 => {
-                            if (data & PPU_REGISTER0_GENERATE_NMI) != 0 {
-                                println!("Enable ppu nmi");
-                            }
                             self.registers[0] = data;
                             self.temporary_vram_address =
                                 (self.temporary_vram_address & 0x73FF) | (data as u16 & 3) << 10;
@@ -1369,9 +1362,6 @@ impl NesPpu {
             self.increment_scanline_cycle();
         } else {
             if self.scanline_number == 261 && self.scanline_cycle == 1 {
-                if (self.registers[2] & 0x80) != 0 {
-                    println!("Clear vblank flag1");
-                }
                 self.suppress_nmi = false;
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
@@ -1382,16 +1372,10 @@ impl NesPpu {
         }
         if self.vblank_clear {
             self.vblank_clear = false;
-            if (self.registers[2] & 0x80) != 0 {
-                println!("Clear vblank flag2");
-            }
             self.registers[2] &= !0x80; //clear vblank flag
         }
-        let new_nmi = !self.suppress_nmi && ((self.registers[2] & 0x80) != 0)
+        let new_nmi = ((self.registers[2] & 0x80) != 0)
             & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
-        if new_nmi ^ self.vblank_nmi && new_nmi {
-            println!("Set nmi for ppu");
-        }
         self.vblank_nmi = new_nmi;
     }
 
@@ -1628,6 +1612,10 @@ impl NesPpu {
             pixel[1] = p[1];
             pixel[2] = p[2];
         }
+    }
+
+    pub fn suppress_nmi(&mut self) {
+        self.suppress_nmi = true;
     }
 
     /// Returns the irq status for the ppu
