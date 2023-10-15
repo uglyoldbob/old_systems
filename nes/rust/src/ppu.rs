@@ -170,6 +170,8 @@ pub struct NesPpu {
     vblank_clear: bool,
     /// Flag used for generating irq signals used by the cpu.
     vblank_nmi: bool,
+    /// Suppress nmi generation
+    suppress_nmi: bool,
     /// Indicates that an odd frame is currently being rendered.
     frame_odd: bool,
     /// Used to ignore writes to certain registers during ppu startup. Used with PPU_STARTUP_CYCLE_COUNT
@@ -366,6 +368,7 @@ impl NesPpu {
             address_bit: false,
             vblank_nmi: false,
             vblank_clear: false,
+            suppress_nmi: false,
             frame_end: false,
             frame_odd: false,
             write_ignore_counter: 0,
@@ -1374,7 +1377,7 @@ impl NesPpu {
             }
             self.registers[2] &= !0x80; //clear vblank flag
         }
-        let new_nmi = ((self.registers[2] & 0x80) != 0)
+        let new_nmi = !self.suppress_nmi && ((self.registers[2] & 0x80) != 0)
             & ((self.registers[0] & PPU_REGISTER0_GENERATE_NMI) != 0);
         if new_nmi ^ self.vblank_nmi && new_nmi {
             println!("Set nmi for ppu");
