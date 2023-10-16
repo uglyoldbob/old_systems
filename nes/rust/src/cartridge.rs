@@ -192,11 +192,11 @@ impl NesCartridge {
         }
         let prg_rom_size = rom_contents[4] as usize * 16384;
 
-        let chr_rom_size = rom_contents[5] as usize * 8192;
+        let mut chr_rom_size = rom_contents[5] as usize * 8192;
         let chr_ram = chr_rom_size == 0;
         if chr_ram {
             //TODO determine correct size for chr-ram
-            //chr_rom_size = 8192;
+            chr_rom_size = 8192;
         }
         let mut file_offset: usize = 16;
         let trainer = if (rom_contents[6] & 4) != 0 {
@@ -224,20 +224,18 @@ impl NesCartridge {
 
         let mut chr_rom = Vec::with_capacity(chr_rom_size);
         if chr_rom_size != 0 {
-            let mut chr_rom_from_rom = false;
             for i in 0..chr_rom_size {
                 let data = if !chr_ram {
                     if rom_contents.len() <= (file_offset + i) {
                         return Err(CartridgeError::RomTooShort);
                     }
-                    chr_rom_from_rom = true;
                     rom_contents[file_offset + i]
                 } else {
                     rand::random()
                 };
                 chr_rom.push(data);
             }
-            if chr_rom_from_rom {
+            if !chr_ram {
                 file_offset += chr_rom_size;
             }
         }
