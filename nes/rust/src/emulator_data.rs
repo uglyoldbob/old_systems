@@ -204,6 +204,7 @@ pub struct NesEmulatorData {
     big_counter: u64,
     /// Indicates vblank was just set
     vblank_just_set: u8,
+    bg_enabled_before: bool,
 }
 
 impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
@@ -247,6 +248,7 @@ impl NesEmulatorData {
             configuration: EmulatorConfiguration::load("./config.toml".to_string()),
             big_counter: 0,
             vblank_just_set: 0,
+            bg_enabled_before: false,
         }
     }
 
@@ -345,11 +347,12 @@ impl NesEmulatorData {
         }
 
         self.ppu_clock_counter += 1;
+
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
             if self.cpu_peripherals.ppu.vblank_just_set {
-                self.vblank_just_set = 35;
+                self.vblank_just_set = 1;
             }
             self.nmi[0] = self.nmi[1];
             self.nmi[1] = self.nmi[2];
@@ -380,6 +383,7 @@ impl NesEmulatorData {
             }
             self.prev_irq = irq;
         }
+        self.bg_enabled_before = self.cpu_peripherals.ppu.get_bg_enabled();
 
         if self.ppu_clock_counter == 0 {
             

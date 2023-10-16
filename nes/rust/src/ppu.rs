@@ -239,6 +239,7 @@ pub struct NesPpu {
     pub bg_debug: Option<(u8, u8)>,
     /// Indicates the mode the ppu access is in
     mode: Option<PpuMode>,
+    bg_enabled: bool,
 }
 
 /// The flags that set the nametable base
@@ -405,6 +406,7 @@ impl NesPpu {
             #[cfg(feature = "debugger")]
             bg_debug: None,
             mode: None,
+            bg_enabled: false,
         }
     }
 
@@ -540,6 +542,10 @@ impl NesPpu {
         }
     }
 
+    pub fn get_bg_enabled(&self) -> bool {
+        self.bg_enabled
+    }
+
     /// Perform writes done by the cpu.
     pub fn write(&mut self, addr: u16, data: u8, palette: &mut [u8; 32]) {
         self.last_cpu_data = data;
@@ -548,6 +554,9 @@ impl NesPpu {
         match addr {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
+                    if addr == 1 {
+                        self.bg_enabled = (data & PPU_REGISTER1_DRAW_BACKGROUND) != 0;
+                    }
                     match addr {
                         0 => {
                             self.registers[0] = data;
@@ -689,6 +698,7 @@ impl NesPpu {
                 self.transfer_vertical_position();
             }
         }
+
         self.scanline_cycle += 1;
         if self.scanline_cycle == 341 {
             self.scanline_cycle = 0;
@@ -697,15 +707,15 @@ impl NesPpu {
                 self.frame_odd = !self.frame_odd;
                 self.scanline_number = 0;
             }
-            if self.scanline_cycle == 0
-                && self.scanline_number == 0
-                && self.frame_odd
-                && ((self.registers[1]
-                    & (PPU_REGISTER1_DRAW_BACKGROUND_FIRST_COLUMN | PPU_REGISTER1_DRAW_BACKGROUND))
-                    != 0)
-            {
-                self.scanline_cycle += 1;
-            }
+        }
+        else if self.scanline_cycle == 339 
+            && self.scanline_number == 261
+            && self.frame_odd
+            && ((self.registers[1]
+                & (PPU_REGISTER1_DRAW_BACKGROUND))
+                != 0)
+        {
+            self.scanline_cycle += 1;
         }
     }
 
