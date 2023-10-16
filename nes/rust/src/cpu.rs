@@ -68,6 +68,8 @@ struct Irq {
     level: bool,
     /// The nmi might trigger
     might_trigger: bool,
+    /// Indicates that the irq is enabled
+    enabled: bool,
 }
 
 impl Irq {
@@ -76,28 +78,27 @@ impl Irq {
         Self {
             level: false,
             might_trigger: false,
+            enabled: false,
         }
     }
 
     /// Check the edge and signal if appropriate
     fn check_level(&mut self) {
-        if self.level {
-            self.might_trigger = true;
-        }
+        self.might_trigger = self.level;
+    }
+
+    fn set_enabled(&mut self, e: bool) {
+        self.enabled = e;
     }
 
     /// Provides the nmi input for the edge detector
-    fn provide_signal(&mut self, sig: bool) {
+    fn poll(&mut self, sig: bool) {
         self.level = sig;
-    }
-
-    fn level(&self) -> bool {
-        self.level
     }
 
     /// Indicates that the nmi should interrupt right now
     fn should_interrupt(&self) -> bool {
-        self.might_trigger
+        self.might_trigger && self.enabled
     }
 
     fn handled(&mut self) {
@@ -233,8 +234,6 @@ pub struct NesCpu {
     nmi_detected: bool,
     /// Shift register for the interrupt detection routine
     interrupt_shift: [(bool, bool); 2],
-    /// The polled irq enable flag
-    polled_irq_flag: bool,
     /// Indicates the type of interrupt, true for nmi, false for irq
     interrupt_type: bool,
     /// Indicates that the cpu is currently interrupting with an interrupt
@@ -255,6 +254,7 @@ pub struct NesCpu {
     dma_running: bool,
     /// The total number of cycles for dma
     dma_count: u16,
+    irq: Irq,
 }
 
 /// The carry flag for the cpu flags register
@@ -307,7 +307,6 @@ impl NesCpu {
             prev_nmi: false,
             nmi_detected: false,
             interrupt_shift: [(false, false); 2],
-            polled_irq_flag: false,
             interrupt_type: false,
             interrupting: false,
             oamdma: None,
@@ -318,6 +317,7 @@ impl NesCpu {
             dmc_dma_counter: 0,
             dma_cycle: false,
             dma_count: 0,
+            irq: Irq::new(),
         }
     }
 
@@ -398,7 +398,7 @@ impl NesCpu {
 
     /// signal the end of a cpu instruction
     fn end_instruction(&mut self) {
-        self.polled_irq_flag = (self.p & CPU_FLAG_INT_DISABLE) == 0;
+        self.irq.set_enabled((self.p & CPU_FLAG_INT_DISABLE) == 0);
         self.subcycle = 0;
         self.opcode = None;
     }
@@ -607,6 +607,8 @@ impl NesCpu {
             s.done_fetching = false;
         }
 
+        s.irq.check_level();
+        s.irq.poll(irq);
         s.poll_interrupt_line(irq, nmi);
         if s.reset {
             match s.subcycle {
@@ -689,15 +691,15 @@ impl NesCpu {
                 }
             }
         } else if s.opcode.is_none() {
-            if (s.interrupt_shift[0].0 && s.polled_irq_flag)
+            if (s.irq.should_interrupt())
                 || s.interrupt_shift[0].1
                 || s.interrupting
             {
-                s.polled_irq_flag = false;
                 match s.subcycle {
                     0 => {
                         s.memory_cycle_read(
                             |s, _v| {
+                                s.irq.set_enabled(false);
                                 s.interrupting = true;
                                 s.subcycle += 1;
                             },
