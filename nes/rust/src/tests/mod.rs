@@ -1331,12 +1331,12 @@ fn cpu_test_interrupts() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 505
+            && nes_data.cpu_peripherals.ppu_frame_number() == 510
         {
             break;
         }
     }
-    assert!(nes_data.mb.check_vram(513, "0ASSED".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(65, "All 5 tests passed".to_string().as_bytes()));
 }
 
 #[test]

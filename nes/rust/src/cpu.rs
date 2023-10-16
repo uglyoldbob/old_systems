@@ -5,7 +5,7 @@ use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 
 /// Handles nmi detection
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 struct Nmi {
     /// The current detected level of the nmi signal
     level: bool,
@@ -62,7 +62,7 @@ impl Nmi {
 }
 
 /// Handles irq detection
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 struct Irq {
     /// The current detected level of the nmi signal
     level: bool,
@@ -255,6 +255,7 @@ pub struct NesCpu {
     /// The total number of cycles for dma
     dma_count: u16,
     irq: Irq,
+    oldirq: Irq,
 }
 
 /// The carry flag for the cpu flags register
@@ -318,6 +319,7 @@ impl NesCpu {
             dma_cycle: false,
             dma_count: 0,
             irq: Irq::new(),
+            oldirq: Irq::new(),
         }
     }
 
@@ -608,6 +610,7 @@ impl NesCpu {
         }
 
         s.irq.check_level();
+        s.oldirq = s.irq;
         s.irq.poll(irq);
         s.poll_interrupt_line(irq, nmi);
         if s.reset {
@@ -8139,6 +8142,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8201,6 +8205,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8263,6 +8268,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8325,6 +8331,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8387,6 +8394,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8449,6 +8457,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8511,6 +8520,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
@@ -8573,6 +8583,7 @@ impl NesCpu {
                                 if pc[1] != pc2[1] {
                                     s.subcycle = 3;
                                 } else {
+                                    s.irq = s.oldirq;
                                     s.end_instruction();
                                 }
                             },
