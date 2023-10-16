@@ -130,6 +130,8 @@ pub enum CartridgeError {
     IncompatibleMapper(u32),
     /// The rom might be too short, indicating some bytes got cut off of the end, or that it has been corrupted/modified
     RomTooShort,
+    /// The rom has bytes that were not parsed
+    RomTooLong,
 }
 
 /// Calculate the sha256 of a chunk of data, and return it in a hex encoded string.
@@ -190,14 +192,14 @@ impl NesCartridge {
         }
         let prg_rom_size = rom_contents[4] as usize * 16384;
 
-        let mut chr_rom_size = rom_contents[5] as usize * 8192;
+        let chr_rom_size = rom_contents[5] as usize * 8192;
         let chr_ram = chr_rom_size == 0;
         if chr_ram {
             //TODO determine correct size for chr-ram
-            chr_rom_size = 8192;
+            //chr_rom_size = 8192;
         }
         let mut file_offset: usize = 16;
-        let trainer = if (rom_contents[6] & 8) != 0 {
+        let trainer = if (rom_contents[6] & 4) != 0 {
             let mut trainer = Vec::with_capacity(512);
             for i in 0..512 {
                 if rom_contents.len() <= (file_offset + i) {
@@ -279,6 +281,7 @@ impl NesCartridge {
         let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
         if file_offset != rom_contents.len() {
+            return Err(CartridgeError::RomTooLong);
             /*println!(
                 "Expected to read {:x} bytes, read {:x}",
                 rom_contents.len(),
@@ -359,6 +362,7 @@ impl NesCartridge {
         }
 
         if file_offset < rom_contents.len() {
+            return Err(CartridgeError::RomTooLong);
             //println!("Didn't use the entire rom file, I should report this as a failure");
         }
 

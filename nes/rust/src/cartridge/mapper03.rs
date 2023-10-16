@@ -87,7 +87,7 @@ impl NesMapperTrait for Mapper03 {
             }
             0x8000..=0xffff => {
                 let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
+                let addr3 = addr2 as u32 & (cart.prg_rom.len()-1) as u32;
                 Some(cart.prg_rom[addr3 as usize])
             }
             _ => None,
