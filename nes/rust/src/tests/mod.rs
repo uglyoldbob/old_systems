@@ -2125,12 +2125,12 @@ fn ppu_nmi() {
     loop {
         nes_data.cycle_step(&mut None, &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
-            && nes_data.cpu_peripherals.ppu_frame_number() == 1325
+            && nes_data.cpu_peripherals.ppu_frame_number() == 1700
         {
             break;
         }
     }
-    assert!(nes_data.mb.check_vram(481, "Passed".to_string().as_bytes()));
+    assert!(nes_data.mb.check_vram(65, "All 10 tests passed".to_string().as_bytes()));
 }
 
 #[test]
