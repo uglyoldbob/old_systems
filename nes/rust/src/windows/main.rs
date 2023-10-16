@@ -4,6 +4,7 @@ use std::io::Write;
 
 use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
 
+use cpal::traits::StreamTrait;
 use egui_multiwin::{
     egui,
     egui_glow::EguiGlow,
@@ -37,6 +38,8 @@ pub struct MainNesWindow {
     sound_sample_interval: f32,
     /// The stream used for audio playback during emulation
     sound_stream: Option<cpal::Stream>,
+    /// Indicates the last know state of the sound stream
+    paused: bool,
 }
 
 impl MainNesWindow {
@@ -78,6 +81,7 @@ impl MainNesWindow {
                 filter: None,
                 sound_sample_interval: 0.0,
                 sound_stream: stream,
+                paused: false,
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -434,6 +438,17 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
             ui.label(format!("{:.0} FPS", self.fps));
         });
+
+        if let Some(s) = &mut self.sound_stream {
+            if c.paused && !self.paused {
+                s.pause();
+                self.paused = true;
+            }
+            if !c.paused && self.paused {
+                s.play();
+                self.paused = false;
+            }
+        }
 
         let time_now = std::time::SystemTime::now();
         let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
