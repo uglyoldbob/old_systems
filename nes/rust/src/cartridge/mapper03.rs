@@ -77,12 +77,19 @@ impl NesMapperTrait for Mapper03 {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
-                    Some(cart.prg_ram[addr2 as usize])
-                } else {
-                    None
+                if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.trainer.as_mut().unwrap();
+                    let addr = addr & 0x1ff;
+                    Some(c[addr as usize])
+                }
+                else {
+                    let mut addr2 = addr & 0x1fff;
+                    if !cart.prg_ram.is_empty() {
+                        addr2 %= cart.prg_ram.len() as u16;
+                        Some(cart.prg_ram[addr2 as usize])
+                    } else {
+                        None
+                    }
                 }
             }
             0x8000..=0xffff => {
@@ -96,9 +103,23 @@ impl NesMapperTrait for Mapper03 {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {
+    fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
         if addr >= 0x8000 {
             self.bank = data;
+        }
+        else if (0x6000..=0x7fff).contains(&addr) {
+            if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                let c = cart.trainer.as_mut().unwrap();
+                let addr = addr & 0x1ff;
+                c[addr as usize] = data;
+            }
+            else {
+                let mut addr2 = addr & 0x1fff;
+                if !cart.prg_ram.is_empty() {
+                    addr2 %= cart.prg_ram.len() as u16;
+                    cart.prg_ram[addr2 as usize] = data;
+                }
+            }
         }
     }
 

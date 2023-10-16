@@ -441,12 +441,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         if let Some(s) = &mut self.sound_stream {
             if c.paused && !self.paused {
-                s.pause();
-                self.paused = true;
+                self.paused = s.pause().is_ok();
             }
             if !c.paused && self.paused {
-                s.play();
-                self.paused = false;
+                self.paused = !s.play().is_ok();
             }
         }
 
