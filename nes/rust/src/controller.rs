@@ -38,6 +38,7 @@ impl UserInput {
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
 pub struct ControllerConfig {
     buttons: [UserInput; 15],
+    rates: [Duration; 2],
 }
 
 impl ControllerConfig {
@@ -45,12 +46,23 @@ impl ControllerConfig {
     pub fn new() -> Self {
         Self {
             buttons: [UserInput::NoInput; 15],
+            rates: [Duration::from_millis(50); 2],
         }
     }
 
     /// Retrieves the array of user inputs
     pub fn get_keys(&self) -> &[UserInput] {
         &self.buttons
+    }
+
+    /// Retrieve the rapid fire rate
+    pub fn get_rate(&self, index: usize) -> f32 {
+        500.0 / self.rates[index].as_millis() as f32
+    }
+
+    /// Sets the rapid fire rate for a and b turbo buttons.
+    pub fn set_rate(&mut self, index: usize, r: f32) {
+        self.rates[index] = Duration::from_millis((500.0 / r) as u64);
     }
 
     /// Set the given button with egui data
@@ -163,6 +175,12 @@ impl ButtonCombination {
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub fn update_egui_buttons(&mut self, i: &egui::InputState, config: &ControllerConfig) {
         for (index, b) in config.buttons.iter().enumerate() {
+            if index == BUTTON_COMBO_TURBOA {
+                self.try_set_rate(index, config.rates[0]);
+            }
+            if index == BUTTON_COMBO_TURBOB {
+                self.try_set_rate(index, config.rates[1]);
+            }
             match b {
                 UserInput::Egui(b) => {
                     if i.key_down(*b) {
@@ -173,6 +191,23 @@ impl ButtonCombination {
                 }
                 _ => {}
             }
+        }
+    }
+
+    /// Try to set the rate of the button
+    pub fn try_set_rate(&mut self, i: usize, newrate: Duration) {
+        match i {
+            BUTTON_COMBO_TURBOA => {
+                if let Some(Button::TurboA(enabled, _rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
+                    self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(enabled, newrate));
+                }
+            }
+            BUTTON_COMBO_TURBOB => {
+                if let Some(Button::TurboB(enabled, _rate)) = self.buttons[BUTTON_COMBO_TURBOB] {
+                    self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(enabled, newrate));
+                }
+            }
+            _ => {}
         }
     }
 
@@ -444,7 +479,7 @@ impl NesControllerTrait for StandardController {
                 }
                 1 => {
                     if let Some(a) = &self.combo[0].buttons[BUTTON_COMBO_TURBOB] {
-                        if let Button::TurboA(_flag, rate) = a {
+                        if let Button::TurboB(_flag, rate) = a {
                             *rate
                         } else {
                             Duration::from_millis(0)

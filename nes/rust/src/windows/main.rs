@@ -558,12 +558,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         let time_now = std::time::SystemTime::now();
         let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
-        if let Some(cont) = &mut c.mb.controllers[0] {
-            cont.rapid_fire(frame_time);
-        }
-        if let Some(cont) = &mut c.mb.controllers[1] {
-            cont.rapid_fire(frame_time);
-        }
         let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         if frame_time < desired_frame_length {
             let st = desired_frame_length - frame_time;
@@ -577,6 +571,15 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 .unwrap()
                 .as_nanos() as f64;
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
+
+        let rapid_time = new_frame_time.duration_since(self.last_frame_time).unwrap();
+        if let Some(cont) = &mut c.mb.controllers[0] {
+            cont.rapid_fire(rapid_time);
+        }
+        if let Some(cont) = &mut c.mb.controllers[1] {
+            cont.rapid_fire(rapid_time);
+        }
+
         self.last_frame_time = new_frame_time;
 
         RedrawResponse {

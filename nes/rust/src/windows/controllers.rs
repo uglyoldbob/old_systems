@@ -93,6 +93,8 @@ impl TrackedWindow<NesEmulatorData> for Window {
             let mut save_config = false;
             if let Some(i) = self.selected_controller {
                 let config = &mut c.configuration.controller_config[i as usize];
+                let mut set_turboa = None;
+                let mut set_turbob = None;
 
                 if let Some(index) = self.waiting_for_input {
                     if let Some(key) = first_key {
@@ -154,6 +156,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     {
                         self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_TURBOA);
                     }
+                    let mut val = config.get_rate(0);
+                    if ui.add(egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate")).changed() {
+                        set_turboa = Some(val);
+                    }
                 });
 
                 ui.horizontal(|ui| {
@@ -171,6 +177,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         .clicked()
                     {
                         self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_TURBOB);
+                    }
+                    let mut val = config.get_rate(1);
+                    if ui.add(egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate")).changed() {
+                        set_turbob = Some(val);
                     }
                 });
 
@@ -278,10 +288,19 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_RIGHT);
                     }
                 });
+                if let Some(r) = set_turboa {
+                    config.set_rate(0, r);
+                    save_config = true;
+                }
+                if let Some(r) = set_turbob {
+                    config.set_rate(1, r);
+                    save_config = true;
+                }
             }
             if save_config {
                 c.configuration.save();
             }
+            
         });
         RedrawResponse {
             quit,
