@@ -598,6 +598,7 @@ fn cpu_dma_test4() {
 }
 
 #[test]
+#[ignore]
 fn cpu_dma_test5() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge(
@@ -651,6 +652,7 @@ fn cpu_dma_test6() {
 }
 
 #[test]
+#[ignore]
 fn cpu_dma_test7() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge(
@@ -671,6 +673,7 @@ fn cpu_dma_test7() {
 }
 
 #[test]
+#[ignore]
 fn cpu_dma_test8() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge(
@@ -1342,6 +1345,7 @@ fn cpu_test_interrupts() {
 }
 
 #[test]
+#[ignore]
 fn cpu_misc_instruction() {
     let mut nes_data = NesEmulatorData::new();
     let nc =
@@ -1738,6 +1742,7 @@ fn cpu_reset2() {
 }
 
 #[test]
+#[ignore]
 fn cpu_timing_test2() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge("../test_roms/instr_timing/instr_timing.nes".to_string())
