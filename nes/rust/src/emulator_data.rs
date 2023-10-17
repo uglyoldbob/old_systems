@@ -33,6 +33,8 @@ pub struct EmulatorConfiguration {
     rom_path: String,
     /// The controller configuration for all 4 possible controllers.
     pub controller_config: [crate::controller::ControllerConfig; 4],
+    /// The scaler to use for the emulator
+    pub scaler: Option<crate::ppu::ScalingAlgorithm>,
 }
 
 impl Default for EmulatorConfiguration {
@@ -60,6 +62,7 @@ impl Default for EmulatorConfiguration {
             path: "".to_string(),
             rom_path: "./roms".to_string(),
             controller_config: controller,
+            scaler: None,
         }
     }
 }

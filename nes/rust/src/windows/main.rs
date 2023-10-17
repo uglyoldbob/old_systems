@@ -420,7 +420,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
         }
 
-        let image = c.cpu_peripherals.ppu_get_frame().to_egui(Some(ScalingAlgorithm::Scale2x));
+        let image = c.cpu_peripherals.ppu_get_frame().to_egui(c.configuration.scaler);
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
