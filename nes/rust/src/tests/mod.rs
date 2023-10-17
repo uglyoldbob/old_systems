@@ -1336,7 +1336,9 @@ fn cpu_test_interrupts() {
             break;
         }
     }
-    assert!(nes_data.mb.check_vram(65, "All 5 tests passed".to_string().as_bytes()));
+    assert!(nes_data
+        .mb
+        .check_vram(65, "All 5 tests passed".to_string().as_bytes()));
 }
 
 #[test]
@@ -2130,7 +2132,9 @@ fn ppu_nmi() {
             break;
         }
     }
-    assert!(nes_data.mb.check_vram(65, "All 10 tests passed".to_string().as_bytes()));
+    assert!(nes_data
+        .mb
+        .check_vram(65, "All 10 tests passed".to_string().as_bytes()));
 }
 
 #[test]

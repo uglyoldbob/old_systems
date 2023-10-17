@@ -48,8 +48,8 @@ impl Mapper01 {
         let control = self.registers[0];
         let a10 = match control & 3 {
             0 | 1 => (control & 1) != 0,
-            2 => (addr & 1 << 10) != 0,
-            _ => (addr & 1 << 11) != 0,
+            2 => (addr & (1 << 10)) != 0,
+            _ => (addr & (1 << 11)) != 0,
         };
         (a10, false)
     }
@@ -103,12 +103,18 @@ impl NesMapperTrait for Mapper01 {
     fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 |= (self.ram_bank as u16) << 13;
-                    Some(cart.prg_ram[addr2 as usize & (cart.prg_ram.len() - 1)])
+                if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.trainer.as_ref().unwrap();
+                    let addr = addr & 0x1ff;
+                    Some(c[addr as usize])
                 } else {
-                    None
+                    let mut addr2 = addr & 0x1fff;
+                    if !cart.prg_ram.is_empty() {
+                        addr2 %= cart.prg_ram.len() as u16;
+                        Some(cart.prg_ram[addr2 as usize])
+                    } else {
+                        None
+                    }
                 }
             }
             0x8000..=0xffff => {
@@ -213,11 +219,16 @@ impl NesMapperTrait for Mapper01 {
                 self.shift_register = 0;
             }
         } else if (0x6000..=0x7fff).contains(&addr) {
-            let mut addr2 = addr & 0x1fff;
-            if !cart.prg_ram.is_empty() {
-                addr2 %= cart.prg_ram.len() as u16;
-                let addr3 = addr2 as usize & (cart.prg_ram.len() - 1);
-                cart.prg_ram[addr3] = data;
+            if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                let c = cart.trainer.as_mut().unwrap();
+                let addr = addr & 0x1ff;
+                c[addr as usize] = data;
+            } else {
+                let mut addr2 = addr & 0x1fff;
+                if !cart.prg_ram.is_empty() {
+                    addr2 %= cart.prg_ram.len() as u16;
+                    cart.prg_ram[addr2 as usize] = data;
+                }
             }
         }
     }

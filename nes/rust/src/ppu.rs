@@ -707,13 +707,10 @@ impl NesPpu {
                 self.frame_odd = !self.frame_odd;
                 self.scanline_number = 0;
             }
-        }
-        else if self.scanline_cycle == 339 
+        } else if self.scanline_cycle == 339
             && self.scanline_number == 261
             && self.frame_odd
-            && ((self.registers[1]
-                & (PPU_REGISTER1_DRAW_BACKGROUND))
-                != 0)
+            && ((self.registers[1] & (PPU_REGISTER1_DRAW_BACKGROUND)) != 0)
         {
             self.scanline_cycle += 1;
         }

@@ -4,6 +4,7 @@ use std::io::Write;
 
 use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
 
+#[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
 
 #[cfg(feature = "eframe")]
@@ -42,6 +43,7 @@ pub struct MainNesWindow {
     /// The interval between sound samples based on the sample rate used in the stream
     sound_sample_interval: f32,
     /// The stream used for audio playback during emulation
+    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     sound_stream: Option<cpal::Stream>,
     /// Indicates the last know state of the sound stream
     paused: bool,
@@ -136,7 +138,8 @@ impl eframe::App for MainNesWindow {
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
             self.sound_sample_interval = sampling_frequency / rf;
-            self.c.cpu_peripherals
+            self.c
+                .cpu_peripherals
                 .apu
                 .set_audio_interval(self.sound_sample_interval);
         }
@@ -198,15 +201,11 @@ impl eframe::App for MainNesWindow {
         let mut save_state = false;
         let mut load_state = false;
 
-        if ctx
-            .input(|i| i.key_pressed(egui::Key::F5))
-        {
+        if ctx.input(|i| i.key_pressed(egui::Key::F5)) {
             save_state = true;
         }
 
-        if ctx
-            .input(|i| i.key_pressed(egui::Key::F6))
-        {
+        if ctx.input(|i| i.key_pressed(egui::Key::F6)) {
             load_state = true;
         }
 

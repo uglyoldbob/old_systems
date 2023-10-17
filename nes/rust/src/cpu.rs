@@ -24,7 +24,7 @@ impl Nmi {
             level: false,
             edge: false,
             might_trigger: false,
-            holding:false,
+            holding: false,
         }
     }
 
@@ -39,8 +39,7 @@ impl Nmi {
 
     /// Provides the nmi input for the edge detector
     fn process_signal(&mut self) {
-        if self.holding & !self.level
-        {
+        if self.holding & !self.level {
             self.edge = true;
         }
         self.level = self.holding;
@@ -694,10 +693,7 @@ impl NesCpu {
                 }
             }
         } else if s.opcode.is_none() {
-            if (s.irq.should_interrupt())
-                || s.interrupt_shift[0].1
-                || s.interrupting
-            {
+            if (s.irq.should_interrupt()) || s.interrupt_shift[0].1 || s.interrupting {
                 match s.subcycle {
                     0 => {
                         s.memory_cycle_read(

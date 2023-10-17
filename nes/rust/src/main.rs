@@ -4,6 +4,15 @@
 
 //! This is the nes emulator written in rust. It is compatible with windows, linux, and osx.
 
+#[cfg(all(feature = "eframe", feature = "egui-multiwin"))]
+compile_error!(
+    "feature \"eframe\" and feature \"egui-multiwin\" cannot be enabled at the same time"
+);
+#[cfg(all(feature = "eframe", feature = "sdl2"))]
+compile_error!("feature \"eframe\" and feature \"sdl2\" cannot be enabled at the same time");
+#[cfg(all(feature = "sdl2", feature = "egui-multiwin"))]
+compile_error!("feature \"sdl2\" and feature \"egui-multiwin\" cannot be enabled at the same time");
+
 mod apu;
 mod cartridge;
 mod controller;
@@ -49,6 +58,7 @@ use sdl2::render::Texture;
 #[cfg(feature = "sdl2")]
 use sdl2::render::TextureCreator;
 
+/// The primary font to use for rendering the gui
 #[cfg(feature = "sdl2")]
 pub const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
 
@@ -148,7 +158,7 @@ fn main() {
     let flags = sdl2::image::InitFlag::all();
     let _sdl2_image = sdl2::image::init(flags).unwrap();
 
-    let mut last_frame_time: std::time::SystemTime = std::time::SystemTime::now();
+    let mut last_frame_time: std::time::Instant = std::time::Instant::now();
 
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge(
@@ -176,14 +186,14 @@ fn main() {
         egui_ctx.begin_frame(egui_state.input.take());
 
         'emulator_loop: loop {
-            nes_data.cycle_step();
+            nes_data.cycle_step(&mut None, &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 break 'emulator_loop;
             }
         }
 
         let frame_data = nes_data.cpu_peripherals.ppu_get_frame();
-        NesPpu::convert_for_sdl2(frame_data, &mut frame);
+        crate::ppu::NesPpu::convert_for_sdl2(frame_data, &mut frame);
 
         //todo update buffer
         painter.update_user_texture_data(nes_frame_texture_id, &frame);
@@ -228,19 +238,16 @@ fn main() {
         }
 
         let time_now = std::time::Instant::now();
-        let frame_time = time_now.duration_since(last_frame_time).unwrap();
+        let frame_time = time_now.duration_since(last_frame_time);
         let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         if frame_time < desired_frame_length {
             let st = (desired_frame_length - frame_time);
             spin_sleep::sleep(st);
         }
 
-        let new_frame_time = std::time::SystemTime::now();
-        let new_fps = 1_000_000_000.0
-            / new_frame_time
-                .duration_since(last_frame_time)
-                .unwrap()
-                .as_nanos() as f64;
+        let new_frame_time = std::time::Instant::now();
+        let new_fps =
+            1_000_000_000.0 / new_frame_time.duration_since(last_frame_time).as_nanos() as f64;
         fps = (fps * 0.95) + (0.05 * new_fps);
         last_frame_time = new_frame_time;
     }

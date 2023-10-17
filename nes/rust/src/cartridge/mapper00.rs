@@ -26,9 +26,9 @@ impl Mapper00 {
     /// Check the mirroring bit for the ppu addressing.
     fn check_mirroring(&self, addr: u16) -> (bool, bool) {
         let a10 = if self.mirror_vertical {
-            (addr & 1 << 10) != 0
+            (addr & (1 << 10)) != 0
         } else {
-            (addr & 1 << 11) != 0
+            (addr & (1 << 11)) != 0
         };
         (a10, false)
     }
@@ -45,12 +45,18 @@ impl NesMapperTrait for Mapper00 {
     fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
-                    Some(cart.prg_ram[addr2 as usize])
+                if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.trainer.as_ref().unwrap();
+                    let addr = addr & 0x1ff;
+                    Some(c[addr as usize])
                 } else {
-                    None
+                    let mut addr2 = addr & 0x1fff;
+                    if !cart.prg_ram.is_empty() {
+                        addr2 %= cart.prg_ram.len() as u16;
+                        Some(cart.prg_ram[addr2 as usize])
+                    } else {
+                        None
+                    }
                 }
             }
             0x8000..=0xffff => {
@@ -84,7 +90,21 @@ impl NesMapperTrait for Mapper00 {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _addr: u16, _data: u8) {}
+    fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
+        if (0x6000..=0x7fff).contains(&addr) {
+            if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                let c = cart.trainer.as_mut().unwrap();
+                let addr = addr & 0x1ff;
+                c[addr as usize] = data;
+            } else {
+                let mut addr2 = addr & 0x1fff;
+                if !cart.prg_ram.is_empty() {
+                    addr2 %= cart.prg_ram.len() as u16;
+                    cart.prg_ram[addr2 as usize] = data;
+                }
+            }
+        }
+    }
 
     fn ppu_peek_address(&self, addr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);
