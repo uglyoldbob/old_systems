@@ -12,13 +12,26 @@ use egui_multiwin::egui;
 use egui_multiwin::egui::InputState;
 
 /// The types of user input that can be accepted
-#[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug)]
 pub enum UserInput {
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     Egui(egui::Key),
     #[cfg(feature = "sdl2")]
     Sdl2,
     NoInput,
+}
+
+impl UserInput {
+    pub fn to_string(&self) -> String {
+        match self {
+            UserInput::Egui(k) => {
+                format!("{:?}", k)
+            }
+            #[cfg(feature = "sdl2")]
+            UserInput::Sdl2 => "SDL2".to_string(),
+            UserInput::NoInput => "None".to_string(),
+        }
+    }
 }
 
 /// Defines how inputs get from user to the ButtonCombination
@@ -33,6 +46,11 @@ impl ControllerConfig {
         Self {
             buttons: [UserInput::NoInput; 15],
         }
+    }
+
+    /// Retrieves the array of user inputs
+    pub fn get_keys(&self) -> &[UserInput] {
+        &self.buttons
     }
 
     /// Set the given button with egui data

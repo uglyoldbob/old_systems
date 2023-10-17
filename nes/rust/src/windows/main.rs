@@ -425,6 +425,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         ui.close_menu();
                     }
                 });
+                ui.menu_button("Edit", |ui| {
+                    let button = egui_multiwin::egui::Button::new("Controllers");
+                    if ui.add_enabled(true, button).clicked() {
+                        windows_to_create.push(super::controllers::Window::new_request());
+                        ui.close_menu();
+                    }
+                });
                 #[cfg(feature = "debugger")]
                 {
                     ui.menu_button("Debug", |ui| {
