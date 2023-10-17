@@ -567,12 +567,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
                 let size = ui.available_size();
-                let zoom = (size.x / 256.0).min(size.y / 240.0);
+                let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
                 let r = ui.add(egui::Image::from_texture(egui::load::SizedTexture {
                     id: t.id(),
                     size: egui_multiwin::egui::Vec2 {
-                        x: 256.0 * zoom,
-                        y: 240.0 * zoom,
+                        x: t.size()[0] as f32 * zoom,
+                        y: t.size()[1] as f32 * zoom,
                     },
                 }));
                 if r.hovered() {
