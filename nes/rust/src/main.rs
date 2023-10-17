@@ -149,7 +149,7 @@ fn main() {
     let shader_ver = egui_sdl2_gl::ShaderVersion::Default;
     let (mut painter, mut egui_state) =
         egui_sdl2_gl::with_sdl2(&window, shader_ver, egui_sdl2_gl::DpiScaling::Custom(2.0));
-    let mut egui_ctx = egui_sdl2_gl::egui::CtxRef::default();
+    let mut egui_ctx = egui_sdl2_gl::egui::Context::default();
 
     let i = sdl2::mixer::InitFlag::MP3;
     let _sdl2mixer = sdl2::mixer::init(i).unwrap();
@@ -213,13 +213,18 @@ fn main() {
                 ));
             });
 
-        let (egui_output, paint_cmds) = egui_ctx.end_frame();
+        let egui_sdl2_gl::egui::FullOutput {
+            platform_output,
+            repaint_after,
+            textures_delta,
+            shapes,
+        } = egui_ctx.end_frame();
 
-        egui_state.process_output(&window, &egui_output);
+        egui_state.process_output(&window, &platform_output);
 
-        let paint_jobs = egui_ctx.tessellate(paint_cmds);
+        let paint_jobs = egui_ctx.tessellate(shapes);
 
-        painter.paint_jobs(None, paint_jobs, &egui_ctx.font_image());
+        painter.paint_jobs(None, textures_delta, paint_jobs);
 
         window.gl_swap_window();
 
