@@ -9,6 +9,12 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
+/// The types of algorithms for scaling up the image
+pub enum ScalingAlgorithm {
+    ///The Scale2x algorithm, based on EPX (Eric's pixel expansion)
+    Scale2x,
+}
+
 /// A rgb image of variable size. Each pixel is 8 bits per channel, red, green, blue.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct RgbImage {
@@ -34,14 +40,65 @@ impl RgbImage {
 
     /// Converts to egui format.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    pub fn to_egui(&self) -> egui::ColorImage {
-        let pixels = self
+    pub fn to_egui(&self, scale: Option<ScalingAlgorithm>) -> egui::ColorImage {
+        let pixels: Vec<egui::Color32> = self
             .data
             .chunks_exact(3)
             .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
             .collect();
+        let (pixels, width, height) = match scale {
+            None => {
+                (pixels, self.width as usize, self.height as usize)
+            }
+            Some(alg) => {
+                match alg {
+                    ScalingAlgorithm::Scale2x => {
+                        let mut newpixels = vec![egui::Color32::BLACK; pixels.len() * 4];
+                        for y in 0..self.height {
+                            for x in 0..self.width {
+                                let p = pixels[y as usize * self.width as usize + x as usize];
+                                let mut pg: [egui::Color32; 4] = [p; 4];
+                                let a = if y > 0 {
+                                    pixels[(y-1) as usize * self.width as usize + x as usize]
+                                }
+                                else {
+                                    egui::Color32::BLACK
+                                };
+                                let d = if (y+1) < self.height {
+                                    pixels[(y+1) as usize * self.width as usize + x as usize]
+                                }
+                                else {
+                                    egui::Color32::BLACK
+                                };
+                                let c = if x > 0 {
+                                    pixels[y as usize * self.width as usize + x as usize - 1]
+                                }
+                                else {
+                                    egui::Color32::BLACK
+                                };
+                                let b = if (x+1) < self.width {
+                                    pixels[y as usize * self.width as usize + x as usize + 1]
+                                }
+                                else {
+                                    egui::Color32::BLACK
+                                };
+                                if c == a && c != d && a != b { pg[0] = a; }
+                                if a == b && a != c && b != d { pg[1] = b; }
+                                if d == c && d != b && c != a { pg[2] = c; }
+                                if b == d && b != a && d != c { pg[3] = d; }
+                                newpixels[2*y as usize * 2*self.width as usize + 2*x as usize] = pg[0];
+                                newpixels[2*y as usize * 2*self.width as usize + 2*x as usize+1] = pg[1];
+                                newpixels[(2*y+1) as usize * 2*self.width as usize + 2*x as usize] = pg[2];
+                                newpixels[(2*y+1) as usize * 2*self.width as usize + 2*x as usize+1] = pg[3];
+                            }
+                        }
+                        (newpixels, 2 * self.width as usize, 2 * self.height as usize)
+                    },
+                }
+            }
+        };
         egui::ColorImage {
-            size: [self.width as usize, self.height as usize],
+            size: [width, height],
             pixels,
         }
     }

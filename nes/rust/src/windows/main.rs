@@ -2,7 +2,7 @@
 //!
 use std::io::Write;
 
-use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
+use crate::{controller::NesControllerTrait, ppu::{NesPpu, ScalingAlgorithm}, NesEmulatorData};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
@@ -420,7 +420,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
         }
 
-        let image = c.cpu_peripherals.ppu_get_frame().to_egui();
+        let image = c.cpu_peripherals.ppu_get_frame().to_egui(Some(ScalingAlgorithm::Scale2x));
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(

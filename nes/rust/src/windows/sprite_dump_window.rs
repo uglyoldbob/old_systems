@@ -77,7 +77,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                 c.cpu_peripherals
                     .ppu
                     .render_palette(&mut self.palette, &c.mb);
-                let image = self.buf.to_egui();
+                let image = self.buf.to_egui(None);
                 if self.texture.is_none() {
                     self.texture = Some(egui.egui_ctx.load_texture(
                         "NES_PPU_SPRITES",
@@ -87,7 +87,7 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                 } else if let Some(t) = &mut self.texture {
                     t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
                 }
-                let image2 = self.palette.to_egui();
+                let image2 = self.palette.to_egui(None);
                 if self.texture2.is_none() {
                     self.texture2 = Some(egui.egui_ctx.load_texture(
                         "NES_PPU_PALETTE",
