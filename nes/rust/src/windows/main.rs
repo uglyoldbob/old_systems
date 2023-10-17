@@ -420,7 +420,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
         }
 
-        let image = NesPpu::convert_to_egui(c.cpu_peripherals.ppu_get_frame());
+        let image = c.cpu_peripherals.ppu_get_frame().to_egui();
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(

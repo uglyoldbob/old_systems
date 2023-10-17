@@ -10,6 +10,7 @@ use eframe::egui;
 use egui_multiwin::egui;
 
 /// A rgb image of variable size. Each pixel is 8 bits per channel, red, green, blue.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct RgbImage {
     /// The raw data of the image
     data: Vec<u8>,
@@ -154,7 +155,7 @@ impl PpuSprite {
 /// The structure for the nes PPU (picture processing unit)
 #[non_exhaustive]
 #[serde_with::serde_as]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesPpu {
     /// The registers for the ppu
     registers: [u8; 8],
@@ -192,8 +193,7 @@ pub struct NesPpu {
     #[serde_as(as = "[_; 2]")]
     patterntable_shift: [u16; 2],
     /// The frame data stored in the ppu for being displayed onto the screen later.
-    #[serde_as(as = "Bytes")]
-    frame_data: Box<[u8; 3 * 256 * 240]>,
+    frame_data: Box<RgbImage>,
     /// Indicates that there is a pending write from the cpu
     pend_vram_write: Option<u8>,
     /// Indicates that there is a pending read from the cpu
@@ -381,7 +381,7 @@ impl NesPpu {
             attributetable_shift: [0, 0],
             patterntable_tile: 0,
             patterntable_shift: [0, 0],
-            frame_data: Box::new([0; 3 * 256 * 240]),
+            frame_data: Box::new(RgbImage::new(256, 240)),
             pend_vram_write: None,
             pend_vram_read: None,
             vram_address: 0,
@@ -1217,12 +1217,12 @@ impl NesPpu {
                 }
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];
-                self.frame_data
+                self.frame_data.data
                     [((self.scanline_number * 256 + cycle as u16) as u32 * 3) as usize] = pixel[0];
-                self.frame_data
+                self.frame_data.data
                     [((self.scanline_number * 256 + cycle as u16) as u32 * 3 + 1) as usize] =
                     pixel[1];
-                self.frame_data
+                self.frame_data.data
                     [((self.scanline_number * 256 + cycle as u16) as u32 * 3 + 2) as usize] =
                     pixel[2];
 
@@ -1385,7 +1385,7 @@ impl NesPpu {
     }
 
     /// Returns a reference to the frame data stored in the ppu.
-    pub fn get_frame(&mut self) -> &[u8; 256 * 240 * 3] {
+    pub fn get_frame(&mut self) -> &RgbImage {
         &self.frame_data
     }
 

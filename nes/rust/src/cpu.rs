@@ -152,7 +152,7 @@ impl NesCpuPeripherals {
     }
 
     /// Returns a reference to the frame data for the ppu
-    pub fn ppu_get_frame(&mut self) -> &[u8; 256 * 240 * 3] {
+    pub fn ppu_get_frame(&mut self) -> &crate::ppu::RgbImage {
         self.ppu.get_frame()
     }
 
