@@ -5,6 +5,11 @@ use std::io::Write;
 use crate::{controller::NesControllerTrait, ppu::NesPpu, NesEmulatorData};
 
 use cpal::traits::StreamTrait;
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
     egui,
     egui_glow::EguiGlow,
@@ -44,18 +49,28 @@ pub struct MainNesWindow {
 
 impl MainNesWindow {
     #[cfg(feature = "eframe")]
-    fn new() -> Self {
-        let mut nes_data = NesEmulatorData::new();
-        let nc = NesCartridge::load_cartridge(
-            "./nes/test_roms/cpu_exec_space/test_cpu_exec_space_apu.nes".to_string(),
-        )
-        .unwrap();
-        nes_data.insert_cartridge(nc);
-        nes_data.power_cycle();
+    pub fn new_request(
+        c: NesEmulatorData,
+        rate: u32,
+        producer: Option<
+            ringbuf::Producer<
+                f32,
+                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+            >,
+        >,
+        stream: Option<cpal::Stream>,
+    ) -> Self {
         Self {
             last_frame_time: std::time::SystemTime::now(),
-            c: nes_data,
+            c,
             fps: 0.0,
+            sound_rate: rate,
+            sound: producer,
+            texture: None,
+            filter: None,
+            sound_sample_interval: 0.0,
+            sound_stream: stream,
+            paused: false,
         }
     }
 
@@ -108,11 +123,49 @@ impl eframe::App for MainNesWindow {
             puffin_egui::profiler_window(ctx);
         }
 
+        if self.filter.is_none() && self.sound_stream.is_some() {
+            println!("Initializing with sample rate {}", self.sound_rate);
+            let rf = self.sound_rate as f32;
+            let sampling_frequency = 21.47727e6 / 12.0;
+            let filter_coeff = biquad::Coefficients::<f32>::from_params(
+                biquad::Type::LowPass,
+                biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
+                biquad::Hertz::<f32>::from_hz(rf / 2.2).unwrap(),
+                biquad::Q_BUTTERWORTH_F32,
+            )
+            .unwrap();
+            self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
+            self.sound_sample_interval = sampling_frequency / rf;
+            self.c.cpu_peripherals
+                .apu
+                .set_audio_interval(self.sound_sample_interval);
+        }
+
+        {
+            ctx.input(|i| {
+                if let Some(controller) = &mut self.c.mb.controllers[0] {
+                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
+                        let cnum = index << 1;
+                        let button_config = &self.c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                        //unimplemented!();
+                    }
+                }
+                if let Some(controller) = &mut self.c.mb.controllers[1] {
+                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
+                        let cnum = 1 + (index << 1);
+                        let button_config = &self.c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                    }
+                }
+            });
+        }
+
         {
             #[cfg(feature = "puffin")]
             puffin::profile_scope!("nes frame render");
             'emulator_loop: loop {
-                self.c.cycle_step();
+                self.c.cycle_step(&mut self.sound, &mut self.filter);
                 if self.c.cpu_peripherals.ppu_frame_end() {
                     break 'emulator_loop;
                 }
@@ -123,10 +176,10 @@ impl eframe::App for MainNesWindow {
             puffin::profile_scope!("nes frame convert");
             let image = NesPpu::convert_to_egui(self.c.cpu_peripherals.ppu_get_frame());
 
-            if let None = self.c.texture {
-                self.c.texture =
+            if let None = self.texture {
+                self.texture =
                     Some(ctx.load_texture("NES_PPU", image, egui::TextureOptions::LINEAR));
-            } else if let Some(t) = &mut self.c.texture {
+            } else if let Some(t) = &mut self.texture {
                 t.set_partial([0, 0], image, egui::TextureOptions::LINEAR);
             }
         }
@@ -142,9 +195,58 @@ impl eframe::App for MainNesWindow {
             });
         });
 
+        let mut save_state = false;
+        let mut load_state = false;
+
+        if ctx
+            .input(|i| i.key_pressed(egui::Key::F5))
+        {
+            save_state = true;
+        }
+
+        if ctx
+            .input(|i| i.key_pressed(egui::Key::F6))
+        {
+            load_state = true;
+        }
+
+        let name = if let Some(cart) = self.c.mb.cartridge() {
+            cart.save_name()
+        } else {
+            "state.bin".to_string()
+        };
+        let name = format!("./saves/{}", name);
+        if save_state {
+            let mut path = std::path::PathBuf::from(&name);
+            path.pop();
+            let _ = std::fs::create_dir_all(path);
+            let state = Box::new(self.c.serialize());
+            let _e = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&name)
+                .unwrap()
+                .write_all(&state);
+        }
+
+        if load_state {
+            if let Ok(a) = std::fs::read(&name) {
+                let _e = self.c.deserialize(a);
+            }
+        }
+
         egui::CentralPanel::default().show(&ctx, |ui| {
-            if let Some(t) = &self.c.texture {
-                ui.image(t, egui::Vec2 { x: 256.0, y: 240.0 });
+            if let Some(t) = &self.texture {
+                let size = ui.available_size();
+                let zoom = (size.x / 256.0).min(size.y / 240.0);
+                let r = ui.add(egui::Image::from_texture(egui::load::SizedTexture {
+                    id: t.id(),
+                    size: egui::Vec2 {
+                        x: 256.0 * zoom,
+                        y: 240.0 * zoom,
+                    },
+                }));
             }
             ui.label(format!("{:.0} FPS", self.fps));
         });

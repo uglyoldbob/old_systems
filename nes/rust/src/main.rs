@@ -25,7 +25,7 @@ use crate::cartridge::NesCartridge;
 #[cfg(feature = "rom_status")]
 pub mod rom_status;
 
-#[cfg(feature = "egui-multiwin")]
+#[cfg(any(feature = "egui-multiwin", feature = "eframe"))]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -253,10 +253,102 @@ fn main() {
     let mut options = eframe::NativeOptions::default();
     //TODO only disable vsync when required
     options.vsync = false;
+
+    let mut nes_data = NesEmulatorData::new();
+    nes_data
+        .parser
+        .find_roms(nes_data.configuration.get_rom_path());
+
+    let host = cpal::default_host();
+    let device = host.default_output_device();
+    let mut sound_rate = 0;
+    let mut sound_producer = None;
+    let sound_stream = if let Some(d) = &device {
+        let ranges = d.supported_output_configs();
+        if let Ok(mut r) = ranges {
+            let supportedconfig = r.next().unwrap().with_max_sample_rate();
+            let format = supportedconfig.sample_format();
+            println!("output format is {:?}", format);
+            let mut config = supportedconfig.config();
+            let mut num_samples = (config.sample_rate.0 as f32 * 0.1) as usize;
+            let sbs = supportedconfig.buffer_size();
+            let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
+                if num_samples > *max as usize {
+                    num_samples = *max as usize;
+                    cpal::BufferSize::Fixed(*max as cpal::FrameCount)
+                } else if num_samples < *min as usize {
+                    num_samples = *min as usize;
+                    cpal::BufferSize::Fixed(*min as cpal::FrameCount)
+                } else {
+                    cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
+                }
+            } else {
+                //TODO maybe do somethind else when buffer size is unknown
+                cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
+            };
+            config.buffer_size = num_samples_buffer;
+            config.channels = 2;
+            println!("SBS IS {:?}", sbs);
+
+            println!("audio config is {:?}", config);
+
+            nes_data.cpu_peripherals.apu.set_audio_buffer(num_samples);
+            println!(
+                "Audio buffer size is {} elements, sample rate is {}",
+                num_samples, config.sample_rate.0
+            );
+            let rb = ringbuf::HeapRb::new(num_samples * 2);
+            let (producer, mut consumer) = rb.split();
+            let mut stream = d
+                .build_output_stream(
+                    &config,
+                    move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
+                        let mut index = 0;
+                        while index < data.len() {
+                            let c = consumer.pop_slice(&mut data[index..]);
+                            if c == 0 {
+                                break;
+                            }
+                            index += c;
+                        }
+                    },
+                    move |_err| {},
+                    None,
+                )
+                .ok();
+            if let Some(s) = &mut stream {
+                s.play().unwrap();
+                sound_rate = config.sample_rate.0;
+                sound_producer = Some(producer);
+            }
+            stream
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let wdir = std::env::current_dir().unwrap();
+    println!("Current dir is {}", wdir.display());
+    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
+
+    if let Some(c) = nes_data.configuration.start_rom() {
+        let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();
+        nes_data.insert_cartridge(nc);
+    }
+
     eframe::run_native(
         "UglyOldBob NES Emulator",
         options,
-        Box::new(|_cc| Box::new(MainNesWindow::new())),
+        Box::new(move |_cc| {
+            Box::new(crate::windows::main::MainNesWindow::new_request(
+                nes_data,
+                sound_rate,
+                sound_producer,
+                sound_stream,
+            ))
+        }),
     );
 }
 

@@ -6,12 +6,15 @@ use std::time::Duration;
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
+use egui_multiwin::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui::InputState;
 
 /// The types of user input that can be accepted
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
 pub enum UserInput {
-    Egui(egui_multiwin::egui::Key),
+    Egui(egui::Key),
     NoInput,
 }
 
@@ -30,7 +33,7 @@ impl ControllerConfig {
     }
 
     /// Set the given button with egui data
-    pub fn set_key_egui(&mut self, index: usize, k: egui_multiwin::egui::Key) {
+    pub fn set_key_egui(&mut self, index: usize, k: egui::Key) {
         self.buttons[index] = UserInput::Egui(k);
     }
 }
@@ -135,7 +138,7 @@ impl ButtonCombination {
     }
 
     /// Update what buttons can be updated with an egui input
-    pub fn update_egui_buttons(&mut self, i: &InputState, config: &ControllerConfig) {
+    pub fn update_egui_buttons(&mut self, i: &egui::InputState, config: &ControllerConfig) {
         for (index, b) in config.buttons.iter().enumerate() {
             match b {
                 UserInput::Egui(b) => {

@@ -1,7 +1,13 @@
 //! This module is for the window that dumps the ppu pattern tables.
 
 use crate::{ppu::RgbImage, NesEmulatorData};
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
@@ -17,6 +23,7 @@ pub struct DumpWindow {
     texture: Option<egui_multiwin::egui::TextureHandle>,
 }
 
+#[cfg(feature = "egui-multiwin")]
 impl DumpWindow {
     /// Create a request to create a new window of self.
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {

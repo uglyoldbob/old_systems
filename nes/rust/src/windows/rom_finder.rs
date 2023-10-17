@@ -1,7 +1,13 @@
 //! The module for finding nes roms
 
 use crate::{cartridge::NesCartridge, NesEmulatorData};
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     egui::Sense,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
@@ -9,7 +15,6 @@ use egui_multiwin::{
 };
 
 /// The structure for a window that helps a user select a rom to load.
-#[cfg(feature = "egui-multiwin")]
 pub struct RomFinder {
     /// Set when the initial scroll to the currently loaded rom has occurred
     scrolled: bool,

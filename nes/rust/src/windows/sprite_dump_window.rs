@@ -1,13 +1,18 @@
 //! This module is for the window that dumps ppu name table information.
 use crate::{ppu::RgbImage, NesEmulatorData};
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
 /// The window for dumping ppu nametable data
-#[cfg(feature = "egui-multiwin")]
 pub struct DumpWindow {
     /// The image to use for the dump
     buf: Box<RgbImage>,
@@ -15,14 +20,15 @@ pub struct DumpWindow {
     palette: Box<RgbImage>,
     /// The texture used for rendering the image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    texture: Option<egui_multiwin::egui::TextureHandle>,
+    texture: Option<egui::TextureHandle>,
     /// The texture for the palette
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    texture2: Option<egui_multiwin::egui::TextureHandle>,
+    texture2: Option<egui::TextureHandle>,
 }
 
 impl DumpWindow {
     /// Create a request to create a new window of self.
+    #[cfg(feature = "egui-multiwin")]
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
             window_state: Box::new(DumpWindow {

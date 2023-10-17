@@ -1,14 +1,19 @@
 //! The module for the main debug window
 
 use crate::NesEmulatorData;
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
 /// The structure for a debug window of the emulator.
-#[cfg(feature = "egui-multiwin")]
 pub struct DebugNesWindow {
     /// The string for a new breakpoint, in hexadecimal characters.
     breakpoint: String,
@@ -135,6 +140,12 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                         for (n, v) in c.cartridge_registers() {
                             ui.label(format!("{}: {:x}", n, v));
                         }
+                        ui.label(format!(
+                            "Chr memory size: {:X}",
+                            c.cartridge().chr_rom.len()
+                        ));
+                        ui.label(format!("Prg rom size: {:X}", c.cartridge().prg_rom.len()));
+                        ui.label(format!("Prg ram size: {:X}", c.cartridge().prg_ram.len()));
                     }
                     ui.label(format!(
                         "X,Y = {},{} @ {:X}",

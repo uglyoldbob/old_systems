@@ -1,16 +1,22 @@
 //! The module for dumping all of the ppu address space
 
 use crate::NesEmulatorData;
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
 /// The window for dumping cpu data
-#[cfg(feature = "egui-multiwin")]
 pub struct PpuMemoryDumpWindow {}
 
+#[cfg(feature = "egui-multiwin")]
 impl PpuMemoryDumpWindow {
     /// Create a request to create a new window of self.
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {

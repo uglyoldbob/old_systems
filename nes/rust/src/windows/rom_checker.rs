@@ -3,14 +3,19 @@
 use std::io::Write;
 
 use crate::{cartridge::NesCartridge, rom_status::RomStatus, NesEmulatorData};
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
+
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
+    egui,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
 /// The structure for a debug window of the emulator.
-#[cfg(feature = "egui-multiwin")]
 pub struct Window {
     /// The index into the large rom list
     index: usize,
