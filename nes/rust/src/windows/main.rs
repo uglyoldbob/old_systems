@@ -2,7 +2,11 @@
 //!
 use std::io::Write;
 
-use crate::{controller::NesControllerTrait, ppu::{NesPpu, ScalingAlgorithm}, NesEmulatorData};
+use crate::{
+    controller::NesControllerTrait,
+    ppu::{NesPpu, ScalingAlgorithm},
+    NesEmulatorData,
+};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
@@ -420,7 +424,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
         }
 
-        let image = c.cpu_peripherals.ppu_get_frame().to_egui(c.configuration.scaler);
+        let image = c
+            .cpu_peripherals
+            .ppu_get_frame()
+            .to_egui(c.configuration.scaler);
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
@@ -435,8 +442,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     image,
                     egui_multiwin::egui::TextureOptions::NEAREST,
                 ));
-            }
-            else {
+            } else {
                 t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
             }
         }
@@ -581,7 +587,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
                 let size = ui.available_size();
-                println!("Texture size is {},{}", t.size()[0], t.size()[1]);
                 let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
                 let r = ui.add(egui::Image::from_texture(egui::load::SizedTexture {
                     id: t.id(),

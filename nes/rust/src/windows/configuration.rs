@@ -15,16 +15,14 @@ use egui_multiwin::{
 };
 
 /// The window for dumping ppu nametable data
-pub struct Window {
-}
+pub struct Window {}
 
 impl Window {
     /// Create a request to create a new window of self.
     #[cfg(feature = "egui-multiwin")]
     pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
         NewWindowRequest {
-            window_state: Box::new(Window {
-            }),
+            window_state: Box::new(Window {}),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
