@@ -8,21 +8,22 @@ use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
 
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui::InputState;
-
 /// The types of user input that can be accepted
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug)]
 pub enum UserInput {
+    /// User input provided by egui input layer
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     Egui(egui::Key),
+    /// Input from sdl2 input layer
     #[cfg(feature = "sdl2")]
     Sdl2,
+    /// No input at all
     NoInput,
 }
 
 impl UserInput {
-    pub fn to_string(&self) -> String {
+    /// Conver the user input to a string, suitable for the user to see.
+    pub fn to_string(self) -> String {
         match self {
             UserInput::Egui(k) => {
                 format!("{:?}", k)
@@ -37,7 +38,9 @@ impl UserInput {
 /// Defines how inputs get from user to the ButtonCombination
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
 pub struct ControllerConfig {
+    /// The array of user input specified for a controller.
     buttons: [UserInput; 15],
+    /// The turbo rates for the a and b buttons.
     rates: [Duration; 2],
 }
 
@@ -141,6 +144,7 @@ pub const BUTTON_COMBO_POWERPAD: usize = 14;
 /// The combination of all possible buttons on a controller.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ButtonCombination {
+    /// The buttons for a controller. None generally means a button is not pressed, there are a few exceptions.
     buttons: [Option<Button>; 15],
     /// Prevents up and down at the same time, and left and right at the same time when active.
     arrow_restrict: bool,
@@ -181,15 +185,12 @@ impl ButtonCombination {
             if index == BUTTON_COMBO_TURBOB {
                 self.try_set_rate(index, config.rates[1]);
             }
-            match b {
-                UserInput::Egui(b) => {
-                    if i.key_down(*b) {
-                        self.set_button(index, 0);
-                    } else {
-                        self.clear_button(index);
-                    }
+            if let UserInput::Egui(b) = b {
+                if i.key_down(*b) {
+                    self.set_button(index, 0);
+                } else {
+                    self.clear_button(index);
                 }
-                _ => {}
             }
         }
     }
@@ -467,23 +468,19 @@ impl NesControllerTrait for StandardController {
             *t += time;
             let req = match index {
                 0 => {
-                    if let Some(a) = &self.combo[0].buttons[BUTTON_COMBO_TURBOA] {
-                        if let Button::TurboA(_flag, rate) = a {
-                            *rate
-                        } else {
-                            Duration::from_millis(0)
-                        }
+                    if let Some(Button::TurboA(_flag, rate)) =
+                        &self.combo[0].buttons[BUTTON_COMBO_TURBOA]
+                    {
+                        *rate
                     } else {
                         Duration::from_millis(0)
                     }
                 }
                 1 => {
-                    if let Some(a) = &self.combo[0].buttons[BUTTON_COMBO_TURBOB] {
-                        if let Button::TurboB(_flag, rate) = a {
-                            *rate
-                        } else {
-                            Duration::from_millis(0)
-                        }
+                    if let Some(Button::TurboB(_flag, rate)) =
+                        &self.combo[0].buttons[BUTTON_COMBO_TURBOB]
+                    {
+                        *rate
                     } else {
                         Duration::from_millis(0)
                     }

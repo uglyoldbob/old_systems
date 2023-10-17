@@ -28,7 +28,8 @@ impl Nmi {
         }
     }
 
-    fn prepare_data(&mut self, sig: bool) {
+    /// Poll the status of the irq line, must provide the logic level for the line.
+    fn poll(&mut self, sig: bool) {
         self.holding = sig;
     }
 
@@ -45,6 +46,7 @@ impl Nmi {
         self.level = self.holding;
     }
 
+    /// Returns the signal level of the nmi
     fn level(&self) -> bool {
         self.level
     }
@@ -54,6 +56,7 @@ impl Nmi {
         self.might_trigger
     }
 
+    /// Indicates that the nmi has been handled
     fn handled(&mut self) {
         println!("NMI handled");
         self.edge = false;
@@ -86,6 +89,7 @@ impl Irq {
         self.might_trigger = self.level;
     }
 
+    /// Set the enabled status of the irq.
     fn set_enabled(&mut self, e: bool) {
         self.enabled = e;
     }
@@ -100,6 +104,7 @@ impl Irq {
         self.might_trigger && self.enabled
     }
 
+    /// Indicate that the irq has been handled
     fn handled(&mut self) {
         self.might_trigger = false;
     }
@@ -253,7 +258,9 @@ pub struct NesCpu {
     dma_running: bool,
     /// The total number of cycles for dma
     dma_count: u16,
+    /// The irq hardware
     irq: Irq,
+    /// The previous status of the irq hardware. Used for undoing the effects of polling the irq line.
     oldirq: Irq,
 }
 
@@ -12540,13 +12547,12 @@ impl NesCpu {
                         s.end_instruction();
                     }
                 },
-                _ => match s.subcycle {
-                    1 => {
+                _ => {
+                    if s.subcycle == 1 {
                         s.copy_debugger(format!("*JAM ${:02x}", o));
                         s.subcycle = 2;
                     }
-                    _ => {}
-                },
+                }
             }
         }
     }

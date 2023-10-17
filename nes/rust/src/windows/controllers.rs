@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use crate::{ppu::RgbImage, NesEmulatorData};
+use crate::NesEmulatorData;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -15,12 +15,13 @@ use egui_multiwin::{
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
-use crate::controller::NesControllerTrait;
-
 /// The window for dumping ppu nametable data
 pub struct Window {
+    /// The controller currently being shown to the user
     selected_controller: Option<u8>,
+    /// Indicates which button on the current controller needs a button input
     waiting_for_input: Option<usize>,
+    /// The last set of known pressed keys fromm egui
     known_keys: HashSet<egui::Key>,
 }
 
@@ -78,12 +79,12 @@ impl TrackedWindow<NesEmulatorData> for Window {
             ui.label("Controller Configuration Window");
 
             egui::ComboBox::from_label("Select a controller")
-                .selected_text(format!(
-                    "{}",
+                .selected_text(
                     self.selected_controller
                         .map(|i| format!("{}", i))
                         .unwrap_or("Select a controller".to_string())
-                ))
+                        .to_string(),
+                )
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut self.selected_controller, Some(0), "First");
                     ui.selectable_value(&mut self.selected_controller, Some(1), "Second");
@@ -98,7 +99,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
 
                 if let Some(index) = self.waiting_for_input {
                     if let Some(key) = first_key {
-                        config.set_key_egui(index as usize, *key);
+                        config.set_key_egui(index, *key);
                         self.waiting_for_input = None;
                         save_config = true;
                     }

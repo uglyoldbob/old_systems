@@ -17,18 +17,9 @@ impl RomStatus {
     /// Returns true if the category of both elements are the same
     pub fn match_category(&self, s: &RomStatus) -> bool {
         match self {
-            RomStatus::Working => match s {
-                RomStatus::Working => true,
-                _ => false,
-            },
-            RomStatus::CompletelyBroken => match s {
-                RomStatus::CompletelyBroken => true,
-                _ => false,
-            },
-            RomStatus::Bug(_b, _save) => match s {
-                RomStatus::Bug(_c, _save) => true,
-                _ => false,
-            },
+            RomStatus::Working => matches!(s, RomStatus::Working),
+            RomStatus::CompletelyBroken => matches!(s, RomStatus::CompletelyBroken),
+            RomStatus::Bug(_b, _save) => matches!(s, RomStatus::Bug(_c, _save)),
         }
     }
 }

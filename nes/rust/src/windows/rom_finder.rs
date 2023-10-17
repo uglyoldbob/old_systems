@@ -7,7 +7,6 @@ use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
-    egui,
     egui::Sense,
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,

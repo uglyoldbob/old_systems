@@ -174,10 +174,10 @@ pub struct NesEmulatorData {
     /// This contains the non-volatile configuration of the emulator
     #[serde(skip)]
     pub configuration: EmulatorConfiguration,
+    /// A large counter used to indicate how many clock cycles have passed. This wraps eventually.
     big_counter: u64,
     /// Indicates vblank was just set
     vblank_just_set: u8,
-    bg_enabled_before: bool,
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -222,7 +222,6 @@ impl NesEmulatorData {
             configuration: EmulatorConfiguration::load("./config.toml".to_string()),
             big_counter: 0,
             vblank_just_set: 0,
-            bg_enabled_before: false,
         }
     }
 
@@ -345,19 +344,16 @@ impl NesEmulatorData {
             self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);
-            if self.cpu_peripherals.ppu.vblank_clear {
-                if self.vblank_just_set > 0 {
-                    self.cpu_peripherals.ppu.suppress_nmi();
-                    self.nmi[0] = false;
-                    self.nmi[1] = false;
-                    self.nmi[2] = false;
-                    self.nmi[3] = false;
-                    self.nmi[4] = false;
-                }
+            if self.cpu_peripherals.ppu.vblank_clear && self.vblank_just_set > 0 {
+                self.cpu_peripherals.ppu.suppress_nmi();
+                self.nmi[0] = false;
+                self.nmi[1] = false;
+                self.nmi[2] = false;
+                self.nmi[3] = false;
+                self.nmi[4] = false;
             }
             self.prev_irq = irq;
         }
-        self.bg_enabled_before = self.cpu_peripherals.ppu.get_bg_enabled();
 
         if self.ppu_clock_counter == 0 {}
     }

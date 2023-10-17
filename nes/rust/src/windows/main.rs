@@ -595,7 +595,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 self.paused = s.pause().is_ok();
             }
             if !c.paused && self.paused {
-                self.paused = !s.play().is_ok();
+                self.paused = s.play().is_err();
             }
         }
 

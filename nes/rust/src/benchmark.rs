@@ -62,10 +62,10 @@ pub fn cpu_bench(c: &mut Criterion) {
                 nc.rom_byte_hack(0xfffc, 0x00);
                 mb.insert_cartridge(nc);
                 let data = CpuBench1 {
-                    cpu: cpu,
-                    cpu_peripherals: cpu_peripherals,
-                    goldenlog: goldenlog,
-                    mb: mb,
+                    cpu,
+                    cpu_peripherals,
+                    goldenlog,
+                    mb,
                 };
                 Box::new(data)
             },
@@ -85,24 +85,24 @@ pub fn cpu_bench(c: &mut Criterion) {
                         let d4 = convert_hex_to_decimal(b[3] as char) as u16;
                         let address = d << 12 | d2 << 8 | d3 << 4 | d4;
 
-                        let reg_a: u8 = (convert_hex_to_decimal(b[50] as char) as u8) << 4
-                            | convert_hex_to_decimal(b[51] as char) as u8;
+                        let reg_a: u8 = convert_hex_to_decimal(b[50] as char) << 4
+                            | convert_hex_to_decimal(b[51] as char);
                         assert_eq!(data.cpu.get_a(), reg_a);
 
-                        let reg_x: u8 = (convert_hex_to_decimal(b[55] as char) as u8) << 4
-                            | convert_hex_to_decimal(b[56] as char) as u8;
+                        let reg_x: u8 = convert_hex_to_decimal(b[55] as char) << 4
+                            | convert_hex_to_decimal(b[56] as char);
                         assert_eq!(data.cpu.get_x(), reg_x);
 
-                        let reg_y: u8 = (convert_hex_to_decimal(b[60] as char) as u8) << 4
-                            | convert_hex_to_decimal(b[61] as char) as u8;
+                        let reg_y: u8 = convert_hex_to_decimal(b[60] as char) << 4
+                            | convert_hex_to_decimal(b[61] as char);
                         assert_eq!(data.cpu.get_y(), reg_y);
 
-                        let reg_p: u8 = (convert_hex_to_decimal(b[65] as char) as u8) << 4
-                            | convert_hex_to_decimal(b[66] as char) as u8;
+                        let reg_p: u8 = convert_hex_to_decimal(b[65] as char) << 4
+                            | convert_hex_to_decimal(b[66] as char);
                         assert_eq!(data.cpu.get_p(), reg_p);
 
-                        let reg_sp: u8 = (convert_hex_to_decimal(b[71] as char) as u8) << 4
-                            | convert_hex_to_decimal(b[72] as char) as u8;
+                        let reg_sp: u8 = convert_hex_to_decimal(b[71] as char) << 4
+                            | convert_hex_to_decimal(b[72] as char);
                         assert_eq!(data.cpu.get_sp(), reg_sp);
 
                         //            println!("Address is {:x} {:x}", address, cpu.get_pc());
@@ -136,7 +136,7 @@ pub fn bench1(c: &mut Criterion) {
         b.iter(|| 'emulator_loop: loop {
             nes_data.cycle_step(&mut None, &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
-                let data = nes_data.cpu_peripherals.ppu_get_frame();
+                let _data = nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;
             }
         });

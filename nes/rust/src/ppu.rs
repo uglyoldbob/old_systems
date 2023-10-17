@@ -239,7 +239,6 @@ pub struct NesPpu {
     pub bg_debug: Option<(u8, u8)>,
     /// Indicates the mode the ppu access is in
     mode: Option<PpuMode>,
-    bg_enabled: bool,
 }
 
 /// The flags that set the nametable base
@@ -406,7 +405,6 @@ impl NesPpu {
             #[cfg(feature = "debugger")]
             bg_debug: None,
             mode: None,
-            bg_enabled: false,
         }
     }
 
@@ -542,10 +540,6 @@ impl NesPpu {
         }
     }
 
-    pub fn get_bg_enabled(&self) -> bool {
-        self.bg_enabled
-    }
-
     /// Perform writes done by the cpu.
     pub fn write(&mut self, addr: u16, data: u8, palette: &mut [u8; 32]) {
         self.last_cpu_data = data;
@@ -554,9 +548,6 @@ impl NesPpu {
         match addr {
             0 | 1 | 5 | 6 => {
                 if self.write_ignore_counter >= PPU_STARTUP_CYCLE_COUNT {
-                    if addr == 1 {
-                        self.bg_enabled = (data & PPU_REGISTER1_DRAW_BACKGROUND) != 0;
-                    }
                     match addr {
                         0 => {
                             self.registers[0] = data;
@@ -1621,6 +1612,7 @@ impl NesPpu {
         }
     }
 
+    /// Triggers nmi suppression for the race condition on vblank
     pub fn suppress_nmi(&mut self) {
         self.suppress_nmi = true;
     }
