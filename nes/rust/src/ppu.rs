@@ -10,7 +10,7 @@ use eframe::egui;
 use egui_multiwin::egui;
 
 /// The types of algorithms for scaling up the image
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
+#[derive(PartialEq, strum::Display, strum::EnumIter, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum ScalingAlgorithm {
     ///The Scale2x algorithm, based on EPX (Eric's pixel expansion)
     Scale2x,

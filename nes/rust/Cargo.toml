@@ -28,6 +28,7 @@ puffin = { version = "0.17", optional=true}
 puffin_egui = { version = "0.23", optional=true }
 egui_sdl2_gl = { version="0.22.1", optional=true }
 ring = "0.17.4"
+strum = { version = "0.25", features = ["derive"] }
 toml = "0.8.2"
 walkdir = "2.4"
 serde = {version = "1.0.189", features = ["derive"]}

@@ -429,7 +429,16 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 egui_multiwin::egui::TextureOptions::NEAREST,
             ));
         } else if let Some(t) = &mut self.texture {
-            t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
+            if t.size()[0] != image.width() || t.size()[1] != image.height() {
+                self.texture = Some(egui.egui_ctx.load_texture(
+                    "NES_PPU",
+                    image,
+                    egui_multiwin::egui::TextureOptions::NEAREST,
+                ));
+            }
+            else {
+                t.set_partial([0, 0], image, egui_multiwin::egui::TextureOptions::NEAREST);
+            }
         }
 
         let mut save_state = false;
@@ -466,6 +475,11 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     }
                 });
                 ui.menu_button("Edit", |ui| {
+                    let button = egui_multiwin::egui::Button::new("Configuration");
+                    if ui.add_enabled(true, button).clicked() {
+                        windows_to_create.push(super::configuration::Window::new_request());
+                        ui.close_menu();
+                    }
                     let button = egui_multiwin::egui::Button::new("Controllers");
                     if ui.add_enabled(true, button).clicked() {
                         windows_to_create.push(super::controllers::Window::new_request());
@@ -567,6 +581,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(t) = &self.texture {
                 let size = ui.available_size();
+                println!("Texture size is {},{}", t.size()[0], t.size()[1]);
                 let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
                 let r = ui.add(egui::Image::from_texture(egui::load::SizedTexture {
                     id: t.id(),

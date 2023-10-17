@@ -1,6 +1,7 @@
 //! The module containing all of the windows for the emulator
 pub mod cartridge_dump;
 pub mod cartridge_prg_ram_dump;
+pub mod configuration;
 pub mod controllers;
 pub mod cpu_memory_dump_window;
 pub mod debug_window;
