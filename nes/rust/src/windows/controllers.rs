@@ -157,7 +157,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_TURBOA);
                     }
                     let mut val = config.get_rate(0);
-                    if ui.add(egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate")).changed() {
+                    if ui
+                        .add(egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate"))
+                        .changed()
+                    {
                         set_turboa = Some(val);
                     }
                 });
@@ -179,7 +182,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_TURBOB);
                     }
                     let mut val = config.get_rate(1);
-                    if ui.add(egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate")).changed() {
+                    if ui
+                        .add(egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate"))
+                        .changed()
+                    {
                         set_turbob = Some(val);
                     }
                 });
@@ -300,7 +306,6 @@ impl TrackedWindow<NesEmulatorData> for Window {
             if save_config {
                 c.configuration.save();
             }
-            
         });
         RedrawResponse {
             quit,

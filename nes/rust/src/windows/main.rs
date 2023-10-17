@@ -20,12 +20,18 @@ use egui_multiwin::{
 
 /// The struct for the main window of the emulator.
 pub struct MainNesWindow {
-    /// The time of the last emulated frame for the emulator. Even if the emulator is paused, the screen will still run at the proper frame rate.
-    last_frame_time: std::time::SystemTime,
+    /// The time of the last drawn frame for the emulator.
+    last_frame_time: std::time::Instant,
+    /// The time of the last emulated frame for the emulator.
+    last_emulated_frame: std::time::Instant,
+    /// Used to synchronize the emulator to the right frame rate
+    emulator_time: std::time::Duration,
     #[cfg(feature = "eframe")]
     c: NesEmulatorData,
-    /// The calculated frames per second performance of the emulator.
+    /// The calculated frames per second performance of the program. Will be higher than the fps of the emulator.
     fps: f64,
+    /// The calculated frames per second performance of the emulator.
+    emulator_fps: f64,
     /// The number of samples per second of the audio output.
     sound_rate: u32,
     /// The producing half of the ring buffer used for audio.
@@ -88,10 +94,15 @@ impl MainNesWindow {
         >,
         stream: Option<cpal::Stream>,
     ) -> NewWindowRequest<NesEmulatorData> {
+        use std::time::Duration;
+
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
-                last_frame_time: std::time::SystemTime::now(),
+                last_frame_time: std::time::Instant::now(),
+                last_emulated_frame: std::time::Instant::now(),
+                emulator_time: Duration::from_millis(0),
                 fps: 0.0,
+                emulator_fps: 0.0,
                 sound_rate: rate,
                 sound: producer,
                 texture: None,
@@ -302,6 +313,33 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             puffin_egui::profiler_window(&egui.egui_ctx);
         }
 
+        let time_now = std::time::Instant::now();
+        let frame_time = time_now.duration_since(self.last_frame_time);
+        self.last_frame_time = time_now;
+
+        let new_fps = 1_000_000_000.0 / frame_time.as_nanos() as f64;
+        self.fps = (self.fps * 0.95) + (0.05 * new_fps);
+
+        if let Some(cont) = &mut c.mb.controllers[0] {
+            cont.rapid_fire(frame_time);
+        }
+        if let Some(cont) = &mut c.mb.controllers[1] {
+            cont.rapid_fire(frame_time);
+        }
+
+        let emulator_frame = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
+        let mut render = false;
+        self.emulator_time += frame_time;
+        if self.emulator_time > emulator_frame {
+            let new_time = std::time::Instant::now();
+            let new_emulated_fps = 1_000_000_000.0
+                / new_time.duration_since(self.last_emulated_frame).as_nanos() as f64;
+            self.emulator_fps = new_emulated_fps;
+            self.last_emulated_frame = new_time;
+            self.emulator_time -= emulator_frame;
+            render = true;
+        }
+
         #[cfg(feature = "puffin")]
         puffin::profile_scope!("frame rendering");
 
@@ -346,36 +384,38 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             });
         }
 
-        'emulator_loop: loop {
-            #[cfg(feature = "debugger")]
-            {
-                if !c.paused {
-                    c.cycle_step(&mut self.sound, &mut self.filter);
-                    if c.cpu_clock_counter == 0
-                        && c.cpu.breakpoint_option()
-                        && (c.cpu.breakpoint() || c.single_step)
-                    {
-                        c.paused = true;
-                        c.single_step = false;
+        if render {
+            'emulator_loop: loop {
+                #[cfg(feature = "debugger")]
+                {
+                    if !c.paused {
+                        c.cycle_step(&mut self.sound, &mut self.filter);
+                        if c.cpu_clock_counter == 0
+                            && c.cpu.breakpoint_option()
+                            && (c.cpu.breakpoint() || c.single_step)
+                        {
+                            c.paused = true;
+                            c.single_step = false;
+                            break 'emulator_loop;
+                        }
+                    } else {
                         break 'emulator_loop;
                     }
-                } else {
-                    break 'emulator_loop;
-                }
-                if c.cpu_peripherals.ppu_frame_end() {
-                    if c.wait_for_frame_end {
-                        println!("End of frame for debugger");
-                        c.paused = true;
-                        c.wait_for_frame_end = false;
+                    if c.cpu_peripherals.ppu_frame_end() {
+                        if c.wait_for_frame_end {
+                            println!("End of frame for debugger");
+                            c.paused = true;
+                            c.wait_for_frame_end = false;
+                        }
+                        break 'emulator_loop;
                     }
-                    break 'emulator_loop;
                 }
-            }
-            #[cfg(not(feature = "debugger"))]
-            {
-                c.cycle_step(&mut self.sound, &mut self.filter);
-                if c.cpu_peripherals.ppu_frame_end() {
-                    break 'emulator_loop;
+                #[cfg(not(feature = "debugger"))]
+                {
+                    c.cycle_step(&mut self.sound, &mut self.filter);
+                    if c.cpu_peripherals.ppu_frame_end() {
+                        break 'emulator_loop;
+                    }
                 }
             }
         }
@@ -544,7 +584,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     }
                 }
             }
-            ui.label(format!("{:.0} FPS", self.fps));
+            ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
+            if ui.input(|i| i.key_down(egui::Key::ArrowLeft)) {
+                ui.label("LEFT");
+            }
         });
 
         if let Some(s) = &mut self.sound_stream {
@@ -555,32 +598,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 self.paused = !s.play().is_ok();
             }
         }
-
-        let time_now = std::time::SystemTime::now();
-        let frame_time = time_now.duration_since(self.last_frame_time).unwrap();
-        let desired_frame_length = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
-        if frame_time < desired_frame_length {
-            let st = desired_frame_length - frame_time;
-            spin_sleep::sleep(st);
-        }
-
-        let new_frame_time = std::time::SystemTime::now();
-        let new_fps = 1_000_000_000.0
-            / new_frame_time
-                .duration_since(self.last_frame_time)
-                .unwrap()
-                .as_nanos() as f64;
-        self.fps = (self.fps * 0.95) + (0.05 * new_fps);
-
-        let rapid_time = new_frame_time.duration_since(self.last_frame_time).unwrap();
-        if let Some(cont) = &mut c.mb.controllers[0] {
-            cont.rapid_fire(rapid_time);
-        }
-        if let Some(cont) = &mut c.mb.controllers[1] {
-            cont.rapid_fire(rapid_time);
-        }
-
-        self.last_frame_time = new_frame_time;
 
         RedrawResponse {
             quit,
