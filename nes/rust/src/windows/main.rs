@@ -4,7 +4,6 @@ use std::io::Write;
 
 use crate::{
     controller::NesControllerTrait,
-    ppu::{NesPpu, ScalingAlgorithm},
     NesEmulatorData,
 };
 
@@ -427,7 +426,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let image = c
             .cpu_peripherals
             .ppu_get_frame()
-            .to_egui(c.configuration.scaler);
+            .to_pixels_egui()
+            .resize(c.configuration.scaler)
+            .to_egui();
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(

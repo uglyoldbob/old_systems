@@ -77,8 +77,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
                 c.cpu_peripherals
                     .ppu
                     .render_attribute_table(&mut self.buf2, &c.mb);
-                let image = self.buf.to_egui(None);
-                let image2 = self.buf2.to_egui(None);
+                let image = self.buf.to_pixels_egui().to_egui();
+                let image2 = self.buf2.to_pixels_egui().to_egui();
                 if self.texture.is_none() {
                     self.texture = Some(egui.egui_ctx.load_texture(
                         "NES_PPU",
