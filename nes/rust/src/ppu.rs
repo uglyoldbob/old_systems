@@ -18,6 +18,8 @@ pub enum ScalingAlgorithm {
     Scale2x,
     ///The Scale3x algorithm, extension of scale2x to x3.
     Scale3x,
+    ///The eagle scaling algorithm
+    Eagle,
 }
 
 /// A rgb image of variable size. Each pixel is 8 bits per channel, red, green, blue.
@@ -230,6 +232,93 @@ impl RgbImage {
                         }
                     }
                     (newpixels, 3 * self.width as usize, 3 * self.height as usize)
+                }
+                ScalingAlgorithm::Eagle => {
+                    let mut newpixels = vec![egui::Color32::BLACK; pixels.len() * 4];
+                    for y in 0..self.height {
+                        for x in 0..self.width {
+                            let letters: [egui::Color32; 9] = [
+                                if x > 0 && y > 0 {
+                                    pixels[(y - 1) as usize * self.width as usize + x as usize - 1]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                if y > 0 {
+                                    pixels[(y - 1) as usize * self.width as usize + x as usize]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                if y > 0 && (x + 1) < self.width {
+                                    pixels[(y - 1) as usize * self.width as usize + x as usize + 1]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                if x > 0 {
+                                    pixels[y as usize * self.width as usize + x as usize - 1]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                pixels[y as usize * self.width as usize + x as usize],
+                                if (x + 1) < self.width {
+                                    pixels[y as usize * self.width as usize + x as usize + 1]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                if x > 0 && (y + 1) < self.height {
+                                    pixels[(y + 1) as usize * self.width as usize + x as usize - 1]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                if (y + 1) < self.height {
+                                    pixels[(y + 1) as usize * self.width as usize + x as usize]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                                if (y + 1) < self.height && (x + 1) < self.width {
+                                    pixels[(y + 1) as usize * self.width as usize + x as usize + 1]
+                                } else {
+                                    egui::Color32::BLACK
+                                },
+                            ];
+                            let mut pg: [egui::Color32; 4] = [letters[4]; 4];
+
+                            let s = letters[0];
+                            let t = letters[1];
+                            let u = letters[2];
+                            let v = letters[3];
+                            let w = letters[5];
+                            let xx = letters[6];
+                            let yy = letters[7];
+                            let z = letters[8];
+
+                            if v == s && s == t {
+                                pg[0] = s;
+                            }
+                            if t == u && u == w {
+                                pg[1] = u;
+                            }
+                            if v == xx && xx == yy {
+                                pg[2] = xx;
+                            }
+
+                            if w == z && z == yy {
+                                pg[3] = z;
+                            }
+
+                            newpixels[2 * y as usize * 2 * self.width as usize + 2 * x as usize] =
+                                pg[0];
+                            newpixels
+                                [2 * y as usize * 2 * self.width as usize + 2 * x as usize + 1] =
+                                pg[1];
+                            newpixels
+                                [(2 * y + 1) as usize * 2 * self.width as usize + 2 * x as usize] =
+                                pg[2];
+                            newpixels[(2 * y + 1) as usize * 2 * self.width as usize
+                                + 2 * x as usize
+                                + 1] = pg[3];
+                        }
+                    }
+                    (newpixels, 2 * self.width as usize, 2 * self.height as usize)
                 }
             },
         };
