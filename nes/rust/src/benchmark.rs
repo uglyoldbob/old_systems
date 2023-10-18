@@ -166,11 +166,68 @@ pub fn romlist_bench(c: &mut Criterion) {
     });
 }
 
+pub fn image_scaling_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("Image scaling");
+    let base_image = crate::ppu::RgbImage::new(256, 240);
+    group.bench_function("no image scaling", |b| {
+        b.iter(|| {
+            let _e = base_image.to_egui(None);
+        });
+    });
+
+    group.bench_function("to_pixels conversion", |b| {
+        b.iter_batched(||{Box::new(crate::ppu::RgbImage::new(256, 240))},|data| {
+            let _e = data.to_pixels();
+        },
+        criterion::BatchSize::PerIteration,);
+    });
+
+    group.bench_function("to_pixels nul resizing conversion", |b| {
+        b.iter_batched(||{Box::new(crate::ppu::RgbImage::new(256, 240))},|data| {
+            let _e = data.to_pixels().resize(None);
+        },
+        criterion::BatchSize::PerIteration,);
+    });
+
+    group.bench_function("to_egui_pixels nul resizing conversion", |b| {
+        b.iter_batched(||{Box::new(crate::ppu::RgbImage::new(256, 240))},|data| {
+            let _e = data.to_pixels_egui().resize(None).to_egui();
+        },
+        criterion::BatchSize::PerIteration,);
+    });
+
+    for alg in <ppu::ScalingAlgorithm as strum::IntoEnumIterator>::iter() {
+        let text = format!("to_egui {} resizing conversion", alg.to_string());
+        group.bench_function(text, |b| {
+            b.iter(
+                || {
+                let _e = base_image.to_egui(Some(alg));
+            });
+        });
+
+        let text = format!("to_pixels {} resizing conversion", alg.to_string());
+        group.bench_function(text, |b| {
+            b.iter_batched(||{Box::new(crate::ppu::RgbImage::new(256, 240))},|data| {
+                let _e = data.to_pixels().resize(Some(alg));
+            },
+            criterion::BatchSize::PerIteration,);
+        });
+        let text = format!("to_egui_pixels {} resizing conversion", alg.to_string());
+        group.bench_function(text, |b| {
+            b.iter_batched(||{Box::new(crate::ppu::RgbImage::new(256, 240))},|data| {
+                let _e = data.to_pixels_egui().resize(Some(alg)).to_egui();
+            },
+            criterion::BatchSize::PerIteration,);
+        });
+    }
+}
+
 fn benches() {
     let mut criterion = crate::Criterion::default().configure_from_args();
     bench1(&mut criterion);
     cpu_bench(&mut criterion);
     romlist_bench(&mut criterion);
+    image_scaling_bench(&mut criterion);
 }
 
 fn main() {
