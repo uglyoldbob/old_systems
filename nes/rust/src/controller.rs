@@ -115,11 +115,7 @@ pub enum Button {
 impl Button {
     /// Returns true when the button is None
     pub fn is_none(&self) -> bool {
-        if Button::None == *self {
-            return true;
-        } else {
-            return false;
-        }
+        Button::None == *self
     }
 
     /// Returns true when the button is not None
@@ -369,15 +365,6 @@ impl NesController {
             NesController::DummyController(_) => NesControllerType::None,
         }
     }
-
-    /// Returns true if the controller is not a real controller at all
-    pub fn is_none(&self) -> bool {
-        if let NesController::DummyController(_) = self {
-            return true;
-        } else {
-            return false;
-        }
-    }
 }
 
 /// The types of controllers that can be plugged into the emulator
@@ -385,8 +372,11 @@ impl NesController {
     serde::Serialize, serde::Deserialize, Copy, Clone, strum::EnumIter, strum::Display, PartialEq,
 )]
 pub enum NesControllerType {
+    /// A standard controller. More realistically this is like an nes advantage.
     StandardController,
+    /// A standard zapper
     Zapper,
+    /// Not a real controller. Signifies the lack of a controller.
     None,
 }
 
@@ -394,7 +384,9 @@ impl NesControllerType {
     /// Creates a new controller based on the type specified by this struct.
     pub fn make_controller(&self) -> NesController {
         match self {
-            NesControllerType::StandardController => NesController::StandardController(StandardController::default()),
+            NesControllerType::StandardController => {
+                NesController::StandardController(StandardController::default())
+            }
             NesControllerType::Zapper => NesController::Zapper(Zapper::default()),
             NesControllerType::None => NesController::DummyController(DummyController::default()),
         }
@@ -404,6 +396,7 @@ impl NesControllerType {
 /// A standard nes controller implementation
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
 pub struct DummyController {
+    /// Required to make the NesControllerTrait functional
     combo: [ButtonCombination; 1],
 }
 
@@ -417,13 +410,13 @@ impl Default for DummyController {
 
 impl NesControllerTrait for DummyController {
     #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
-    fn clock(&mut self, c: bool) {}
+    fn clock(&mut self, _c: bool) {}
 
     #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
-    fn rapid_fire(&mut self, time: Duration) {}
+    fn rapid_fire(&mut self, _time: Duration) {}
 
     #[doc = " Update the serial/parallel input"]
-    fn parallel_signal(&mut self, s: bool) {}
+    fn parallel_signal(&mut self, _s: bool) {}
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
@@ -448,13 +441,6 @@ pub struct Zapper {
     combo: [ButtonCombination; 1],
 }
 
-impl Zapper {
-    /// Create a new zapper
-    pub fn new() -> NesController {
-        Self::default().into()
-    }
-}
-
 impl Default for Zapper {
     fn default() -> Self {
         Self {
@@ -465,13 +451,13 @@ impl Default for Zapper {
 
 impl NesControllerTrait for Zapper {
     #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
-    fn clock(&mut self, c: bool) {}
+    fn clock(&mut self, _c: bool) {}
 
     #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
-    fn rapid_fire(&mut self, time: Duration) {}
+    fn rapid_fire(&mut self, _time: Duration) {}
 
     #[doc = " Update the serial/parallel input"]
-    fn parallel_signal(&mut self, s: bool) {}
+    fn parallel_signal(&mut self, _s: bool) {}
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
@@ -482,8 +468,7 @@ impl NesControllerTrait for Zapper {
     fn dump_data(&self) -> u8 {
         let d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
         let d4 = self.combo[0].buttons[BUTTON_COMBO_FIRE].is_some();
-        let val = 0xE7 | if d3 { 1 << 3 } else { 0 } | if d4 { 1 << 4 } else { 0 };
-        val
+        0xE7 | if d3 { 1 << 3 } else { 0 } | if d4 { 1 << 4 } else { 0 }
     }
 
     #[doc = " Read data from the controller."]

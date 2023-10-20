@@ -23,7 +23,7 @@ pub enum ScalingAlgorithm {
 }
 
 /// A 24bpp pixel.
-#[derive(Copy, Clone, std::cmp::PartialEq)]
+#[derive(Copy, Clone, std::cmp::PartialEq, Default)]
 pub struct Pixel {
     /// The red channel
     r: u8,
@@ -31,12 +31,6 @@ pub struct Pixel {
     g: u8,
     /// The blue channel
     b: u8,
-}
-
-impl Default for Pixel {
-    fn default() -> Self {
-        Self { r: 0, g: 0, b: 0 }
-    }
 }
 
 /// A generic pixel based image
@@ -50,6 +44,7 @@ pub struct PixelImage<T> {
 }
 
 impl PixelImage<egui::Color32> {
+    /// Converts the image to an egui usable format
     pub fn to_egui(self) -> egui::ColorImage {
         egui::ColorImage {
             size: [self.width as usize, self.height as usize],
@@ -376,7 +371,7 @@ impl RgbImage {
     }
 
     /// Convert to a PixelImage<Pixel>
-    pub fn to_pixels(self) -> PixelImage<Pixel> {
+    pub fn to_pixels(&self) -> PixelImage<Pixel> {
         let pixels: Vec<Pixel> = self
             .data
             .chunks_exact(3)

@@ -5,7 +5,6 @@ use std::io::Write;
 use crate::{
     apu::NesApu,
     cartridge::NesCartridge,
-    controller::{Button, NesController, StandardController},
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
@@ -64,10 +63,12 @@ impl Default for EmulatorConfiguration {
             start_rom: None,
             path: "".to_string(),
             rom_path: "./roms".to_string(),
-            controller_type: [crate::controller::NesControllerType::StandardController,
+            controller_type: [
+                crate::controller::NesControllerType::StandardController,
                 crate::controller::NesControllerType::None,
                 crate::controller::NesControllerType::None,
-                crate::controller::NesControllerType::None],
+                crate::controller::NesControllerType::None,
+            ],
             controller_config: controller,
             scaler: None,
         }
@@ -247,7 +248,7 @@ impl NesEmulatorData {
             Ok(r) => {
                 let audio = self.cpu_peripherals.apu.get_buffer();
                 let screen = self.cpu_peripherals.ppu.backup_frame();
-                let controllers = self.mb.controllers.clone();
+                let controllers = self.mb.controllers;
                 let config_path = self.configuration.path.to_owned();
                 let romlist = self.roms.clone();
                 let cd = self.mb.cartridge().map(|c| c.save_cart_data());

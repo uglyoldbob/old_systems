@@ -22,18 +22,10 @@ pub struct RomListEntry {
 }
 
 /// A list of roms for the emulator.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub struct RomList {
     /// The tree of roms.
     pub elements: std::collections::BTreeMap<PathBuf, RomListEntry>,
-}
-
-impl Default for RomList {
-    fn default() -> Self {
-        Self {
-            elements: std::collections::BTreeMap::new(),
-        }
-    }
 }
 
 impl RomList {
