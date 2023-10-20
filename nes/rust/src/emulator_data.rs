@@ -239,6 +239,7 @@ impl NesEmulatorData {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
                 let audio = self.cpu_peripherals.apu.get_buffer();
+                let screen = self.cpu_peripherals.ppu.backup_frame();
                 let controllers = self.mb.controllers.clone();
                 let config_path = self.configuration.path.to_owned();
                 let romlist = self.roms.clone();
@@ -249,6 +250,7 @@ impl NesEmulatorData {
                 self.roms = romlist;
                 self.configuration.path = config_path;
                 self.cpu_peripherals.apu.restore_buffer(audio);
+                self.cpu_peripherals.ppu.set_frame(screen);
                 Ok(())
             }
             Err(e) => Err(e),

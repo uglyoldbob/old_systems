@@ -343,7 +343,7 @@ where
 }
 
 /// A rgb image of variable size. Each pixel is 8 bits per channel, red, green, blue.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct RgbImage {
     /// The raw data of the image
     data: Vec<u8>,
@@ -351,6 +351,16 @@ pub struct RgbImage {
     pub width: u16,
     /// The height of the image in pixels.
     pub height: u16,
+}
+
+impl Default for RgbImage {
+    fn default() -> Self {
+        Self {
+            data: vec![0; 1],
+            width: 1,
+            height: 1,
+        }
+    }
 }
 
 impl RgbImage {
@@ -543,6 +553,7 @@ pub struct NesPpu {
     /// The shift register for the patterntable, used for background rendering
     #[serde_as(as = "[_; 2]")]
     patterntable_shift: [u16; 2],
+    #[serde(skip)]
     /// The frame data stored in the ppu for being displayed onto the screen later.
     frame_data: Box<RgbImage>,
     /// Indicates that there is a pending write from the cpu
@@ -1740,6 +1751,16 @@ impl NesPpu {
         &self.frame_data
     }
 
+    /// Make a backup of the frame data, usually before loading a save state.
+    pub fn backup_frame(&self) -> Box<RgbImage> {
+        self.frame_data.clone()
+    }
+
+    /// Restores the screen contents for when loading save states.
+    pub fn set_frame(&mut self, f: Box<RgbImage>) {
+        self.frame_data = f;
+    }
+
     /// Renders all sprites
     pub fn render_sprites(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         let allsprites = self.get_64_sprites();
@@ -1981,18 +2002,5 @@ impl NesPpu {
             .map(|p| egui_sdl2_gl::egui::Color32::from_rgb(p[0], p[1], p[2]))
             .collect();
         *buf = pixels;
-    }
-
-    /// Converts the data in the given reference (from this module usually), into a form that egui can use directly.
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
-    pub fn convert_to_egui(f: &[u8; 256 * 240 * 3]) -> egui::ColorImage {
-        let pixels = f
-            .chunks_exact(3)
-            .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
-            .collect();
-        egui::ColorImage {
-            size: [256, 240],
-            pixels,
-        }
     }
 }
