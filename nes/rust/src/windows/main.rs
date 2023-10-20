@@ -2,10 +2,7 @@
 //!
 use std::io::Write;
 
-use crate::{
-    controller::NesControllerTrait,
-    NesEmulatorData,
-};
+use crate::{controller::NesControllerTrait, NesEmulatorData};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;

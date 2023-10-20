@@ -29,6 +29,7 @@ pub struct NesMotherboard {
     last_ppu_coordinates: (u16, u16),
     /// Used for open bus implementation of the cpu memory bus
     last_cpu_data: u8,
+    #[serde(skip)]
     /// The controllers for the system
     pub controllers: [Option<NesController>; 2],
 }
@@ -66,11 +67,12 @@ impl NesMotherboard {
 
     /// Return a reference to the cartridge if it exists
     pub fn cartridge(&self) -> Option<&NesCartridge> {
-        if let Some(c) = &self.cart {
-            Some(c)
-        } else {
-            None
-        }
+        self.cart.as_ref()
+    }
+
+    /// Return a mutable reference to the cartridge if it exists
+    pub fn cartridge_mut(&mut self) -> Option<&mut NesCartridge> {
+        self.cart.as_mut()
     }
 
     /// Remove any cartridge that may exist in the system.

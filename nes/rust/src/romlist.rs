@@ -6,14 +6,14 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Data gathered from a successful rom load
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RomListResult {
     /// The mapper number of the rom
     pub mapper: u32,
 }
 
 /// A single entry for a potentially valid rom for the emulator
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RomListEntry {
     /// Stores whether or not the rom is valid, and what kind of error was encountered.
     pub result: Option<Result<RomListResult, CartridgeError>>,
@@ -22,10 +22,18 @@ pub struct RomListEntry {
 }
 
 /// A list of roms for the emulator.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct RomList {
     /// The tree of roms.
     pub elements: std::collections::BTreeMap<PathBuf, RomListEntry>,
+}
+
+impl Default for RomList {
+    fn default() -> Self {
+        Self {
+            elements: std::collections::BTreeMap::new(),
+        }
+    }
 }
 
 impl RomList {

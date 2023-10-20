@@ -165,6 +165,7 @@ pub struct NesEmulatorData {
     nmi: [bool; 5],
     /// Used for triggering the cpu irq line
     prev_irq: bool,
+    #[serde(skip)]
     /// The list of roms for the emulator
     pub roms: RomList,
     /// The parser for known roms
@@ -237,8 +238,14 @@ impl NesEmulatorData {
     pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<bincode::ErrorKind>> {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
+                let controllers = self.mb.controllers.clone();
                 let config_path = self.configuration.path.to_owned();
+                let romlist = self.roms.clone();
+                let cd = self.mb.cartridge().map(|c| c.save_cart_data());
                 *self = r;
+                cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
+                self.mb.controllers = controllers;
+                self.roms = romlist;
                 self.configuration.path = config_path;
                 Ok(())
             }

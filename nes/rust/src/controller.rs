@@ -76,7 +76,7 @@ impl ControllerConfig {
 }
 
 /// The various buttons used by controllers
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub enum Button {
     /// The A button on standard controllers.
     A,
@@ -142,7 +142,7 @@ pub const BUTTON_COMBO_POTENTIOMETER: usize = 13;
 pub const BUTTON_COMBO_POWERPAD: usize = 14;
 
 /// The combination of all possible buttons on a controller.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct ButtonCombination {
     /// The buttons for a controller. None generally means a button is not pressed, there are a few exceptions.
     buttons: [Option<Button>; 15],
@@ -327,13 +327,13 @@ pub trait NesControllerTrait {
 /// A generic implementation of a NES controller
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(NesControllerTrait)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub enum NesController {
     StandardController,
 }
 
 /// A standard nes controller implementation
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct StandardController {
     /// The standard button combination
     combo: [ButtonCombination; 1],

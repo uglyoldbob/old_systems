@@ -65,18 +65,23 @@ pub trait NesMemoryBusDevice {
 
 /// The data for a cartridge.
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct NesCartridgeData {
+    #[serde(skip)]
     /// An optional trainer for the cartridge
     pub trainer: Option<Vec<u8>>,
+    #[serde(skip)]
     /// The prg rom, where code typically goes.
     pub prg_rom: Vec<u8>,
+    #[serde(skip)]
     /// The chr rom, where graphics are generally stored
     pub chr_rom: Vec<u8>,
     /// chr_ram ?
     pub chr_ram: bool,
+    #[serde(skip)]
     /// inst_rom ?
     pub inst_rom: Option<Vec<u8>>,
+    #[serde(skip)]
     /// prom?
     pub prom: Option<(Vec<u8>, Vec<u8>)>,
     /// Program ram
@@ -113,12 +118,21 @@ pub struct NesCartridge {
     hash: String,
     /// The name to use for save games
     save: String,
+    #[serde(skip)]
+    /// The convenience name of the rom
+    rom_name: String,
+}
+
+/// The data from a cartridge that needs to be saved when loading a save state
+pub struct NesCartridgeBackup {
+    /// The data in the cartridge, including ram and everything else
+    data: NesCartridgeData,
     /// The convenience name of the rom
     rom_name: String,
 }
 
 /// The types of errors that can occur when loading a rom
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum CartridgeError {
     /// There can be a filesystem error opening the file
     FsError(String),
@@ -146,6 +160,24 @@ impl NesCartridge {
     /// "Parses" an obsolete ines rom
     fn load_obsolete_ines(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
+    }
+
+    /// Saves the contents of the cartridge data so that it can be restored after loading a save state.
+    pub fn save_cart_data(&self) -> NesCartridgeBackup {
+        NesCartridgeBackup {
+            data: self.data.clone(),
+            rom_name: self.rom_name.clone(),
+        }
+    }
+
+    /// Restore previously saved data after loading a save state.
+    pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
+        self.data.prg_rom = old_data.data.prg_rom;
+        self.data.chr_rom = old_data.data.chr_rom;
+        self.data.inst_rom = old_data.data.inst_rom;
+        self.data.trainer = old_data.data.trainer;
+        self.data.prom = old_data.data.prom;
+        self.rom_name = old_data.rom_name;
     }
 
     /// Retrieve the hash of the rom contents
