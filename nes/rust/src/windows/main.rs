@@ -320,12 +320,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let new_fps = 1_000_000_000.0 / frame_time.as_nanos() as f64;
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
 
-        if let Some(cont) = &mut c.mb.controllers[0] {
-            cont.rapid_fire(frame_time);
-        }
-        if let Some(cont) = &mut c.mb.controllers[1] {
-            cont.rapid_fire(frame_time);
-        }
+        c.mb.controllers[0].rapid_fire(frame_time);
+        c.mb.controllers[1].rapid_fire(frame_time);
 
         let emulator_frame = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         let mut render = false;
@@ -366,19 +362,15 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         {
             egui.egui_ctx.input(|i| {
-                if let Some(controller) = &mut c.mb.controllers[0] {
-                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
-                        let cnum = index << 1;
-                        let button_config = &c.configuration.controller_config[cnum];
-                        contr.update_egui_buttons(i, button_config);
-                    }
+                for (index, contr) in c.mb.controllers[0].get_buttons_iter_mut().enumerate() {
+                    let cnum = index << 1;
+                    let button_config = &c.configuration.controller_config[cnum];
+                    contr.update_egui_buttons(i, button_config);
                 }
-                if let Some(controller) = &mut c.mb.controllers[1] {
-                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
-                        let cnum = 1 + (index << 1);
-                        let button_config = &c.configuration.controller_config[cnum];
-                        contr.update_egui_buttons(i, button_config);
-                    }
+                for (index, contr) in c.mb.controllers[1].get_buttons_iter_mut().enumerate() {
+                    let cnum = 1 + (index << 1);
+                    let button_config = &c.configuration.controller_config[cnum];
+                    contr.update_egui_buttons(i, button_config);
                 }
             });
         }

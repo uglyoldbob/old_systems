@@ -31,7 +31,7 @@ pub struct NesMotherboard {
     last_cpu_data: u8,
     #[serde(skip)]
     /// The controllers for the system
-    pub controllers: [Option<NesController>; 2],
+    pub controllers: [NesController; 2],
 }
 
 impl NesMotherboard {
@@ -61,7 +61,7 @@ impl NesMotherboard {
             last_ppu_cycle: 2,
             last_cpu_data: 0,
             last_ppu_coordinates: (0, 0),
-            controllers: [None, None],
+            controllers: [NesController::default(); 2],
         }
     }
 
@@ -100,23 +100,17 @@ impl NesMotherboard {
 
     /// Signals a change in the three outputs fromm the cpu related to the controllers
     pub fn joy_out_signal(&mut self, out: [bool; 3]) {
-        if let Some(c) = &mut self.controllers[0] {
-            c.parallel_signal(out[0]);
-        }
-        if let Some(c) = &mut self.controllers[1] {
-            c.parallel_signal(out[0]);
-        }
+        self.controllers[0].parallel_signal(out[0]);
+        self.controllers[1].parallel_signal(out[0]);
         //TODO handle expansion port here
     }
 
     /// Signals a change in signal for the joystick outputs. right true means the right joystick signal. signal is the actual signal level (active level is false).
     pub fn joy_clock_signal(&mut self, right: bool, signal: bool) {
         if !right {
-            if let Some(c) = &mut self.controllers[0] {
-                c.clock(signal);
-            }
-        } else if let Some(c) = &mut self.controllers[1] {
-            c.clock(signal);
+            self.controllers[0].clock(signal);
+        } else {
+            self.controllers[1].clock(signal);
         }
         //TODO clock expansion port for both left and right
     }
@@ -160,20 +154,12 @@ impl NesMotherboard {
                         response = Some(per.apu.dump(addr & 0x1f));
                     }
                     0x4016 => {
-                        if let Some(c) = &self.controllers[0] {
-                            let d = c.dump_data() & 0x1f;
-                            response = Some((d ^ 0x1f) | (self.last_cpu_data & 0xe0));
-                        } else {
-                            response = None;
-                        }
+                        let d = self.controllers[0].dump_data() & 0x1f;
+                        response = Some((d ^ 0x1f) | (self.last_cpu_data & 0xe0));
                     }
                     0x4017 => {
-                        if let Some(c) = &self.controllers[1] {
-                            let d = c.dump_data() & 0x1f;
-                            response = Some((d ^ 0x1f) | (self.last_cpu_data & 0xe0));
-                        } else {
-                            response = None;
-                        }
+                        let d = self.controllers[1].dump_data() & 0x1f;
+                        response = Some((d ^ 0x1f) | (self.last_cpu_data & 0xe0));
                     }
                     _ => {}
                 }
@@ -229,21 +215,13 @@ impl NesMotherboard {
                         self.last_cpu_data = response;
                     }
                     0x4016 => {
-                        if let Some(c) = &mut self.controllers[0] {
-                            let d = c.read_data() & 0x1f;
-                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
-                        } else {
-                            response = self.last_cpu_data & 0xe0;
-                        }
+                        let d = self.controllers[0].read_data() & 0x1f;
+                        response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         self.last_cpu_data = response;
                     }
                     0x4017 => {
-                        if let Some(c) = &mut self.controllers[1] {
-                            let d = c.read_data() & 0x1f;
-                            response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
-                        } else {
-                            response = self.last_cpu_data & 0xe0;
-                        }
+                        let d = self.controllers[1].read_data() & 0x1f;
+                        response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         self.last_cpu_data = response;
                     }
                     _ => {}

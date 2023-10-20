@@ -96,25 +96,28 @@ impl TrackedWindow<NesEmulatorData> for Window {
             if let Some(i) = self.selected_controller {
                 let controller = &mut c.mb.controllers[i as usize];
                 match controller {
-                    None => {}
-                    Some(controller) => match controller {
-                        crate::controller::NesController::StandardController(_) => {}
-                        crate::controller::NesController::Zapper(_) => {}
-                    },
+                    crate::controller::NesController::StandardController(_) => {}
+                    crate::controller::NesController::Zapper(_) => {}
+                    crate::controller::NesController::DummyController(_) => {}
                 }
 
-                let controllerr = egui_multiwin::egui::ComboBox::from_id_source("Select Control Block")
-                    .selected_text(match controller {
-                        Some(c) => c.to_string(),
-                        None => "No Controller".to_string(),
-                    })
-                    .show_ui(ui, |ui| {
-                        let mut changed = false;
-                        for opt in NesController::iter() {
-                            changed |= ui.selectable_value(controller, Some(opt), opt.to_string()).changed();
-                        }
-                        changed
-                    });
+                let controllerr =
+                    egui_multiwin::egui::ComboBox::from_id_source("Select Control Block")
+                        .selected_text(controller.to_string())
+                        .show_ui(ui, |ui| {
+                            let mut changed = false;
+                            for opt in NesController::iter() {
+                                if ui
+                                    .selectable_value(controller, opt, opt.to_string())
+                                    .changed()
+                                {
+                                    changed = true;
+                                    c.configuration.controller_type[i as usize] =
+                                        controller.get_type();
+                                }
+                            }
+                            changed
+                        });
                 if controllerr.inner.is_some_and(|t| t) {
                     save_config = true;
                 }

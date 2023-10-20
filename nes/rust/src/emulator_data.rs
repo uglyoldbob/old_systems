@@ -5,10 +5,11 @@ use std::io::Write;
 use crate::{
     apu::NesApu,
     cartridge::NesCartridge,
+    controller::{Button, NesController, StandardController},
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
-    romlist::RomList, controller::{NesController, StandardController},
+    romlist::RomList,
 };
 
 #[cfg(feature = "eframe")]
@@ -31,6 +32,8 @@ pub struct EmulatorConfiguration {
     path: String,
     /// The root path for all roms
     rom_path: String,
+    /// The controller types
+    pub controller_type: [crate::controller::NesControllerType; 4],
     /// The controller configuration for all 4 possible controllers.
     pub controller_config: [crate::controller::ControllerConfig; 4],
     /// The scaler to use for the emulator
@@ -61,6 +64,10 @@ impl Default for EmulatorConfiguration {
             start_rom: None,
             path: "".to_string(),
             rom_path: "./roms".to_string(),
+            controller_type: [crate::controller::NesControllerType::StandardController,
+                crate::controller::NesControllerType::None,
+                crate::controller::NesControllerType::None,
+                crate::controller::NesControllerType::None],
             controller_config: controller,
             scaler: None,
         }
@@ -267,8 +274,8 @@ impl NesEmulatorData {
     /// Effectively power cycles the emulator. Technically throws away the current system and builds a new one.
     pub fn power_cycle(&mut self) {
         let cart = self.remove_cartridge();
-        let controller1 = self.mb.controllers[0].take();
-        let controller2 = self.mb.controllers[1].take();
+        let controller1 = self.mb.controllers[0];
+        let controller2 = self.mb.controllers[1];
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let mut apu = NesApu::new();

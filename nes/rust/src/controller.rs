@@ -108,6 +108,24 @@ pub enum Button {
     Potentiometer(u16),
     /// An extra button for the powerpad
     PowerPad,
+    /// Not a button
+    None,
+}
+
+impl Button {
+    /// Returns true when the button is None
+    pub fn is_none(&self) -> bool {
+        if Button::None == *self {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /// Returns true when the button is not None
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
 }
 
 /// The index into the button combination array for button A
@@ -145,7 +163,7 @@ pub const BUTTON_COMBO_POWERPAD: usize = 14;
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
 pub struct ButtonCombination {
     /// The buttons for a controller. None generally means a button is not pressed, there are a few exceptions.
-    buttons: [Option<Button>; 15],
+    buttons: [Button; 15],
     /// Prevents up and down at the same time, and left and right at the same time when active.
     arrow_restrict: bool,
 }
@@ -155,21 +173,21 @@ impl ButtonCombination {
     pub fn new() -> Self {
         Self {
             buttons: [
-                None,
-                Some(Button::TurboA(false, Duration::from_millis(50))),
-                Some(Button::TurboB(false, Duration::from_millis(50))),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(Button::Potentiometer(127)),
-                None,
+                Button::None,
+                Button::TurboA(false, Duration::from_millis(50)),
+                Button::TurboB(false, Duration::from_millis(50)),
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::None,
+                Button::Potentiometer(127),
+                Button::None,
             ],
             arrow_restrict: true,
         }
@@ -199,13 +217,13 @@ impl ButtonCombination {
     pub fn try_set_rate(&mut self, i: usize, newrate: Duration) {
         match i {
             BUTTON_COMBO_TURBOA => {
-                if let Some(Button::TurboA(enabled, _rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
-                    self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(enabled, newrate));
+                if let Button::TurboA(enabled, _rate) = self.buttons[BUTTON_COMBO_TURBOA] {
+                    self.buttons[BUTTON_COMBO_TURBOA] = Button::TurboA(enabled, newrate);
                 }
             }
             BUTTON_COMBO_TURBOB => {
-                if let Some(Button::TurboB(enabled, _rate)) = self.buttons[BUTTON_COMBO_TURBOB] {
-                    self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(enabled, newrate));
+                if let Button::TurboB(enabled, _rate) = self.buttons[BUTTON_COMBO_TURBOB] {
+                    self.buttons[BUTTON_COMBO_TURBOB] = Button::TurboB(enabled, newrate);
                 }
             }
             _ => {}
@@ -216,61 +234,61 @@ impl ButtonCombination {
     pub fn set_button(&mut self, i: usize, val: u16) {
         match i {
             BUTTON_COMBO_A => {
-                self.buttons[BUTTON_COMBO_A] = Some(Button::A);
+                self.buttons[BUTTON_COMBO_A] = Button::A;
             }
             BUTTON_COMBO_TURBOA => {
-                if let Some(Button::TurboA(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
-                    self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(true, rate));
+                if let Button::TurboA(_enabled, rate) = self.buttons[BUTTON_COMBO_TURBOA] {
+                    self.buttons[BUTTON_COMBO_TURBOA] = Button::TurboA(true, rate);
                 }
             }
             BUTTON_COMBO_TURBOB => {
-                if let Some(Button::TurboB(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOB] {
-                    self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(true, rate));
+                if let Button::TurboB(_enabled, rate) = self.buttons[BUTTON_COMBO_TURBOB] {
+                    self.buttons[BUTTON_COMBO_TURBOB] = Button::TurboB(true, rate);
                 }
             }
             BUTTON_COMBO_B => {
-                self.buttons[BUTTON_COMBO_B] = Some(Button::B);
+                self.buttons[BUTTON_COMBO_B] = Button::B;
             }
             BUTTON_COMBO_START => {
-                self.buttons[BUTTON_COMBO_START] = Some(Button::Start);
+                self.buttons[BUTTON_COMBO_START] = Button::Start;
             }
             BUTTON_COMBO_SLOW => {
-                self.buttons[BUTTON_COMBO_SLOW] = Some(Button::Slow);
+                self.buttons[BUTTON_COMBO_SLOW] = Button::Slow;
             }
             BUTTON_COMBO_SELECT => {
-                self.buttons[BUTTON_COMBO_SELECT] = Some(Button::Select);
+                self.buttons[BUTTON_COMBO_SELECT] = Button::Select;
             }
             BUTTON_COMBO_UP => {
                 if !self.arrow_restrict || self.buttons[BUTTON_COMBO_DOWN].is_none() {
-                    self.buttons[BUTTON_COMBO_UP] = Some(Button::Up);
+                    self.buttons[BUTTON_COMBO_UP] = Button::Up;
                 }
             }
             BUTTON_COMBO_DOWN => {
                 if !self.arrow_restrict || self.buttons[BUTTON_COMBO_UP].is_none() {
-                    self.buttons[BUTTON_COMBO_DOWN] = Some(Button::Down);
+                    self.buttons[BUTTON_COMBO_DOWN] = Button::Down;
                 }
             }
             BUTTON_COMBO_LEFT => {
                 if !self.arrow_restrict || self.buttons[BUTTON_COMBO_RIGHT].is_none() {
-                    self.buttons[BUTTON_COMBO_LEFT] = Some(Button::Left);
+                    self.buttons[BUTTON_COMBO_LEFT] = Button::Left;
                 }
             }
             BUTTON_COMBO_RIGHT => {
                 if !self.arrow_restrict || self.buttons[BUTTON_COMBO_LEFT].is_none() {
-                    self.buttons[BUTTON_COMBO_RIGHT] = Some(Button::Right);
+                    self.buttons[BUTTON_COMBO_RIGHT] = Button::Right;
                 }
             }
             BUTTON_COMBO_FIRE => {
-                self.buttons[BUTTON_COMBO_FIRE] = Some(Button::Fire);
+                self.buttons[BUTTON_COMBO_FIRE] = Button::Fire;
             }
             BUTTON_COMBO_LIGHT => {
-                self.buttons[BUTTON_COMBO_LIGHT] = Some(Button::LightSensor);
+                self.buttons[BUTTON_COMBO_LIGHT] = Button::LightSensor;
             }
             BUTTON_COMBO_POTENTIOMETER => {
-                self.buttons[BUTTON_COMBO_POTENTIOMETER] = Some(Button::Potentiometer(val));
+                self.buttons[BUTTON_COMBO_POTENTIOMETER] = Button::Potentiometer(val);
             }
             BUTTON_COMBO_POWERPAD => {
-                self.buttons[BUTTON_COMBO_POWERPAD] = Some(Button::PowerPad);
+                self.buttons[BUTTON_COMBO_POWERPAD] = Button::PowerPad;
             }
             _ => {}
         }
@@ -280,18 +298,18 @@ impl ButtonCombination {
     pub fn clear_button(&mut self, i: usize) {
         match i {
             BUTTON_COMBO_TURBOA => {
-                if let Some(Button::TurboA(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOA] {
-                    self.buttons[BUTTON_COMBO_TURBOA] = Some(Button::TurboA(false, rate));
+                if let Button::TurboA(_enabled, rate) = self.buttons[BUTTON_COMBO_TURBOA] {
+                    self.buttons[BUTTON_COMBO_TURBOA] = Button::TurboA(false, rate);
                 }
             }
             BUTTON_COMBO_TURBOB => {
-                if let Some(Button::TurboB(_enabled, rate)) = self.buttons[BUTTON_COMBO_TURBOB] {
-                    self.buttons[BUTTON_COMBO_TURBOB] = Some(Button::TurboB(false, rate));
+                if let Button::TurboB(_enabled, rate) = self.buttons[BUTTON_COMBO_TURBOB] {
+                    self.buttons[BUTTON_COMBO_TURBOB] = Button::TurboB(false, rate);
                 }
             }
             BUTTON_COMBO_POTENTIOMETER => {}
             _ => {
-                self.buttons[i] = None;
+                self.buttons[i] = Button::None;
             }
         }
     }
@@ -333,6 +351,94 @@ pub trait NesControllerTrait {
 pub enum NesController {
     StandardController,
     Zapper,
+    DummyController,
+}
+
+impl Default for NesController {
+    fn default() -> Self {
+        NesController::DummyController(DummyController::default())
+    }
+}
+
+impl NesController {
+    /// Converts this type into the NesControllerType struct
+    pub fn get_type(&self) -> NesControllerType {
+        match self {
+            NesController::StandardController(_) => NesControllerType::StandardController,
+            NesController::Zapper(_) => NesControllerType::Zapper,
+            NesController::DummyController(_) => NesControllerType::None,
+        }
+    }
+
+    /// Returns true if the controller is not a real controller at all
+    pub fn is_none(&self) -> bool {
+        if let NesController::DummyController(_) = self {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+/// The types of controllers that can be plugged into the emulator
+#[derive(
+    serde::Serialize, serde::Deserialize, Copy, Clone, strum::EnumIter, strum::Display, PartialEq,
+)]
+pub enum NesControllerType {
+    StandardController,
+    Zapper,
+    None,
+}
+
+impl NesControllerType {
+    /// Creates a new controller based on the type specified by this struct.
+    pub fn make_controller(&self) -> NesController {
+        match self {
+            NesControllerType::StandardController => NesController::StandardController(StandardController::default()),
+            NesControllerType::Zapper => NesController::Zapper(Zapper::default()),
+            NesControllerType::None => NesController::DummyController(DummyController::default()),
+        }
+    }
+}
+
+/// A standard nes controller implementation
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
+pub struct DummyController {
+    combo: [ButtonCombination; 1],
+}
+
+impl Default for DummyController {
+    fn default() -> Self {
+        Self {
+            combo: [ButtonCombination::new()],
+        }
+    }
+}
+
+impl NesControllerTrait for DummyController {
+    #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
+    fn clock(&mut self, c: bool) {}
+
+    #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
+    fn rapid_fire(&mut self, time: Duration) {}
+
+    #[doc = " Update the serial/parallel input"]
+    fn parallel_signal(&mut self, s: bool) {}
+
+    #[doc = " Get a mutable iterator of all button combinations for this controller."]
+    fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
+        self.combo.iter_mut()
+    }
+
+    #[doc = " Dump data from the controller. No side effects."]
+    fn dump_data(&self) -> u8 {
+        0xff
+    }
+
+    #[doc = " Read data from the controller."]
+    fn read_data(&mut self) -> u8 {
+        0xff
+    }
 }
 
 /// A standard nes controller implementation
@@ -376,7 +482,7 @@ impl NesControllerTrait for Zapper {
     fn dump_data(&self) -> u8 {
         let d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
         let d4 = self.combo[0].buttons[BUTTON_COMBO_FIRE].is_some();
-        let val = 0xEE | if d3 { 1 << 3 } else { 0 } | if d4 { 1 << 4 } else { 0 };
+        let val = 0xE7 | if d3 { 1 << 3 } else { 0 } | if d4 { 1 << 4 } else { 0 };
         val
     }
 
@@ -439,44 +545,31 @@ impl StandardController {
     ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register
     fn check_strobe(&mut self) {
         if self.strobe {
-            let rapida = self.combo[0].buttons[BUTTON_COMBO_TURBOA]
-                .as_ref()
-                .map(|c| {
-                    if let Button::TurboA(flag, _rate) = c {
-                        if *flag {
-                            self.rapid_fire[0].0
-                        } else {
-                            false
-                        }
+            let rapida =
+                if let Button::TurboA(flag, _rate) = &self.combo[0].buttons[BUTTON_COMBO_TURBOA] {
+                    if *flag {
+                        self.rapid_fire[0].0
                     } else {
                         false
                     }
-                })
-                .unwrap_or(true);
-            let rapidb = self.combo[0].buttons[BUTTON_COMBO_TURBOB]
-                .as_ref()
-                .map(|c| {
-                    if let Button::TurboB(flag, _rate) = c {
-                        if *flag {
-                            self.rapid_fire[1].0
-                        } else {
-                            false
-                        }
+                } else {
+                    false
+                };
+            let rapidb =
+                if let Button::TurboB(flag, _rate) = &self.combo[0].buttons[BUTTON_COMBO_TURBOB] {
+                    if *flag {
+                        self.rapid_fire[1].0
                     } else {
                         false
                     }
-                })
-                .unwrap_or(false);
-            let slow = self.combo[0].buttons[BUTTON_COMBO_SLOW]
-                .as_ref()
-                .map(|c| {
-                    if let Button::Slow = c {
-                        self.rapid_fire[2].0
-                    } else {
-                        false
-                    }
-                })
-                .unwrap_or(false);
+                } else {
+                    false
+                };
+            let slow = if let Button::Slow = self.combo[0].buttons[BUTTON_COMBO_SLOW] {
+                self.rapid_fire[2].0
+            } else {
+                false
+            };
             let controller_buttons =
                 if rapida || self.combo[0].buttons[BUTTON_COMBO_A].is_some() {
                     0
@@ -527,8 +620,7 @@ impl NesControllerTrait for StandardController {
             *t += time;
             let req = match index {
                 0 => {
-                    if let Some(Button::TurboA(_flag, rate)) =
-                        &self.combo[0].buttons[BUTTON_COMBO_TURBOA]
+                    if let Button::TurboA(_flag, rate) = &self.combo[0].buttons[BUTTON_COMBO_TURBOA]
                     {
                         *rate
                     } else {
@@ -536,8 +628,7 @@ impl NesControllerTrait for StandardController {
                     }
                 }
                 1 => {
-                    if let Some(Button::TurboB(_flag, rate)) =
-                        &self.combo[0].buttons[BUTTON_COMBO_TURBOB]
+                    if let Button::TurboB(_flag, rate) = &self.combo[0].buttons[BUTTON_COMBO_TURBOB]
                     {
                         *rate
                     } else {
