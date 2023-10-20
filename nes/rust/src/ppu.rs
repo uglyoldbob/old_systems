@@ -1,6 +1,7 @@
 //! The ppu module for the emulator. Responsible for emulating the chip that generates all of the graphics for the nes.
 
 use crate::motherboard::NesMotherboard;
+use egui_multiwin::egui::Vec2;
 use serde_with::Bytes;
 
 #[cfg(feature = "eframe")]
@@ -368,6 +369,16 @@ impl RgbImage {
             width: w,
             height: h,
         }
+    }
+
+    /// Retrieves the pixel for the image
+    pub fn get_pixel(&self, pos: Vec2) -> [u8; 3] {
+        let mut p = [0; 3];
+        let index = pos.x as usize + pos.y as usize * self.width as usize;
+        p[0] = self.data[index * 3];
+        p[1] = self.data[index * 3 + 1];
+        p[2] = self.data[index * 3 + 2];
+        p
     }
 
     /// Convert to a PixelImage<Pixel>

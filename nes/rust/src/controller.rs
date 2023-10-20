@@ -449,6 +449,19 @@ impl Default for Zapper {
     }
 }
 
+impl Zapper {
+    /// Provide zapper specific inputs
+    pub fn provide_zapper_data(&mut self, trigger: bool, vision: bool) {
+        self.combo[0].buttons[BUTTON_COMBO_FIRE] =
+            if trigger { Button::Fire } else { Button::None };
+        self.combo[0].buttons[BUTTON_COMBO_LIGHT] = if vision {
+            Button::LightSensor
+        } else {
+            Button::None
+        };
+    }
+}
+
 impl NesControllerTrait for Zapper {
     #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
     fn clock(&mut self, _c: bool) {}

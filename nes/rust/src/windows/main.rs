@@ -53,6 +53,12 @@ pub struct MainNesWindow {
     sound_stream: Option<cpal::Stream>,
     /// Indicates the last know state of the sound stream
     paused: bool,
+    /// Used for the zapper
+    mouse: bool,
+    /// Used for the zapper
+    mouse_vision: bool,
+    /// The delay required for the zapper
+    mouse_delay: u8,
 }
 
 impl MainNesWindow {
@@ -110,6 +116,9 @@ impl MainNesWindow {
                 sound_sample_interval: 0.0,
                 sound_stream: stream,
                 paused: false,
+                mouse: false,
+                mouse_vision: false,
+                mouse_delay: 0,
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -362,15 +371,26 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         {
             egui.egui_ctx.input(|i| {
-                for (index, contr) in c.mb.controllers[0].get_buttons_iter_mut().enumerate() {
-                    let cnum = index << 1;
-                    let button_config = &c.configuration.controller_config[cnum];
-                    contr.update_egui_buttons(i, button_config);
+                let controller = &mut c.mb.controllers[0];
+                if let crate::controller::NesController::Zapper(z) = controller {
+                    z.provide_zapper_data(self.mouse, self.mouse_vision);
+                } else {
+                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
+                        let cnum = index << 1;
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                    }
                 }
-                for (index, contr) in c.mb.controllers[1].get_buttons_iter_mut().enumerate() {
-                    let cnum = 1 + (index << 1);
-                    let button_config = &c.configuration.controller_config[cnum];
-                    contr.update_egui_buttons(i, button_config);
+
+                let controller = &mut c.mb.controllers[1];
+                if let crate::controller::NesController::Zapper(z) = controller {
+                    z.provide_zapper_data(self.mouse, self.mouse_vision);
+                } else {
+                    for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
+                        let cnum = 1 + (index << 1);
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                    }
                 }
             });
         }
@@ -407,6 +427,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     if c.cpu_peripherals.ppu_frame_end() {
                         break 'emulator_loop;
                     }
+                }
+            }
+            if self.mouse_delay > 0 {
+                self.mouse_delay -= 1;
+                if self.mouse_delay == 0 {
+                    self.mouse = false;
                 }
             }
         }
@@ -577,20 +603,36 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             if let Some(t) = &self.texture {
                 let size = ui.available_size();
                 let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
-                let r = ui.add(egui::Image::from_texture(egui::load::SizedTexture {
-                    id: t.id(),
-                    size: egui_multiwin::egui::Vec2 {
-                        x: t.size()[0] as f32 * zoom,
-                        y: t.size()[1] as f32 * zoom,
-                    },
-                }));
+                let r = ui.add(
+                    egui::Image::from_texture(egui::load::SizedTexture {
+                        id: t.id(),
+                        size: egui_multiwin::egui::Vec2 {
+                            x: t.size()[0] as f32 * zoom,
+                            y: t.size()[1] as f32 * zoom,
+                        },
+                    })
+                    .sense(egui::Sense::click()),
+                );
+                if r.clicked() {
+                    self.mouse = true;
+                    println!("FIRE");
+                    self.mouse_delay = 30;
+                }
                 if r.hovered() {
                     if let Some(pos) = r.hover_pos() {
                         let coord = pos - r.rect.left_top();
                         c.cpu_peripherals.ppu.bg_debug =
                             Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
+
+                        let pixel = c.cpu_peripherals.ppu.get_frame().get_pixel(coord / zoom);
+                        self.mouse_vision = pixel[0] > 10 && pixel[1] > 10 && pixel[2] > 10;
+
                         //println!("Hover at {:?}", pos - r.rect.left_top());
+                    } else {
+                        self.mouse_vision = false;
                     }
+                } else {
+                    self.mouse_vision = false;
                 }
             }
             ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
