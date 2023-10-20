@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use crate::NesEmulatorData;
+use crate::{controller::NesController, NesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -14,6 +14,7 @@ use egui_multiwin::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
+use strum::IntoEnumIterator;
 
 /// The window for dumping ppu nametable data
 pub struct Window {
@@ -93,6 +94,31 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 });
             let mut save_config = false;
             if let Some(i) = self.selected_controller {
+                let controller = &mut c.mb.controllers[i as usize];
+                match controller {
+                    None => {}
+                    Some(controller) => match controller {
+                        crate::controller::NesController::StandardController(_) => {}
+                        crate::controller::NesController::Zapper(_) => {}
+                    },
+                }
+
+                let controllerr = egui_multiwin::egui::ComboBox::from_id_source("Select Control Block")
+                    .selected_text(match controller {
+                        Some(c) => c.to_string(),
+                        None => "No Controller".to_string(),
+                    })
+                    .show_ui(ui, |ui| {
+                        let mut changed = false;
+                        for opt in NesController::iter() {
+                            changed |= ui.selectable_value(controller, Some(opt), opt.to_string()).changed();
+                        }
+                        changed
+                    });
+                if controllerr.inner.is_some_and(|t| t) {
+                    save_config = true;
+                }
+
                 let config = &mut c.configuration.controller_config[i as usize];
                 let mut set_turboa = None;
                 let mut set_turbob = None;

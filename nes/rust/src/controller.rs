@@ -76,7 +76,7 @@ impl ControllerConfig {
 }
 
 /// The various buttons used by controllers
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
 pub enum Button {
     /// The A button on standard controllers.
     A,
@@ -142,7 +142,7 @@ pub const BUTTON_COMBO_POTENTIOMETER: usize = 13;
 pub const BUTTON_COMBO_POWERPAD: usize = 14;
 
 /// The combination of all possible buttons on a controller.
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
 pub struct ButtonCombination {
     /// The buttons for a controller. None generally means a button is not pressed, there are a few exceptions.
     buttons: [Option<Button>; 15],
@@ -327,14 +327,16 @@ pub trait NesControllerTrait {
 /// A generic implementation of a NES controller
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(NesControllerTrait)]
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Copy, Clone, strum::EnumIter, strum::Display, PartialEq,
+)]
 pub enum NesController {
     StandardController,
     Zapper,
 }
 
 /// A standard nes controller implementation
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
 pub struct Zapper {
     /// The button combination
     combo: [ButtonCombination; 1],
@@ -343,10 +345,15 @@ pub struct Zapper {
 impl Zapper {
     /// Create a new zapper
     pub fn new() -> NesController {
+        Self::default().into()
+    }
+}
+
+impl Default for Zapper {
+    fn default() -> Self {
         Self {
             combo: [ButtonCombination::new()],
         }
-        .into()
     }
 }
 
@@ -380,7 +387,7 @@ impl NesControllerTrait for Zapper {
 }
 
 /// A standard nes controller implementation
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
 pub struct StandardController {
     /// The standard button combination
     combo: [ButtonCombination; 1],
@@ -411,17 +418,22 @@ const BUTTON_LEFT: u8 = 0x40;
 /// Flag for the right button
 const BUTTON_RIGHT: u8 = 0x80;
 
-impl StandardController {
-    /// Create a new controller
-    pub fn new() -> NesController {
-        (Self {
+impl Default for StandardController {
+    fn default() -> Self {
+        Self {
             combo: [ButtonCombination::new()],
             shift_register: 0xff,
             strobe: false,
             prevclk: false,
             rapid_fire: [(false, Duration::from_millis(0)); 3],
-        })
-        .into()
+        }
+    }
+}
+
+impl StandardController {
+    /// Create a new controller
+    pub fn new() -> NesController {
+        Self::default().into()
     }
 
     ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register

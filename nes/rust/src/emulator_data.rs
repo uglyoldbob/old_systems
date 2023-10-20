@@ -8,7 +8,7 @@ use crate::{
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
-    romlist::RomList,
+    romlist::RomList, controller::{NesController, StandardController},
 };
 
 #[cfg(feature = "eframe")]
