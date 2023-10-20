@@ -143,6 +143,7 @@ pub struct NesApu {
     sample_interval: f32,
     /// Inhibits clocking the length counters when set
     inhibit_length_clock: bool,
+    #[serde(skip)]
     /// The audio buffer
     buffer: Vec<f32>,
     /// The index into the audio buffer
@@ -180,6 +181,16 @@ impl NesApu {
             always_clock: 0,
             pend_halt: [None; 4],
         }
+    }
+
+    /// Saves the contents of the audio buffer.
+    pub fn get_buffer(&self) -> Vec<f32> {
+        self.buffer.clone()
+    }
+
+    /// Restores the contents of the audio buffer.
+    pub fn restore_buffer(&mut self, v: Vec<f32>) {
+        self.buffer = v;
     }
 
     /// Returns the length of the audio buffer

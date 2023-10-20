@@ -238,6 +238,7 @@ impl NesEmulatorData {
     pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<bincode::ErrorKind>> {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
+                let audio = self.cpu_peripherals.apu.get_buffer();
                 let controllers = self.mb.controllers.clone();
                 let config_path = self.configuration.path.to_owned();
                 let romlist = self.roms.clone();
@@ -247,6 +248,7 @@ impl NesEmulatorData {
                 self.mb.controllers = controllers;
                 self.roms = romlist;
                 self.configuration.path = config_path;
+                self.cpu_peripherals.apu.restore_buffer(audio);
                 Ok(())
             }
             Err(e) => Err(e),
