@@ -295,6 +295,23 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_RIGHT);
                     }
                 });
+                ui.horizontal(|ui| {
+                    ui.label("Trigger:");
+                    if ui
+                        .button(
+                            if let Some(crate::controller::BUTTON_COMBO_FIRE) =
+                                self.waiting_for_input
+                            {
+                                "Waiting for input".to_string()
+                            } else {
+                                keys[crate::controller::BUTTON_COMBO_FIRE].to_string()
+                            },
+                        )
+                        .clicked()
+                    {
+                        self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_FIRE);
+                    }
+                });
                 if let Some(r) = set_turboa {
                     config.set_rate(0, r);
                     save_config = true;

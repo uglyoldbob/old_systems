@@ -371,7 +371,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         let cnum = index << 1;
                         let button_config = &c.configuration.controller_config[cnum];
                         contr.update_egui_buttons(i, button_config);
-                        //unimplemented!();
                     }
                 }
                 if let Some(controller) = &mut c.mb.controllers[1] {

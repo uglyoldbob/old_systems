@@ -330,6 +330,53 @@ pub trait NesControllerTrait {
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub enum NesController {
     StandardController,
+    Zapper,
+}
+
+/// A standard nes controller implementation
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct Zapper {
+    /// The button combination
+    combo: [ButtonCombination; 1],
+}
+
+impl Zapper {
+    /// Create a new zapper
+    pub fn new() -> NesController {
+        Self {
+            combo: [ButtonCombination::new()],
+        }
+        .into()
+    }
+}
+
+impl NesControllerTrait for Zapper {
+    #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
+    fn clock(&mut self, c: bool) {}
+
+    #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
+    fn rapid_fire(&mut self, time: Duration) {}
+
+    #[doc = " Update the serial/parallel input"]
+    fn parallel_signal(&mut self, s: bool) {}
+
+    #[doc = " Get a mutable iterator of all button combinations for this controller."]
+    fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
+        self.combo.iter_mut()
+    }
+
+    #[doc = " Dump data from the controller. No side effects."]
+    fn dump_data(&self) -> u8 {
+        let d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
+        let d4 = self.combo[0].buttons[BUTTON_COMBO_FIRE].is_some();
+        let val = 0xEE | if d3 { 1 << 3 } else { 0 } | if d4 { 1 << 4 } else { 0 };
+        val
+    }
+
+    #[doc = " Read data from the controller."]
+    fn read_data(&mut self) -> u8 {
+        self.dump_data()
+    }
 }
 
 /// A standard nes controller implementation
@@ -512,7 +559,6 @@ impl NesControllerTrait for StandardController {
     }
 
     fn read_data(&mut self) -> u8 {
-        let data = self.shift_register & 1;
-        data | 0x1e
+        self.dump_data()
     }
 }
