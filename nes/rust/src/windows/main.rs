@@ -59,6 +59,8 @@ pub struct MainNesWindow {
     mouse_vision: bool,
     /// The delay required for the zapper
     mouse_delay: u8,
+    /// The zapper was fired "off-screen"
+    mouse_miss: bool,
     /// The stored resized image for the emulator
     image: crate::ppu::PixelImage<egui::Color32>,
 }
@@ -121,6 +123,7 @@ impl MainNesWindow {
                 mouse: false,
                 mouse_vision: false,
                 mouse_delay: 0,
+                mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
@@ -619,7 +622,14 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 );
                 if r.clicked() {
                     self.mouse = true;
+                    self.mouse_miss = false;
                     println!("FIRE");
+                    self.mouse_delay = 30;
+                }
+                else if r.clicked_by(egui::PointerButton::Secondary) {
+                    self.mouse = true;
+                    self.mouse_miss = true;
+                    println!("FIRE off screen");
                     self.mouse_delay = 30;
                 }
                 if r.hovered() {
@@ -629,7 +639,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
                         let pixel = self.image.get_pixel(coord / zoom);
-                        self.mouse_vision = pixel.r() > 10 && pixel.g() > 10 && pixel.b() > 10;
+                        self.mouse_vision = !self.mouse_miss && pixel.r() > 10 && pixel.g() > 10 && pixel.b() > 10;
 
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     } else {

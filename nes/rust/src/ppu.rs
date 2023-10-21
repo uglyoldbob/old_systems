@@ -71,7 +71,9 @@ where
 {
     /// Retrieves the pixel for the image
     pub fn get_pixel(&self, pos: Vec2) -> T {
-        let index = pos.x as usize + pos.y as usize * self.width as usize;
+        let x = (pos.x as usize).min(self.width as usize - 1);
+        let y = (pos.y as usize).min(self.height as usize - 1);
+        let index = x + y * self.width as usize;
         self.pixels[index]
     }
 

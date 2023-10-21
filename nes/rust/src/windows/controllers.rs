@@ -350,23 +350,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         });
                     }
                     crate::controller::NesController::Zapper(_) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Trigger:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_FIRE) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_FIRE].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_FIRE);
-                            }
-                        });
+                        ui.label("Zapper controlled by mouse");
                     }
                     crate::controller::NesController::DummyController(_) => {}
                 }
