@@ -35,6 +35,7 @@ pub struct Pixel {
 }
 
 /// A generic pixel based image
+#[derive(Clone)]
 pub struct PixelImage<T> {
     /// The actual pixels of the image
     pixels: Vec<T>,
@@ -54,10 +55,26 @@ impl PixelImage<egui::Color32> {
     }
 }
 
+impl<T> Default for PixelImage<T> where T: Default + Clone {
+    fn default() -> Self {
+        Self {
+            pixels: vec![T::default(); 1],
+            width: 1,
+            height: 1,
+        }
+    }
+}
+
 impl<T> PixelImage<T>
 where
     T: Default + Clone + Copy + std::cmp::PartialEq,
 {
+    /// Retrieves the pixel for the image
+    pub fn get_pixel(&self, pos: Vec2) -> T {
+        let index = pos.x as usize + pos.y as usize * self.width as usize;
+        self.pixels[index]
+    }
+
     /// Resize the image using an optional resizing algorithm
     pub fn resize(self, scale: Option<ScalingAlgorithm>) -> PixelImage<T> {
         let pixels = self.pixels;

@@ -59,6 +59,8 @@ pub struct MainNesWindow {
     mouse_vision: bool,
     /// The delay required for the zapper
     mouse_delay: u8,
+    /// The stored resized image for the emulator
+    image: crate::ppu::PixelImage<egui::Color32>,
 }
 
 impl MainNesWindow {
@@ -119,6 +121,7 @@ impl MainNesWindow {
                 mouse: false,
                 mouse_vision: false,
                 mouse_delay: 0,
+                image: crate::ppu::PixelImage::<egui::Color32>::default(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -441,8 +444,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             .cpu_peripherals
             .ppu_get_frame()
             .to_pixels_egui()
-            .resize(c.configuration.scaler)
-            .to_egui();
+            .resize(c.configuration.scaler);
+        self.image = image.clone();
+        let image = image.to_egui();
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
@@ -624,8 +628,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         c.cpu_peripherals.ppu.bg_debug =
                             Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
-                        let pixel = c.cpu_peripherals.ppu.get_frame().get_pixel(coord / zoom);
-                        self.mouse_vision = pixel[0] > 10 && pixel[1] > 10 && pixel[2] > 10;
+                        let pixel = self.image.get_pixel(coord / zoom);
+                        self.mouse_vision = pixel.r() > 10 && pixel.g() > 10 && pixel.b() > 10;
 
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     } else {
