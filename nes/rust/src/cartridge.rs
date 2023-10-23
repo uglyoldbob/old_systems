@@ -3,12 +3,14 @@
 mod mapper00;
 mod mapper01;
 mod mapper03;
+mod mapper04;
 
 use std::{collections::BTreeMap, path::PathBuf, slice::ChunksExact};
 
 use mapper00::Mapper00;
 use mapper01::Mapper01;
 use mapper03::Mapper03;
+use mapper04::Mapper04;
 
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +50,7 @@ pub enum NesMapper {
     Mapper00,
     Mapper01,
     Mapper03,
+    Mapper04,
 }
 
 /// The trait for cpu memory reads and writes, implemented by devices on the bus
