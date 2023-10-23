@@ -13,3 +13,4 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] AI driven controllers
 - [ ] Fix currently broken games
 - [ ] Add pal support
+- [ ] wix installer for windows
