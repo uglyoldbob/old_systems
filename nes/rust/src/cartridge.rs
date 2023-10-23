@@ -222,14 +222,17 @@ impl PersistentStorage {
         }
     }
 
-    fn make_persistent(p: PathBuf, v: Vec<u8>) -> Option<Self> {
+    fn make_persistent(p: PathBuf, v: Vec<u8>, overwrite: bool) -> Option<Self> {
         let file = if p.exists() {
             let file = std::fs::OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
                 .open(&p);
-            if let Ok(file) = file {
+            if let Ok(mut file) = file {
+                if overwrite {
+                    std::io::Write::write_all(&mut file, &v[..]);
+                }
                 Some(file)
             } else {
                 None
@@ -262,7 +265,7 @@ impl PersistentStorage {
     /// Reupgrade the object to be fully persistent
     fn upgrade_to_persistent(&mut self, p: PathBuf) {
         if let PersistentStorage::ShouldBePersistent(v) = self {
-            if let Some(ps) = Self::make_persistent(p, v.clone()) {
+            if let Some(ps) = Self::make_persistent(p, v.clone(), true) {
                 println!("Have upgraded to persistent storage again");
                 *self = ps;
             }
@@ -275,7 +278,7 @@ impl PersistentStorage {
         let t = match self {
             PersistentStorage::Persistent(_pb, _a) => None,
             PersistentStorage::ShouldBePersistent(_v) => None,
-            PersistentStorage::Volatile(v) => Self::make_persistent(p, v.clone()),
+            PersistentStorage::Volatile(v) => Self::make_persistent(p, v.clone(), false),
         };
         if let Some(t) = t {
             *self = t;
