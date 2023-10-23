@@ -481,7 +481,7 @@ impl NesControllerTrait for Zapper {
     fn dump_data(&self) -> u8 {
         let d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
         let d4 = self.combo[0].buttons[BUTTON_COMBO_FIRE].is_some();
-        0xE7 | if d3 { 1 << 3 } else { 0 } | if d4 { 1 << 4 } else { 0 }
+        0xE7 | if d3 { 1 << 3 } else { 0 } | if !d4 { 1 << 4 } else { 0 }
     }
 
     #[doc = " Read data from the controller."]

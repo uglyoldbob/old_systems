@@ -424,6 +424,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             c.paused = true;
                             c.wait_for_frame_end = false;
                         }
+                        if self.mouse_delay > 0 {
+                            self.mouse_delay -= 1;
+                            if self.mouse_delay == 0 {
+                                self.mouse = false;
+                                self.mouse_miss = false;
+                            }
+                        }
                         break 'emulator_loop;
                     }
                 }
@@ -433,12 +440,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     if c.cpu_peripherals.ppu_frame_end() {
                         break 'emulator_loop;
                     }
-                }
-            }
-            if self.mouse_delay > 0 {
-                self.mouse_delay -= 1;
-                if self.mouse_delay == 0 {
-                    self.mouse = false;
                 }
             }
         }
@@ -618,19 +619,19 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             y: t.size()[1] as f32 * zoom,
                         },
                     })
-                    .sense(egui::Sense::click()),
+                    .sense(egui::Sense::click_and_drag()),
                 );
-                if r.clicked() {
+                if r.clicked() || r.dragged() {
                     self.mouse = true;
                     self.mouse_miss = false;
                     println!("FIRE");
-                    self.mouse_delay = 30;
+                    self.mouse_delay = 10;
                 }
-                else if r.clicked_by(egui::PointerButton::Secondary) {
+                else if r.clicked_by(egui::PointerButton::Secondary) || r.dragged_by(egui::PointerButton::Secondary) {
                     self.mouse = true;
                     self.mouse_miss = true;
                     println!("FIRE off screen");
-                    self.mouse_delay = 30;
+                    self.mouse_delay = 10;
                 }
                 if r.hovered() {
                     if let Some(pos) = r.hover_pos() {
