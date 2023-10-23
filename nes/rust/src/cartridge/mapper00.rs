@@ -45,8 +45,8 @@ impl NesMapperTrait for Mapper00 {
     fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
-                if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                    let c = cart.trainer.as_ref().unwrap();
+                if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.nonvolatile.trainer.as_ref().unwrap();
                     let addr = addr & 0x1ff;
                     Some(c[addr as usize])
                 } else {
@@ -61,8 +61,8 @@ impl NesMapperTrait for Mapper00 {
             }
             0x8000..=0xffff => {
                 let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                Some(cart.prg_rom[addr3 as usize])
+                let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
+                Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             _ => None,
         }
@@ -81,8 +81,8 @@ impl NesMapperTrait for Mapper00 {
             }
             0x8000..=0xffff => {
                 let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                Some(cart.prg_rom[addr3 as usize])
+                let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
+                Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             _ => None,
         }
@@ -92,8 +92,8 @@ impl NesMapperTrait for Mapper00 {
 
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
         if (0x6000..=0x7fff).contains(&addr) {
-            if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                let c = cart.trainer.as_mut().unwrap();
+            if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                let c = cart.nonvolatile.trainer.as_mut().unwrap();
                 let addr = addr & 0x1ff;
                 c[addr as usize] = data;
             } else {
@@ -108,7 +108,7 @@ impl NesMapperTrait for Mapper00 {
 
     fn ppu_peek_address(&self, addr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);
-        let data = cart.chr_rom[(addr as usize) % cart.chr_rom.len()];
+        let data = cart.nonvolatile.chr_rom[(addr as usize) % cart.nonvolatile.chr_rom.len()];
         (mirror, thing, Some(data))
     }
 
@@ -118,22 +118,22 @@ impl NesMapperTrait for Mapper00 {
     }
 
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
-        if cart.chr_rom.is_empty() {
+        if cart.nonvolatile.chr_rom.is_empty() {
             return None;
         }
-        Some(cart.chr_rom[(self.ppu_address as usize) % cart.chr_rom.len()])
+        Some(cart.nonvolatile.chr_rom[(self.ppu_address as usize) % cart.nonvolatile.chr_rom.len()])
     }
 
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
-        if !cart.volatile.chr_ram || cart.chr_rom.is_empty() {
+        if !cart.volatile.chr_ram || cart.nonvolatile.chr_rom.is_empty() {
             return;
         }
-        let addr2 = self.ppu_address as u32 % cart.chr_rom.len() as u32;
-        cart.chr_rom[addr2 as usize] = data;
+        let addr2 = self.ppu_address as u32 % cart.nonvolatile.chr_rom.len() as u32;
+        cart.nonvolatile.chr_rom[addr2 as usize] = data;
     }
 
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8) {
-        let addr = addr as usize % cart.prg_rom.len();
-        cart.prg_rom[addr] = new_byte;
+        let addr = addr as usize % cart.nonvolatile.prg_rom.len();
+        cart.nonvolatile.prg_rom[addr] = new_byte;
     }
 }

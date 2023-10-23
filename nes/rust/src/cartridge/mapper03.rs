@@ -37,11 +37,12 @@ impl Mapper03 {
     }
     /// Perform a ppu read operation
     fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
-        if cart.chr_rom.is_empty() {
+        if cart.nonvolatile.chr_rom.is_empty() {
             return None;
         }
-        let addr2 = (addr | (self.bank as u16 * 0x2000)) & (cart.chr_rom.len() - 1) as u16;
-        Some(cart.chr_rom[addr2 as usize])
+        let addr2 =
+            (addr | (self.bank as u16 * 0x2000)) & (cart.nonvolatile.chr_rom.len() - 1) as u16;
+        Some(cart.nonvolatile.chr_rom[addr2 as usize])
     }
 }
 
@@ -67,8 +68,8 @@ impl NesMapperTrait for Mapper03 {
             }
             0x8000..=0xffff => {
                 let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.prg_rom.len() as u32;
-                Some(cart.prg_rom[addr3 as usize])
+                let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
+                Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             _ => None,
         }
@@ -77,8 +78,8 @@ impl NesMapperTrait for Mapper03 {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
-                if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                    let c = cart.trainer.as_mut().unwrap();
+                if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.nonvolatile.trainer.as_mut().unwrap();
                     let addr = addr & 0x1ff;
                     Some(c[addr as usize])
                 } else {
@@ -93,8 +94,8 @@ impl NesMapperTrait for Mapper03 {
             }
             0x8000..=0xffff => {
                 let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 & (cart.prg_rom.len() - 1) as u32;
-                Some(cart.prg_rom[addr3 as usize])
+                let addr3 = addr2 as u32 & (cart.nonvolatile.prg_rom.len() - 1) as u32;
+                Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             _ => None,
         }
@@ -106,8 +107,8 @@ impl NesMapperTrait for Mapper03 {
         if addr >= 0x8000 {
             self.bank = data;
         } else if (0x6000..=0x7fff).contains(&addr) {
-            if cart.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                let c = cart.trainer.as_mut().unwrap();
+            if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                let c = cart.nonvolatile.trainer.as_mut().unwrap();
                 let addr = addr & 0x1ff;
                 c[addr as usize] = data;
             } else {

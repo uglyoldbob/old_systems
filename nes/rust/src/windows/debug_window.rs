@@ -141,9 +141,12 @@ impl TrackedWindow<NesEmulatorData> for DebugNesWindow {
                         }
                         ui.label(format!(
                             "Chr memory size: {:X}",
-                            c.cartridge().chr_rom.len()
+                            c.cartridge().nonvolatile.chr_rom.len()
                         ));
-                        ui.label(format!("Prg rom size: {:X}", c.cartridge().prg_rom.len()));
+                        ui.label(format!(
+                            "Prg rom size: {:X}",
+                            c.cartridge().nonvolatile.prg_rom.len()
+                        ));
                         ui.label(format!(
                             "Prg ram size: {:X}",
                             c.cartridge().volatile.prg_ram.len()

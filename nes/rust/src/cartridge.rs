@@ -159,6 +159,7 @@ impl PersistentStorage {
             .create(true)
             .open(&p)
             .ok()?;
+        file.set_len(v.len() as u64);
         let mm = unsafe { memmap2::MmapMut::map_mut(&file) }.ok()?;
         Some(PersistentStorage::Persistent(mm))
     }
@@ -190,26 +191,29 @@ impl PersistentStorage {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridgeData {
     #[serde(skip)]
-    /// An optional trainer for the cartridge
-    pub trainer: Option<Vec<u8>>,
-    #[serde(skip)]
-    /// The prg rom, where code typically goes.
-    pub prg_rom: Vec<u8>,
-    #[serde(skip)]
-    /// The chr rom, where graphics are generally stored
-    pub chr_rom: Vec<u8>,
-    #[serde(skip)]
-    /// inst_rom ?
-    pub inst_rom: Option<Vec<u8>>,
-    #[serde(skip)]
-    /// prom?
-    pub prom: Option<(Vec<u8>, Vec<u8>)>,
+    /// The nonvolatile data for the cartridge
+    pub nonvolatile: NonvolatileCartridgeData,
     /// The potentially volatile cartridge data
     pub volatile: VolatileCartridgeData,
 }
 
+/// Nonvolatile storage for cartridge data
+#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
+pub struct NonvolatileCartridgeData {
+    /// An optional trainer for the cartridge
+    pub trainer: Option<Vec<u8>>,
+    /// The prg rom, where code typically goes.
+    pub prg_rom: Vec<u8>,
+    /// The chr rom, where graphics are generally stored
+    pub chr_rom: Vec<u8>,
+    /// inst_rom ?
+    pub inst_rom: Option<Vec<u8>>,
+    /// prom?
+    pub prom: Option<(Vec<u8>, Vec<u8>)>,
+}
+
 /// Volatile storage for cartridge data
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct VolatileCartridgeData {
     /// Program ram
     pub prg_ram: Vec<u8>,
@@ -256,8 +260,8 @@ pub struct NesCartridge {
 
 /// The data from a cartridge that needs to be saved when loading a save state
 pub struct NesCartridgeBackup {
-    /// The data in the cartridge, including ram and everything else
-    data: VolatileCartridgeData,
+    /// The non-volatile data in the cartridge
+    data: NonvolatileCartridgeData,
     /// The convenience name of the rom
     rom_name: String,
 }
@@ -294,16 +298,16 @@ impl NesCartridge {
     }
 
     /// Saves the contents of the cartridge data so that it can be restored after loading a save state.
-    pub fn save_cart_data(&self) -> NesCartridgeBackup {
+    pub fn save_cart_data(&mut self) -> NesCartridgeBackup {
         NesCartridgeBackup {
-            data: self.data.volatile.clone(),
+            data: self.data.nonvolatile.clone(),
             rom_name: self.rom_name.clone(),
         }
     }
 
     /// Restore previously saved data after loading a save state.
     pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
-        self.data.volatile = old_data.data;
+        self.data.nonvolatile = old_data.data;
         self.rom_name = old_data.rom_name;
     }
 
@@ -437,13 +441,17 @@ impl NesCartridge {
             chr_ram,
         };
 
-        let rom_data = NesCartridgeData {
+        let nonvol = NonvolatileCartridgeData {
             trainer,
             prg_rom,
             chr_rom,
-            volatile: vol,
             inst_rom,
             prom: None,
+        };
+
+        let rom_data = NesCartridgeData {
+            volatile: vol,
+            nonvolatile: nonvol,
         };
         let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
@@ -545,13 +553,17 @@ impl NesCartridge {
             chr_ram: false,
         };
 
-        let rom_data = NesCartridgeData {
+        let nonvol = NonvolatileCartridgeData {
             trainer,
             prg_rom,
             chr_rom,
-            volatile: vol,
             inst_rom: None,
             prom: None,
+        };
+
+        let rom_data = NesCartridgeData {
+            nonvolatile: nonvol,
+            volatile: vol,
         };
 
         let mapper = NesCartridge::get_mapper(mappernum as u32, &rom_data)?;

@@ -252,7 +252,7 @@ impl NesEmulatorData {
                 let controllers = self.mb.controllers;
                 let config_path = self.configuration.path.to_owned();
                 let romlist = self.roms.clone();
-                let cd = self.mb.cartridge().map(|c| c.save_cart_data());
+                let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
                 cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
                 self.mb.controllers = controllers;
