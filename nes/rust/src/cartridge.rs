@@ -4,7 +4,7 @@ mod mapper00;
 mod mapper01;
 mod mapper03;
 
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf, slice::ChunksExact};
 
 use mapper00::Mapper00;
 use mapper01::Mapper01;
@@ -150,6 +150,28 @@ impl<'de> serde::Deserialize<'de> for PersistentStorage {
     }
 }
 
+impl std::ops::Index<usize> for PersistentStorage {
+    type Output = u8;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.contents()[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for PersistentStorage {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.contents_mut()[index]
+    }
+}
+
+impl Drop for PersistentStorage {
+    fn drop(&mut self) {
+        if let PersistentStorage::Persistent(p) = self {
+            p.flush();
+        }
+    }
+}
+
 impl PersistentStorage {
     /// Create a new persistent storage object
     fn new_persistent(p: PathBuf, v: Vec<u8>) -> Option<Self> {
@@ -164,9 +186,72 @@ impl PersistentStorage {
         Some(PersistentStorage::Persistent(mm))
     }
 
+    /// Convert this volatile object to a non-volatile object, taking on the contents of the existing nonvolatile storage if it exists.
+    /// If it does not exist, then the current contents are transferred over.
+    fn convert_to_nonvolatile(&mut self, p: PathBuf) {
+        let t = match self {
+            PersistentStorage::Persistent(a) => None,
+            PersistentStorage::Volatile(v) => {
+                let file = if p.exists() {
+                    let file = std::fs::OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .open(&p);
+                    if let Ok(file) = file {
+                        Some(file)
+                    } else {
+                        None
+                    }
+                } else {
+                    let file = std::fs::OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .open(&p);
+                    if let Ok(mut file) = file {
+                        std::io::Write::write_all(&mut file, &v[..]);
+                        Some(file)
+                    } else {
+                        None
+                    }
+                };
+                if let Some(file) = file {
+                    let mm = unsafe { memmap2::MmapMut::map_mut(&file) };
+                    if let Ok(mm) = mm {
+                        Some(PersistentStorage::Persistent(mm))
+                    }
+                    else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        };
+        if let Some(t) = t {
+            *self = t;
+        }
+    }
+
     /// Create a new volatile storage object
     fn new_volatile(v: Vec<u8>) -> Self {
         PersistentStorage::Volatile(v)
+    }
+
+    /// Convenience function for determining if the contents are empty.
+    fn is_empty(&self) -> bool {
+        self.contents().is_empty()
+    }
+
+    /// The length of the contents
+    pub fn len(&self) -> usize {
+        self.contents().len()
+    }
+
+    /// Get chunks of the data
+    pub fn chunks_exact(&self, cs: usize) -> ChunksExact<'_, u8> {
+        self.contents().chunks_exact(cs)
     }
 
     /// Retrieve a reference to the contents
@@ -216,7 +301,7 @@ pub struct NonvolatileCartridgeData {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct VolatileCartridgeData {
     /// Program ram
-    pub prg_ram: Vec<u8>,
+    pub prg_ram: PersistentStorage,
     /// Battery backup for prog ram active?
     pub battery_backup: bool,
     /// True for vertical mirroring, false for horizontal mirroring
@@ -323,7 +408,7 @@ impl NesCartridge {
 
     /// Retrieve the save name for the cartridge
     pub fn save_name(&self) -> String {
-        self.save.clone()
+        format!("{}.save", self.save)
     }
 
     /// Retrieve the mapper number for the cartridge
@@ -434,7 +519,7 @@ impl NesCartridge {
         let mappernum = (rom_contents[6] >> 4) | (rom_contents[7] & 0xf0);
 
         let vol = VolatileCartridgeData {
-            prg_ram,
+            prg_ram: PersistentStorage::Volatile(prg_ram),
             battery_backup: (rom_contents[6] & 2) != 0,
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mappernum as u32,
@@ -470,7 +555,7 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
             hash: hash.to_owned(),
-            save: format!("{}.save", hash),
+            save: format!("{}", hash),
             rom_name: name.to_owned(),
         })
     }
@@ -546,7 +631,7 @@ impl NesCartridge {
             | (rom_contents[8] as u16) << 8;
 
         let vol = VolatileCartridgeData {
-            prg_ram: Vec::new(),
+            prg_ram: PersistentStorage::Volatile(Vec::new()),
             battery_backup: (rom_contents[6] & 2) != 0,
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mappernum as u32,
@@ -575,7 +660,7 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
             hash: hash.to_owned(),
-            save: format!("{}.save", hash),
+            save: format!("{}", hash),
             rom_name: name.to_owned(),
         })
     }
@@ -597,7 +682,7 @@ impl NesCartridge {
         {
             return Err(CartridgeError::InvalidRom);
         }
-        if (rom_contents[7] & 0xC) == 8 {
+        let mut cart = if (rom_contents[7] & 0xC) == 8 {
             Self::load_ines2(name, &rom_contents)
         } else if (rom_contents[7] & 0xC) == 4 {
             Self::load_obsolete_ines(name, &rom_contents)
@@ -611,7 +696,17 @@ impl NesCartridge {
         } else {
             //or ines 0.7
             Self::load_obsolete_ines(name, &rom_contents)
+        };
+
+        if let Ok(c) = &mut cart {
+            let mut pb : PathBuf = PathBuf::from("./saves");
+            pb.push(format!("{}.prgram", c.save));
+            if c.data.volatile.battery_backup {
+                c.data.volatile.prg_ram.convert_to_nonvolatile(pb);
+            }
         }
+
+        cart
     }
 }
 
