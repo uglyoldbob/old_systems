@@ -20,6 +20,10 @@ use egui_multiwin::{
 
 /// The struct for the main window of the emulator.
 pub struct MainNesWindow {
+    /// The last time a rewind point was saved.
+    rewind_point: Option<std::time::Instant>,
+    /// The rewind points
+    rewinds: [Vec<u8>; 3],
     /// The time of the last drawn frame for the emulator.
     last_frame_time: std::time::Instant,
     /// The time of the last emulated frame for the emulator.
@@ -108,6 +112,8 @@ impl MainNesWindow {
 
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
+                rewind_point: None,
+                rewinds: [Vec::new(), Vec::new(), Vec::new()],
                 last_frame_time: std::time::Instant::now(),
                 last_emulated_frame: std::time::Instant::now(),
                 emulator_time: Duration::from_millis(0),
@@ -332,6 +338,25 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let frame_time = time_now.duration_since(self.last_frame_time);
         self.last_frame_time = time_now;
 
+        if self.rewind_point.is_none() {
+            self.rewind_point = Some(time_now);
+            let p = c.serialize();
+            self.rewinds[0] = p.clone();
+            self.rewinds[1] = p.clone();
+            self.rewinds[2] = p.clone();
+        }
+        else if let Some(t) = self.rewind_point {
+            if let Some(rew) = c.configuration.rewind_interval {
+                if time_now.duration_since(t) > rew {
+                    println!("Making rewind point");
+                    self.rewinds[2] = self.rewinds[1].clone();
+                    self.rewinds[1] = self.rewinds[0].clone();
+                    self.rewinds[0] = c.serialize();
+                    self.rewind_point = Some(time_now);
+                }
+            }
+        }
+
         let new_fps = 1_000_000_000.0 / frame_time.as_nanos() as f64;
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
 
@@ -472,6 +497,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         let mut save_state = false;
         let mut load_state = false;
+        let mut rewind_state = false;
 
         egui_multiwin::egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::menu::bar(ui, |ui| {
@@ -581,6 +607,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             load_state = true;
         }
 
+        if egui
+            .egui_ctx
+            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F7))
+        {
+            rewind_state = true;
+        }
+
         let name = if let Some(cart) = c.mb.cartridge() {
             cart.save_name()
         } else {
@@ -607,6 +640,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 if e.is_err() {
                     println!("Error loading state {:?}", e);
                 }
+            }
+        }
+
+        if rewind_state {
+            let e = c.deserialize(self.rewinds[1].clone());
+            if e.is_err() {
+                println!("Error loading rewind state {:?}", e);
             }
         }
 

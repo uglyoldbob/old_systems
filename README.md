@@ -8,7 +8,7 @@ Repository for emulation of old game systems and other old computing systems
 - [x] Implement battery backed cartridge ram
 - [ ] Network play
 - [ ] More mapper support
-- [ ] Rewind support
+- [x] Rewind support
 - [ ] Recording support
 - [ ] AI driven controllers
 - [ ] Fix currently broken games

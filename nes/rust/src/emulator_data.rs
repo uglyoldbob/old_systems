@@ -23,9 +23,11 @@ use egui_multiwin::multi_window::CommonEventHandler;
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct EmulatorConfiguration {
     /// Should a rom be persistent from one run to another?
-    sticky_rom: bool,
+    pub sticky_rom: bool,
     /// What is the startup rom for the emulator?
     start_rom: Option<String>,
+    /// What is the duration between save points fo rewinding?
+    pub rewind_interval: Option<std::time::Duration>,
     #[serde(skip)]
     /// The path for saving and loading
     path: String,
@@ -61,6 +63,7 @@ impl Default for EmulatorConfiguration {
         Self {
             sticky_rom: true,
             start_rom: None,
+            rewind_interval: Some(std::time::Duration::from_millis(5000)),
             path: "".to_string(),
             rom_path: "./roms".to_string(),
             controller_type: [
@@ -80,6 +83,10 @@ impl EmulatorConfiguration {
     pub fn set_startup(&mut self, name: String) {
         if self.sticky_rom {
             self.start_rom = Some(name);
+            self.save();
+        }
+        else {
+            self.start_rom = None;
             self.save();
         }
     }
