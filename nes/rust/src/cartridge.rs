@@ -4,7 +4,7 @@ mod mapper00;
 mod mapper01;
 mod mapper03;
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use mapper00::Mapper00;
 use mapper01::Mapper01;
@@ -63,9 +63,131 @@ pub trait NesMemoryBusDevice {
     fn memory_cycle_write(&mut self, addr: u16, data: u8);
 }
 
+/// A visitor for PersistentStorage
+pub struct PersistentVisitor;
+
+impl<'de> serde::de::Visitor<'de> for PersistentVisitor {
+    type Value = PersistentStorage;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("byte array")
+    }
+
+    fn visit_seq<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
+    where
+        V: serde::de::SeqAccess<'de>,
+    {
+        let len = std::cmp::min(visitor.size_hint().unwrap_or(0), 4096);
+        let mut bytes = Vec::with_capacity(len);
+
+        while let Some(b) = visitor.next_element()? {
+            bytes.push(b);
+        }
+        Ok(PersistentStorage::new_volatile(bytes))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(PersistentStorage::new_volatile(v.to_vec()))
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(PersistentStorage::new_volatile(v))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(PersistentStorage::new_volatile(v.as_bytes().to_vec()))
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(PersistentStorage::new_volatile(v.into_bytes()))
+    }
+}
+
+/// A vec that could be battery backed
+pub enum PersistentStorage {
+    /// The vec is battery backed by a file
+    Persistent(memmap2::MmapMut),
+    /// The vec is simply a plain vector
+    Volatile(Vec<u8>),
+}
+
+impl Clone for PersistentStorage {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Persistent(arg0) => Self::Volatile(arg0.to_vec()),
+            Self::Volatile(arg0) => Self::Volatile(arg0.clone()),
+        }
+    }
+}
+
+impl serde::Serialize for PersistentStorage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.contents().serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PersistentStorage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_byte_buf(PersistentVisitor)
+    }
+}
+
+impl PersistentStorage {
+    /// Create a new persistent storage object
+    fn new_persistent(p: PathBuf, v: Vec<u8>) -> Option<Self> {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&p)
+            .ok()?;
+        let mm = unsafe { memmap2::MmapMut::map_mut(&file) }.ok()?;
+        Some(PersistentStorage::Persistent(mm))
+    }
+
+    /// Create a new volatile storage object
+    fn new_volatile(v: Vec<u8>) -> Self {
+        PersistentStorage::Volatile(v)
+    }
+
+    /// Retrieve a reference to the contents
+    fn contents(&self) -> &[u8] {
+        match self {
+            PersistentStorage::Persistent(mm) => mm.as_ref(),
+            PersistentStorage::Volatile(v) => &v[..],
+        }
+    }
+
+    /// Retrieve a mutable reference to the contents
+    fn contents_mut(&mut self) -> &mut [u8] {
+        match self {
+            PersistentStorage::Persistent(mm) => mm.as_mut(),
+            PersistentStorage::Volatile(v) => &mut v[..],
+        }
+    }
+}
+
 /// The data for a cartridge.
 #[non_exhaustive]
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesCartridgeData {
     #[serde(skip)]
     /// An optional trainer for the cartridge
@@ -76,20 +198,29 @@ pub struct NesCartridgeData {
     #[serde(skip)]
     /// The chr rom, where graphics are generally stored
     pub chr_rom: Vec<u8>,
-    /// chr_ram ?
-    pub chr_ram: bool,
     #[serde(skip)]
     /// inst_rom ?
     pub inst_rom: Option<Vec<u8>>,
     #[serde(skip)]
     /// prom?
     pub prom: Option<(Vec<u8>, Vec<u8>)>,
+    /// The potentially volatile cartridge data
+    pub volatile: VolatileCartridgeData,
+}
+
+/// Volatile storage for cartridge data
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct VolatileCartridgeData {
     /// Program ram
     pub prg_ram: Vec<u8>,
+    /// Battery backup for prog ram active?
+    pub battery_backup: bool,
     /// True for vertical mirroring, false for horizontal mirroring
     pub mirroring: bool,
     /// The mapper number
     pub mapper: u32,
+    /// chr_ram ?
+    pub chr_ram: bool,
 }
 
 #[non_exhaustive]
@@ -126,7 +257,7 @@ pub struct NesCartridge {
 /// The data from a cartridge that needs to be saved when loading a save state
 pub struct NesCartridgeBackup {
     /// The data in the cartridge, including ram and everything else
-    data: NesCartridgeData,
+    data: VolatileCartridgeData,
     /// The convenience name of the rom
     rom_name: String,
 }
@@ -165,18 +296,14 @@ impl NesCartridge {
     /// Saves the contents of the cartridge data so that it can be restored after loading a save state.
     pub fn save_cart_data(&self) -> NesCartridgeBackup {
         NesCartridgeBackup {
-            data: self.data.clone(),
+            data: self.data.volatile.clone(),
             rom_name: self.rom_name.clone(),
         }
     }
 
     /// Restore previously saved data after loading a save state.
     pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
-        self.data.prg_rom = old_data.data.prg_rom;
-        self.data.chr_rom = old_data.data.chr_rom;
-        self.data.inst_rom = old_data.data.inst_rom;
-        self.data.trainer = old_data.data.trainer;
-        self.data.prom = old_data.data.prom;
+        self.data.volatile = old_data.data;
         self.rom_name = old_data.rom_name;
     }
 
@@ -288,7 +415,11 @@ impl NesCartridge {
         let ram_size = if (rom_contents[6] & 2) != 0 {
             0x2000
         } else {
-            rom_contents[8] as usize * 8192
+            if rom_contents[8] != 0 {
+                rom_contents[8] as usize * 8192
+            } else {
+                8192
+            }
         };
         let mut prg_ram = Vec::with_capacity(ram_size);
         for _i in 0..ram_size {
@@ -297,16 +428,22 @@ impl NesCartridge {
         }
 
         let mappernum = (rom_contents[6] >> 4) | (rom_contents[7] & 0xf0);
+
+        let vol = VolatileCartridgeData {
+            prg_ram,
+            battery_backup: (rom_contents[6] & 2) != 0,
+            mirroring: (rom_contents[6] & 1) != 0,
+            mapper: mappernum as u32,
+            chr_ram,
+        };
+
         let rom_data = NesCartridgeData {
             trainer,
             prg_rom,
             chr_rom,
-            chr_ram,
+            volatile: vol,
             inst_rom,
             prom: None,
-            prg_ram,
-            mirroring: (rom_contents[6] & 1) != 0,
-            mapper: mappernum as u32,
         };
         let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
 
@@ -399,16 +536,22 @@ impl NesCartridge {
         let mappernum = (rom_contents[6] >> 4) as u16
             | (rom_contents[7] & 0xf0) as u16
             | (rom_contents[8] as u16) << 8;
+
+        let vol = VolatileCartridgeData {
+            prg_ram: Vec::new(),
+            battery_backup: (rom_contents[6] & 2) != 0,
+            mirroring: (rom_contents[6] & 1) != 0,
+            mapper: mappernum as u32,
+            chr_ram: false,
+        };
+
         let rom_data = NesCartridgeData {
             trainer,
             prg_rom,
             chr_rom,
-            chr_ram: false,
+            volatile: vol,
             inst_rom: None,
             prom: None,
-            prg_ram: Vec::new(),
-            mirroring: (rom_contents[6] & 1) != 0,
-            mapper: mappernum as u32,
         };
 
         let mapper = NesCartridge::get_mapper(mappernum as u32, &rom_data)?;

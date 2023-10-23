@@ -61,7 +61,13 @@ impl TrackedWindow<NesEmulatorData> for CartridgeMemoryDumpWindow {
                 #[cfg(feature = "debugger")]
                 {
                     if let Some(cart) = c.mb.cartridge() {
-                        for (i, chunk) in cart.cartridge().prg_ram.chunks_exact(8).enumerate() {
+                        for (i, chunk) in cart
+                            .cartridge()
+                            .volatile
+                            .prg_ram
+                            .chunks_exact(8)
+                            .enumerate()
+                        {
                             ui.label(format!(
                                 "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
                                 i * 8,

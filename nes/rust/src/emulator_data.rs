@@ -20,7 +20,7 @@ use egui_multiwin::multi_window::CommonEventHandler;
 
 /// Persistent configuration for the emulator
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct EmulatorConfiguration {
     /// Should a rom be persistent from one run to another?
     sticky_rom: bool,
@@ -246,6 +246,7 @@ impl NesEmulatorData {
     pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<bincode::ErrorKind>> {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
+                let config = self.configuration.clone();
                 let audio = self.cpu_peripherals.apu.get_buffer();
                 let screen = self.cpu_peripherals.ppu.backup_frame();
                 let controllers = self.mb.controllers;
@@ -259,6 +260,7 @@ impl NesEmulatorData {
                 self.configuration.path = config_path;
                 self.cpu_peripherals.apu.restore_buffer(audio);
                 self.cpu_peripherals.ppu.set_frame(screen);
+                self.configuration = config;
                 Ok(())
             }
             Err(e) => Err(e),

@@ -626,8 +626,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     self.mouse_miss = false;
                     println!("FIRE");
                     self.mouse_delay = 10;
-                }
-                else if r.clicked_by(egui::PointerButton::Secondary) || r.dragged_by(egui::PointerButton::Secondary) {
+                } else if r.clicked_by(egui::PointerButton::Secondary)
+                    || r.dragged_by(egui::PointerButton::Secondary)
+                {
                     self.mouse = true;
                     self.mouse_miss = true;
                     println!("FIRE off screen");
@@ -640,7 +641,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
                         let pixel = self.image.get_pixel(coord / zoom);
-                        self.mouse_vision = !self.mouse_miss && pixel.r() > 10 && pixel.g() > 10 && pixel.b() > 10;
+                        self.mouse_vision =
+                            !self.mouse_miss && pixel.r() > 10 && pixel.g() > 10 && pixel.b() > 10;
 
                         //println!("Hover at {:?}", pos - r.rect.left_top());
                     } else {

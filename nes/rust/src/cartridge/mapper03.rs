@@ -21,7 +21,7 @@ impl Mapper03 {
     /// Create a new mapper03
     pub fn new(d: &NesCartridgeData) -> NesMapper {
         NesMapper::from(Self {
-            mirror_vertical: d.mirroring,
+            mirror_vertical: d.volatile.mirroring,
             ppu_address: 0,
             bank: 0,
         })
@@ -58,9 +58,9 @@ impl NesMapperTrait for Mapper03 {
         match addr {
             0x6000..=0x7fff => {
                 let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
-                    Some(cart.prg_ram[addr2 as usize])
+                if !cart.volatile.prg_ram.is_empty() {
+                    addr2 %= cart.volatile.prg_ram.len() as u16;
+                    Some(cart.volatile.prg_ram[addr2 as usize])
                 } else {
                     None
                 }
@@ -83,9 +83,9 @@ impl NesMapperTrait for Mapper03 {
                     Some(c[addr as usize])
                 } else {
                     let mut addr2 = addr & 0x1fff;
-                    if !cart.prg_ram.is_empty() {
-                        addr2 %= cart.prg_ram.len() as u16;
-                        Some(cart.prg_ram[addr2 as usize])
+                    if !cart.volatile.prg_ram.is_empty() {
+                        addr2 %= cart.volatile.prg_ram.len() as u16;
+                        Some(cart.volatile.prg_ram[addr2 as usize])
                     } else {
                         None
                     }
@@ -112,9 +112,9 @@ impl NesMapperTrait for Mapper03 {
                 c[addr as usize] = data;
             } else {
                 let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
-                    cart.prg_ram[addr2 as usize] = data;
+                if !cart.volatile.prg_ram.is_empty() {
+                    addr2 %= cart.volatile.prg_ram.len() as u16;
+                    cart.volatile.prg_ram[addr2 as usize] = data;
                 }
             }
         }

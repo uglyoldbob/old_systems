@@ -55,7 +55,10 @@ impl PixelImage<egui::Color32> {
     }
 }
 
-impl<T> Default for PixelImage<T> where T: Default + Clone {
+impl<T> Default for PixelImage<T>
+where
+    T: Default + Clone,
+{
     fn default() -> Self {
         Self {
             pixels: vec![T::default(); 1],

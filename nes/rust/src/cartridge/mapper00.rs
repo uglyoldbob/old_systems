@@ -19,7 +19,7 @@ impl Mapper00 {
     /// Create a new mapper00
     pub fn new(d: &NesCartridgeData) -> NesMapper {
         NesMapper::from(Self {
-            mirror_vertical: d.mirroring,
+            mirror_vertical: d.volatile.mirroring,
             ppu_address: 0,
         })
     }
@@ -51,9 +51,9 @@ impl NesMapperTrait for Mapper00 {
                     Some(c[addr as usize])
                 } else {
                     let mut addr2 = addr & 0x1fff;
-                    if !cart.prg_ram.is_empty() {
-                        addr2 %= cart.prg_ram.len() as u16;
-                        Some(cart.prg_ram[addr2 as usize])
+                    if !cart.volatile.prg_ram.is_empty() {
+                        addr2 %= cart.volatile.prg_ram.len() as u16;
+                        Some(cart.volatile.prg_ram[addr2 as usize])
                     } else {
                         None
                     }
@@ -72,9 +72,9 @@ impl NesMapperTrait for Mapper00 {
         match addr {
             0x6000..=0x7fff => {
                 let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
-                    Some(cart.prg_ram[addr2 as usize])
+                if !cart.volatile.prg_ram.is_empty() {
+                    addr2 %= cart.volatile.prg_ram.len() as u16;
+                    Some(cart.volatile.prg_ram[addr2 as usize])
                 } else {
                     None
                 }
@@ -98,9 +98,9 @@ impl NesMapperTrait for Mapper00 {
                 c[addr as usize] = data;
             } else {
                 let mut addr2 = addr & 0x1fff;
-                if !cart.prg_ram.is_empty() {
-                    addr2 %= cart.prg_ram.len() as u16;
-                    cart.prg_ram[addr2 as usize] = data;
+                if !cart.volatile.prg_ram.is_empty() {
+                    addr2 %= cart.volatile.prg_ram.len() as u16;
+                    cart.volatile.prg_ram[addr2 as usize] = data;
                 }
             }
         }
@@ -125,7 +125,7 @@ impl NesMapperTrait for Mapper00 {
     }
 
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
-        if !cart.chr_ram || cart.chr_rom.is_empty() {
+        if !cart.volatile.chr_ram || cart.chr_rom.is_empty() {
             return;
         }
         let addr2 = self.ppu_address as u32 % cart.chr_rom.len() as u32;
