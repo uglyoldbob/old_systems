@@ -344,8 +344,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             self.rewinds[0] = p.clone();
             self.rewinds[1] = p.clone();
             self.rewinds[2] = p.clone();
-        }
-        else if let Some(t) = self.rewind_point {
+        } else if let Some(t) = self.rewind_point {
             if let Some(rew) = c.configuration.rewind_interval {
                 if time_now.duration_since(t) > rew {
                     println!("Making rewind point");

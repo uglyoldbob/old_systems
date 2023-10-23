@@ -36,6 +36,78 @@ impl RomList {
         }
     }
 
+    pub fn get_unknown_quantity(&self) -> u32 {
+        let mut quant = 0;
+        for (_s, rs) in &self.elements {
+            if rs.result.is_none() {
+                quant += 1;
+            }
+        }
+        quant
+    }
+
+    pub fn get_broken_quantity(&self) -> u32 {
+        let mut quant = 0;
+        for (s, rs) in &self.elements {
+            if let Some(rs) = &rs.result {
+                match rs {
+                    Ok(rom) => {
+                    }
+                    Err(romerr) => match romerr {
+                        CartridgeError::IncompatibleMapper(m) => {
+                        }
+                        CartridgeError::FsError(e) => {}
+                        _ => { quant += 1; }
+                    },
+                }
+            }
+        }
+        quant
+    }
+
+    /// Retrieves the number of roms that are not usable
+    pub fn get_bad_quantity(&self) -> u32 {
+        let mut quant = 0;
+        for (s, rs) in &self.elements {
+            if let Some(rs) = &rs.result {
+                match rs {
+                    Ok(rom) => {
+                    }
+                    Err(romerr) => match romerr {
+                        CartridgeError::IncompatibleMapper(m) => {
+                        }
+                        CartridgeError::FsError(e) => {}
+                        CartridgeError::InvalidRom => {
+                        }
+                        _ => { quant += 1; }
+                    },
+                }
+            }
+        }
+        quant
+    }
+
+    /// Get a mapper count tree. Maps mappernumber to quantity
+    pub fn get_mapper_quantity(&self) -> std::collections::BTreeMap<u32, u32> {
+        let mut mq = std::collections::BTreeMap::new();
+        for (s, rs) in &self.elements {
+            if let Some(rs) = &rs.result {
+                match rs {
+                    Ok(rom) => {
+                        mq.insert(rom.mapper, mq.get(&rom.mapper).unwrap_or(&0) + 1);
+                    }
+                    Err(romerr) => match romerr {
+                        CartridgeError::IncompatibleMapper(m) => {
+                            mq.insert(*m, mq.get(m).unwrap_or(&0) + 1);
+                        }
+                        _ => {}
+                    },
+                }
+            }
+        }
+        mq
+    }
+
     /// Load the rom list from disk
     pub fn load_list() -> Self {
         let contents = std::fs::read("./roms.bin");

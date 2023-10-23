@@ -84,8 +84,7 @@ impl EmulatorConfiguration {
         if self.sticky_rom {
             self.start_rom = Some(name);
             self.save();
-        }
-        else {
+        } else {
             self.start_rom = None;
             self.save();
         }

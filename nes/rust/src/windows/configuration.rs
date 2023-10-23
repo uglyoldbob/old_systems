@@ -61,7 +61,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
 
             let mut save_config = false;
 
-            if ui.checkbox(&mut c.configuration.sticky_rom, "Remember last rom").changed() {
+            if ui
+                .checkbox(&mut c.configuration.sticky_rom, "Remember last rom")
+                .changed()
+            {
                 if !c.configuration.sticky_rom {
                     c.configuration.set_startup("".to_string());
                 }

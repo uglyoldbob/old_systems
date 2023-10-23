@@ -14,3 +14,4 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] Fix currently broken games
 - [ ] Add pal support
 - [ ] wix installer for windows
+- [ ] Add a list of instructions to the debugger

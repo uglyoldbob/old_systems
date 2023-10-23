@@ -7,6 +7,7 @@ use crate::{cartridge::NesCartridge, rom_status::RomStatus, NesEmulatorData};
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
+use egui_multiwin::egui::ScrollArea;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{
     egui_glow::EguiGlow,
@@ -86,192 +87,208 @@ impl TrackedWindow<NesEmulatorData> for Window {
         let windows_to_create = vec![];
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            ui.label("Rom checking window");
-            let mut save_state = None;
-            if let Some(rom) = c.mb.cartridge() {
-                ui.label(format!("Current rom is {}", rom.rom_name()));
-                if let Some((_hash, result)) = c.rom_test.list().elements.get_key_value(&rom.hash())
-                {
-                    match result {
-                        RomStatus::CompletelyBroken => {
-                            ui.label("Rom is completely broken");
-                        }
-                        RomStatus::Bug(b, state) => {
-                            ui.label(format!("ROM affected by bug\n{}", b));
-                            if ui.button("Load save state").clicked() {
-                                save_state = state.clone();
+            ScrollArea::vertical().show(ui, |ui| {
+                ui.label("Rom checking window");
+                let mut save_state = None;
+                if let Some(rom) = c.mb.cartridge() {
+                    ui.label(format!("Current rom is {}", rom.rom_name()));
+                    if let Some((_hash, result)) =
+                        c.rom_test.list().elements.get_key_value(&rom.hash())
+                    {
+                        match result {
+                            RomStatus::CompletelyBroken => {
+                                ui.label("Rom is completely broken");
+                            }
+                            RomStatus::Bug(b, state) => {
+                                ui.label(format!("ROM affected by bug\n{}", b));
+                                if ui.button("Load save state").clicked() {
+                                    save_state = state.clone();
+                                }
+                            }
+                            RomStatus::Working => {
+                                ui.label("Rom is working so far");
                             }
                         }
-                        RomStatus::Working => {
-                            ui.label("Rom is working so far");
-                        }
+                    }
+                    if ui.button("Set status to no bugs").clicked() {
+                        c.rom_test.put_entry(rom.hash(), RomStatus::Working);
+                    }
+                    if ui.button("Set status to completely broken").clicked() {
+                        c.rom_test
+                            .put_entry(rom.hash(), RomStatus::CompletelyBroken);
+                    }
+                    ui.text_edit_multiline(&mut self.bug);
+                    if ui.button("Set status to has a bug").clicked() {
+                        c.rom_test.put_entry(
+                            rom.hash(),
+                            RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())),
+                        );
+                        self.bug = "".to_string();
                     }
                 }
-                if ui.button("Set status to no bugs").clicked() {
-                    c.rom_test.put_entry(rom.hash(), RomStatus::Working);
+                ui.label(format!(
+                    "There are {} known roms",
+                    c.parser.list().elements.len()
+                ));
+                if let Some(state) = save_state {
+                    let _e = c.deserialize(state);
                 }
-                if ui.button("Set status to completely broken").clicked() {
-                    c.rom_test
-                        .put_entry(rom.hash(), RomStatus::CompletelyBroken);
-                }
-                ui.text_edit_multiline(&mut self.bug);
-                if ui.button("Set status to has a bug").clicked() {
-                    c.rom_test.put_entry(
-                        rom.hash(),
-                        RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())),
-                    );
-                    self.bug = "".to_string();
-                }
-            }
-            ui.label(format!(
-                "There are {} known roms",
-                c.parser.list().elements.len()
-            ));
-            if let Some(state) = save_state {
-                let _e = c.deserialize(state);
-            }
 
-            if self.next_rom.is_none() {
-                if let Some((path, _romentry)) = c.roms.elements.iter().nth(self.index) {
-                    if let Ok(cart) =
-                        crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
-                    {
-                        let hash = cart.hash();
-                        match c.rom_test.list().elements.get_key_value(&hash) {
-                            Some((_hash, status)) => {
-                                if let Some(desired) = &self.want_status {
-                                    if let Some(desired) = desired {
-                                        if status.match_category(desired) {
-                                            self.next_rom = Some(cart);
+                if self.next_rom.is_none() {
+                    if let Some((path, _romentry)) = c.roms.elements.iter().nth(self.index) {
+                        if let Ok(cart) =
+                            crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
+                        {
+                            let hash = cart.hash();
+                            match c.rom_test.list().elements.get_key_value(&hash) {
+                                Some((_hash, status)) => {
+                                    if let Some(desired) = &self.want_status {
+                                        if let Some(desired) = desired {
+                                            if status.match_category(desired) {
+                                                self.next_rom = Some(cart);
+                                            } else {
+                                                self.index += 1;
+                                            }
                                         } else {
                                             self.index += 1;
                                         }
                                     } else {
-                                        self.index += 1;
+                                        self.next_rom = Some(cart);
                                     }
-                                } else {
-                                    self.next_rom = Some(cart);
                                 }
-                            }
-                            None => {
-                                if let Some(desired) = &self.want_status {
-                                    if desired.is_some() {
-                                        self.index += 1;
+                                None => {
+                                    if let Some(desired) = &self.want_status {
+                                        if desired.is_some() {
+                                            self.index += 1;
+                                        } else {
+                                            self.next_rom = Some(cart);
+                                        }
                                     } else {
                                         self.next_rom = Some(cart);
                                     }
-                                } else {
-                                    self.next_rom = Some(cart);
                                 }
                             }
+                        } else {
+                            self.index += 1;
                         }
                     } else {
+                        println!("No roms?");
+                    }
+                }
+
+                if let Some((path, _romentry)) = c.roms.elements.iter().nth(self.index) {
+                    ui.label(format!("The next rom is {}", path.display()));
+
+                    let mut new_rom = None;
+                    if self.next_rom.is_some() && self.want_status.is_some() {
+                        new_rom = self.next_rom.take();
+                        self.want_status = None;
+                    }
+                    if ui.button("Load next rom").clicked() {
+                        new_rom = self.next_rom.take();
                         self.index += 1;
                     }
-                } else {
-                    println!("No roms?");
-                }
-            }
-
-            if let Some((path, _romentry)) = c.roms.elements.iter().nth(self.index) {
-                ui.label(format!("The next rom is {}", path.display()));
-
-                let mut new_rom = None;
-                if self.next_rom.is_some() && self.want_status.is_some() {
-                    new_rom = self.next_rom.take();
-                    self.want_status = None;
-                }
-                if ui.button("Load next rom").clicked() {
-                    new_rom = self.next_rom.take();
-                    self.index += 1;
-                }
-                if ui.button("Find next bug").clicked() {
-                    self.want_status = Some(Some(RomStatus::Bug("".to_string(), None)));
-                    self.index += 1;
-                    self.next_rom = None;
-                }
-                if ui.button("Find next completely broken").clicked() {
-                    self.want_status = Some(Some(RomStatus::CompletelyBroken));
-                    self.index += 1;
-                    self.next_rom = None;
-                }
-                if ui.button("Find next unlisted").clicked() {
-                    self.want_status = Some(None);
-                    self.index += 1;
-                    self.next_rom = None;
-                }
-                if ui.button("Restart").clicked() {
-                    self.index = 0;
-                    self.next_rom = None;
-                }
-                if ui.button("Create report").clicked() {
-                    let mut file = std::fs::File::create("./report.txt").unwrap();
-                    writeln!(&mut file, "Rom testing results").unwrap();
-                    let mut num_broken = 0;
-                    let mut num_bug = 0;
-                    let mut num_working = 0;
-                    let mut num_unknown = 0;
-                    for (i, (path, _entry)) in c.roms.elements.iter().enumerate() {
-                        let mut rom_found = false;
-                        let mut rom_valid = false;
-                        if let Ok(cart) =
-                            crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
-                        {
-                            rom_valid = true;
-                            for (romhash, status) in &c.rom_test.list().elements {
-                                if cart.hash() == *romhash {
-                                    rom_found = true;
-                                    match status {
-                                        RomStatus::CompletelyBroken => num_broken += 1,
-                                        RomStatus::Bug(_a, _) => num_bug += 1,
-                                        RomStatus::Working => num_working += 1,
-                                    };
-                                    let pstat = match status {
-                                        RomStatus::CompletelyBroken => {
-                                            "Completely broken".to_string()
-                                        }
-                                        RomStatus::Bug(a, _) => format!("Has bug: {}", a),
-                                        RomStatus::Working => "Working as expected".to_string(),
-                                    };
-                                    writeln!(
-                                        &mut file,
-                                        "{}: Rom is {}\n\tstatus {}",
-                                        i,
-                                        path.display(),
-                                        pstat
-                                    )
-                                    .unwrap();
+                    if ui.button("Find next bug").clicked() {
+                        self.want_status = Some(Some(RomStatus::Bug("".to_string(), None)));
+                        self.index += 1;
+                        self.next_rom = None;
+                    }
+                    if ui.button("Find next completely broken").clicked() {
+                        self.want_status = Some(Some(RomStatus::CompletelyBroken));
+                        self.index += 1;
+                        self.next_rom = None;
+                    }
+                    if ui.button("Find next unlisted").clicked() {
+                        self.want_status = Some(None);
+                        self.index += 1;
+                        self.next_rom = None;
+                    }
+                    if ui.button("Restart").clicked() {
+                        self.index = 0;
+                        self.next_rom = None;
+                    }
+                    if ui.button("Create report").clicked() {
+                        let mut file = std::fs::File::create("./report.txt").unwrap();
+                        writeln!(&mut file, "Rom testing results").unwrap();
+                        let mut num_broken = 0;
+                        let mut num_bug = 0;
+                        let mut num_working = 0;
+                        let mut num_unknown = 0;
+                        for (i, (path, _entry)) in c.roms.elements.iter().enumerate() {
+                            let mut rom_found = false;
+                            let mut rom_valid = false;
+                            if let Ok(cart) =
+                                crate::NesCartridge::load_cartridge(path.to_str().unwrap().into())
+                            {
+                                rom_valid = true;
+                                for (romhash, status) in &c.rom_test.list().elements {
+                                    if cart.hash() == *romhash {
+                                        rom_found = true;
+                                        match status {
+                                            RomStatus::CompletelyBroken => num_broken += 1,
+                                            RomStatus::Bug(_a, _) => num_bug += 1,
+                                            RomStatus::Working => num_working += 1,
+                                        };
+                                        let pstat = match status {
+                                            RomStatus::CompletelyBroken => {
+                                                "Completely broken".to_string()
+                                            }
+                                            RomStatus::Bug(a, _) => format!("Has bug: {}", a),
+                                            RomStatus::Working => "Working as expected".to_string(),
+                                        };
+                                        writeln!(
+                                            &mut file,
+                                            "{}: Rom is {}\n\tstatus {}",
+                                            i,
+                                            path.display(),
+                                            pstat
+                                        )
+                                        .unwrap();
+                                    }
                                 }
                             }
+                            if !rom_found && rom_valid {
+                                writeln!(
+                                    &mut file,
+                                    "{}: Rom is {}\n\tstatus unknown",
+                                    i,
+                                    path.display()
+                                )
+                                .unwrap();
+                                num_unknown += 1;
+                            }
                         }
-                        if !rom_found && rom_valid {
-                            writeln!(
-                                &mut file,
-                                "{}: Rom is {}\n\tstatus unknown",
-                                i,
-                                path.display()
-                            )
-                            .unwrap();
-                            num_unknown += 1;
-                        }
+                        writeln!(
+                            &mut file,
+                            "Number of completely broken roms: {}",
+                            num_broken
+                        )
+                        .unwrap();
+                        writeln!(&mut file, "Number of buggy roms: {}", num_bug).unwrap();
+                        writeln!(&mut file, "Number of working roms: {}", num_working).unwrap();
+                        writeln!(&mut file, "Number of unknown roms: {}", num_unknown).unwrap();
                     }
-                    writeln!(
-                        &mut file,
-                        "Number of completely broken roms: {}",
-                        num_broken
-                    )
-                    .unwrap();
-                    writeln!(&mut file, "Number of buggy roms: {}", num_bug).unwrap();
-                    writeln!(&mut file, "Number of working roms: {}", num_working).unwrap();
-                    writeln!(&mut file, "Number of unknown roms: {}", num_unknown).unwrap();
+                    if let Some(nc) = new_rom {
+                        c.remove_cartridge();
+                        c.insert_cartridge(nc);
+                        c.power_cycle();
+                        self.index += 1;
+                    }
                 }
-                if let Some(nc) = new_rom {
-                    c.remove_cartridge();
-                    c.insert_cartridge(nc);
-                    c.power_cycle();
-                    self.index += 1;
+                ui.label("Rom count by mapper:");
+                let unknown = c.roms.get_unknown_quantity();
+                ui.label(format!("UNKNOWN: {}", unknown));
+                let broken = c.roms.get_broken_quantity();
+                ui.label(format!("BROKEN: {}", broken));
+                let bad = c.roms.get_bad_quantity();
+                ui.label(format!("INVALID: {}", bad));
+                let mut sum = bad;
+                for (mapper, quantity) in c.roms.get_mapper_quantity() {
+                    sum += quantity;
+                    ui.label(format!("Mapper {}: {}", mapper, quantity));
                 }
-            }
+                ui.label(format!("Total good+bad is {}/{}", sum, c.roms.elements.len()));
+            })
         });
         if self.index >= c.roms.elements.len() {
             self.index = 0;
