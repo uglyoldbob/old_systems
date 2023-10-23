@@ -603,7 +603,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         if load_state {
             if let Ok(a) = std::fs::read(&name) {
-                let _e = c.deserialize(a);
+                let e = c.deserialize(a);
+                if e.is_err() {
+                    println!("Error loading state {:?}", e);
+                }
             }
         }
 

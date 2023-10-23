@@ -70,7 +70,7 @@ impl<'de> serde::de::Visitor<'de> for PersistentVisitor {
     type Value = PersistentStorage;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("byte array")
+        formatter.write_str("byte sequence")
     }
 
     fn visit_seq<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
@@ -80,45 +80,69 @@ impl<'de> serde::de::Visitor<'de> for PersistentVisitor {
         let len = std::cmp::min(visitor.size_hint().unwrap_or(0), 4096);
         let mut bytes = Vec::with_capacity(len);
 
+        let t: Option<u8> = visitor.next_element()?;
         while let Some(b) = visitor.next_element()? {
             bytes.push(b);
         }
-        Ok(PersistentStorage::new_volatile(bytes))
+        if let Some(t) = t {
+            match t {
+                0 | 1 => Ok(PersistentStorage::new_should(bytes)),
+                _ => Ok(PersistentStorage::new_volatile(bytes)),
+            }
+        } else {
+            Ok(PersistentStorage::new_volatile(bytes))
+        }
     }
 
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(PersistentStorage::new_volatile(v.to_vec()))
+        match v[0] {
+            0 | 1 => Ok(PersistentStorage::new_should(v[1..].to_vec())),
+            _ => Ok(PersistentStorage::new_volatile(v[1..].to_vec())),
+        }
     }
 
     fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(PersistentStorage::new_volatile(v))
+        match v[0] {
+            0 | 1 => Ok(PersistentStorage::new_should(v[1..].to_vec())),
+            _ => Ok(PersistentStorage::new_volatile(v[1..].to_vec())),
+        }
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(PersistentStorage::new_volatile(v.as_bytes().to_vec()))
+        let v = v.as_bytes().to_vec();
+        match v[0] {
+            0 | 1 => Ok(PersistentStorage::new_should(v[1..].to_vec())),
+            _ => Ok(PersistentStorage::new_volatile(v[1..].to_vec())),
+        }
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        Ok(PersistentStorage::new_volatile(v.into_bytes()))
+        let v = v.into_bytes();
+        match v[0] {
+            0 | 1 => Ok(PersistentStorage::new_should(v[1..].to_vec())),
+            _ => Ok(PersistentStorage::new_volatile(v[1..].to_vec())),
+        }
     }
 }
 
 /// A vec that could be battery backed
 pub enum PersistentStorage {
     /// The vec is battery backed by a file
-    Persistent(memmap2::MmapMut),
+    Persistent(PathBuf, memmap2::MmapMut),
+    /// The vec should be persistent but it is not for some reason
+    ShouldBePersistent(Vec<u8>),
     /// The vec is simply a plain vector
     Volatile(Vec<u8>),
 }
@@ -126,7 +150,8 @@ pub enum PersistentStorage {
 impl Clone for PersistentStorage {
     fn clone(&self) -> Self {
         match self {
-            Self::Persistent(arg0) => Self::Volatile(arg0.to_vec()),
+            Self::Persistent(pb, arg0) => Self::ShouldBePersistent(arg0.to_vec()),
+            Self::ShouldBePersistent(v) => Self::ShouldBePersistent(v.clone()),
             Self::Volatile(arg0) => Self::Volatile(arg0.clone()),
         }
     }
@@ -137,7 +162,23 @@ impl serde::Serialize for PersistentStorage {
     where
         S: serde::Serializer,
     {
-        self.contents().serialize(serializer)
+        let elem = self.contents();
+        let mut seq = serializer.serialize_seq(Some(elem.len() + 1))?;
+        match self {
+            PersistentStorage::Volatile(_v) => {
+                serde::ser::SerializeSeq::serialize_element(&mut seq, &(2 as u8))?;
+            }
+            PersistentStorage::Persistent(_pb, _v) => {
+                serde::ser::SerializeSeq::serialize_element(&mut seq, &(0 as u8))?;
+            }
+            PersistentStorage::ShouldBePersistent(v) => {
+                serde::ser::SerializeSeq::serialize_element(&mut seq, &(1 as u8))?;
+            }
+        }
+        for e in elem {
+            serde::ser::SerializeSeq::serialize_element(&mut seq, e)?;
+        }
+        serde::ser::SerializeSeq::end(seq)
     }
 }
 
@@ -166,72 +207,84 @@ impl std::ops::IndexMut<usize> for PersistentStorage {
 
 impl Drop for PersistentStorage {
     fn drop(&mut self) {
-        if let PersistentStorage::Persistent(p) = self {
-            p.flush();
+        if let PersistentStorage::Persistent(p, v) = self {
+            v.flush();
         }
     }
 }
 
 impl PersistentStorage {
-    /// Create a new persistent storage object
-    fn new_persistent(p: PathBuf, v: Vec<u8>) -> Option<Self> {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&p)
-            .ok()?;
-        file.set_len(v.len() as u64);
-        let mm = unsafe { memmap2::MmapMut::map_mut(&file) }.ok()?;
-        Some(PersistentStorage::Persistent(mm))
+    fn print_type(&self) {
+        match self {
+            PersistentStorage::Persistent(_pb, _v) => println!("Persistant storage"),
+            PersistentStorage::ShouldBePersistent(_v) => println!("Should be persistent storage"),
+            PersistentStorage::Volatile(_v) => println!("Volatile storage"),
+        }
+    }
+
+    fn make_persistent(p: PathBuf, v: Vec<u8>) -> Option<Self> {
+        let file = if p.exists() {
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&p);
+            if let Ok(file) = file {
+                Some(file)
+            } else {
+                None
+            }
+        } else {
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(&p);
+            if let Ok(mut file) = file {
+                std::io::Write::write_all(&mut file, &v[..]);
+                Some(file)
+            } else {
+                None
+            }
+        };
+        if let Some(file) = file {
+            let mm = unsafe { memmap2::MmapMut::map_mut(&file) };
+            if let Ok(mm) = mm {
+                Some(PersistentStorage::Persistent(p, mm))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Reupgrade the object to be fully persistent
+    fn upgrade_to_persistent(&mut self, p: PathBuf) {
+        if let PersistentStorage::ShouldBePersistent(v) = self {
+            if let Some(ps) = Self::make_persistent(p, v.clone()) {
+                println!("Have upgraded to persistent storage again");
+                *self = ps;
+            }
+        }
     }
 
     /// Convert this volatile object to a non-volatile object, taking on the contents of the existing nonvolatile storage if it exists.
     /// If it does not exist, then the current contents are transferred over.
     fn convert_to_nonvolatile(&mut self, p: PathBuf) {
         let t = match self {
-            PersistentStorage::Persistent(a) => None,
-            PersistentStorage::Volatile(v) => {
-                let file = if p.exists() {
-                    let file = std::fs::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create(true)
-                        .open(&p);
-                    if let Ok(file) = file {
-                        Some(file)
-                    } else {
-                        None
-                    }
-                } else {
-                    let file = std::fs::OpenOptions::new()
-                        .read(true)
-                        .write(true)
-                        .create(true)
-                        .open(&p);
-                    if let Ok(mut file) = file {
-                        std::io::Write::write_all(&mut file, &v[..]);
-                        Some(file)
-                    } else {
-                        None
-                    }
-                };
-                if let Some(file) = file {
-                    let mm = unsafe { memmap2::MmapMut::map_mut(&file) };
-                    if let Ok(mm) = mm {
-                        Some(PersistentStorage::Persistent(mm))
-                    }
-                    else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
+            PersistentStorage::Persistent(_pb, _a) => None,
+            PersistentStorage::ShouldBePersistent(_v) => None,
+            PersistentStorage::Volatile(v) => Self::make_persistent(p, v.clone()),
         };
         if let Some(t) = t {
             *self = t;
         }
+    }
+
+    /// Create a new object that should be persistent
+    fn new_should(v: Vec<u8>) -> Self {
+        PersistentStorage::ShouldBePersistent(v)
     }
 
     /// Create a new volatile storage object
@@ -257,7 +310,8 @@ impl PersistentStorage {
     /// Retrieve a reference to the contents
     fn contents(&self) -> &[u8] {
         match self {
-            PersistentStorage::Persistent(mm) => mm.as_ref(),
+            PersistentStorage::Persistent(_pb, mm) => mm.as_ref(),
+            PersistentStorage::ShouldBePersistent(v) => &v[..],
             PersistentStorage::Volatile(v) => &v[..],
         }
     }
@@ -265,7 +319,8 @@ impl PersistentStorage {
     /// Retrieve a mutable reference to the contents
     fn contents_mut(&mut self) -> &mut [u8] {
         match self {
-            PersistentStorage::Persistent(mm) => mm.as_mut(),
+            PersistentStorage::Persistent(_pb, mm) => mm.as_mut(),
+            PersistentStorage::ShouldBePersistent(v) => &mut v[..],
             PersistentStorage::Volatile(v) => &mut v[..],
         }
     }
@@ -393,6 +448,11 @@ impl NesCartridge {
     /// Restore previously saved data after loading a save state.
     pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
         self.data.nonvolatile = old_data.data;
+        self.data.volatile.prg_ram.print_type();
+        let mut pb: PathBuf = PathBuf::from("./saves");
+        pb.push(format!("{}.prgram", self.save));
+        self.data.volatile.prg_ram.upgrade_to_persistent(pb);
+        self.data.volatile.prg_ram.print_type();
         self.rom_name = old_data.rom_name;
     }
 
@@ -699,10 +759,11 @@ impl NesCartridge {
         };
 
         if let Ok(c) = &mut cart {
-            let mut pb : PathBuf = PathBuf::from("./saves");
+            let mut pb: PathBuf = PathBuf::from("./saves");
             pb.push(format!("{}.prgram", c.save));
             if c.data.volatile.battery_backup {
                 c.data.volatile.prg_ram.convert_to_nonvolatile(pb);
+                c.data.volatile.prg_ram.print_type();
             }
         }
 
