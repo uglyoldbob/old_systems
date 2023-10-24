@@ -62,39 +62,39 @@ impl Mapper04 {
         if (self.registers[0] & 0x80) == 0 {
             match addr {
                 0..=0x7ff => {
-                    let bank : u16 = ((self.chr_roms[0] as u16) & 0xFE) << 10;
-                    let addr2 = (addr & 0x7ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = ((self.chr_roms[0] as u32) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x800..=0xfff => {
-                    let bank : u16 = ((self.chr_roms[1] as u16) & 0xFE) << 10;
-                    let addr2 = (addr & 0x7ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = ((self.chr_roms[1] as u32) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x1000..=0x13ff => {
-                    let bank : u16 = (self.chr_roms[2] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[2] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x1400..=0x17ff => {
-                    let bank : u16 = (self.chr_roms[3] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[3] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x1800..=0x1bff => {
-                    let bank : u16 = (self.chr_roms[4] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[4] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x1c00..=0x1fff => {
-                    let bank : u16 = (self.chr_roms[5] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[5] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 _ => {
@@ -105,39 +105,39 @@ impl Mapper04 {
         else {
             match addr {
                 0x1000..=0x17ff => {
-                    let bank : u16 = ((self.chr_roms[0] as u16) & 0xFE) << 10;
-                    let addr2 = (addr & 0x7ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = ((self.chr_roms[0] as u32) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x1800..=0x1fff => {
-                    let bank : u16 = ((self.chr_roms[1] as u16) & 0xFE) << 10;
-                    let addr2 = (addr & 0x7ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = ((self.chr_roms[1] as u32) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x000..=0x3ff => {
-                    let bank : u16 = (self.chr_roms[2] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[2] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x400..=0x7ff => {
-                    let bank : u16 = (self.chr_roms[3] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[3] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0x800..=0xbff => {
-                    let bank : u16 = (self.chr_roms[4] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[4] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len()as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 0xc00..=0xfff => {
-                    let bank : u16 = (self.chr_roms[5] as u16) << 10;
-                    let addr2 = (addr & 0x3ff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    let bank = (self.chr_roms[5] as u32) << 10;
+                    let addr2 = (addr & 0x3ff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr3 as usize])
                 }
                 _ => {
@@ -188,47 +188,47 @@ impl NesMapperTrait for Mapper04 {
             0x8000..=0x9fff => {
                 if (self.registers[0] & 0x40) == 0 {
                     //banked with prg_rom[0]
-                    let bank : u16 = (self.prg_roms[0] as u16) << 13;
-                    let addr2 = (addr & 0x1fff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    let bank = (self.prg_roms[0] as u32) << 13;
+                    let addr2 = (addr & 0x1fff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.prg_rom[addr3 as usize])
                 }
                 else {
                     //fixed to second to last bank
-                    let bank : u16 = 0x3E << 13;
-                    let addr2 = (addr & 0x1fff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    let bank = 0x3E << 13;
+                    let addr2 = (addr & 0x1fff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.prg_rom[addr3 as usize])
                 }
             }
             0xA000..=0xBFFF => {
                 //banked with prg_rom[1]
-                let bank : u16 = (self.prg_roms[1] as u16) << 13;
-                let addr2 = (addr & 0x1fff) | bank;
-                let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                let bank = (self.prg_roms[1] as u32) << 13;
+                let addr2 = (addr & 0x1fff) as u32 | bank;
+                let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u32 - 1);
                 Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             0xC000..=0xDFFF => {
                 if (self.registers[0] & 0x40) != 0 {
                     //banked with prg_rom[0]
-                    let bank : u16 = (self.prg_roms[0] as u16) << 13;
-                    let addr2 = (addr & 0x1fff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    let bank = (self.prg_roms[0] as u32) << 13;
+                    let addr2 = (addr & 0x1fff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.prg_rom[addr3 as usize])
                 }
                 else {
                     //fixed to second to last bank
-                    let bank : u16 = 0x3E << 13;
-                    let addr2 = (addr & 0x1fff) | bank;
-                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    let bank = 0x3E << 13;
+                    let addr2 = (addr & 0x1fff) as u32 | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.prg_rom[addr3 as usize])
                 }
             }
             0xE000..=0xFFFF => {
                 //fixed to second to last bank
-                let bank : u16 = 0x3F << 13;
-                let addr2 = (addr & 0x1fff) | bank;
-                let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                let bank = 0x3F << 13;
+                let addr2 = (addr & 0x1fff) as u32 | bank;
+                let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u32 - 1);
                 Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             _ => None,
