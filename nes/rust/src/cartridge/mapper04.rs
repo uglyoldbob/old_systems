@@ -19,6 +19,8 @@ pub struct Mapper04 {
     chr_roms: [u8; 6],
     /// The irq counter for the mapper
     irq_counter: u8,
+    /// The irq counter latch
+    irq_latch: u8,
     /// Indicates that the irq counter should be reloaded
     reload_irq: bool,
     /// Indicates that interrupts are enabled
@@ -36,6 +38,7 @@ impl Mapper04 {
             prg_roms: [0; 2],
             chr_roms: [0; 6],
             irq_counter: 0,
+            irq_latch: 0,
             reload_irq: false,
             irq_enabled: false,
             irq_pending: false,
@@ -56,20 +59,34 @@ impl Mapper04 {
             return None;
         }
         match addr {
-            _ => {}
+            _ => { None }
         }
-        let addr2 =
-            (addr | (self.bank as u16 * 0x2000)) & (cart.nonvolatile.chr_rom.len() - 1) as u16;
-        Some(cart.nonvolatile.chr_rom[addr2 as usize])
     }
 }
 
 impl NesMapperTrait for Mapper04 {
+    fn irq(&self) -> bool {
+        false
+    }
+
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         let mut hm = BTreeMap::new();
-        hm.insert("Mirror".to_string(), self.mirror_vertical as u8);
-        hm.insert("Mapper".to_string(), 3);
-        hm.insert("PPU BANK".to_string(), self.bank);
+        hm.insert("PPU bank 0".to_string(), self.chr_roms[0]);
+        hm.insert("PPU bank 1".to_string(), self.chr_roms[1]);
+        hm.insert("PPU bank 2".to_string(), self.chr_roms[2]);
+        hm.insert("PPU bank 3".to_string(), self.chr_roms[3]);
+
+        hm.insert("CPU bank 0".to_string(), self.prg_roms[0]);
+        hm.insert("CPU bank 1".to_string(), self.prg_roms[1]);
+
+        hm.insert("Mirroring".to_string(), self.registers[2]);
+        hm.insert("PRG RAM".to_string(), self.registers[3]);
+
+        hm.insert("IRQ LATCH".to_string(), self.irq_latch);
+        hm.insert("IRQ Counter".to_string(), self.irq_counter);
+        hm.insert("IRQ Enabled".to_string(), self.irq_enabled as u8);
+
+        hm.insert("Mapper".to_string(), 4);
         hm
     }
 
@@ -85,44 +102,21 @@ impl NesMapperTrait for Mapper04 {
                 }
             }
             0x8000..=0xffff => {
-                let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
-                Some(cart.nonvolatile.prg_rom[addr3 as usize])
+                None
             }
             _ => None,
         }
     }
 
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
-        match addr {
-            0x6000..=0x7fff => {
-                if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                    let c = cart.nonvolatile.trainer.as_mut().unwrap();
-                    let addr = addr & 0x1ff;
-                    Some(c[addr as usize])
-                } else {
-                    let mut addr2 = addr & 0x1fff;
-                    if !cart.volatile.prg_ram.is_empty() {
-                        addr2 %= cart.volatile.prg_ram.len() as u16;
-                        Some(cart.volatile.prg_ram[addr2 as usize])
-                    } else {
-                        None
-                    }
-                }
-            }
-            0x8000..=0xffff => {
-                let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 & (cart.nonvolatile.prg_rom.len() - 1) as u32;
-                Some(cart.nonvolatile.prg_rom[addr3 as usize])
-            }
-            _ => None,
-        }
+        self.memory_cycle_dump(cart, addr)
     }
 
     fn memory_cycle_nop(&mut self) {}
 
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
         match addr {
+            0..=0x5FFF => {}
             0x6000..=0x7fff => {
                 if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
                     let c = cart.nonvolatile.trainer.as_mut().unwrap();
@@ -150,6 +144,9 @@ impl NesMapperTrait for Mapper04 {
                         }
                         7 => {
                             self.prg_roms[1] = data;
+                        }
+                        _ => {
+                            unreachable!();
                         }
                     }
                     self.registers[1] = data;

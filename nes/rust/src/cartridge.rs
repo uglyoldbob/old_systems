@@ -40,6 +40,8 @@ trait NesMapperTrait {
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
     /// Returns a list of registers used by the cartridge
     fn cartridge_registers(&self) -> BTreeMap<String, u8>;
+    /// Retrieve the irq signal
+    fn irq(&self) -> bool;
 }
 
 /// The mapper for an nes cartridge
