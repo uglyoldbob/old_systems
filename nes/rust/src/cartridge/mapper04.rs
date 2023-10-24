@@ -58,8 +58,92 @@ impl Mapper04 {
         if cart.nonvolatile.chr_rom.is_empty() {
             return None;
         }
-        match addr {
-            _ => { None }
+        // The a12 inversion bit
+        if (self.registers[0] & 0x80) == 0 {
+            match addr {
+                0..=0x7ff => {
+                    let bank : u16 = ((self.chr_roms[0] as u16) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x800..=0xfff => {
+                    let bank : u16 = ((self.chr_roms[1] as u16) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x1000..=0x13ff => {
+                    let bank : u16 = (self.chr_roms[2] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x1400..=0x17ff => {
+                    let bank : u16 = (self.chr_roms[3] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x1800..=0x1bff => {
+                    let bank : u16 = (self.chr_roms[4] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x1c00..=0x1fff => {
+                    let bank : u16 = (self.chr_roms[5] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                _ => {
+                    None
+                }
+            }
+        }
+        else {
+            match addr {
+                0x1000..=0x17ff => {
+                    let bank : u16 = ((self.chr_roms[0] as u16) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x1800..=0x1fff => {
+                    let bank : u16 = ((self.chr_roms[1] as u16) & 0xFE) << 10;
+                    let addr2 = (addr & 0x7ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x000..=0x3ff => {
+                    let bank : u16 = (self.chr_roms[2] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x400..=0x7ff => {
+                    let bank : u16 = (self.chr_roms[3] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0x800..=0xbff => {
+                    let bank : u16 = (self.chr_roms[4] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                0xc00..=0xfff => {
+                    let bank : u16 = (self.chr_roms[5] as u16) << 10;
+                    let addr2 = (addr & 0x3ff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.chr_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.chr_rom[addr3 as usize])
+                }
+                _ => {
+                    None
+                }
+            }
         }
     }
 }
