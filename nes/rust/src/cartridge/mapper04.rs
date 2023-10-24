@@ -46,7 +46,7 @@ impl Mapper04 {
     }
     /// Check the mirroring bit for the ppu addressing.
     fn check_mirroring(&self, addr: u16) -> (bool, bool) {
-        let a10 = if (self.registers[2] & 1) != 0 {
+        let a10 = if (self.registers[2] & 1) == 0 {
             (addr & 1 << 10) != 0
         } else {
             (addr & 1 << 11) != 0
