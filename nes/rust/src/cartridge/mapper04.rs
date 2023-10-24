@@ -101,8 +101,51 @@ impl NesMapperTrait for Mapper04 {
                     None
                 }
             }
-            0x8000..=0xffff => {
-                None
+            0x8000..=0x9fff => {
+                if (self.registers[0] & 0x40) == 0 {
+                    //banked with prg_rom[0]
+                    let bank : u16 = (self.prg_roms[0] as u16) << 13;
+                    let addr2 = (addr & 0x1fff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr3 as usize])
+                }
+                else {
+                    //fixed to second to last bank
+                    let bank : u16 = 0x3E << 13;
+                    let addr2 = (addr & 0x1fff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr3 as usize])
+                }
+            }
+            0xA000..=0xBFFF => {
+                //banked with prg_rom[1]
+                let bank : u16 = (self.prg_roms[1] as u16) << 13;
+                let addr2 = (addr & 0x1fff) | bank;
+                let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                Some(cart.nonvolatile.prg_rom[addr3 as usize])
+            }
+            0xC000..=0xDFFF => {
+                if (self.registers[0] & 0x40) != 0 {
+                    //banked with prg_rom[0]
+                    let bank : u16 = (self.prg_roms[0] as u16) << 13;
+                    let addr2 = (addr & 0x1fff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr3 as usize])
+                }
+                else {
+                    //fixed to second to last bank
+                    let bank : u16 = 0x3E << 13;
+                    let addr2 = (addr & 0x1fff) | bank;
+                    let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr3 as usize])
+                }
+            }
+            0xE000..=0xFFFF => {
+                //fixed to second to last bank
+                let bank : u16 = 0x3F << 13;
+                let addr2 = (addr & 0x1fff) | bank;
+                let addr3 = addr2 & (cart.nonvolatile.prg_rom.len() as u16 - 1);
+                Some(cart.nonvolatile.prg_rom[addr3 as usize])
             }
             _ => None,
         }

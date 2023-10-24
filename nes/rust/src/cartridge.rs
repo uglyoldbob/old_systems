@@ -490,6 +490,7 @@ impl NesCartridge {
             0 => mapper00::Mapper00::new(rom_data),
             1 => mapper01::Mapper01::new(rom_data),
             3 => mapper03::Mapper03::new(rom_data),
+            4 => mapper04::Mapper04::new(rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper));
             }
