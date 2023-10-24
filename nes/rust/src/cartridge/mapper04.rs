@@ -14,9 +14,17 @@ pub struct Mapper04 {
     /// Registers: Bank select, Bank data, mirroring, prg ram protect, irq latch, irq reload, irq disable, irq enable
     registers: [u8; 8],
     /// prg rom bank registers
-    prg_roms: [u16; 4],
+    prg_roms: [u8; 2],
     /// chr rom bank registers
-    chr_roms: [u16; 6],
+    chr_roms: [u8; 6],
+    /// The irq counter for the mapper
+    irq_counter: u8,
+    /// Indicates that the irq counter should be reloaded
+    reload_irq: bool,
+    /// Indicates that interrupts are enabled
+    irq_enabled: bool,
+    /// Indicates that an irq is pending
+    irq_pending: bool,
 }
 
 impl Mapper04 {
@@ -25,8 +33,12 @@ impl Mapper04 {
         NesMapper::from(Self {
             ppu_address: 0,
             registers: [0; 8],
-            prg_roms: [0; 4],
+            prg_roms: [0; 2],
             chr_roms: [0; 6],
+            irq_counter: 0,
+            reload_irq: false,
+            irq_enabled: false,
+            irq_pending: false,
         })
     }
     /// Check the mirroring bit for the ppu addressing.
@@ -110,18 +122,66 @@ impl NesMapperTrait for Mapper04 {
     fn memory_cycle_nop(&mut self) {}
 
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
-        if addr >= 0x8000 {
-            self.bank = data;
-        } else if (0x6000..=0x7fff).contains(&addr) {
-            if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                let c = cart.nonvolatile.trainer.as_mut().unwrap();
-                let addr = addr & 0x1ff;
-                c[addr as usize] = data;
-            } else {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.volatile.prg_ram.is_empty() {
-                    addr2 %= cart.volatile.prg_ram.len() as u16;
-                    cart.volatile.prg_ram[addr2 as usize] = data;
+        match addr {
+            0x6000..=0x7fff => {
+                if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.nonvolatile.trainer.as_mut().unwrap();
+                    let addr = addr & 0x1ff;
+                    c[addr as usize] = data;
+                } else {
+                    let mut addr2 = addr & 0x1fff;
+                    if !cart.volatile.prg_ram.is_empty() {
+                        addr2 %= cart.volatile.prg_ram.len() as u16;
+                        cart.volatile.prg_ram[addr2 as usize] = data;
+                    }
+                }
+            }
+            0x8000..=0x9FFF => {
+                if (addr & 1) == 0 {
+                    self.registers[0] = data;
+                }
+                else {
+                    match self.registers[0] & 7 {
+                        0..=5 => {
+                            self.chr_roms[self.registers[0] as usize & 7] = data;
+                        }
+                        6 => {
+                            self.prg_roms[0] = data;
+                        }
+                        7 => {
+                            self.prg_roms[1] = data;
+                        }
+                    }
+                    self.registers[1] = data;
+                }
+            }
+            0xA000..=0xBFFF => {
+                if (addr & 1) == 0 {
+                    self.registers[2] = data;
+                }
+                else {
+                    self.registers[3] = data;
+                }
+            }
+            0xC000..=0xDFFF => {
+                if (addr & 1) == 0 {
+                    self.registers[4] = data;
+                }
+                else {
+                    self.irq_counter = 0;
+                    self.reload_irq = true;
+                    self.registers[5] = data;
+                }
+            }
+            0xE000..=0xFFFF => {
+                if (addr & 1) == 0 {
+                    self.registers[6] = data;
+                    self.irq_enabled = true;
+                    self.irq_pending = false;
+                }
+                else {
+                    self.registers[7] = data;
+                    self.irq_enabled = true;
                 }
             }
         }
@@ -142,7 +202,8 @@ impl NesMapperTrait for Mapper04 {
         self.ppu_read(self.ppu_address, cart)
     }
 
-    fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {}
+    fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {
+    }
 
     fn rom_byte_hack(&mut self, _cart: &mut NesCartridgeData, _addr: u32, _new_byte: u8) {}
 }
