@@ -100,7 +100,7 @@ impl NesMapperTrait for Mapper01 {
     fn irq(&self) -> bool {
         false
     }
-    
+
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         let mut hm = BTreeMap::new();
         hm.insert("Control".to_string(), self.registers[0]);

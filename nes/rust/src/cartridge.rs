@@ -440,6 +440,11 @@ fn calc_sha256(data: &[u8]) -> String {
 }
 
 impl NesCartridge {
+    /// Helper function to get the irq signal from the cartridge
+    pub fn irq(&self) -> bool {
+        self.mapper.irq()
+    }
+
     /// "Parses" an obsolete ines rom
     fn load_obsolete_ines(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)

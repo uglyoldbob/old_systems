@@ -287,7 +287,11 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     sum += quantity;
                     ui.label(format!("Mapper {}: {}", mapper, quantity));
                 }
-                ui.label(format!("Total good+bad is {}/{}", sum, c.roms.elements.len()));
+                ui.label(format!(
+                    "Total good+bad is {}/{}",
+                    sum,
+                    c.roms.elements.len()
+                ));
             })
         });
         if self.index >= c.roms.elements.len() {

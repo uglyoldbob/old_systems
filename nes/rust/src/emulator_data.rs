@@ -370,7 +370,8 @@ impl NesEmulatorData {
             let nmi = self.nmi[2];
 
             self.cpu_peripherals.apu.clock_slow(sound, filter);
-            let irq = self.cpu_peripherals.apu.irq();
+            let irq = self.cpu_peripherals.apu.irq()
+                | self.mb.cartridge().map(|cart| cart.irq()).unwrap_or(false);
             self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
             self.cpu
                 .cycle(&mut self.mb, &mut self.cpu_peripherals, nmi, self.prev_irq);

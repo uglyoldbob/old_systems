@@ -51,13 +51,13 @@ impl RomList {
         for (s, rs) in &self.elements {
             if let Some(rs) = &rs.result {
                 match rs {
-                    Ok(rom) => {
-                    }
+                    Ok(rom) => {}
                     Err(romerr) => match romerr {
-                        CartridgeError::IncompatibleMapper(m) => {
-                        }
+                        CartridgeError::IncompatibleMapper(m) => {}
                         CartridgeError::FsError(e) => {}
-                        _ => { quant += 1; }
+                        _ => {
+                            quant += 1;
+                        }
                     },
                 }
             }
@@ -71,15 +71,14 @@ impl RomList {
         for (s, rs) in &self.elements {
             if let Some(rs) = &rs.result {
                 match rs {
-                    Ok(rom) => {
-                    }
+                    Ok(rom) => {}
                     Err(romerr) => match romerr {
-                        CartridgeError::IncompatibleMapper(m) => {
-                        }
+                        CartridgeError::IncompatibleMapper(m) => {}
                         CartridgeError::FsError(e) => {}
-                        CartridgeError::InvalidRom => {
+                        CartridgeError::InvalidRom => {}
+                        _ => {
+                            quant += 1;
                         }
-                        _ => { quant += 1; }
                     },
                 }
             }
