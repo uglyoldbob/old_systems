@@ -147,24 +147,27 @@ impl Mapper04 {
 
     /// Runs when the irq is actually clocked
     fn irq_clock(&mut self) {
-        if self.irq_counter == 0 && self.irq_enabled {
-            println!("Mapper 4 irq");
-            self.irq_pending = true;
-        }
+        println!("IRQ CLOCK {}", self.irq_counter);
+        let old_counter = self.irq_counter;
         if self.irq_counter == 0 || self.reload_irq {
             self.irq_counter = self.irq_latch;
-        } else if self.irq_counter > 0 {
+        }
+        else {
             self.irq_counter -= 1;
         }
+        if old_counter == 1 && self.irq_counter == 0 && self.irq_enabled {
+            if !self.irq_pending {
+                println!("IRQ {:X}", self.ppu_address);
+            }
+            self.irq_pending = true;
+        }
+        self.reload_irq = false;
     }
 
     /// Runs for the input signal to the irq, eventually clocking the irq
     fn irq_filter(&mut self, clock: bool) {
-        if clock {
-            self.irq_filter = 0;
-        }
-        self.irq_filter = (self.irq_filter << 1) | 1;
-        if (self.irq_filter & 4) != 0 {
+        self.irq_filter = (self.irq_filter << 1) | clock as u8;
+        if (self.irq_filter & 7) == 1 {
             self.irq_clock();
         }
     }
@@ -172,7 +175,7 @@ impl Mapper04 {
 
 impl NesMapperTrait for Mapper04 {
     fn irq(&self) -> bool {
-        false
+        self.irq_pending
     }
 
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
@@ -191,6 +194,7 @@ impl NesMapperTrait for Mapper04 {
         hm.insert("IRQ LATCH".to_string(), self.irq_latch);
         hm.insert("IRQ Counter".to_string(), self.irq_counter);
         hm.insert("IRQ Enabled".to_string(), self.irq_enabled as u8);
+        hm.insert("IRQ Pending".to_string(), self.irq_pending as u8);
 
         hm.insert("Mapper".to_string(), 4);
         hm
@@ -308,6 +312,7 @@ impl NesMapperTrait for Mapper04 {
             0xC000..=0xDFFF => {
                 if (addr & 1) == 0 {
                     self.registers[4] = data;
+                    self.irq_latch = data;
                 } else {
                     self.irq_counter = 0;
                     self.reload_irq = true;
@@ -317,8 +322,9 @@ impl NesMapperTrait for Mapper04 {
             0xE000..=0xFFFF => {
                 if (addr & 1) == 0 {
                     self.registers[6] = data;
-                    self.irq_enabled = true;
+                    self.irq_enabled = false;
                     self.irq_pending = false;
+                    println!("IRQ PENDING CLEARED");
                 } else {
                     self.registers[7] = data;
                     self.irq_enabled = true;
@@ -334,8 +340,10 @@ impl NesMapperTrait for Mapper04 {
     }
 
     fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool) {
-        self.irq_filter((addr & (1 << 12)) != 0);
         self.ppu_address = addr;
+        if addr < 0x2000 {
+            self.irq_filter((addr & (1 << 12)) != 0);
+        }
         self.check_mirroring(addr)
     }
 
