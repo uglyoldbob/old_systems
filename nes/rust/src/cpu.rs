@@ -755,6 +755,7 @@ impl NesCpu {
                     5 => {
                         let addr = if !s.interrupt_type {
                             //IRQ
+                            println!("IRQ {:X}", s.pc);
                             0xfffe
                         } else {
                             //NMI

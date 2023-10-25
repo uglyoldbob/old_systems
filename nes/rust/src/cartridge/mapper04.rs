@@ -146,25 +146,27 @@ impl Mapper04 {
     }
 
     /// Runs when the irq is actually clocked
-    fn irq_clock(&mut self, addr: u16) {
-        let old_counter = self.irq_counter;
+    fn irq_clock(&mut self) {
         if self.irq_counter == 0 || self.reload_irq {
             self.irq_counter = self.irq_latch;
-        }
-        else {
+        } else {
             self.irq_counter -= 1;
         }
-        if old_counter == 1 && self.irq_counter == 0 && self.irq_enabled {
+        if self.irq_counter == 0 && self.irq_enabled {
+            if !self.irq_pending {
+                println!("IRQ {:X}", self.ppu_address);
+            }
             self.irq_pending = true;
         }
+
         self.reload_irq = false;
     }
 
     /// Runs for the input signal to the irq, eventually clocking the irq
-    fn irq_filter(&mut self, clock: bool, addr: u16) {
+    fn irq_filter(&mut self, clock: bool) {
         self.irq_filter = (self.irq_filter << 1) | clock as u8;
         if (self.irq_filter & 7) == 1 {
-            self.irq_clock(addr);
+            self.irq_clock();
         }
     }
 }
@@ -320,7 +322,6 @@ impl NesMapperTrait for Mapper04 {
                     self.registers[6] = data;
                     self.irq_enabled = false;
                     self.irq_pending = false;
-                    println!("IRQ PENDING CLEARED");
                 } else {
                     self.registers[7] = data;
                     self.irq_enabled = true;
@@ -338,7 +339,7 @@ impl NesMapperTrait for Mapper04 {
     fn ppu_memory_cycle_address(&mut self, addr: u16) -> (bool, bool) {
         self.ppu_address = addr;
         if addr < 0x2000 {
-            self.irq_filter((addr & (1 << 12)) != 0, addr);
+            self.irq_filter((addr & (1 << 12)) != 0);
         }
         self.check_mirroring(addr)
     }

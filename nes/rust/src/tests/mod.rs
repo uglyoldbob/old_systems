@@ -2221,7 +2221,7 @@ fn controller3() {
         if let Some(b) = button {
             b.set_button(thebutton, 0);
         }
-        
+
         loop {
             nes_data.cycle_step(&mut None, &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end()
