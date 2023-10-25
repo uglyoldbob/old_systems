@@ -1154,7 +1154,7 @@ impl NesPpu {
 
     /// Returns true when sprites should be fetched.
     fn should_fetch_sprites(&self) -> bool {
-        (self.registers[1] & PPU_REGISTER1_DRAW_SPRITES) != 0
+        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
     }
 
     /// Returns true when sprites should be evaulated.
@@ -1733,7 +1733,11 @@ impl NesPpu {
             } else {
                 //do nothing
                 let cycle = self.scanline_cycle - 337;
-                self.idle_operation(bus, cycle);
+                if self.should_fetch_background() || Some(PpuMode::Background) == self.mode {
+                    self.background_fetch(bus, cycle);
+                } else {
+                    self.idle_operation(bus, cycle);
+                }
                 self.increment_scanline_cycle();
             }
         } else if self.scanline_number == 240 {
