@@ -666,14 +666,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 if r.clicked() || r.dragged() {
                     self.mouse = true;
                     self.mouse_miss = false;
-                    println!("FIRE");
                     self.mouse_delay = 10;
                 } else if r.clicked_by(egui::PointerButton::Secondary)
                     || r.dragged_by(egui::PointerButton::Secondary)
                 {
                     self.mouse = true;
                     self.mouse_miss = true;
-                    println!("FIRE off screen");
                     self.mouse_delay = 10;
                 }
                 if r.hovered() {
@@ -695,9 +693,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 }
             }
             ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
-            if ui.input(|i| i.key_down(egui::Key::ArrowLeft)) {
-                ui.label("LEFT");
-            }
         });
 
         if let Some(s) = &mut self.sound_stream {

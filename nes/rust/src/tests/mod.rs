@@ -583,7 +583,7 @@ fn cpu_dma_test4() {
         "../test_roms/dmc_dma_during_read4/dma_4016_read.nes".to_string(),
     )
     .unwrap();
-    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
+    nes_data.mb.controllers[0] = controller::StandardController::new();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2148,7 +2148,7 @@ fn controller1() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/count_errors.nes".to_string())
         .unwrap();
-    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
+    nes_data.mb.controllers[0] = controller::StandardController::new();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2169,7 +2169,7 @@ fn controller2() {
     let nc =
         NesCartridge::load_cartridge("../test_roms/read_joy3/count_errors_fast.nes".to_string())
             .unwrap();
-    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
+    nes_data.mb.controllers[0] = controller::StandardController::new();
     nes_data.insert_cartridge(nc);
 
     loop {
@@ -2188,7 +2188,7 @@ fn controller3() {
     let mut nes_data = NesEmulatorData::new();
     let nc = NesCartridge::load_cartridge("../test_roms/read_joy3/test_buttons.nes".to_string())
         .unwrap();
-    nes_data.mb.controllers[0] = Some(controller::StandardController::new());
+    nes_data.mb.controllers[0] = controller::StandardController::new();
     nes_data.insert_cartridge(nc);
 
     let mut frame = 100;
@@ -2215,13 +2215,13 @@ fn controller3() {
     for (thebutton, text, vram) in tests {
         println!("Testing {}", text);
         assert!(nes_data.mb.check_vram(vram, text.to_string().as_bytes()));
-        if let Some(c) = &mut nes_data.mb.controllers[0] {
-            let mut buttons = c.get_buttons_iter_mut();
-            let button = buttons.next();
-            if let Some(b) = button {
-                b.set_button(thebutton, 0);
-            }
+        let c = &mut nes_data.mb.controllers[0];
+        let mut buttons = c.get_buttons_iter_mut();
+        let button = buttons.next();
+        if let Some(b) = button {
+            b.set_button(thebutton, 0);
         }
+        
         loop {
             nes_data.cycle_step(&mut None, &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end()
@@ -2231,12 +2231,11 @@ fn controller3() {
             }
         }
 
-        if let Some(c) = &mut nes_data.mb.controllers[0] {
-            let mut buttons = c.get_buttons_iter_mut();
-            let button = buttons.next();
-            if let Some(b) = button {
-                b.clear_button(thebutton);
-            }
+        let c = &mut nes_data.mb.controllers[0];
+        let mut buttons = c.get_buttons_iter_mut();
+        let button = buttons.next();
+        if let Some(b) = button {
+            b.clear_button(thebutton);
         }
         loop {
             nes_data.cycle_step(&mut None, &mut None);

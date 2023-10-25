@@ -1259,6 +1259,11 @@ impl NesPpu {
                 bus.ppu_cycle_1(a & 0x3fff, self);
                 self.cycle1_done = true;
             }
+            else {
+                self.mode = Some(PpuMode::Idle);
+                bus.ppu_cycle_1(self.vram_address, self);
+                self.cycle1_done = true;
+            }
         } else if self.cycle1_done {
             if let Some(a) = self.pend_vram_write {
                 self.mode = None;
@@ -1275,6 +1280,11 @@ impl NesPpu {
                 self.ppudata_buffer = bus.ppu_cycle_2_read(self);
                 self.cycle1_done = false;
                 self.pend_vram_read = None;
+            }
+            else {
+                self.mode = None;
+                bus.ppu_cycle_2_read(self);
+                self.cycle1_done = false;
             }
         }
     }
@@ -1622,95 +1632,93 @@ impl NesPpu {
                 let cycle = self.scanline_cycle - 257;
                 let sprite_num = cycle / 8;
                 let row = self.scanline_number;
-                if cycle > 0 {
-                    if self.should_fetch_sprites() || self.mode == Some(PpuMode::Sprite) {
-                        match (cycle / 2) % 4 {
-                            0 => {
-                                if (cycle & 1) == 0 {
-                                    //nametable byte
-                                    let x = cycle as u8 / 8;
-                                    let y = (row / 8) as u8;
-                                    let base = self.nametable_base();
-                                    let offset = y << 5 | x;
-                                    self.mode = Some(PpuMode::Sprite);
-                                    bus.ppu_cycle_1(base + offset as u16, self); //TODO verify this calculation
-                                    self.cycle1_done = true;
-                                } else if self.cycle1_done {
-                                    self.mode = None;
-                                    bus.ppu_cycle_2_read(self);
-                                    self.cycle1_done = false;
-                                }
+                if self.should_fetch_sprites() || self.mode == Some(PpuMode::Sprite) {
+                    match (cycle / 2) % 4 {
+                        0 => {
+                            if (cycle & 1) == 0 {
+                                //nametable byte
+                                let x = cycle as u8 / 8;
+                                let y = (row / 8) as u8;
+                                let base = self.nametable_base();
+                                let offset = y << 5 | x;
+                                self.mode = Some(PpuMode::Sprite);
+                                bus.ppu_cycle_1(base + offset as u16, self); //TODO verify this calculation
+                                self.cycle1_done = true;
+                            } else if self.cycle1_done {
+                                self.mode = None;
+                                bus.ppu_cycle_2_read(self);
+                                self.cycle1_done = false;
                             }
-                            1 => {
-                                if (cycle & 1) == 0 {
-                                    //nametable byte
-                                    let cycle = cycle & !2;
-                                    let x = cycle as u8 / 8;
-                                    let y = (row / 8) as u8;
-                                    let base = self.nametable_base();
-                                    let offset = y << 5 | x;
-                                    self.mode = Some(PpuMode::Sprite);
-                                    bus.ppu_cycle_1(base + offset as u16, self); //TODO verify this calculation
-                                    self.cycle1_done = true;
-                                } else if self.cycle1_done {
-                                    self.mode = None;
-                                    bus.ppu_cycle_2_read(self);
-                                    self.cycle1_done = false;
-                                }
-                            }
-                            2 => {
-                                //pattern table tile low
-                                if (cycle & 1) == 0 {
-                                    let base = self.sprite_patterntable_base(
-                                        &self.sprites[sprite_num as usize],
-                                    );
-                                    let offset = self.sprites[sprite_num as usize]
-                                        .tile_num(row as u8, self.sprite_height());
-                                    let o2 = self.sprites[sprite_num as usize]
-                                        .line_number(row as u8)
-                                        as u16;
-                                    let calc = base + offset + o2;
-                                    self.mode = Some(PpuMode::Sprite);
-                                    bus.ppu_cycle_1(calc, self);
-                                    self.cycle1_done = true;
-                                } else if self.cycle1_done {
-                                    let mut pt = self.patterntable_tile.to_le_bytes();
-                                    self.mode = None;
-                                    pt[0] = bus.ppu_cycle_2_read(self);
-                                    self.patterntable_tile = u16::from_le_bytes(pt);
-                                    self.cycle1_done = false;
-                                }
-                            }
-                            3 => {
-                                //pattern table tile high
-                                if (cycle & 1) == 0 {
-                                    let base = self.sprite_patterntable_base(
-                                        &self.sprites[sprite_num as usize],
-                                    );
-                                    let offset = self.sprites[sprite_num as usize]
-                                        .tile_num(row as u8, self.sprite_height());
-                                    let o2 = self.sprites[sprite_num as usize]
-                                        .line_number(row as u8)
-                                        as u16;
-                                    let calc = 8 + base + offset + o2;
-                                    self.mode = Some(PpuMode::Sprite);
-                                    bus.ppu_cycle_1(calc, self);
-                                    self.cycle1_done = true;
-                                } else if self.cycle1_done {
-                                    let mut pt = self.patterntable_tile.to_le_bytes();
-                                    self.mode = None;
-                                    pt[1] = bus.ppu_cycle_2_read(self);
-                                    self.cycle1_done = false;
-                                    self.patterntable_tile = u16::from_le_bytes(pt);
-                                    self.sprites[sprite_num as usize].patterntable_data =
-                                        self.patterntable_tile;
-                                }
-                            }
-                            _ => {}
                         }
-                    } else {
-                        self.idle_operation(bus, self.scanline_cycle - 1);
+                        1 => {
+                            if (cycle & 1) == 0 {
+                                //nametable byte
+                                let cycle = cycle & !2;
+                                let x = cycle as u8 / 8;
+                                let y = (row / 8) as u8;
+                                let base = self.nametable_base();
+                                let offset = y << 5 | x;
+                                self.mode = Some(PpuMode::Sprite);
+                                bus.ppu_cycle_1(base + offset as u16, self); //TODO verify this calculation
+                                self.cycle1_done = true;
+                            } else if self.cycle1_done {
+                                self.mode = None;
+                                bus.ppu_cycle_2_read(self);
+                                self.cycle1_done = false;
+                            }
+                        }
+                        2 => {
+                            //pattern table tile low
+                            if (cycle & 1) == 0 {
+                                let base = self.sprite_patterntable_base(
+                                    &self.sprites[sprite_num as usize],
+                                );
+                                let offset = self.sprites[sprite_num as usize]
+                                    .tile_num(row as u8, self.sprite_height());
+                                let o2 = self.sprites[sprite_num as usize]
+                                    .line_number(row as u8)
+                                    as u16;
+                                let calc = base + offset + o2;
+                                self.mode = Some(PpuMode::Sprite);
+                                bus.ppu_cycle_1(calc, self);
+                                self.cycle1_done = true;
+                            } else if self.cycle1_done {
+                                let mut pt = self.patterntable_tile.to_le_bytes();
+                                self.mode = None;
+                                pt[0] = bus.ppu_cycle_2_read(self);
+                                self.patterntable_tile = u16::from_le_bytes(pt);
+                                self.cycle1_done = false;
+                            }
+                        }
+                        3 => {
+                            //pattern table tile high
+                            if (cycle & 1) == 0 {
+                                let base = self.sprite_patterntable_base(
+                                    &self.sprites[sprite_num as usize],
+                                );
+                                let offset = self.sprites[sprite_num as usize]
+                                    .tile_num(row as u8, self.sprite_height());
+                                let o2 = self.sprites[sprite_num as usize]
+                                    .line_number(row as u8)
+                                    as u16;
+                                let calc = 8 + base + offset + o2;
+                                self.mode = Some(PpuMode::Sprite);
+                                bus.ppu_cycle_1(calc, self);
+                                self.cycle1_done = true;
+                            } else if self.cycle1_done {
+                                let mut pt = self.patterntable_tile.to_le_bytes();
+                                self.mode = None;
+                                pt[1] = bus.ppu_cycle_2_read(self);
+                                self.cycle1_done = false;
+                                self.patterntable_tile = u16::from_le_bytes(pt);
+                                self.sprites[sprite_num as usize].patterntable_data =
+                                    self.patterntable_tile;
+                            }
+                        }
+                        _ => {}
                     }
+                } else {
+                    self.idle_operation(bus, self.scanline_cycle - 1);
                 }
                 self.increment_scanline_cycle();
             } else if self.scanline_cycle <= 336 {

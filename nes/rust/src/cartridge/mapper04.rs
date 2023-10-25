@@ -148,6 +148,7 @@ impl Mapper04 {
     /// Runs when the irq is actually clocked
     fn irq_clock(&mut self) {
         if self.irq_counter == 0 && self.irq_enabled {
+            println!("Mapper 4 irq");
             self.irq_pending = true;
         }
         if self.irq_counter == 0 || self.reload_irq {
@@ -161,9 +162,8 @@ impl Mapper04 {
     fn irq_filter(&mut self, clock: bool) {
         if clock {
             self.irq_filter = 0;
-        } else {
-            self.irq_filter = (self.irq_filter << 1) | 1;
         }
+        self.irq_filter = (self.irq_filter << 1) | 1;
         if (self.irq_filter & 4) != 0 {
             self.irq_clock();
         }
