@@ -453,8 +453,14 @@ fn main() {
 
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
-    nes_data.mb.controllers[0] = nes_data.configuration.controller_type[0].make_controller();
-    nes_data.mb.controllers[1] = nes_data.configuration.controller_type[1].make_controller();
+    nes_data.mb.set_controller(
+        0,
+        nes_data.configuration.controller_type[0].make_controller(),
+    );
+    nes_data.mb.set_controller(
+        1,
+        nes_data.configuration.controller_type[1].make_controller(),
+    );
 
     if let Some(c) = nes_data.configuration.start_rom() {
         let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();

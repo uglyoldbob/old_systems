@@ -31,7 +31,7 @@ pub struct NesMotherboard {
     last_cpu_data: u8,
     #[serde(skip)]
     /// The controllers for the system
-    pub controllers: [NesController; 2],
+    controllers: [NesController; 2],
 }
 
 impl NesMotherboard {
@@ -61,7 +61,32 @@ impl NesMotherboard {
             last_ppu_cycle: 2,
             last_cpu_data: 0,
             last_ppu_coordinates: (0, 0),
-            controllers: [NesController::default(); 2],
+            controllers: [NesController::default(), NesController::default()],
+        }
+    }
+
+    /// Get one of the four possible controllers for the system, cloned
+    pub fn get_controller(&self, index: u8) -> Option<NesController> {
+        if index < 2 {
+            Some(self.controllers[index as usize].clone())
+        } else {
+            None
+        }
+    }
+
+    /// Get one of the four possible controllers, mutably
+    pub fn get_controller_mut(&mut self, index: u8) -> Option<&mut NesController> {
+        if index < 2 {
+            Some(&mut self.controllers[index as usize])
+        } else {
+            None
+        }
+    }
+
+    /// Set one of the four possible controllers for the system
+    pub fn set_controller(&mut self, index: u8, nc: NesController) {
+        if index < 2 {
+            self.controllers[index as usize] = nc;
         }
     }
 

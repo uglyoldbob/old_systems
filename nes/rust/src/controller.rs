@@ -342,12 +342,13 @@ pub trait NesControllerTrait {
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(NesControllerTrait)]
 #[derive(
-    serde::Serialize, serde::Deserialize, Copy, Clone, strum::EnumIter, strum::Display, PartialEq,
+    serde::Serialize, serde::Deserialize, Clone, strum::EnumIter, strum::Display, PartialEq,
 )]
 pub enum NesController {
     StandardController,
     Zapper,
     DummyController,
+    FourScore,
 }
 
 impl Default for NesController {
@@ -363,6 +364,7 @@ impl NesController {
             NesController::StandardController(_) => NesControllerType::StandardController,
             NesController::Zapper(_) => NesControllerType::Zapper,
             NesController::DummyController(_) => NesControllerType::None,
+            NesController::FourScore(_) => NesControllerType::FourScore,
         }
     }
 }
@@ -378,6 +380,8 @@ pub enum NesControllerType {
     Zapper,
     /// Not a real controller. Signifies the lack of a controller.
     None,
+    /// The four player controller adapter
+    FourScore,
 }
 
 impl NesControllerType {
@@ -389,6 +393,115 @@ impl NesControllerType {
             }
             NesControllerType::Zapper => NesController::Zapper(Zapper::default()),
             NesControllerType::None => NesController::DummyController(DummyController::default()),
+            NesControllerType::FourScore => NesController::FourScore(FourScore::default()),
+        }
+    }
+}
+
+/// Half of a four score controller adapter. The four score is modeled as two separate controllers.
+#[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub struct FourScore {
+    /// The fourscore contains two potential controllers
+    combo: [ButtonCombination; 2],
+    /// The controllers that the four score uses
+    controllers: [Option<Box<NesController>>; 2],
+    /// The strobe signal triggers loading the controller data into the shift register
+    strobe: bool,
+    /// The previous clock signal
+    prevclk: bool,
+    /// The counter for the clocking operation
+    clock_counter: u32,
+}
+
+impl Default for FourScore {
+    fn default() -> Self {
+        Self {
+            combo: [ButtonCombination::new(); 2],
+            controllers: [None, None],
+            strobe: false,
+            prevclk: false,
+            clock_counter: 0,
+        }
+    }
+}
+
+impl NesControllerTrait for FourScore {
+    #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
+    fn clock(&mut self, c: bool) {
+        let active_high_edge = c && !self.prevclk;
+        if active_high_edge && !self.strobe {
+            match self.clock_counter {
+                0..=7 => {
+                    if let Some(controller) = &mut self.controllers[0] {
+                        controller.clock(c);
+                    }
+                }
+                8..=15 => {
+                    if let Some(controller) = &mut self.controllers[1] {
+                        controller.clock(c);
+                    }
+                }
+                _ => {}
+            }
+            if self.clock_counter < 24 {
+                self.clock_counter += 1;
+            }
+        }
+        self.prevclk = c;
+    }
+
+    #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
+    fn rapid_fire(&mut self, time: Duration) {
+        if let Some(controller) = &mut self.controllers[0] {
+            controller.rapid_fire(time);
+        }
+        if let Some(controller) = &mut self.controllers[1] {
+            controller.rapid_fire(time);
+        }
+    }
+
+    #[doc = " Update the serial/parallel input"]
+    fn parallel_signal(&mut self, s: bool) {
+        self.strobe = s;
+        if let Some(controller) = &mut self.controllers[0] {
+            controller.parallel_signal(s);
+        }
+        if let Some(controller) = &mut self.controllers[1] {
+            controller.parallel_signal(s);
+        }
+    }
+
+    #[doc = " Get a mutable iterator of all button combinations for this controller."]
+    fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
+        self.combo.iter_mut()
+    }
+
+    #[doc = " Dump data from the controller. No side effects."]
+    fn dump_data(&self) -> u8 {
+        0
+    }
+
+    #[doc = " Read data from the controller."]
+    fn read_data(&mut self) -> u8 {
+        match self.clock_counter {
+            0..=7 => {
+                if let Some(controller) = &mut self.controllers[0] {
+                    controller.read_data()
+                } else {
+                    0xFF
+                }
+            }
+            8..=15 => {
+                if let Some(controller) = &mut self.controllers[1] {
+                    controller.read_data()
+                } else {
+                    0xFF
+                }
+            }
+            16..=17 => 0,
+            18 => 0xFF,
+            19..=23 => 0,
+            _ => 0xFF,
         }
     }
 }
@@ -535,11 +648,6 @@ impl Default for StandardController {
 }
 
 impl StandardController {
-    /// Create a new controller
-    pub fn new() -> NesController {
-        Self::default().into()
-    }
-
     ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register
     fn check_strobe(&mut self) {
         if self.strobe {

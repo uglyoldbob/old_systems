@@ -2,7 +2,10 @@
 
 use std::collections::HashSet;
 
-use crate::{controller::NesController, NesEmulatorData};
+use crate::{
+    controller::{DummyController, NesController},
+    NesEmulatorData,
+};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -93,26 +96,62 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     ui.selectable_value(&mut self.selected_controller, Some(3), "Fourth");
                 });
             let mut save_config = false;
+            let mut controller_mod = None;
             if let Some(i) = self.selected_controller {
-                let controller = &mut c.mb.controllers[i as usize];
-
-                let controllerr = egui_multiwin::egui::ComboBox::from_id_source("Controller Type")
-                    .selected_text(controller.to_string())
-                    .show_ui(ui, |ui| {
-                        let mut changed = false;
-                        for opt in NesController::iter() {
-                            if ui
-                                .selectable_value(controller, opt, opt.to_string())
-                                .changed()
-                            {
-                                changed = true;
-                                c.configuration.controller_type[i as usize] = controller.get_type();
-                            }
-                        }
-                        changed
-                    });
-                if controllerr.inner.is_some_and(|t| t) {
-                    save_config = true;
+                let controller = c.mb.get_controller(i);
+                if let Some(mut controller) = controller {
+                    let controllerr =
+                        egui_multiwin::egui::ComboBox::from_id_source("Controller Type")
+                            .selected_text(controller.to_string())
+                            .show_ui(ui, |ui| {
+                                let mut changed = false;
+                                for opt in NesController::iter() {
+                                    if ui
+                                        .selectable_value(
+                                            &mut controller,
+                                            opt.clone(),
+                                            opt.to_string(),
+                                        )
+                                        .changed()
+                                    {
+                                        changed = true;
+                                        c.configuration.controller_type[i as usize] =
+                                            controller.get_type();
+                                        controller_mod = Some((i, opt));
+                                    }
+                                }
+                                changed
+                            });
+                    if controllerr.inner.is_some_and(|t| t) {
+                        save_config = true;
+                    }
+                } else {
+                    let mut controller = NesController::DummyController(DummyController::default());
+                    let controllerr =
+                        egui_multiwin::egui::ComboBox::from_id_source("Controller Type")
+                            .selected_text(controller.to_string())
+                            .show_ui(ui, |ui| {
+                                let mut changed = false;
+                                for opt in NesController::iter() {
+                                    if ui
+                                        .selectable_value(
+                                            &mut controller,
+                                            opt.clone(),
+                                            opt.to_string(),
+                                        )
+                                        .changed()
+                                    {
+                                        changed = true;
+                                        c.configuration.controller_type[i as usize] =
+                                            controller.get_type();
+                                        controller_mod = Some((i, opt));
+                                    }
+                                }
+                                changed
+                            });
+                    if controllerr.inner.is_some_and(|t| t) {
+                        save_config = true;
+                    }
                 }
 
                 let config = &mut c.configuration.controller_config[i as usize];
@@ -129,230 +168,244 @@ impl TrackedWindow<NesEmulatorData> for Window {
 
                 let keys = config.get_keys();
 
-                match controller {
-                    crate::controller::NesController::StandardController(_) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Button A:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_A) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_A].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_A);
-                            }
-                        });
+                let controller = c.mb.get_controller_mut(i);
+                if let Some(controller) = controller {
+                    match controller {
+                        crate::controller::NesController::FourScore(_fs) => {
+                            ui.label("A problem occurred");
+                        }
+                        crate::controller::NesController::StandardController(_) => {
+                            ui.horizontal(|ui| {
+                                ui.label("Button A:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_A) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_A].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_A);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button B:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_B) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_B].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_B);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button B:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_B) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_B].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_B);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button Turbo A:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_TURBOA) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_TURBOA].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input =
-                                    Some(crate::controller::BUTTON_COMBO_TURBOA);
-                            }
-                            let mut val = config.get_rate(0);
-                            if ui
-                                .add(
-                                    egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate"),
-                                )
-                                .changed()
-                            {
-                                set_turboa = Some(val);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Turbo A:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_TURBOA) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_TURBOA].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_TURBOA);
+                                }
+                                let mut val = config.get_rate(0);
+                                if ui
+                                    .add(
+                                        egui::Slider::new(&mut val, 0.5..=25.0)
+                                            .text("Rapid fire rate"),
+                                    )
+                                    .changed()
+                                {
+                                    set_turboa = Some(val);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button Turbo B:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_TURBOB) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_TURBOB].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input =
-                                    Some(crate::controller::BUTTON_COMBO_TURBOB);
-                            }
-                            let mut val = config.get_rate(1);
-                            if ui
-                                .add(
-                                    egui::Slider::new(&mut val, 0.5..=25.0).text("Rapid fire rate"),
-                                )
-                                .changed()
-                            {
-                                set_turbob = Some(val);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Turbo B:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_TURBOB) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_TURBOB].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_TURBOB);
+                                }
+                                let mut val = config.get_rate(1);
+                                if ui
+                                    .add(
+                                        egui::Slider::new(&mut val, 0.5..=25.0)
+                                            .text("Rapid fire rate"),
+                                    )
+                                    .changed()
+                                {
+                                    set_turbob = Some(val);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button Start:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_START) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_START].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input =
-                                    Some(crate::controller::BUTTON_COMBO_START);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Start:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_START) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_START].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_START);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button Select:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_SELECT) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_SELECT].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input =
-                                    Some(crate::controller::BUTTON_COMBO_SELECT);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Select:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_SELECT) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_SELECT].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_SELECT);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button Up:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_UP) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_UP].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_UP);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Up:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_UP) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_UP].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_UP);
+                                }
+                            });
 
-                        ui.horizontal(|ui| {
-                            ui.label("Button Down:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_DOWN) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_DOWN].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_DOWN);
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("Button Left:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_LEFT) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_LEFT].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_LEFT);
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("Button Right:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_RIGHT) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_RIGHT].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input =
-                                    Some(crate::controller::BUTTON_COMBO_RIGHT);
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("Trigger:");
-                            if ui
-                                .button(
-                                    if let Some(crate::controller::BUTTON_COMBO_FIRE) =
-                                        self.waiting_for_input
-                                    {
-                                        "Waiting for input".to_string()
-                                    } else {
-                                        keys[crate::controller::BUTTON_COMBO_FIRE].to_string()
-                                    },
-                                )
-                                .clicked()
-                            {
-                                self.waiting_for_input = Some(crate::controller::BUTTON_COMBO_FIRE);
-                            }
-                        });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Down:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_DOWN) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_DOWN].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_DOWN);
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Left:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_LEFT) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_LEFT].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_LEFT);
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Button Right:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_RIGHT) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_RIGHT].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_RIGHT);
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label("Trigger:");
+                                if ui
+                                    .button(
+                                        if let Some(crate::controller::BUTTON_COMBO_FIRE) =
+                                            self.waiting_for_input
+                                        {
+                                            "Waiting for input".to_string()
+                                        } else {
+                                            keys[crate::controller::BUTTON_COMBO_FIRE].to_string()
+                                        },
+                                    )
+                                    .clicked()
+                                {
+                                    self.waiting_for_input =
+                                        Some(crate::controller::BUTTON_COMBO_FIRE);
+                                }
+                            });
+                        }
+                        crate::controller::NesController::Zapper(_) => {
+                            ui.label("Zapper controlled by mouse");
+                        }
+                        crate::controller::NesController::DummyController(_) => {}
                     }
-                    crate::controller::NesController::Zapper(_) => {
-                        ui.label("Zapper controlled by mouse");
-                    }
-                    crate::controller::NesController::DummyController(_) => {}
                 }
 
                 if let Some(r) = set_turboa {
@@ -363,6 +416,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     config.set_rate(1, r);
                     save_config = true;
                 }
+            }
+
+            if let Some((i, cont)) = controller_mod {
+                c.mb.set_controller(i, cont);
             }
             if save_config {
                 c.configuration.save();

@@ -255,13 +255,19 @@ impl NesEmulatorData {
                 let config = self.configuration.clone();
                 let audio = self.cpu_peripherals.apu.get_buffer();
                 let screen = self.cpu_peripherals.ppu.backup_frame();
-                let controllers = self.mb.controllers;
+                let controller1 = self.mb.get_controller(0);
+                let controller2 = self.mb.get_controller(1);
                 let config_path = self.configuration.path.to_owned();
                 let romlist = self.roms.clone();
                 let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
                 cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
-                self.mb.controllers = controllers;
+                if let Some(controller) = controller1 {
+                    self.mb.set_controller(0, controller);
+                }
+                if let Some(controller) = controller2 {
+                    self.mb.set_controller(1, controller);
+                }
                 self.roms = romlist;
                 self.configuration.path = config_path;
                 self.cpu_peripherals.apu.restore_buffer(audio);
@@ -283,8 +289,8 @@ impl NesEmulatorData {
     /// Effectively power cycles the emulator. Technically throws away the current system and builds a new one.
     pub fn power_cycle(&mut self) {
         let cart = self.remove_cartridge();
-        let controller1 = self.mb.controllers[0];
-        let controller2 = self.mb.controllers[1];
+        let controller1 = self.mb.get_controller(0);
+        let controller2 = self.mb.get_controller(1);
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let mut apu = NesApu::new();
@@ -301,8 +307,12 @@ impl NesEmulatorData {
         self.cpu_peripherals = NesCpuPeripherals::new(ppu, apu);
         self.mb = mb;
 
-        self.mb.controllers[0] = controller1;
-        self.mb.controllers[1] = controller2;
+        if let Some(controller) = controller1 {
+            self.mb.set_controller(0, controller);
+        }
+        if let Some(controller) = controller2 {
+            self.mb.set_controller(1, controller);
+        }
 
         self.cpu_clock_counter = rand::random::<u8>() % 16;
         self.ppu_clock_counter = rand::random::<u8>() % 4;
