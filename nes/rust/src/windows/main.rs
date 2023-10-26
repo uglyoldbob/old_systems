@@ -18,6 +18,8 @@ use egui_multiwin::{
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
+use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt};
+
 /// The struct for the main window of the emulator.
 pub struct MainNesWindow {
     /// The last time a rewind point was saved.
@@ -67,6 +69,12 @@ pub struct MainNesWindow {
     mouse_miss: bool,
     /// The stored resized image for the emulator
     image: crate::ppu::PixelImage<egui::Color32>,
+    /// The result of opening gstreamer
+    have_gstreamer: Result<(), gstreamer::glib::Error>,
+    /// The pipeline for recording to disk
+    record_pipeline: Option<gstreamer::Pipeline>,
+    /// The source for video data fromm the emulator
+    record_source: Option<gstreamer_app::AppSrc>,
 }
 
 impl MainNesWindow {
@@ -110,8 +118,16 @@ impl MainNesWindow {
     ) -> NewWindowRequest<NesEmulatorData> {
         use std::time::Duration;
 
+        let have_gstreamer = gstreamer::init();
+        if let Err(e) = &have_gstreamer {
+            println!("Failed to open gstreamer: {:?}", e);
+        }
+
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
+                have_gstreamer,
+                record_pipeline: None,
+                record_source: None,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
                 last_frame_time: std::time::Instant::now(),
@@ -314,6 +330,11 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
     fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
         self.sound_stream.take();
+        if let Some(pipeline) = &mut self.record_pipeline {
+            pipeline
+                .set_state(gstreamer::State::Null)
+                .expect("Unable to set the recording pipeline to the `Null` state");
+        }
         true
     }
 
@@ -471,6 +492,99 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             c.paused = true;
                             c.wait_for_frame_end = false;
                         }
+                        if !self.paused {
+                            let image = c
+                                .cpu_peripherals
+                                .ppu_get_frame()
+                                .to_pixels_egui()
+                                .resize(c.configuration.scaler);
+                            self.image = image;
+                        }
+                        if self.record_pipeline.is_none() {
+                            if self.have_gstreamer.is_ok() {
+                                let version = gstreamer::version_string().as_str().to_string();
+                                println!("GStreamer version is {}", version);
+                                let vinfo = gstreamer_video::VideoInfo::builder(
+                                    gstreamer_video::VideoFormat::Rgb,
+                                    256,
+                                    240,
+                                )
+                                .interlace_mode(gstreamer_video::VideoInterlaceMode::Progressive)
+                                .stride(&[320])
+                                .build()
+                                .unwrap();
+                                let video_caps = vinfo.to_caps().unwrap();
+                                let app_source = gstreamer_app::AppSrc::builder()
+                                    .name("emulator_video")
+                                    .caps(&video_caps)
+                                    .format(gstreamer::Format::Time)
+                                    .build();
+                                app_source.set_block(true);
+                                let vsource = gstreamer::ElementFactory::make("rawvideoparse")
+                                    .name("vparse")
+                                    .property_from_str("framerate", "60/1")
+                                    .build()
+                                    .expect("Could not create source element.");
+                                let vconv = gstreamer::ElementFactory::make("videoconvert")
+                                    .name("vconvert")
+                                    .build()
+                                    .expect("Could not create source element.");
+                                let vencoder = gstreamer::ElementFactory::make("openh264enc")
+                                    .name("vencode")
+                                    .build()
+                                    .expect("Could not create source element.");
+
+                                let sink = gstreamer::ElementFactory::make("filesink")
+                                    .name("sink")
+                                    .property_from_str("location", "./test.avi")
+                                    .build()
+                                    .expect("Could not create sink element");
+
+                                let pipeline = gstreamer::Pipeline::with_name("recording-pipeline");
+                                pipeline
+                                    .add_many([
+                                        app_source.upcast_ref(),
+                                        &vsource,
+                                        &vconv,
+                                        &vencoder,
+                                        &sink,
+                                    ])
+                                    .unwrap();
+                                gstreamer::Element::link_many([app_source.upcast_ref(), &vsource])
+                                    .unwrap();
+                                vsource
+                                    .link(&vconv)
+                                    .expect("Elements 1 could not be linked.");
+                                vconv
+                                    .link(&vencoder)
+                                    .expect("Element 2 could not be linked");
+                                vencoder
+                                    .link(&sink)
+                                    .expect("Elements 3 could not be linked.");
+
+                                pipeline
+                                    .set_state(gstreamer::State::Playing)
+                                    .expect("Unable to set the pipeline to the `Playing` state");
+
+                                self.record_source = Some(app_source);
+                                self.record_pipeline = Some(pipeline);
+                            }
+                        }
+                        if let Some(pipeline) = &mut self.record_pipeline {
+                            if let Some(source) = &mut self.record_source {
+                                let mut buf = gstreamer::Buffer::with_size(320 * 240 * 3).unwrap();
+                                self.image.to_gstreamer(320, 240, &mut buf);
+                                match source.push_buffer(buf) {
+                                    Ok(a) => {
+                                        println!("Success sending video data? {:?}", a);
+                                    }
+                                    Err(e) => {
+                                        println!("Error pushing video data: {:?}", e);
+                                    }
+                                }
+                            }
+                        }
+
                         if self.mouse_delay > 0 {
                             self.mouse_delay -= 1;
                             if self.mouse_delay == 0 {
@@ -491,13 +605,15 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
         }
 
-        let image = c
-            .cpu_peripherals
-            .ppu_get_frame()
-            .to_pixels_egui()
-            .resize(c.configuration.scaler);
-        self.image = image.clone();
-        let image = image.to_egui();
+        if self.paused {
+            let image = c
+                .cpu_peripherals
+                .ppu_get_frame()
+                .to_pixels_egui()
+                .resize(c.configuration.scaler);
+            self.image = image;
+        }
+        let image = self.image.clone().to_egui();
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
