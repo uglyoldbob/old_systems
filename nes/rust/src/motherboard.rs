@@ -1,5 +1,7 @@
 //! This module handles all of the wiring and memory for the nes system.
 
+use crate::controller::DummyController;
+use crate::controller::FourScore;
 use crate::controller::NesController;
 use crate::controller::NesControllerTrait;
 use crate::ppu::NesPpu;
@@ -66,26 +68,126 @@ impl NesMotherboard {
     }
 
     /// Get one of the four possible controllers for the system, cloned
-    pub fn get_controller(&self, index: u8) -> Option<NesController> {
-        if index < 2 {
-            Some(self.controllers[index as usize].clone())
-        } else {
-            None
+    pub fn get_controller(&self, index: u8) -> NesController {
+        match index {
+            0 | 2 => match &self.controllers[0] {
+                NesController::FourScore(fs) => fs.get_controller(index >> 1),
+                any => {
+                    if index == 0 {
+                        any.clone()
+                    } else {
+                        NesController::DummyController(DummyController::default())
+                    }
+                }
+            },
+            _ => match &self.controllers[1] {
+                NesController::FourScore(fs) => fs.get_controller(index >> 1),
+                any => {
+                    if index == 1 {
+                        any.clone()
+                    } else {
+                        NesController::DummyController(DummyController::default())
+                    }
+                }
+            },
         }
     }
 
     /// Get one of the four possible controllers, mutably
-    pub fn get_controller_mut(&mut self, index: u8) -> Option<&mut NesController> {
-        if index < 2 {
-            Some(&mut self.controllers[index as usize])
-        } else {
-            None
+    pub fn get_controller_mut(&mut self, index: u8) -> &mut NesController {
+        match index {
+            0 | 2 => match &mut self.controllers[0] {
+                NesController::FourScore(fs) => fs.get_controller_mut(index >> 1),
+                any => any,
+            },
+            _ => match &mut self.controllers[1] {
+                NesController::FourScore(fs) => fs.get_controller_mut(index >> 1),
+                any => any,
+            },
         }
     }
 
     /// Set one of the four possible controllers for the system
     pub fn set_controller(&mut self, index: u8, nc: NesController) {
-        if index < 2 {
+        let p3_current = if let NesController::FourScore(fs) = &self.controllers[0] {
+            fs.has_second_controller()
+        } else {
+            false
+        };
+        let p4_current = if let NesController::FourScore(fs) = &self.controllers[1] {
+            fs.has_second_controller()
+        } else {
+            false
+        };
+        let fourscore_current = p3_current || p4_current;
+        let fourscore_new = match index {
+            0 | 1 => fourscore_current,
+            2 => match nc {
+                NesController::StandardController(_) => true,
+                NesController::Zapper(_) => true,
+                NesController::DummyController(_) => p4_current,
+                NesController::FourScore(_) => false,
+            },
+            3 => match nc {
+                NesController::StandardController(_) => true,
+                NesController::Zapper(_) => true,
+                NesController::DummyController(_) => p3_current,
+                NesController::FourScore(_) => false,
+            },
+            _ => fourscore_current,
+        };
+        if !fourscore_current && fourscore_new {
+            //reconfigure the controllers to insert four score adapters
+            let mut fs1 = FourScore::default();
+            let mut fs2 = FourScore::default();
+            fs1.set_controller(0, self.controllers[0].clone());
+            fs2.set_controller(0, self.controllers[1].clone());
+            if index == 2 {
+                fs1.set_controller(1, nc);
+            } else if index == 3 {
+                fs2.set_controller(1, nc);
+            }
+            self.controllers[0] = NesController::FourScore(fs1);
+            self.controllers[1] = NesController::FourScore(fs2);
+        } else if fourscore_current && !fourscore_new {
+            //reconfigure the controllers to remove existing four score adapters
+            let mut p1 = NesController::DummyController(DummyController::default());
+            let mut p2 = NesController::DummyController(DummyController::default());
+
+            if let NesController::FourScore(fs) = &self.controllers[0] {
+                p1 = fs.get_controller(0);
+            }
+            if let NesController::FourScore(fs) = &self.controllers[1] {
+                p2 = fs.get_controller(0);
+            }
+            self.controllers[0] = p1;
+            self.controllers[1] = p2;
+        } else if fourscore_current {
+            // modify existing four score adapters
+            match index {
+                0 => {
+                    if let NesController::FourScore(fs) = &mut self.controllers[0] {
+                        fs.set_controller(0, nc);
+                    }
+                }
+                1 => {
+                    if let NesController::FourScore(fs) = &mut self.controllers[1] {
+                        fs.set_controller(0, nc);
+                    }
+                }
+                2 => {
+                    if let NesController::FourScore(fs) = &mut self.controllers[0] {
+                        fs.set_controller(1, nc);
+                    }
+                }
+                _ => {
+                    if let NesController::FourScore(fs) = &mut self.controllers[1] {
+                        fs.set_controller(1, nc);
+                    }
+                }
+            }
+        } else {
+            // Modify regular two controller setup
             self.controllers[index as usize] = nc;
         }
     }

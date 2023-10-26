@@ -404,7 +404,7 @@ pub struct FourScore {
     /// The fourscore contains two potential controllers
     combo: [ButtonCombination; 2],
     /// The controllers that the four score uses
-    controllers: [Option<Box<NesController>>; 2],
+    controllers: [Box<NesController>; 2],
     /// The strobe signal triggers loading the controller data into the shift register
     strobe: bool,
     /// The previous clock signal
@@ -417,7 +417,10 @@ impl Default for FourScore {
     fn default() -> Self {
         Self {
             combo: [ButtonCombination::new(); 2],
-            controllers: [None, None],
+            controllers: [
+                Box::new(NesController::DummyController(DummyController::default())),
+                Box::new(NesController::DummyController(DummyController::default())),
+            ],
             strobe: false,
             prevclk: false,
             clock_counter: 0,
@@ -425,24 +428,42 @@ impl Default for FourScore {
     }
 }
 
+impl FourScore {
+    /// Retrieve a mutable reference to a controller
+    pub fn get_controller_mut(&mut self, index: u8) -> &mut Box<NesController> {
+        &mut self.controllers[index as usize]
+    }
+
+    /// Return a clone of the requested controller
+    pub fn get_controller(&self, index: u8) -> NesController {
+        (*self.controllers[index as usize]).clone()
+    }
+
+    /// Set the controller of the four score to the given controller
+    pub fn set_controller(&mut self, index: u8, nc: NesController) {
+        self.controllers[index as usize] = Box::new(nc);
+    }
+
+    /// Returns true if the second controller is present
+    pub fn has_second_controller(&self) -> bool {
+        !matches!(*self.controllers[1], NesController::DummyController(d))
+    }
+}
+
 impl NesControllerTrait for FourScore {
     #[doc = " Clock signal for the controller, must implement additional logic for edge sensitive behavior"]
     fn clock(&mut self, c: bool) {
         let active_high_edge = c && !self.prevclk;
-        if active_high_edge && !self.strobe {
-            match self.clock_counter {
-                0..=7 => {
-                    if let Some(controller) = &mut self.controllers[0] {
-                        controller.clock(c);
-                    }
-                }
-                8..=15 => {
-                    if let Some(controller) = &mut self.controllers[1] {
-                        controller.clock(c);
-                    }
-                }
-                _ => {}
+        match self.clock_counter {
+            0..=7 => {
+                self.controllers[0].clock(c);
             }
+            8..=15 => {
+                self.controllers[1].clock(c);
+            }
+            _ => {}
+        }
+        if active_high_edge && !self.strobe {
             if self.clock_counter < 24 {
                 self.clock_counter += 1;
             }
@@ -452,23 +473,18 @@ impl NesControllerTrait for FourScore {
 
     #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
     fn rapid_fire(&mut self, time: Duration) {
-        if let Some(controller) = &mut self.controllers[0] {
-            controller.rapid_fire(time);
-        }
-        if let Some(controller) = &mut self.controllers[1] {
-            controller.rapid_fire(time);
-        }
+        self.controllers[0].rapid_fire(time);
+        self.controllers[1].rapid_fire(time);
     }
 
     #[doc = " Update the serial/parallel input"]
     fn parallel_signal(&mut self, s: bool) {
         self.strobe = s;
-        if let Some(controller) = &mut self.controllers[0] {
-            controller.parallel_signal(s);
+        if s {
+            self.clock_counter = 0;
         }
-        if let Some(controller) = &mut self.controllers[1] {
-            controller.parallel_signal(s);
-        }
+        self.controllers[0].parallel_signal(s);
+        self.controllers[1].parallel_signal(s);
     }
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
@@ -483,26 +499,16 @@ impl NesControllerTrait for FourScore {
 
     #[doc = " Read data from the controller."]
     fn read_data(&mut self) -> u8 {
-        match self.clock_counter {
-            0..=7 => {
-                if let Some(controller) = &mut self.controllers[0] {
-                    controller.read_data()
-                } else {
-                    0xFF
-                }
-            }
-            8..=15 => {
-                if let Some(controller) = &mut self.controllers[1] {
-                    controller.read_data()
-                } else {
-                    0xFF
-                }
-            }
+        let d = match self.clock_counter {
+            0..=7 => self.controllers[0].read_data(),
+            8..=15 => self.controllers[1].read_data(),
             16..=17 => 0,
             18 => 0xFF,
             19..=23 => 0,
             _ => 0xFF,
-        }
+        };
+        println!("D{}: {}", self.clock_counter, d);
+        d
     }
 }
 

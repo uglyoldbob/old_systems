@@ -358,10 +358,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let new_fps = 1_000_000_000.0 / frame_time.as_nanos() as f64;
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
 
-        c.mb.get_controller_mut(0)
-            .map(|cont| cont.rapid_fire(frame_time));
-        c.mb.get_controller_mut(1)
-            .map(|cont| cont.rapid_fire(frame_time));
+        c.mb.get_controller_mut(0).rapid_fire(frame_time);
+        c.mb.get_controller_mut(1).rapid_fire(frame_time);
+        c.mb.get_controller_mut(2).rapid_fire(frame_time);
+        c.mb.get_controller_mut(3).rapid_fire(frame_time);
 
         let emulator_frame = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         let mut render = false;
@@ -403,28 +403,46 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         {
             egui.egui_ctx.input(|i| {
                 let controller = c.mb.get_controller_mut(0);
-                if let Some(controller) = controller {
-                    if let crate::controller::NesController::Zapper(z) = controller {
-                        z.provide_zapper_data(self.mouse, self.mouse_vision);
-                    } else {
-                        for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
-                            let cnum = index << 1;
-                            let button_config = &c.configuration.controller_config[cnum];
-                            contr.update_egui_buttons(i, button_config);
-                        }
+                if let crate::controller::NesController::Zapper(z) = controller {
+                    z.provide_zapper_data(self.mouse, self.mouse_vision);
+                } else {
+                    for contr in controller.get_buttons_iter_mut() {
+                        let cnum = 0;
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
                     }
                 }
 
-                let controller = c.mb.get_controller_mut(0);
-                if let Some(controller) = controller {
-                    if let crate::controller::NesController::Zapper(z) = controller {
-                        z.provide_zapper_data(self.mouse, self.mouse_vision);
-                    } else {
-                        for (index, contr) in controller.get_buttons_iter_mut().enumerate() {
-                            let cnum = 1 + (index << 1);
-                            let button_config = &c.configuration.controller_config[cnum];
-                            contr.update_egui_buttons(i, button_config);
-                        }
+                let controller = c.mb.get_controller_mut(1);
+                if let crate::controller::NesController::Zapper(z) = controller {
+                    z.provide_zapper_data(self.mouse, self.mouse_vision);
+                } else {
+                    for contr in controller.get_buttons_iter_mut() {
+                        let cnum = 1;
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                    }
+                }
+
+                let controller = c.mb.get_controller_mut(2);
+                if let crate::controller::NesController::Zapper(z) = controller {
+                    z.provide_zapper_data(self.mouse, self.mouse_vision);
+                } else {
+                    for contr in controller.get_buttons_iter_mut() {
+                        let cnum = 2;
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
+                    }
+                }
+
+                let controller = c.mb.get_controller_mut(3);
+                if let crate::controller::NesController::Zapper(z) = controller {
+                    z.provide_zapper_data(self.mouse, self.mouse_vision);
+                } else {
+                    for contr in controller.get_buttons_iter_mut() {
+                        let cnum = 3;
+                        let button_config = &c.configuration.controller_config[cnum];
+                        contr.update_egui_buttons(i, button_config);
                     }
                 }
             });

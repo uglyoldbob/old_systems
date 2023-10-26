@@ -461,6 +461,14 @@ fn main() {
         1,
         nes_data.configuration.controller_type[1].make_controller(),
     );
+    nes_data.mb.set_controller(
+        2,
+        nes_data.configuration.controller_type[2].make_controller(),
+    );
+    nes_data.mb.set_controller(
+        3,
+        nes_data.configuration.controller_type[3].make_controller(),
+    );
 
     if let Some(c) = nes_data.configuration.start_rom() {
         let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();
