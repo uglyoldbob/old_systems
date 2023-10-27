@@ -47,17 +47,8 @@ impl Recording {
             if have_gstreamer.is_ok() {
                 let version = gstreamer::version_string().as_str().to_string();
                 println!("GStreamer version is {}", version);
-                let vinfo = gstreamer_video::VideoInfo::builder(
-                    gstreamer_video::VideoFormat::Rgb,
-                    image.width as u32,
-                    image.height as u32,
-                ).fps(60)
-                .build()
-                .unwrap();
-                let video_caps = vinfo.to_caps().unwrap();
                 let app_source = gstreamer_app::AppSrc::builder()
                     .name("emulator_video")
-                    .caps(&video_caps)
                     .format(gstreamer::Format::Time)
                     .build();
                 let ainfo = gstreamer_audio::AudioInfo::builder(
@@ -154,7 +145,7 @@ impl Recording {
                 avimux.link(&sink).unwrap();
 
                 audio_source.set_stream_type(gstreamer_app::AppStreamType::Stream);
-                self.audio = Some(AudioProducerWithRate::new_gstreamer(8820, interval, audio_source));
+                self.audio = Some(AudioProducerWithRate::new_gstreamer(4410, interval, audio_source));
 
                 pipeline
                     .set_state(gstreamer::State::Playing)

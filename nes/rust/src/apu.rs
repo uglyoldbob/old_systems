@@ -19,11 +19,14 @@ impl AudioProducerMethod {
             AudioProducerMethod::GStreamer(appsrc) => {
                 let b: Vec<u8> = slice
                     .iter()
-                    .map(|a| a.to_bits().to_le_bytes())
+                    .map(|a| {
+                        let f = a + 1.0;
+                        let u = f.to_bits();
+                        u.to_le_bytes()})
                     .flatten()
                     .collect();
                 let buf = gstreamer::Buffer::from_slice(b);
-                appsrc.push_buffer(buf);
+                let _e = appsrc.push_buffer(buf).is_err();
             }
         }
     }
