@@ -18,7 +18,9 @@ use egui_multiwin::{
     tracked_window::{RedrawResponse, TrackedWindow},
 };
 
-use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt};
+use gstreamer::prelude::{
+    Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExtManual,
+};
 
 /// The struct for the main window of the emulator.
 pub struct MainNesWindow {
@@ -75,6 +77,8 @@ pub struct MainNesWindow {
     record_pipeline: Option<gstreamer::Pipeline>,
     /// The source for video data fromm the emulator
     record_source: Option<gstreamer_app::AppSrc>,
+    /// The number of frames recorded
+    num_frames: usize,
 }
 
 impl MainNesWindow {
@@ -128,6 +132,7 @@ impl MainNesWindow {
                 have_gstreamer,
                 record_pipeline: None,
                 record_source: None,
+                num_frames: 0,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
                 last_frame_time: std::time::Instant::now(),
@@ -331,6 +336,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
     fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
         self.sound_stream.take();
         if let Some(pipeline) = &mut self.record_pipeline {
+            if let Some(source) = &mut self.record_source {
+                println!("Recorded {} frames", self.num_frames);
+                source.end_of_stream();
+            }
             pipeline
                 .set_state(gstreamer::State::Null)
                 .expect("Unable to set the recording pipeline to the `Null` state");
@@ -506,11 +515,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 println!("GStreamer version is {}", version);
                                 let vinfo = gstreamer_video::VideoInfo::builder(
                                     gstreamer_video::VideoFormat::Rgb,
-                                    256,
+                                    320,
                                     240,
                                 )
-                                .interlace_mode(gstreamer_video::VideoInterlaceMode::Progressive)
-                                .stride(&[320])
                                 .build()
                                 .unwrap();
                                 let video_caps = vinfo.to_caps().unwrap();
@@ -520,9 +527,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                     .format(gstreamer::Format::Time)
                                     .build();
                                 app_source.set_block(true);
-                                let vsource = gstreamer::ElementFactory::make("rawvideoparse")
+                                let vsource = gstreamer::ElementFactory::make("videoparse")
                                     .name("vparse")
                                     .property_from_str("framerate", "60/1")
+                                    .property_from_str("width", "320")
+                                    .property_from_str("height", "240")
+                                    .property_from_str("format", "rgb")
                                     .build()
                                     .expect("Could not create source element.");
                                 let vconv = gstreamer::ElementFactory::make("videoconvert")
@@ -531,6 +541,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                     .expect("Could not create source element.");
                                 let vencoder = gstreamer::ElementFactory::make("openh264enc")
                                     .name("vencode")
+                                    .build()
+                                    .expect("Could not create source element.");
+                                let avimux = gstreamer::ElementFactory::make("avimux")
+                                    .name("avi")
                                     .build()
                                     .expect("Could not create source element.");
 
@@ -547,20 +561,19 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                         &vsource,
                                         &vconv,
                                         &vencoder,
+                                        &avimux,
                                         &sink,
                                     ])
                                     .unwrap();
-                                gstreamer::Element::link_many([app_source.upcast_ref(), &vsource])
-                                    .unwrap();
-                                vsource
-                                    .link(&vconv)
-                                    .expect("Elements 1 could not be linked.");
-                                vconv
-                                    .link(&vencoder)
-                                    .expect("Element 2 could not be linked");
-                                vencoder
-                                    .link(&sink)
-                                    .expect("Elements 3 could not be linked.");
+                                gstreamer::Element::link_many([
+                                    app_source.upcast_ref(),
+                                    &vsource,
+                                    &vconv,
+                                    &vencoder,
+                                    &avimux,
+                                    &sink,
+                                ])
+                                .unwrap();
 
                                 pipeline
                                     .set_state(gstreamer::State::Playing)
@@ -576,7 +589,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 self.image.to_gstreamer(320, 240, &mut buf);
                                 match source.push_buffer(buf) {
                                     Ok(a) => {
-                                        println!("Success sending video data? {:?}", a);
+                                        self.num_frames += 1;
                                     }
                                     Err(e) => {
                                         println!("Error pushing video data: {:?}", e);

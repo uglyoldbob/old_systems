@@ -65,16 +65,16 @@ impl PixelImage<egui::Color32> {
             v.push(p.b());
             if (i as u16 % self.width) == (self.width - 1) {
                 for _index in self.width..w as u16 {
-                    //v.push(0);
-                    //v.push(0);
-                    //v.push(0);
+                    v.push(0);
+                    v.push(0);
+                    v.push(0);
                 }
             }
         }
         for _ in oc..ac {
-            //v.push(255);
-            //v.push(255);
-            //v.push(255);
+            v.push(255);
+            v.push(255);
+            v.push(255);
         }
         let mut p = buf.make_mut().map_writable().unwrap();
         for (a, b) in v.iter().zip(p.iter_mut()) {
