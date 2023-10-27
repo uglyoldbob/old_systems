@@ -391,7 +391,7 @@ fn main() {
     let host = cpal::default_host();
     let device = host.default_output_device();
     let mut sound_rate = 0;
-    let mut sound_producer = Vec::new();
+    let mut sound_producer = None;
     let sound_stream = if let Some(d) = &device {
         let ranges = d.supported_output_configs();
         if let Ok(mut r) = ranges {
@@ -450,7 +450,7 @@ fn main() {
             if let Some(s) = &mut stream {
                 s.play().unwrap();
                 sound_rate = config.sample_rate.0;
-                sound_producer.push(user_audio);
+                sound_producer = Some(user_audio);
             }
             stream
         } else {

@@ -344,7 +344,7 @@ impl NesEmulatorData {
     /// Run a single cycle of the cpu and ppu system, dividing the input as necessary
     pub fn cycle_step(
         &mut self,
-        sound: &mut Vec<AudioProducerWithRate>,
+        sound: &mut Vec<&mut AudioProducerWithRate>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.big_counter += 1;

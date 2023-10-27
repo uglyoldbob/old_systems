@@ -42,7 +42,7 @@ pub struct MainNesWindow {
     /// The number of samples per second of the audio output.
     sound_rate: u32,
     /// The producing half of the ring buffer used for audio.
-    sound: Vec<AudioProducerWithRate>,
+    sound: Option<AudioProducerWithRate>,
     /// The texture used for rendering the ppu image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
@@ -51,8 +51,6 @@ pub struct MainNesWindow {
     /// The stream used for audio playback during emulation
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     sound_stream: Option<cpal::Stream>,
-    /// The audio stream for recordings
-    recording_sound: Option<AudioProducerWithRate>,
     /// Indicates the last know state of the sound stream
     paused: bool,
     /// Used for the zapper
@@ -96,12 +94,16 @@ impl MainNesWindow {
     #[cfg(feature = "egui-multiwin")]
     pub fn new_request(
         rate: u32,
-        producer: Vec<AudioProducerWithRate>,
+        producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
     ) -> NewWindowRequest<NesEmulatorData> {
         use std::time::Duration;
 
         let have_gstreamer = gstreamer::init();
+        gstreamer::debug_add_log_function(|a,b,c,d,e,f,g|{
+            println!("GSTREAMER: {:?} {} {} {} {} {:?} {:?}", a, b, c, d, e, f, g);
+        });
+        gstreamer::debug_set_active(true);
         if let Err(e) = &have_gstreamer {
             println!("Failed to open gstreamer: {:?}", e);
         }
@@ -127,7 +129,6 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
-                recording_sound: None,
                 recording: Recording::new(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
@@ -389,10 +390,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             )
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
-            self.sound[0].set_audio_interval(sampling_frequency / rf);
-
-            let rs = AudioProducerWithRate::new_with_size(4410, sampling_frequency / 4410.0);
-            self.recording_sound = Some(rs);
+            if let Some(sound) = &mut self.sound {
+                sound.set_audio_interval(sampling_frequency / rf);
+            }
         }
 
         let quit = false;
@@ -447,11 +447,18 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         }
 
         if render {
+            let mut sound = Vec::new();
+            if let Some(s) = &mut self.sound {
+                sound.push(s);
+            }
+            if let Some(s) = self.recording.get_sound() {
+                sound.push(s);
+            }
             'emulator_loop: loop {
                 #[cfg(feature = "debugger")]
                 {
                     if !c.paused {
-                        c.cycle_step(&mut self.sound, &mut self.filter);
+                        c.cycle_step(&mut sound, &mut self.filter);
                         if c.cpu_clock_counter == 0
                             && c.cpu.breakpoint_option()
                             && (c.cpu.breakpoint() || c.single_step)
@@ -674,11 +681,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         if let Some(rec) = start_stop_recording {
             if rec {
                 c.resolution_locked = true;
+                let sampling_frequency = 21.47727e6 / 12.0;
                 self.recording.start(
                     &self.have_gstreamer,
                     &self.image,
                     60,
                     format!("./{}.avi", chrono::Local::now().to_string()),
+                    sampling_frequency / 44100.0
                 );
             } else {
                 c.resolution_locked = false;

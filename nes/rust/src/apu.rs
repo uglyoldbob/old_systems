@@ -2,6 +2,33 @@
 
 use biquad::Biquad;
 
+/// The various ways of producing samples of data
+enum AudioProducerMethod {
+    /// A ring buffer is used to produce the audio
+    RingBuffer(crate::AudioProducer),
+    /// The audio is pushed directly to gstreamer
+    GStreamer(gstreamer_app::AppSrc),
+}
+
+impl AudioProducerMethod {
+    fn push_slice(&mut self, slice: &[f32]) {
+        match self {
+            AudioProducerMethod::RingBuffer(rb) => {
+                rb.push_slice(slice);
+            }
+            AudioProducerMethod::GStreamer(appsrc) => {
+                let b: Vec<u8> = slice
+                    .iter()
+                    .map(|a| a.to_bits().to_le_bytes())
+                    .flatten()
+                    .collect();
+                let buf = gstreamer::Buffer::from_slice(b);
+                appsrc.push_buffer(buf);
+            }
+        }
+    }
+}
+
 /// A struct that allows the producer and the rate of sample production to be linked together
 pub struct AudioProducerWithRate {
     /// The number of clocks between generated samples
@@ -9,13 +36,11 @@ pub struct AudioProducerWithRate {
     /// The counter for generating samples at the right times
     counter: f32,
     /// The ringbuffer to put samples into
-    producer: crate::AudioProducer,
+    producer: AudioProducerMethod,
     /// The buffer to put samples into
     buffer: Vec<f32>,
     /// The index of where to store samples
     buffer_index: usize,
-    /// The optional consumer of the ring buffer
-    consumer: Option<crate::AudioConsumer>,
 }
 
 impl AudioProducerWithRate {
@@ -24,30 +49,21 @@ impl AudioProducerWithRate {
         Self {
             interval: 1.0,
             counter: 0.0,
-            producer,
+            producer: AudioProducerMethod::RingBuffer(producer),
             buffer: vec![0.0; size],
             buffer_index: 0,
-            consumer: None,
         }
     }
 
     /// Create a new object and a new ringbuffer based on size
-    pub fn new_with_size(size: usize, interval: f32) -> Self {
-        let rb: ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>> =
-            ringbuf::HeapRb::new(size);
-        let (producer, receiver) = rb.split();
+    pub fn new_gstreamer(size: usize, interval: f32, src: gstreamer_app::AppSrc) -> Self {
         Self {
             interval,
             counter: 0.0,
-            producer,
+            producer: AudioProducerMethod::GStreamer(src),
             buffer: vec![0.0; size],
             buffer_index: 0,
-            consumer: Some(receiver),
         }
-    }
-
-    pub fn take_consumer(&mut self) -> Option<crate::AudioConsumer> {
-        self.consumer.take()
     }
 
     /// Set the interval for generating audio on this stream
@@ -397,7 +413,7 @@ impl NesApu {
     /// Clock the apu
     pub fn clock_slow(
         &mut self,
-        sound: &mut Vec<AudioProducerWithRate>,
+        sound: &mut Vec<&mut AudioProducerWithRate>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.always_clock = self.always_clock.wrapping_add(1);
