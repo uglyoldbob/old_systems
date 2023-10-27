@@ -2,7 +2,7 @@
 //!
 use std::io::Write;
 
-use crate::{apu::AudioProducerWithRate, controller::NesControllerTrait, NesEmulatorData};
+use crate::{apu::AudioProducerWithRate, controller::NesControllerTrait, NesEmulatorData, recording::Recording};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
@@ -16,10 +16,6 @@ use egui_multiwin::{
     egui_glow::EguiGlow,
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
-};
-
-use gstreamer::prelude::{
-    Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExtManual,
 };
 
 /// The struct for the main window of the emulator.
@@ -68,12 +64,8 @@ pub struct MainNesWindow {
     image: crate::ppu::PixelImage<egui::Color32>,
     /// The result of opening gstreamer
     have_gstreamer: Result<(), gstreamer::glib::Error>,
-    /// The pipeline for recording to disk
-    record_pipeline: Option<gstreamer::Pipeline>,
-    /// The source for video data fromm the emulator
-    record_source: Option<gstreamer_app::AppSrc>,
-    /// The number of frames recorded
-    num_frames: usize,
+    /// The recording object
+    recording: Recording,
 }
 
 impl MainNesWindow {
@@ -116,9 +108,6 @@ impl MainNesWindow {
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
                 have_gstreamer,
-                record_pipeline: None,
-                record_source: None,
-                num_frames: 0,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
                 last_frame_time: std::time::Instant::now(),
@@ -138,6 +127,7 @@ impl MainNesWindow {
                 mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
                 recording_sound: None,
+                recording: Recording::new(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -320,15 +310,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
     fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
         self.sound_stream.take();
-        if let Some(pipeline) = &mut self.record_pipeline {
-            if let Some(source) = &mut self.record_source {
-                println!("Recorded {} frames", self.num_frames);
-                source.end_of_stream();
-            }
-            pipeline
-                .set_state(gstreamer::State::Null)
-                .expect("Unable to set the recording pipeline to the `Null` state");
-        }
+        self.recording.stop();
         true
     }
 
@@ -494,94 +476,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 .resize(c.configuration.scaler);
                             self.image = image;
                         }
-                        if self.record_pipeline.is_none() {
-                            if self.have_gstreamer.is_ok() {
-                                let version = gstreamer::version_string().as_str().to_string();
-                                println!("GStreamer version is {}", version);
-                                let vinfo = gstreamer_video::VideoInfo::builder(
-                                    gstreamer_video::VideoFormat::Rgb,
-                                    256,
-                                    240,
-                                )
-                                .build()
-                                .unwrap();
-                                let video_caps = vinfo.to_caps().unwrap();
-                                let app_source = gstreamer_app::AppSrc::builder()
-                                    .name("emulator_video")
-                                    .caps(&video_caps)
-                                    .format(gstreamer::Format::Time)
-                                    .build();
-                                app_source.set_block(true);
-                                let vsource = gstreamer::ElementFactory::make("videoparse")
-                                    .name("vparse")
-                                    .property_from_str("framerate", "60/1")
-                                    .property_from_str("width", "256")
-                                    .property_from_str("height", "240")
-                                    .property_from_str("format", "rgb")
-                                    .build()
-                                    .expect("Could not create source element.");
-                                let vconv = gstreamer::ElementFactory::make("videoconvert")
-                                    .name("vconvert")
-                                    .build()
-                                    .expect("Could not create source element.");
-                                let vencoder = gstreamer::ElementFactory::make("openh264enc")
-                                    .name("vencode")
-                                    .build()
-                                    .expect("Could not create source element.");
-                                let avimux = gstreamer::ElementFactory::make("avimux")
-                                    .name("avi")
-                                    .build()
-                                    .expect("Could not create source element.");
-
-                                let sink = gstreamer::ElementFactory::make("filesink")
-                                    .name("sink")
-                                    .property_from_str("location", "./test.avi")
-                                    .build()
-                                    .expect("Could not create sink element");
-
-                                let pipeline = gstreamer::Pipeline::with_name("recording-pipeline");
-                                pipeline
-                                    .add_many([
-                                        app_source.upcast_ref(),
-                                        &vsource,
-                                        &vconv,
-                                        &vencoder,
-                                        &avimux,
-                                        &sink,
-                                    ])
-                                    .unwrap();
-                                gstreamer::Element::link_many([
-                                    app_source.upcast_ref(),
-                                    &vsource,
-                                    &vconv,
-                                    &vencoder,
-                                    &avimux,
-                                    &sink,
-                                ])
-                                .unwrap();
-
-                                pipeline
-                                    .set_state(gstreamer::State::Playing)
-                                    .expect("Unable to set the pipeline to the `Playing` state");
-
-                                self.record_source = Some(app_source);
-                                self.record_pipeline = Some(pipeline);
-                            }
-                        }
-                        if let Some(pipeline) = &mut self.record_pipeline {
-                            if let Some(source) = &mut self.record_source {
-                                let mut buf = gstreamer::Buffer::with_size(256 * 240 * 3).unwrap();
-                                self.image.to_gstreamer(256, 240, &mut buf);
-                                match source.push_buffer(buf) {
-                                    Ok(a) => {
-                                        self.num_frames += 1;
-                                    }
-                                    Err(e) => {
-                                        println!("Error pushing video data: {:?}", e);
-                                    }
-                                }
-                            }
-                        }
+                        self.recording.start(&self.have_gstreamer);
+                        self.recording.send_frame(&self.image);
 
                         if self.mouse_delay > 0 {
                             self.mouse_delay -= 1;

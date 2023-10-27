@@ -196,6 +196,9 @@ pub struct NesEmulatorData {
     big_counter: u64,
     /// Indicates vblank was just set
     vblank_just_set: u8,
+    #[serde(skip)]
+    /// Indicates that the screen resolution is locked
+    resolution_locked: bool,
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -240,6 +243,7 @@ impl NesEmulatorData {
             configuration: EmulatorConfiguration::load("./config.toml".to_string()),
             big_counter: 0,
             vblank_just_set: 0,
+            resolution_locked: false,
         }
     }
 
@@ -260,6 +264,7 @@ impl NesEmulatorData {
                 let controller4 = self.mb.get_controller(3);
                 let config_path = self.configuration.path.to_owned();
                 let romlist = self.roms.clone();
+                let locked = self.resolution_locked;
                 let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
                 cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
@@ -271,6 +276,7 @@ impl NesEmulatorData {
                 self.configuration.path = config_path;
                 self.cpu_peripherals.ppu.set_frame(screen);
                 self.configuration = config;
+                self.resolution_locked = locked;
                 Ok(())
             }
             Err(e) => Err(e),

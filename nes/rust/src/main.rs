@@ -20,6 +20,7 @@ mod cpu;
 mod emulator_data;
 mod motherboard;
 mod ppu;
+mod recording;
 mod romlist;
 #[cfg(test)]
 mod utility;
