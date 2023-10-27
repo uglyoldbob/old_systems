@@ -2,7 +2,10 @@
 //!
 use std::io::Write;
 
-use crate::{apu::AudioProducerWithRate, controller::NesControllerTrait, NesEmulatorData, recording::Recording};
+use crate::{
+    apu::AudioProducerWithRate, controller::NesControllerTrait, recording::Recording,
+    NesEmulatorData,
+};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
@@ -476,7 +479,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 .resize(c.configuration.scaler);
                             self.image = image;
                         }
-                        self.recording.start(&self.have_gstreamer);
+                        self.recording.start(&self.have_gstreamer, &self.image, 60, "./test.avi".to_string());
                         self.recording.send_frame(&self.image);
 
                         if self.mouse_delay > 0 {

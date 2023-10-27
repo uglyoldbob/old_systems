@@ -33,7 +33,8 @@ impl AudioProducerWithRate {
 
     /// Create a new object and a new ringbuffer based on size
     pub fn new_with_size(size: usize, interval: f32) -> Self {
-        let rb: ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>> = ringbuf::HeapRb::new(size);
+        let rb: ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>> =
+            ringbuf::HeapRb::new(size);
         let (producer, receiver) = rb.split();
         Self {
             interval,
