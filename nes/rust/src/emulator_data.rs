@@ -3,7 +3,7 @@
 use std::io::Write;
 
 use crate::{
-    apu::NesApu,
+    apu::{AudioProducerWithRate, NesApu},
     cartridge::NesCartridge,
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
@@ -253,7 +253,6 @@ impl NesEmulatorData {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
                 let config = self.configuration.clone();
-                let audio = self.cpu_peripherals.apu.get_buffer();
                 let screen = self.cpu_peripherals.ppu.backup_frame();
                 let controller1 = self.mb.get_controller(0);
                 let controller2 = self.mb.get_controller(1);
@@ -270,7 +269,6 @@ impl NesEmulatorData {
                 self.mb.set_controller(3, controller4);
                 self.roms = romlist;
                 self.configuration.path = config_path;
-                self.cpu_peripherals.apu.restore_buffer(audio);
                 self.cpu_peripherals.ppu.set_frame(screen);
                 self.configuration = config;
                 Ok(())
@@ -296,11 +294,6 @@ impl NesEmulatorData {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let mut apu = NesApu::new();
-
-        let audio_interval = self.cpu_peripherals.apu.get_audio_interval();
-        let buffer_len = self.cpu_peripherals.apu.get_audio_buffer_length();
-        apu.set_audio_interval(audio_interval);
-        apu.set_audio_buffer(buffer_len);
 
         let breakpoints = self.cpu.breakpoints.clone();
         self.cpu = NesCpu::new();
@@ -345,12 +338,7 @@ impl NesEmulatorData {
     /// Run a single cycle of the cpu and ppu system, dividing the input as necessary
     pub fn cycle_step(
         &mut self,
-        sound: &mut Option<
-            ringbuf::Producer<
-                f32,
-                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-            >,
-        >,
+        sound: &mut Vec<AudioProducerWithRate>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.big_counter += 1;

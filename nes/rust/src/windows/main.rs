@@ -2,7 +2,7 @@
 //!
 use std::io::Write;
 
-use crate::{controller::NesControllerTrait, NesEmulatorData};
+use crate::{apu::AudioProducerWithRate, controller::NesControllerTrait, NesEmulatorData};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
@@ -43,19 +43,12 @@ pub struct MainNesWindow {
     /// The number of samples per second of the audio output.
     sound_rate: u32,
     /// The producing half of the ring buffer used for audio.
-    sound: Option<
-        ringbuf::Producer<
-            f32,
-            std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-        >,
-    >,
+    sound: Vec<AudioProducerWithRate>,
     /// The texture used for rendering the ppu image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
     /// The filter used for audio playback, filtering out high frequency noise, increasing the quality of audio playback.
     filter: Option<biquad::DirectForm1<f32>>,
-    /// The interval between sound samples based on the sample rate used in the stream
-    sound_sample_interval: f32,
     /// The stream used for audio playback during emulation
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     sound_stream: Option<cpal::Stream>,
@@ -86,12 +79,7 @@ impl MainNesWindow {
     pub fn new_request(
         c: NesEmulatorData,
         rate: u32,
-        producer: Option<
-            ringbuf::Producer<
-                f32,
-                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-            >,
-        >,
+        producer: Option<crate::AudioProducer>,
         stream: Option<cpal::Stream>,
     ) -> Self {
         Self {
@@ -102,7 +90,6 @@ impl MainNesWindow {
             sound: producer,
             texture: None,
             filter: None,
-            sound_sample_interval: 0.0,
             sound_stream: stream,
             paused: false,
         }
@@ -112,15 +99,12 @@ impl MainNesWindow {
     #[cfg(feature = "egui-multiwin")]
     pub fn new_request(
         rate: u32,
-        producer: Option<
-            ringbuf::Producer<
-                f32,
-                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-            >,
-        >,
+        producer: Vec<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
     ) -> NewWindowRequest<NesEmulatorData> {
         use std::time::Duration;
+
+        use crate::apu::AudioProducerWithRate;
 
         let have_gstreamer = gstreamer::init();
         if let Err(e) = &have_gstreamer {
@@ -144,7 +128,6 @@ impl MainNesWindow {
                 sound: producer,
                 texture: None,
                 filter: None,
-                sound_sample_interval: 0.0,
                 sound_stream: stream,
                 paused: false,
                 mouse: false,
@@ -190,7 +173,6 @@ impl eframe::App for MainNesWindow {
             )
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
-            self.sound_sample_interval = sampling_frequency / rf;
             self.c
                 .cpu_peripherals
                 .apu
@@ -421,10 +403,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             )
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
-            self.sound_sample_interval = sampling_frequency / rf;
-            c.cpu_peripherals
-                .apu
-                .set_audio_interval(self.sound_sample_interval);
+            self.sound[0].set_audio_interval(sampling_frequency / rf);
         }
 
         let quit = false;
