@@ -27,6 +27,9 @@ mod utility;
 /// A convenience type for the type used in the ringbuf crate.
 pub type AudioProducer =
     ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
+/// A convenience type for the type used in the ringbuf crate.
+pub type AudioConsumer =
+    ringbuf::Consumer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
 
 use emulator_data::NesEmulatorData;
 

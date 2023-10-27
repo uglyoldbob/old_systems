@@ -52,6 +52,8 @@ pub struct MainNesWindow {
     /// The stream used for audio playback during emulation
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     sound_stream: Option<cpal::Stream>,
+    /// The audio stream for recordings
+    recording_sound: Option<AudioProducerWithRate>,
     /// Indicates the last know state of the sound stream
     paused: bool,
     /// Used for the zapper
@@ -135,6 +137,7 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
+                recording_sound: None,
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -404,6 +407,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
             self.sound[0].set_audio_interval(sampling_frequency / rf);
+
+            let rs = AudioProducerWithRate::new_with_size(4410, sampling_frequency / 4410.0);
+            self.recording_sound = Some(rs);
         }
 
         let quit = false;
@@ -494,7 +500,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 println!("GStreamer version is {}", version);
                                 let vinfo = gstreamer_video::VideoInfo::builder(
                                     gstreamer_video::VideoFormat::Rgb,
-                                    320,
+                                    256,
                                     240,
                                 )
                                 .build()
@@ -509,7 +515,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 let vsource = gstreamer::ElementFactory::make("videoparse")
                                     .name("vparse")
                                     .property_from_str("framerate", "60/1")
-                                    .property_from_str("width", "320")
+                                    .property_from_str("width", "256")
                                     .property_from_str("height", "240")
                                     .property_from_str("format", "rgb")
                                     .build()
@@ -564,8 +570,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         }
                         if let Some(pipeline) = &mut self.record_pipeline {
                             if let Some(source) = &mut self.record_source {
-                                let mut buf = gstreamer::Buffer::with_size(320 * 240 * 3).unwrap();
-                                self.image.to_gstreamer(320, 240, &mut buf);
+                                let mut buf = gstreamer::Buffer::with_size(256 * 240 * 3).unwrap();
+                                self.image.to_gstreamer(256, 240, &mut buf);
                                 match source.push_buffer(buf) {
                                     Ok(a) => {
                                         self.num_frames += 1;

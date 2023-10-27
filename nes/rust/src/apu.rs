@@ -14,6 +14,8 @@ pub struct AudioProducerWithRate {
     buffer: Vec<f32>,
     /// The index of where to store samples
     buffer_index: usize,
+    /// The optional consumer of the ring buffer
+    consumer: Option<crate::AudioConsumer>,
 }
 
 impl AudioProducerWithRate {
@@ -25,7 +27,26 @@ impl AudioProducerWithRate {
             producer,
             buffer: vec![0.0; size],
             buffer_index: 0,
+            consumer: None,
         }
+    }
+
+    /// Create a new object and a new ringbuffer based on size
+    pub fn new_with_size(size: usize, interval: f32) -> Self {
+        let rb: ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>> = ringbuf::HeapRb::new(size);
+        let (producer, receiver) = rb.split();
+        Self {
+            interval,
+            counter: 0.0,
+            producer,
+            buffer: vec![0.0; size],
+            buffer_index: 0,
+            consumer: Some(receiver),
+        }
+    }
+
+    pub fn take_consumer(&mut self) -> Option<crate::AudioConsumer> {
+        self.consumer.take()
     }
 
     /// Set the interval for generating audio on this stream
@@ -159,6 +180,8 @@ use triangle::ApuTriangleChannel;
 
 mod dmc;
 use dmc::ApuDmcChannel;
+
+use crate::AudioConsumer;
 
 /// The nes apu
 #[non_exhaustive]
