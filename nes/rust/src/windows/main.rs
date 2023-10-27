@@ -673,6 +673,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         if let Some(rec) = start_stop_recording {
             if rec {
+                c.resolution_locked = true;
                 self.recording.start(
                     &self.have_gstreamer,
                     &self.image,
@@ -680,6 +681,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     format!("./{}.avi", chrono::Local::now().to_string()),
                 );
             } else {
+                c.resolution_locked = false;
                 self.recording.stop();
             }
         }

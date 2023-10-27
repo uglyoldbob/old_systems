@@ -198,7 +198,7 @@ pub struct NesEmulatorData {
     vblank_just_set: u8,
     #[serde(skip)]
     /// Indicates that the screen resolution is locked
-    resolution_locked: bool,
+    pub resolution_locked: bool,
 }
 
 #[cfg(feature = "egui-multiwin")]
