@@ -19,6 +19,11 @@ impl Recording {
         }
     }
 
+    /// Returns true if recording
+    pub fn is_recording(&self) -> bool {
+        self.record_pipeline.is_some()
+    }
+
     /// Start recording by setting up the necessary objects.
     pub fn start(
         &mut self,
@@ -105,9 +110,11 @@ impl Recording {
 
     /// Send a frame of data to the recording
     pub fn send_frame(&mut self, image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
-        if let Some(pipeline) = &mut self.record_pipeline {
+        if let Some(_pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
-                let mut buf = gstreamer::Buffer::with_size(image.width as usize * image.height as usize * 3).unwrap();
+                let mut buf =
+                    gstreamer::Buffer::with_size(image.width as usize * image.height as usize * 3)
+                        .unwrap();
                 image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
                 match source.push_buffer(buf) {
                     Ok(a) => {}

@@ -101,8 +101,6 @@ impl MainNesWindow {
     ) -> NewWindowRequest<NesEmulatorData> {
         use std::time::Duration;
 
-        use crate::apu::AudioProducerWithRate;
-
         let have_gstreamer = gstreamer::init();
         if let Err(e) = &have_gstreamer {
             println!("Failed to open gstreamer: {:?}", e);
@@ -479,7 +477,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                 .resize(c.configuration.scaler);
                             self.image = image;
                         }
-                        self.recording.start(&self.have_gstreamer, &self.image, 60, "./test.avi".to_string());
                         self.recording.send_frame(&self.image);
 
                         if self.mouse_delay > 0 {
@@ -533,6 +530,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let mut save_state = false;
         let mut load_state = false;
         let mut rewind_state = false;
+        //Some(true) means start recording, Some(false) means stop recording
+        let mut start_stop_recording: Option<bool> = None;
 
         egui_multiwin::egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::menu::bar(ui, |ui| {
@@ -562,6 +561,29 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         println!("Loading state");
                         load_state = true;
                         ui.close_menu();
+                    }
+
+                    if !self.recording.is_recording() {
+                        let button = egui_multiwin::egui::Button::new("Begin recording");
+                        if ui.add_enabled(true, button).clicked()
+                            || egui
+                                .egui_ctx
+                                .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
+                        {
+                            start_stop_recording = Some(true);
+                            ui.close_menu();
+                        }
+                    }
+                    else {
+                        let button = egui_multiwin::egui::Button::new("Stop recording");
+                        if ui.add_enabled(true, button).clicked()
+                            || egui
+                                .egui_ctx
+                                .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
+                        {
+                            start_stop_recording = Some(false);
+                            ui.close_menu();
+                        }
                     }
                 });
                 ui.menu_button("Edit", |ui| {
@@ -647,6 +669,19 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F7))
         {
             rewind_state = true;
+        }
+
+        if let Some(rec) = start_stop_recording {
+            if rec {
+                self.recording.start(
+                    &self.have_gstreamer,
+                    &self.image,
+                    60,
+                    format!("./{}.avi", chrono::Local::now().to_string()),
+                );
+            } else {
+                self.recording.stop();
+            }
         }
 
         let name = if let Some(cart) = c.mb.cartridge() {
