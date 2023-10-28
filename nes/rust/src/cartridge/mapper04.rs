@@ -153,9 +153,6 @@ impl Mapper04 {
             self.irq_counter -= 1;
         }
         if self.irq_counter == 0 && self.irq_enabled {
-            if !self.irq_pending {
-                println!("IRQ {:X}", self.ppu_address);
-            }
             self.irq_pending = true;
         }
 

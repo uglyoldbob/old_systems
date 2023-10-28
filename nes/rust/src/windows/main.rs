@@ -67,6 +67,8 @@ pub struct MainNesWindow {
     mouse_miss: bool,
     /// The stored resized image for the emulator
     image: crate::ppu::PixelImage<egui::Color32>,
+    /// The gilrs object
+    gilrs: gilrs::Gilrs,
 }
 
 impl MainNesWindow {
@@ -131,6 +133,7 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
+                gilrs: gilrs::Gilrs::new().unwrap(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -415,6 +418,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     }
                 }
             });
+            for (id, gamepad) in self.gilrs.gamepads() {
+                println!("{}: {} is {:?}", id, gamepad.name(), gamepad.power_info());
+            }
         }
 
         if render {

@@ -499,16 +499,14 @@ impl NesControllerTrait for FourScore {
 
     #[doc = " Read data from the controller."]
     fn read_data(&mut self) -> u8 {
-        let d = match self.clock_counter {
+        match self.clock_counter {
             0..=7 => self.controllers[0].read_data(),
             8..=15 => self.controllers[1].read_data(),
             16..=17 => 0,
             18 => 0xFF,
             19..=23 => 0,
             _ => 0xFF,
-        };
-        println!("D{}: {}", self.clock_counter, d);
-        d
+        }
     }
 }
 
