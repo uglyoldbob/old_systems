@@ -126,13 +126,13 @@ impl NesMotherboard {
                 NesController::StandardController(_) => true,
                 NesController::Zapper(_) => true,
                 NesController::DummyController(_) => p4_current,
-                NesController::FourScore(_) => false,
+                NesController::FourScore(_) => true,
             },
             3 => match nc {
                 NesController::StandardController(_) => true,
                 NesController::Zapper(_) => true,
                 NesController::DummyController(_) => p3_current,
-                NesController::FourScore(_) => false,
+                NesController::FourScore(_) => true,
             },
             _ => fourscore_current,
         };
@@ -188,7 +188,9 @@ impl NesMotherboard {
             }
         } else {
             // Modify regular two controller setup
-            self.controllers[index as usize] = nc;
+            if index < 2 {
+                self.controllers[index as usize] = nc;
+            }
         }
     }
 
