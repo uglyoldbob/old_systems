@@ -402,47 +402,16 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
         {
             egui.egui_ctx.input(|i| {
-                let controller = c.mb.get_controller_mut(0);
-                if let crate::controller::NesController::Zapper(z) = controller {
-                    z.provide_zapper_data(self.mouse, self.mouse_vision);
-                } else {
-                    for contr in controller.get_buttons_iter_mut() {
-                        let cnum = 0;
-                        let button_config = &c.configuration.controller_config[cnum];
-                        contr.update_egui_buttons(i, button_config);
-                    }
-                }
-
-                let controller = c.mb.get_controller_mut(1);
-                if let crate::controller::NesController::Zapper(z) = controller {
-                    z.provide_zapper_data(self.mouse, self.mouse_vision);
-                } else {
-                    for contr in controller.get_buttons_iter_mut() {
-                        let cnum = 1;
-                        let button_config = &c.configuration.controller_config[cnum];
-                        contr.update_egui_buttons(i, button_config);
-                    }
-                }
-
-                let controller = c.mb.get_controller_mut(2);
-                if let crate::controller::NesController::Zapper(z) = controller {
-                    z.provide_zapper_data(self.mouse, self.mouse_vision);
-                } else {
-                    for contr in controller.get_buttons_iter_mut() {
-                        let cnum = 2;
-                        let button_config = &c.configuration.controller_config[cnum];
-                        contr.update_egui_buttons(i, button_config);
-                    }
-                }
-
-                let controller = c.mb.get_controller_mut(3);
-                if let crate::controller::NesController::Zapper(z) = controller {
-                    z.provide_zapper_data(self.mouse, self.mouse_vision);
-                } else {
-                    for contr in controller.get_buttons_iter_mut() {
-                        let cnum = 3;
-                        let button_config = &c.configuration.controller_config[cnum];
-                        contr.update_egui_buttons(i, button_config);
+                for index in 0..4 {
+                    let controller = c.mb.get_controller_mut(index);
+                    if let crate::controller::NesController::Zapper(z) = controller {
+                        z.provide_zapper_data(self.mouse, self.mouse_vision);
+                    } else {
+                        for contr in controller.get_buttons_iter_mut() {
+                            let cnum = index;
+                            let button_config = &c.configuration.controller_config[cnum as usize];
+                            contr.update_egui_buttons(i, button_config);
+                        }
                     }
                 }
             });
