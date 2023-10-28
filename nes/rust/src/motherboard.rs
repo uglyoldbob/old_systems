@@ -188,7 +188,9 @@ impl NesMotherboard {
             }
         } else {
             // Modify regular two controller setup
-            self.controllers[index as usize] = nc;
+            if index < 2 {
+                self.controllers[index as usize] = nc;
+            }
         }
     }
 
