@@ -15,9 +15,9 @@ pub enum UserInput {
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     Egui(egui::Key),
     /// User input provided by a button from gilrs
-    GilrsButton(gilrs::GamepadId, gilrs::Button),
+    GilrsButton(gilrs::GamepadId, gilrs::ev::Code),
     /// User input button provided by an axis from gilrs, true means positive direction
-    GilrsAxisButton(gilrs::GamepadId, gilrs::Axis, bool),
+    GilrsAxisButton(gilrs::GamepadId, gilrs::ev::Code, bool),
     /// Input from sdl2 input layer
     #[cfg(feature = "sdl2")]
     Sdl2,
@@ -87,6 +87,22 @@ impl ControllerConfig {
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub fn set_key_egui(&mut self, index: usize, k: egui::Key) {
         self.buttons[index] = UserInput::Egui(k);
+    }
+
+    /// Set the given button with gilrs code data
+    pub fn set_key_gilrs_button(&mut self, index: usize, id: gilrs::GamepadId, c: gilrs::ev::Code) {
+        self.buttons[index] = UserInput::GilrsButton(id, c);
+    }
+
+    /// Set the given button with gilrs axis data as a button
+    pub fn set_key_gilrs_axis(
+        &mut self,
+        index: usize,
+        id: gilrs::GamepadId,
+        c: gilrs::ev::Code,
+        dir: bool,
+    ) {
+        self.buttons[index] = UserInput::GilrsAxisButton(id, c, dir);
     }
 }
 
@@ -208,7 +224,6 @@ impl ButtonCombination {
     pub fn update_gilrs_buttons(
         &mut self,
         gid: gilrs::GamepadId,
-        gp: gilrs::Gamepad,
         code: gilrs::ev::Code,
         button: &gilrs::ev::state::ButtonData,
         config: &ControllerConfig,
@@ -220,15 +235,13 @@ impl ButtonCombination {
             if index == BUTTON_COMBO_TURBOB {
                 self.try_set_rate(index, config.rates[1]);
             }
-            if let UserInput::GilrsButton(id, b) = b {
+            if let UserInput::GilrsButton(id, c) = b {
                 if *id == gid {
-                    if let Some(bcode) = gp.button_code(*b) {
-                        if bcode == code {
-                            if button.is_pressed() {
-                                self.set_button(index, 0);
-                            } else {
-                                self.clear_button(index);
-                            }
+                    if *c == code {
+                        if button.is_pressed() {
+                            self.set_button(index, 0);
+                        } else {
+                            self.clear_button(index);
                         }
                     }
                 }
@@ -240,7 +253,6 @@ impl ButtonCombination {
     pub fn update_gilrs_axes(
         &mut self,
         gid: gilrs::GamepadId,
-        gp: gilrs::Gamepad,
         code: gilrs::ev::Code,
         axis: &gilrs::ev::state::AxisData,
         config: &ControllerConfig,
@@ -255,20 +267,18 @@ impl ButtonCombination {
             match b {
                 UserInput::GilrsAxisButton(id, a, dir) => {
                     if *id == gid {
-                        if let Some(acode) = gp.axis_code(*a) {
-                            if acode == code {
-                                if *dir {
-                                    if axis.value() > 0.5 {
-                                        self.set_button(index, 0);
-                                    } else {
-                                        self.clear_button(index);
-                                    }
+                        if *a == code {
+                            if *dir {
+                                if axis.value() > 0.5 {
+                                    self.set_button(index, 0);
                                 } else {
-                                    if axis.value() < -0.5 {
-                                        self.set_button(index, 0);
-                                    } else {
-                                        self.clear_button(index);
-                                    }
+                                    self.clear_button(index);
+                                }
+                            } else {
+                                if axis.value() < -0.5 {
+                                    self.set_button(index, 0);
+                                } else {
+                                    self.clear_button(index);
                                 }
                             }
                         }

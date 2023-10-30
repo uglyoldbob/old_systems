@@ -1,6 +1,6 @@
 //! This modules contains the window for editing controller properties
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     controller::{DummyController, NesController},
@@ -27,6 +27,11 @@ pub struct Window {
     waiting_for_input: Option<usize>,
     /// The last set of known pressed keys fromm egui
     known_keys: HashSet<egui::Key>,
+    /// The set of data from gilrs
+    gilrs_last_known: (
+        HashSet<(gilrs::GamepadId, gilrs::ev::Code)>,
+        HashMap<(gilrs::GamepadId, gilrs::ev::Code), f32>,
+    ),
 }
 
 impl Window {
@@ -38,6 +43,7 @@ impl Window {
                 selected_controller: None,
                 known_keys: HashSet::new(),
                 waiting_for_input: None,
+                gilrs_last_known: (HashSet::new(), HashMap::new()),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -73,6 +79,41 @@ impl TrackedWindow<NesEmulatorData> for Window {
         let windows_to_create = vec![];
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            let (old_gilrs_button, old_gilrs_axis) = self.gilrs_last_known.clone();
+            if let Some(olocal) = &mut c.olocal {
+                let gilrs = &mut olocal.gilrs;
+
+                let mut bhash = HashSet::new();
+                let mut ahash = HashMap::new();
+                for (id, gp) in gilrs.gamepads() {
+                    let state = gp.state();
+                    for (code, bd) in state.buttons() {
+                        if bd.is_pressed() {
+                            bhash.insert((id, code));
+                        }
+                    }
+                    for (code, ad) in state.axes() {
+                        ahash.insert((id, code), ad.value());
+                    }
+                }
+                self.gilrs_last_known = (bhash, ahash);
+            }
+            let (new_b, new_a) = &self.gilrs_last_known;
+            let mut diff_b = new_b.difference(&old_gilrs_button);
+            let diff_a: Vec<(&(gilrs::GamepadId, gilrs::ev::Code), &f32)> = new_a
+                .iter()
+                .filter(|(complex_id, val)| {
+                    if let Some(v2) = old_gilrs_axis.get(complex_id) {
+                        *v2 == **val
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+
+            let first_joy_button = diff_b.next();
+            let first_joy_axis = diff_a.iter().next();
+
             let newkeys = ui.input(|i| i.keys_down.clone());
 
             let oldkeys = self.known_keys.clone();
@@ -129,6 +170,20 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         config.set_key_egui(index, *key);
                         self.waiting_for_input = None;
                         save_config = true;
+                    } else if let Some((id, joybutton)) = first_joy_button {
+                        config.set_key_gilrs_button(index, *id, *joybutton);
+                        self.waiting_for_input = None;
+                        save_config = true;
+                    } else if let Some(((id, code), axis)) = first_joy_axis {
+                        if **axis < -0.5 {
+                            config.set_key_gilrs_axis(index, *id, *code, false);
+                            self.waiting_for_input = None;
+                            save_config = true;
+                        } else if **axis > 0.5 {
+                            config.set_key_gilrs_axis(index, *id, *code, true);
+                            self.waiting_for_input = None;
+                            save_config = true;
+                        }
                     }
                 }
 

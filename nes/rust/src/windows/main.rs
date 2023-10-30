@@ -429,13 +429,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                     let cnum = index;
                                     let button_config =
                                         &c.local.configuration.controller_config[cnum as usize];
-                                    contr.update_gilrs_buttons(
-                                        id,
-                                        gamepad,
-                                        code,
-                                        button,
-                                        button_config,
-                                    );
+                                    contr.update_gilrs_buttons(id, code, button, button_config);
                                 }
                             }
                         }
@@ -449,7 +443,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                                     let cnum = index;
                                     let button_config =
                                         &c.local.configuration.controller_config[cnum as usize];
-                                    contr.update_gilrs_axes(id, gamepad, code, axis, button_config);
+                                    contr.update_gilrs_axes(id, code, axis, button_config);
                                 }
                             }
                         }
