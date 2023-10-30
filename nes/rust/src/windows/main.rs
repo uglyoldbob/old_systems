@@ -100,7 +100,7 @@ impl MainNesWindow {
         use std::time::Duration;
 
         let have_gstreamer = gstreamer::init();
-        gstreamer::debug_add_log_function(|a,b,c,d,e,f,g|{
+        gstreamer::debug_add_log_function(|a, b, c, d, e, f, g| {
             println!("GSTREAMER: {:?} {} {} {} {} {:?} {:?}", a, b, c, d, e, f, g);
         });
         gstreamer::debug_set_active(true);
@@ -687,7 +687,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     &self.image,
                     60,
                     format!("./{}.avi", chrono::Local::now().to_string()),
-                    sampling_frequency / 44100.0
+                    sampling_frequency / 44100.0,
                 );
             } else {
                 c.resolution_locked = false;

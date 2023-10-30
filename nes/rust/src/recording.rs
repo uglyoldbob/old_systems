@@ -1,6 +1,9 @@
 //! This is the module for recording related code
 
-use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, PadExt, GstObjectExt};
+use gstreamer::{
+    prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
+    ClockTime,
+};
 
 use crate::{apu::AudioProducerWithRate, AudioConsumer};
 
@@ -47,8 +50,18 @@ impl Recording {
             if have_gstreamer.is_ok() {
                 let version = gstreamer::version_string().as_str().to_string();
                 println!("GStreamer version is {}", version);
+                let vinfo = gstreamer_video::VideoInfo::builder(
+                    gstreamer_video::VideoFormat::Rgb,
+                    image.width as u32,
+                    image.height as u32,
+                )
+                .fps(60)
+                .build()
+                .unwrap();
+                let video_caps = vinfo.to_caps().unwrap();
                 let app_source = gstreamer_app::AppSrc::builder()
                     .name("emulator_video")
+                    .caps(&video_caps)
                     .format(gstreamer::Format::Time)
                     .build();
                 let ainfo = gstreamer_audio::AudioInfo::builder(
@@ -58,22 +71,17 @@ impl Recording {
                 )
                 .build()
                 .unwrap();
-                app_source.set_block(false);
                 let audio_caps = ainfo.to_caps().unwrap();
                 let audio_source = gstreamer_app::AppSrc::builder()
                     .name("emulator_audio")
                     .caps(&audio_caps)
                     .format(gstreamer::Format::Time)
                     .build();
-                audio_source.set_block(false);
-                let vsource = gstreamer::ElementFactory::make("videoparse")
-                    .name("vparse")
-                    .property_from_str("framerate", format!("{}/1", framerate).as_str())
-                    .property_from_str("width", format!("{}", image.width).as_str())
-                    .property_from_str("height", format!("{}", image.height).as_str())
-                    .property_from_str("format", "rgb")
-                    .build()
-                    .expect("Could not create source element.");
+                audio_source.set_block(true);
+                app_source.set_do_timestamp(true);
+                app_source.set_is_live(true);
+                app_source.set_block(false);
+                audio_source.set_do_timestamp(true);
                 let vconv = gstreamer::ElementFactory::make("videoconvert")
                     .name("vconvert")
                     .build()
@@ -95,12 +103,8 @@ impl Recording {
                     .build()
                     .expect("Could not create source element.");
 
-                let aqueue = gstreamer::ElementFactory::make("queue")
-                    .name("aqueue")
-                    .build()
-                    .expect("Could not create source element.");
-                let vqueue = gstreamer::ElementFactory::make("queue")
-                    .name("vqueue")
+                let aresample = gstreamer::ElementFactory::make("audioresample")
+                    .name("aresample")
                     .build()
                     .expect("Could not create source element.");
 
@@ -116,36 +120,39 @@ impl Recording {
                         app_source.upcast_ref(),
                         audio_source.upcast_ref(),
                         &aencoder,
-                        &vsource,
                         &vconv,
                         &aconv,
-                        &aqueue,
+                        &aresample,
                         &vencoder,
-                        &vqueue,
                         &avimux,
                         &sink,
                     ])
                     .unwrap();
+                gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder])
+                    .unwrap();
                 gstreamer::Element::link_many([
-                    app_source.upcast_ref(),
-                    &vsource,
-                    &vconv,
-                    &vencoder,
-                    &vqueue,
+                    audio_source.upcast_ref(),
+                    &aconv,
+                    &aresample,
+                    &aencoder,
                 ])
                 .unwrap();
-                gstreamer::Element::link_many([
-                    audio_source.upcast_ref(), 
-                    &aconv,
-                    &aencoder,
-                    &aqueue]).unwrap();
 
-                aqueue.link(&avimux).unwrap();
-                vqueue.link(&avimux).unwrap();
+                aencoder.link(&avimux).unwrap();
+                vencoder.link(&avimux).unwrap();
                 avimux.link(&sink).unwrap();
 
                 audio_source.set_stream_type(gstreamer_app::AppStreamType::Stream);
-                self.audio = Some(AudioProducerWithRate::new_gstreamer(4410, interval, audio_source));
+
+                let clock = pipeline.clock();
+                println!(
+                    "Set app source clock {:?}",
+                    app_source.set_clock(clock.as_ref())
+                );
+                println!(
+                    "Set audio source clock {:?}",
+                    audio_source.set_clock(clock.as_ref())
+                );
 
                 pipeline
                     .set_state(gstreamer::State::Playing)
@@ -154,7 +161,11 @@ impl Recording {
                 self.record_source = Some(app_source);
                 self.record_pipeline = Some(pipeline);
 
-                
+                self.audio = Some(AudioProducerWithRate::new_gstreamer(
+                    44100,
+                    interval,
+                    audio_source,
+                ));
             }
         }
     }
@@ -167,6 +178,8 @@ impl Recording {
                     gstreamer::Buffer::with_size(image.width as usize * image.height as usize * 3)
                         .unwrap();
                 image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
+                println!("Queued buffer: {}", source.current_level_bytes());
+                source.do_timestamp();
                 match source.push_buffer(buf) {
                     Ok(a) => {}
                     Err(e) => {
@@ -180,9 +193,9 @@ impl Recording {
     /// Stop recording
     pub fn stop(&mut self) {
         if let Some(pipeline) = &mut self.record_pipeline {
-
-            let dot = gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-                std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
+            let dot =
+                gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
+            std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
 
             if let Some(source) = &mut self.record_source {
                 source.end_of_stream();
@@ -193,5 +206,6 @@ impl Recording {
         }
         self.record_pipeline = None;
         self.record_source = None;
+        self.audio = None;
     }
 }

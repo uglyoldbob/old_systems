@@ -22,10 +22,12 @@ impl AudioProducerMethod {
                     .map(|a| {
                         let f = a + 1.0;
                         let u = f.to_bits();
-                        u.to_le_bytes()})
+                        u.to_le_bytes()
+                    })
                     .flatten()
                     .collect();
                 let buf = gstreamer::Buffer::from_slice(b);
+                appsrc.do_timestamp();
                 let _e = appsrc.push_buffer(buf).is_err();
             }
         }
