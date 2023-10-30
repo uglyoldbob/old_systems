@@ -80,6 +80,7 @@ impl Recording {
                 audio_source.set_block(true);
                 app_source.set_do_timestamp(true);
                 app_source.set_is_live(true);
+                audio_source.set_is_live(true);
                 app_source.set_block(false);
                 audio_source.set_do_timestamp(true);
                 let vconv = gstreamer::ElementFactory::make("videoconvert")
@@ -142,18 +143,6 @@ impl Recording {
                 vencoder.link(&avimux).unwrap();
                 avimux.link(&sink).unwrap();
 
-                audio_source.set_stream_type(gstreamer_app::AppStreamType::Stream);
-
-                let clock = pipeline.clock();
-                println!(
-                    "Set app source clock {:?}",
-                    app_source.set_clock(clock.as_ref())
-                );
-                println!(
-                    "Set audio source clock {:?}",
-                    audio_source.set_clock(clock.as_ref())
-                );
-
                 pipeline
                     .set_state(gstreamer::State::Playing)
                     .expect("Unable to set the pipeline to the `Playing` state");
@@ -178,7 +167,6 @@ impl Recording {
                     gstreamer::Buffer::with_size(image.width as usize * image.height as usize * 3)
                         .unwrap();
                 image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
-                println!("Queued buffer: {}", source.current_level_bytes());
                 source.do_timestamp();
                 match source.push_buffer(buf) {
                     Ok(a) => {}

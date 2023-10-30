@@ -682,11 +682,12 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             if rec {
                 c.resolution_locked = true;
                 let sampling_frequency = 21.47727e6 / 12.0;
+                let tn = chrono::Local::now();
                 self.recording.start(
                     &self.have_gstreamer,
                     &self.image,
                     60,
-                    format!("./{}.avi", chrono::Local::now().to_string()),
+                    format!("./{}.avi", tn.format("%Y-%m-%d %H:%M:%S")),
                     sampling_frequency / 44100.0,
                 );
             } else {
