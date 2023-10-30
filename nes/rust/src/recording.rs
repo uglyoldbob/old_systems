@@ -55,7 +55,7 @@ impl Recording {
                     image.width as u32,
                     image.height as u32,
                 )
-                .fps(60)
+                .fps(framerate as i32)
                 .build()
                 .unwrap();
                 let video_caps = vinfo.to_caps().unwrap();
