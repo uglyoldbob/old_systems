@@ -20,9 +20,17 @@ mod cpu;
 mod emulator_data;
 mod motherboard;
 mod ppu;
+mod recording;
 mod romlist;
 #[cfg(test)]
 mod utility;
+
+/// A convenience type for the type used in the ringbuf crate.
+pub type AudioProducer =
+    ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
+/// A convenience type for the type used in the ringbuf crate.
+pub type AudioConsumer =
+    ringbuf::Consumer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
 
 use emulator_data::NesEmulatorData;
 
@@ -366,6 +374,8 @@ fn main() {
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
+    use crate::apu::AudioProducerWithRate;
+
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
     let mut event_loop = egui_multiwin::winit::event_loop::EventLoopBuilder::with_user_event();
@@ -412,13 +422,15 @@ fn main() {
 
             println!("audio config is {:?}", config);
 
-            nes_data.cpu_peripherals.apu.set_audio_buffer(num_samples);
             println!(
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
             let rb = ringbuf::HeapRb::new(num_samples * 2);
             let (producer, mut consumer) = rb.split();
+
+            let user_audio = AudioProducerWithRate::new(producer, num_samples * 2);
+
             let mut stream = d
                 .build_output_stream(
                     &config,
@@ -439,7 +451,7 @@ fn main() {
             if let Some(s) = &mut stream {
                 s.play().unwrap();
                 sound_rate = config.sample_rate.0;
-                sound_producer = Some(producer);
+                sound_producer = Some(user_audio);
             }
             stream
         } else {

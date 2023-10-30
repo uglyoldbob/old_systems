@@ -2,7 +2,10 @@
 //!
 use std::io::Write;
 
-use crate::{controller::NesControllerTrait, NesEmulatorData};
+use crate::{
+    apu::AudioProducerWithRate, controller::NesControllerTrait, recording::Recording,
+    NesEmulatorData,
+};
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;
@@ -39,19 +42,12 @@ pub struct MainNesWindow {
     /// The number of samples per second of the audio output.
     sound_rate: u32,
     /// The producing half of the ring buffer used for audio.
-    sound: Option<
-        ringbuf::Producer<
-            f32,
-            std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-        >,
-    >,
+    sound: Option<AudioProducerWithRate>,
     /// The texture used for rendering the ppu image.
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub texture: Option<egui::TextureHandle>,
     /// The filter used for audio playback, filtering out high frequency noise, increasing the quality of audio playback.
     filter: Option<biquad::DirectForm1<f32>>,
-    /// The interval between sound samples based on the sample rate used in the stream
-    sound_sample_interval: f32,
     /// The stream used for audio playback during emulation
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     sound_stream: Option<cpal::Stream>,
@@ -67,6 +63,10 @@ pub struct MainNesWindow {
     mouse_miss: bool,
     /// The stored resized image for the emulator
     image: crate::ppu::PixelImage<egui::Color32>,
+    /// The result of opening gstreamer
+    have_gstreamer: Result<(), gstreamer::glib::Error>,
+    /// The recording object
+    recording: Recording,
 }
 
 impl MainNesWindow {
@@ -74,12 +74,7 @@ impl MainNesWindow {
     pub fn new_request(
         c: NesEmulatorData,
         rate: u32,
-        producer: Option<
-            ringbuf::Producer<
-                f32,
-                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-            >,
-        >,
+        producer: Option<crate::AudioProducer>,
         stream: Option<cpal::Stream>,
     ) -> Self {
         Self {
@@ -90,7 +85,6 @@ impl MainNesWindow {
             sound: producer,
             texture: None,
             filter: None,
-            sound_sample_interval: 0.0,
             sound_stream: stream,
             paused: false,
         }
@@ -100,18 +94,23 @@ impl MainNesWindow {
     #[cfg(feature = "egui-multiwin")]
     pub fn new_request(
         rate: u32,
-        producer: Option<
-            ringbuf::Producer<
-                f32,
-                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-            >,
-        >,
+        producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
     ) -> NewWindowRequest<NesEmulatorData> {
         use std::time::Duration;
 
+        let have_gstreamer = gstreamer::init();
+        gstreamer::debug_add_log_function(|a, b, c, d, e, f, g| {
+            println!("GSTREAMER: {:?} {} {} {} {} {:?} {:?}", a, b, c, d, e, f, g);
+        });
+        gstreamer::debug_set_active(true);
+        if let Err(e) = &have_gstreamer {
+            println!("Failed to open gstreamer: {:?}", e);
+        }
+
         NewWindowRequest {
             window_state: Box::new(MainNesWindow {
+                have_gstreamer,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
                 last_frame_time: std::time::Instant::now(),
@@ -123,7 +122,6 @@ impl MainNesWindow {
                 sound: producer,
                 texture: None,
                 filter: None,
-                sound_sample_interval: 0.0,
                 sound_stream: stream,
                 paused: false,
                 mouse: false,
@@ -131,6 +129,7 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
+                recording: Recording::new(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -169,7 +168,6 @@ impl eframe::App for MainNesWindow {
             )
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
-            self.sound_sample_interval = sampling_frequency / rf;
             self.c
                 .cpu_peripherals
                 .apu
@@ -314,6 +312,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
 
     fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
         self.sound_stream.take();
+        self.recording.stop();
         true
     }
 
@@ -391,10 +390,9 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             )
             .unwrap();
             self.filter = Some(biquad::DirectForm1::<f32>::new(filter_coeff));
-            self.sound_sample_interval = sampling_frequency / rf;
-            c.cpu_peripherals
-                .apu
-                .set_audio_interval(self.sound_sample_interval);
+            if let Some(sound) = &mut self.sound {
+                sound.set_audio_interval(sampling_frequency / rf);
+            }
         }
 
         let quit = false;
@@ -457,11 +455,18 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         }
 
         if render {
+            let mut sound = Vec::new();
+            if let Some(s) = &mut self.sound {
+                sound.push(s);
+            }
+            if let Some(s) = self.recording.get_sound() {
+                sound.push(s);
+            }
             'emulator_loop: loop {
                 #[cfg(feature = "debugger")]
                 {
                     if !c.paused {
-                        c.cycle_step(&mut self.sound, &mut self.filter);
+                        c.cycle_step(&mut sound, &mut self.filter);
                         if c.cpu_clock_counter == 0
                             && c.cpu.breakpoint_option()
                             && (c.cpu.breakpoint() || c.single_step)
@@ -479,6 +484,16 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             c.paused = true;
                             c.wait_for_frame_end = false;
                         }
+                        if !self.paused {
+                            let image = c
+                                .cpu_peripherals
+                                .ppu_get_frame()
+                                .to_pixels_egui()
+                                .resize(c.local.configuration.scaler);
+                            self.image = image;
+                        }
+                        self.recording.send_frame(&self.image);
+
                         if self.mouse_delay > 0 {
                             self.mouse_delay -= 1;
                             if self.mouse_delay == 0 {
@@ -499,13 +514,16 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             }
         }
 
-        let image = c
-            .cpu_peripherals
-            .ppu_get_frame()
-            .to_pixels_egui()
-            .resize(c.local.configuration.scaler);
-        self.image = image.clone();
-        let image = image.to_egui();
+        if self.paused {
+            let image = c
+                .cpu_peripherals
+                .ppu_get_frame()
+                .to_pixels_egui()
+                .resize(c.local.configuration.scaler);
+            self.image = image;
+        }
+        let image = self.image.clone().to_egui();
+
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
@@ -528,6 +546,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         let mut save_state = false;
         let mut load_state = false;
         let mut rewind_state = false;
+        //Some(true) means start recording, Some(false) means stop recording
+        let mut start_stop_recording: Option<bool> = None;
 
         egui_multiwin::egui::TopBottomPanel::top("menu_bar").show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::menu::bar(ui, |ui| {
@@ -557,6 +577,29 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                         println!("Loading state");
                         load_state = true;
                         ui.close_menu();
+                    }
+
+                    if !self.recording.is_recording() {
+                        let button = egui_multiwin::egui::Button::new("Begin recording");
+                        if ui.add_enabled(true, button).clicked()
+                            || egui
+                                .egui_ctx
+                                .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
+                        {
+                            start_stop_recording = Some(true);
+                            ui.close_menu();
+                        }
+                    }
+                    else {
+                        let button = egui_multiwin::egui::Button::new("Stop recording");
+                        if ui.add_enabled(true, button).clicked()
+                            || egui
+                                .egui_ctx
+                                .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
+                        {
+                            start_stop_recording = Some(false);
+                            ui.close_menu();
+                        }
                     }
                 });
                 ui.menu_button("Edit", |ui| {
@@ -642,6 +685,24 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F7))
         {
             rewind_state = true;
+        }
+
+        if let Some(rec) = start_stop_recording {
+            if rec {
+                c.local.resolution_locked = true;
+                let sampling_frequency = 21.47727e6 / 12.0;
+                let tn = chrono::Local::now();
+                self.recording.start(
+                    &self.have_gstreamer,
+                    &self.image,
+                    60,
+                    format!("./{}.avi", tn.format("%Y-%m-%d %H:%M:%S")),
+                    sampling_frequency / 44100.0,
+                );
+            } else {
+                c.local.resolution_locked = false;
+                self.recording.stop();
+            }
         }
 
         let name = if let Some(cart) = c.mb.cartridge() {

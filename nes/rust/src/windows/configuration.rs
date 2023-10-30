@@ -71,22 +71,32 @@ impl TrackedWindow<NesEmulatorData> for Window {
             }
 
             let mut scaler = c.local.configuration.scaler;
-            egui::ComboBox::from_label("Scaling algorithm")
-                .selected_text(
+            if !c.local.resolution_locked {
+                egui::ComboBox::from_label("Scaling algorithm")
+                    .selected_text(
+                        scaler
+                            .map(|i| format!("{}", i))
+                            .unwrap_or("None".to_string())
+                            .to_string(),
+                    )
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut scaler, None, "None");
+                        for opt in crate::ppu::ScalingAlgorithm::iter() {
+                            ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
+                        }
+                    });
+                if scaler != c.local.configuration.scaler {
+                    c.local.configuration.scaler = scaler;
+                    save_config = true;
+                }
+            } else {
+                ui.label(format!(
+                    "Scaling algorithm: {}",
                     scaler
                         .map(|i| format!("{}", i))
                         .unwrap_or("None".to_string())
-                        .to_string(),
-                )
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut scaler, None, "None");
-                    for opt in crate::ppu::ScalingAlgorithm::iter() {
-                        ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
-                    }
-                });
-            if scaler != c.local.configuration.scaler {
-                c.local.configuration.scaler = scaler;
-                save_config = true;
+                        .to_string()
+                ));
             }
             if save_config {
                 c.local.configuration.save();

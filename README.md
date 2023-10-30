@@ -9,7 +9,7 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] Network play
 - [ ] More mapper support
 - [x] Rewind support
-- [ ] Recording support
+- [x] Recording support
 - [ ] AI driven controllers
 - [ ] Fix currently broken games
 - [ ] Add pal support

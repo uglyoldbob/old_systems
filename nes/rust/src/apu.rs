@@ -2,6 +2,100 @@
 
 use biquad::Biquad;
 
+/// The various ways of producing samples of data
+enum AudioProducerMethod {
+    /// A ring buffer is used to produce the audio
+    RingBuffer(crate::AudioProducer),
+    /// The audio is pushed directly to gstreamer
+    GStreamer(gstreamer_app::AppSrc),
+}
+
+impl AudioProducerMethod {
+    fn push_slice(&mut self, slice: &[f32]) {
+        match self {
+            AudioProducerMethod::RingBuffer(rb) => {
+                rb.push_slice(slice);
+            }
+            AudioProducerMethod::GStreamer(appsrc) => {
+                let b: Vec<u8> = slice
+                    .iter()
+                    .map(|a| {
+                        let f = a + 1.0;
+                        let u = f.to_bits();
+                        u.to_le_bytes()
+                    })
+                    .flatten()
+                    .collect();
+                let buf = gstreamer::Buffer::from_slice(b);
+                appsrc.do_timestamp();
+                let _e = appsrc.push_buffer(buf).is_err();
+            }
+        }
+    }
+}
+
+/// A struct that allows the producer and the rate of sample production to be linked together
+pub struct AudioProducerWithRate {
+    /// The number of clocks between generated samples
+    interval: f32,
+    /// The counter for generating samples at the right times
+    counter: f32,
+    /// The ringbuffer to put samples into
+    producer: AudioProducerMethod,
+    /// The buffer to put samples into
+    buffer: Vec<f32>,
+    /// The index of where to store samples
+    buffer_index: usize,
+}
+
+impl AudioProducerWithRate {
+    /// Build a new object
+    pub fn new(producer: crate::AudioProducer, size: usize) -> Self {
+        Self {
+            interval: 1.0,
+            counter: 0.0,
+            producer: AudioProducerMethod::RingBuffer(producer),
+            buffer: vec![0.0; size],
+            buffer_index: 0,
+        }
+    }
+
+    /// Create a new object and a new ringbuffer based on size
+    pub fn new_gstreamer(size: usize, interval: f32, src: gstreamer_app::AppSrc) -> Self {
+        Self {
+            interval,
+            counter: 0.0,
+            producer: AudioProducerMethod::GStreamer(src),
+            buffer: vec![0.0; size],
+            buffer_index: 0,
+        }
+    }
+
+    /// Set the interval for generating audio on this stream
+    pub fn set_audio_interval(&mut self, i: f32) {
+        self.interval = i;
+    }
+
+    /// Fill the local audio buffer with data, returning a Some when it is full
+    fn fill_audio_buffer(&mut self, sample: f32) {
+        self.counter += 1.0;
+        if self.counter >= self.interval {
+            self.counter -= self.interval;
+            self.buffer[self.buffer_index] = sample;
+            let out = if self.buffer_index < (self.buffer.len() - 1) {
+                self.buffer_index += 1;
+                None
+            } else {
+                self.buffer_index = 0;
+                Some(&self.buffer)
+            };
+            if let Some(out) = out {
+                self.producer.push_slice(out);
+            }
+        }
+    }
+}
+
 ///The modes that the sweep can operate in
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub enum ApuSweepAddition {
@@ -109,6 +203,8 @@ use triangle::ApuTriangleChannel;
 mod dmc;
 use dmc::ApuDmcChannel;
 
+use crate::AudioConsumer;
+
 /// The nes apu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -139,15 +235,8 @@ pub struct NesApu {
     timing_clock: u32,
     /// The index for generating audio samples
     output_index: f32,
-    /// The number of slow clock cycles between audio samples
-    sample_interval: f32,
     /// Inhibits clocking the length counters when set
     inhibit_length_clock: bool,
-    #[serde(skip)]
-    /// The audio buffer
-    buffer: Vec<f32>,
-    /// The index into the audio buffer
-    buffer_index: usize,
     /// A clock that always runs
     always_clock: usize,
     /// Halt holders for the 4 channels
@@ -174,35 +263,10 @@ impl NesApu {
             sound_disabled_clock: 0,
             timing_clock: 0,
             output_index: 0.0,
-            sample_interval: 100.0,
             inhibit_length_clock: false,
-            buffer: vec![],
-            buffer_index: 0,
             always_clock: 0,
             pend_halt: [None; 4],
         }
-    }
-
-    /// Saves the contents of the audio buffer.
-    pub fn get_buffer(&self) -> Vec<f32> {
-        self.buffer.clone()
-    }
-
-    /// Restores the contents of the audio buffer.
-    pub fn restore_buffer(&mut self, v: Vec<f32>) {
-        self.buffer = v;
-    }
-
-    /// Returns the length of the audio buffer
-    pub fn get_audio_buffer_length(&self) -> usize {
-        self.buffer.len()
-    }
-
-    /// Initialize the audio buffer
-    pub fn set_audio_buffer(&mut self, size: usize) {
-        println!("Set audio buffer?");
-        self.buffer = vec![0.0; size & !1];
-        self.buffer_index = self.buffer.len() - 2;
     }
 
     /// Reset the apu
@@ -335,33 +399,8 @@ impl NesApu {
         }
     }
 
-    /// Get the interval between audio samples
-    pub fn get_audio_interval(&self) -> f32 {
-        self.sample_interval
-    }
-
-    /// Set the interval between audio samples
-    pub fn set_audio_interval(&mut self, interval: f32) {
-        self.sample_interval = interval;
-    }
-
-    /// Fill the local audio buffer with data, returning a Some when it is full
-    fn fill_audio_buffer(&mut self, sample: f32) -> Option<&[f32]> {
-        self.buffer[self.buffer_index] = sample;
-        if self.buffer_index < (self.buffer.len() - 1) {
-            self.buffer_index += 1;
-            None
-        } else {
-            self.buffer_index = 0;
-            Some(&self.buffer)
-        }
-    }
-
     /// Build an audio sample and run the audio filter
-    fn build_audio_sample(
-        &mut self,
-        filter: &mut Option<biquad::DirectForm1<f32>>,
-    ) -> Option<&[f32]> {
+    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
@@ -370,13 +409,7 @@ impl NesApu {
         if let Some(filter) = filter {
             let e = filter.run(audio / 2.5 - 1.0);
             self.output_index += 1.0;
-            if self.output_index >= self.sample_interval {
-                self.output_index -= self.sample_interval;
-                self.fill_audio_buffer(e);
-                self.fill_audio_buffer(e)
-            } else {
-                None
-            }
+            Some(e)
         } else {
             None
         }
@@ -385,12 +418,7 @@ impl NesApu {
     /// Clock the apu
     pub fn clock_slow(
         &mut self,
-        sound: &mut Option<
-            ringbuf::Producer<
-                f32,
-                std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
-            >,
-        >,
+        sound: &mut Vec<&mut AudioProducerWithRate>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.always_clock = self.always_clock.wrapping_add(1);
@@ -425,8 +453,9 @@ impl NesApu {
             self.sound_disabled = false;
         }
         if let Some(sample) = self.build_audio_sample(filter) {
-            if let Some(p) = sound {
-                p.push_slice(sample);
+            for p in sound {
+                p.fill_audio_buffer(sample);
+                p.fill_audio_buffer(sample);
             }
         }
     }
