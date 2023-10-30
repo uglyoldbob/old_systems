@@ -122,18 +122,26 @@ impl NesMapperTrait for Mapper00 {
     }
 
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
-        if cart.nonvolatile.chr_rom.is_empty() {
+        let mut v = Vec::new();
+        let chr = if !cart.volatile.chr_ram.is_empty() {
+            &mut cart.volatile.chr_ram
+        } else if !cart.nonvolatile.chr_rom.is_empty() {
+            &mut cart.nonvolatile.chr_rom
+        } else {
+            &mut v
+        };
+        if chr.is_empty() {
             return None;
         }
-        Some(cart.nonvolatile.chr_rom[(self.ppu_address as usize) % cart.nonvolatile.chr_rom.len()])
+        Some(chr[(self.ppu_address as usize) % chr.len()])
     }
 
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
-        if !cart.volatile.chr_ram || cart.nonvolatile.chr_rom.is_empty() {
+        if cart.volatile.chr_ram.is_empty() {
             return;
         }
-        let addr2 = self.ppu_address as u32 % cart.nonvolatile.chr_rom.len() as u32;
-        cart.nonvolatile.chr_rom[addr2 as usize] = data;
+        let addr2 = self.ppu_address as u32 % cart.volatile.chr_ram.len() as u32;
+        cart.volatile.chr_ram[addr2 as usize] = data;
     }
 
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8) {

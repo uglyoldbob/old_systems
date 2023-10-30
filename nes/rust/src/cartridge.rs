@@ -371,8 +371,8 @@ pub struct VolatileCartridgeData {
     pub mirroring: bool,
     /// The mapper number
     pub mapper: u32,
-    /// chr_ram ?
-    pub chr_ram: bool,
+    /// Where chr-ram is stored
+    pub chr_ram: Vec<u8>,
 }
 
 #[non_exhaustive]
@@ -515,11 +515,6 @@ impl NesCartridge {
         let prg_rom_size = rom_contents[4] as usize * 16384;
 
         let mut chr_rom_size = rom_contents[5] as usize * 8192;
-        let chr_ram = chr_rom_size == 0;
-        if chr_ram {
-            //TODO determine correct size for chr-ram
-            chr_rom_size = 8192;
-        }
         let mut file_offset: usize = 16;
         let trainer = if (rom_contents[6] & 4) != 0 {
             let mut trainer = Vec::with_capacity(512);
@@ -545,20 +540,23 @@ impl NesCartridge {
         file_offset += prg_rom_size;
 
         let mut chr_rom = Vec::with_capacity(chr_rom_size);
+        let mut chr_ram = Vec::with_capacity(8192);
         if chr_rom_size != 0 {
             for i in 0..chr_rom_size {
-                let data = if !chr_ram {
+                let data = {
                     if rom_contents.len() <= (file_offset + i) {
                         return Err(CartridgeError::RomTooShort);
                     }
                     rom_contents[file_offset + i]
-                } else {
-                    rand::random()
                 };
                 chr_rom.push(data);
             }
-            if !chr_ram {
-                file_offset += chr_rom_size;
+            file_offset += chr_rom_size;
+        } else {
+            let mut chr_ram_size = 8192;
+            for i in 0..chr_ram_size {
+                let data = rand::random();
+                chr_ram.push(data);
             }
         }
         let inst_rom = if (rom_contents[7] & 2) != 0 {
@@ -709,7 +707,7 @@ impl NesCartridge {
             battery_backup: (rom_contents[6] & 2) != 0,
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mappernum as u32,
-            chr_ram: false,
+            chr_ram: Vec::new(),
         };
 
         let nonvol = NonvolatileCartridgeData {

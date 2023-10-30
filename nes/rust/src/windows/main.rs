@@ -415,8 +415,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 }
             });
             if let Some(olocal) = &mut c.olocal {
-                while let Some(_e) = olocal.gilrs.next_event() {
-                }
+                while let Some(_e) = olocal.gilrs.next_event() {}
             }
             if let Some(olocal) = &mut c.olocal {
                 let gilrs = &mut olocal.gilrs;
@@ -523,7 +522,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             self.image = image;
         }
         let image = self.image.clone().to_egui();
-
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
