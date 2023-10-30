@@ -417,6 +417,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 }
             });
             if let Some(olocal) = &mut c.olocal {
+                while let Some(_e) = olocal.gilrs.next_event() {
+                }
+            }
+            if let Some(olocal) = &mut c.olocal {
                 let gilrs = &mut olocal.gilrs;
                 for (id, gamepad) in gilrs.gamepads() {
                     let gs = gamepad.state();
