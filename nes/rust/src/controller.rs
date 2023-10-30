@@ -14,6 +14,10 @@ pub enum UserInput {
     /// User input provided by egui input layer
     #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     Egui(egui::Key),
+    /// User input provided by a button from gilrs
+    GilrsButton(gilrs::GamepadId, gilrs::Button),
+    /// User input button provided by an axis from gilrs, true means positive direction
+    GilrsAxisButton(gilrs::GamepadId, gilrs::Axis, bool),
     /// Input from sdl2 input layer
     #[cfg(feature = "sdl2")]
     Sdl2,
@@ -30,6 +34,12 @@ impl UserInput {
             }
             #[cfg(feature = "sdl2")]
             UserInput::Sdl2 => "SDL2".to_string(),
+            UserInput::GilrsButton(id, b) => {
+                format!("Gamepad {} {:?}", id, b)
+            }
+            UserInput::GilrsAxisButton(id, a, dir) => {
+                format!("Gamepad {} {:?} {}", id, a, if dir { " Positive" } else { " Negative" })
+            }
             UserInput::NoInput => "None".to_string(),
         }
     }
@@ -186,6 +196,84 @@ impl ButtonCombination {
                 Button::None,
             ],
             arrow_restrict: true,
+        }
+    }
+
+    /// Update button information with button data from gilrs
+    pub fn update_gilrs_buttons(
+        &mut self,
+        gid: gilrs::GamepadId,
+        gp: gilrs::Gamepad,
+        code: gilrs::ev::Code,
+        button: &gilrs::ev::state::ButtonData,
+        config: &ControllerConfig,
+    ) {
+        for (index, b) in config.buttons.iter().enumerate() {
+            if index == BUTTON_COMBO_TURBOA {
+                self.try_set_rate(index, config.rates[0]);
+            }
+            if index == BUTTON_COMBO_TURBOB {
+                self.try_set_rate(index, config.rates[1]);
+            }
+            if let UserInput::GilrsButton(id, b) = b {
+                if *id == gid {
+                    if let Some(bcode) = gp.button_code(*b) {
+                        if bcode == code {
+                            if button.is_pressed() {
+                                self.set_button(index, 0);
+                            }
+                            else {
+                                self.clear_button(index);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Update button information with axis data fromm gilrs
+    pub fn update_gilrs_axes(&mut self,
+        gid: gilrs::GamepadId,
+        gp: gilrs::Gamepad,
+        code: gilrs::ev::Code,
+        axis: &gilrs::ev::state::AxisData,
+        config: &ControllerConfig,
+    ) {
+        for (index, b) in config.buttons.iter().enumerate() {
+            if index == BUTTON_COMBO_TURBOA {
+                self.try_set_rate(index, config.rates[0]);
+            }
+            if index == BUTTON_COMBO_TURBOB {
+                self.try_set_rate(index, config.rates[1]);
+            }
+            match b {
+                UserInput::GilrsAxisButton(id, a, dir) => {
+                    if *id == gid {
+                        if let Some(acode) = gp.axis_code(*a) {
+                            if acode == code {
+                                if *dir {
+                                    if axis.value() > 0.5 {
+                                        self.set_button(index, 0);
+                                    }
+                                    else {
+                                        self.clear_button(index);
+                                    }
+                                }
+                                else {
+                                    if axis.value() < -0.5 {
+                                        self.set_button(index, 0);
+                                    }
+                                    else {
+                                        self.clear_button(index);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 

@@ -19,7 +19,7 @@ biquad = "0.4.2"
 cpal = {version = "0.15.2", optional=true}
 data-encoding = "2.4.0"
 enum_dispatch = "0.3.12"
-gilrs = "0.10.2"
+gilrs = {version = "0.10.2", features = ["serde-serialize"]}
 rand = "0.8.5"
 ringbuf = "0.3.3"
 egui-multiwin = { version = "0.1.12", features = ["serde"], optional=true }
