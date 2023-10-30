@@ -67,8 +67,6 @@ pub struct MainNesWindow {
     mouse_miss: bool,
     /// The stored resized image for the emulator
     image: crate::ppu::PixelImage<egui::Color32>,
-    /// The gilrs object
-    gilrs: gilrs::Gilrs,
 }
 
 impl MainNesWindow {
@@ -133,7 +131,6 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 image: crate::ppu::PixelImage::<egui::Color32>::default(),
-                gilrs: gilrs::Gilrs::new().unwrap(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -419,38 +416,41 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     }
                 }
             });
-            for (id, gamepad) in self.gilrs.gamepads() {
-                let gs = gamepad.state();
-                for (code, button) in gs.buttons() {
-                    for index in 0..4 {
-                        let controller = c.mb.get_controller_mut(index);
-                        if let crate::controller::NesController::Zapper(z) = controller {
-                        } else {
-                            for contr in controller.get_buttons_iter_mut() {
-                                let cnum = index;
-                                let button_config =
-                                    &c.local.configuration.controller_config[cnum as usize];
-                                contr.update_gilrs_buttons(
-                                    id,
-                                    gamepad,
-                                    code,
-                                    button,
-                                    button_config,
-                                );
+            if let Some(olocal) = &mut c.olocal {
+                let gilrs = &mut olocal.gilrs;
+                for (id, gamepad) in gilrs.gamepads() {
+                    let gs = gamepad.state();
+                    for (code, button) in gs.buttons() {
+                        for index in 0..4 {
+                            let controller = c.mb.get_controller_mut(index);
+                            if let crate::controller::NesController::Zapper(z) = controller {
+                            } else {
+                                for contr in controller.get_buttons_iter_mut() {
+                                    let cnum = index;
+                                    let button_config =
+                                        &c.local.configuration.controller_config[cnum as usize];
+                                    contr.update_gilrs_buttons(
+                                        id,
+                                        gamepad,
+                                        code,
+                                        button,
+                                        button_config,
+                                    );
+                                }
                             }
                         }
                     }
-                }
-                for (code, axis) in gs.axes() {
-                    for index in 0..4 {
-                        let controller = c.mb.get_controller_mut(index);
-                        if let crate::controller::NesController::Zapper(z) = controller {
-                        } else {
-                            for contr in controller.get_buttons_iter_mut() {
-                                let cnum = index;
-                                let button_config =
-                                    &c.local.configuration.controller_config[cnum as usize];
-                                contr.update_gilrs_axes(id, gamepad, code, axis, button_config);
+                    for (code, axis) in gs.axes() {
+                        for index in 0..4 {
+                            let controller = c.mb.get_controller_mut(index);
+                            if let crate::controller::NesController::Zapper(z) = controller {
+                            } else {
+                                for contr in controller.get_buttons_iter_mut() {
+                                    let cnum = index;
+                                    let button_config =
+                                        &c.local.configuration.controller_config[cnum as usize];
+                                    contr.update_gilrs_axes(id, gamepad, code, axis, button_config);
+                                }
                             }
                         }
                     }

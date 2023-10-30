@@ -150,9 +150,22 @@ impl EmulatorConfiguration {
     }
 }
 
-/// Stores data local to this particular emulator, not saved into save states
-#[derive(Clone)]
+/// Just like LocalEmulatorDataClone, but the members must do not implement Clone
 pub struct LocalEmulatorData {
+    pub gilrs: gilrs::Gilrs,
+}
+
+impl Default for LocalEmulatorData {
+    fn default() -> Self {
+        Self {
+            gilrs: gilrs::GilrsBuilder::new().build().unwrap(),
+        }
+    }
+}
+
+/// Stores data local to this particular emulator, not saved into save states. Elements must be cloneable.
+#[derive(Clone)]
+pub struct LocalEmulatorDataClone {
     /// This contains the non-volatile configuration of the emulator
     pub configuration: EmulatorConfiguration,
     /// The parser for known roms
@@ -164,7 +177,7 @@ pub struct LocalEmulatorData {
     pub rom_test: crate::rom_status::RomListTestParser,
 }
 
-impl Default for LocalEmulatorData {
+impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
         Self {
             configuration: EmulatorConfiguration::load("./config.toml".to_string()),
@@ -211,7 +224,10 @@ pub struct NesEmulatorData {
     vblank_just_set: u8,
     #[serde(skip)]
     /// Local emulator data that does not get stored into save states
-    pub local: LocalEmulatorData,
+    pub local: LocalEmulatorDataClone,
+    /// Local emulator data that cannot be cloned
+    #[serde(skip)]
+    pub olocal: Option<LocalEmulatorData>,
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -251,7 +267,8 @@ impl NesEmulatorData {
             prev_irq: false,
             big_counter: 0,
             vblank_just_set: 0,
-            local: LocalEmulatorData::default(),
+            local: LocalEmulatorDataClone::default(),
+            olocal: Some(LocalEmulatorData::default()),
         }
     }
 
@@ -265,6 +282,7 @@ impl NesEmulatorData {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
                 let lcl = self.local.clone();
+                let olcl = self.olocal.take();
                 let audio = self.cpu_peripherals.apu.get_buffer();
                 let screen = self.cpu_peripherals.ppu.backup_frame();
                 let controller1 = self.mb.get_controller(0);
@@ -279,6 +297,7 @@ impl NesEmulatorData {
                 self.mb.set_controller(2, controller3);
                 self.mb.set_controller(3, controller4);
                 self.local = lcl;
+                self.olocal = olcl;
                 self.cpu_peripherals.apu.restore_buffer(audio);
                 self.cpu_peripherals.ppu.set_frame(screen);
                 Ok(())
