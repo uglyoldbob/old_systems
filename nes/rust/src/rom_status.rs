@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Indicates the tested status of a rom
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum RomStatus {
     /// The rom is completely unusable
     CompletelyBroken,
@@ -25,7 +25,7 @@ impl RomStatus {
 }
 
 /// A list of roms for the emulator.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct RomList {
     /// The tree of roms.
     pub elements: std::collections::BTreeMap<String, RomStatus>,
@@ -58,6 +58,7 @@ impl RomList {
 }
 
 /// A struct for listing and parsing valid roms for the emulator.
+#[derive(Clone)]
 pub struct RomListTestParser {
     /// The list of roms
     list: RomList,

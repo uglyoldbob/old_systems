@@ -374,8 +374,9 @@ fn main() {
     let event_loop = event_loop.build();
     let mut nes_data = NesEmulatorData::new();
     nes_data
+        .local
         .parser
-        .find_roms(nes_data.configuration.get_rom_path());
+        .find_roms(nes_data.local.configuration.get_rom_path());
     let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();
@@ -455,22 +456,22 @@ fn main() {
     println!("Current dir is {}", wdir.display());
     nes_data.mb.set_controller(
         0,
-        nes_data.configuration.controller_type[0].make_controller(),
+        nes_data.local.configuration.controller_type[0].make_controller(),
     );
     nes_data.mb.set_controller(
         1,
-        nes_data.configuration.controller_type[1].make_controller(),
+        nes_data.local.configuration.controller_type[1].make_controller(),
     );
     nes_data.mb.set_controller(
         2,
-        nes_data.configuration.controller_type[2].make_controller(),
+        nes_data.local.configuration.controller_type[2].make_controller(),
     );
     nes_data.mb.set_controller(
         3,
-        nes_data.configuration.controller_type[3].make_controller(),
+        nes_data.local.configuration.controller_type[3].make_controller(),
     );
 
-    if let Some(c) = nes_data.configuration.start_rom() {
+    if let Some(c) = nes_data.local.configuration.start_rom() {
         let nc = NesCartridge::load_cartridge(c.to_string()).unwrap();
         nes_data.insert_cartridge(nc);
     }

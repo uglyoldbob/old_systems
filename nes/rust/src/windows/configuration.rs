@@ -62,15 +62,15 @@ impl TrackedWindow<NesEmulatorData> for Window {
             let mut save_config = false;
 
             if ui
-                .checkbox(&mut c.configuration.sticky_rom, "Remember last rom")
+                .checkbox(&mut c.local.configuration.sticky_rom, "Remember last rom")
                 .changed()
             {
-                if !c.configuration.sticky_rom {
-                    c.configuration.set_startup("".to_string());
+                if !c.local.configuration.sticky_rom {
+                    c.local.configuration.set_startup("".to_string());
                 }
             }
 
-            let mut scaler = c.configuration.scaler;
+            let mut scaler = c.local.configuration.scaler;
             egui::ComboBox::from_label("Scaling algorithm")
                 .selected_text(
                     scaler
@@ -84,12 +84,12 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
                     }
                 });
-            if scaler != c.configuration.scaler {
-                c.configuration.scaler = scaler;
+            if scaler != c.local.configuration.scaler {
+                c.local.configuration.scaler = scaler;
                 save_config = true;
             }
             if save_config {
-                c.configuration.save();
+                c.local.configuration.save();
             }
         });
         RedrawResponse {

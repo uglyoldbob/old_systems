@@ -348,7 +348,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             self.rewinds[1] = p.clone();
             self.rewinds[2] = p.clone();
         } else if let Some(t) = self.rewind_point {
-            if let Some(rew) = c.configuration.rewind_interval {
+            if let Some(rew) = c.local.configuration.rewind_interval {
                 if time_now.duration_since(t) > rew {
                     self.rewinds[2] = self.rewinds[1].clone();
                     self.rewinds[1] = self.rewinds[0].clone();
@@ -412,7 +412,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                     } else {
                         for contr in controller.get_buttons_iter_mut() {
                             let cnum = index;
-                            let button_config = &c.configuration.controller_config[cnum as usize];
+                            let button_config =
+                                &c.local.configuration.controller_config[cnum as usize];
                             contr.update_egui_buttons(i, button_config);
                         }
                     }
@@ -428,8 +429,14 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             for contr in controller.get_buttons_iter_mut() {
                                 let cnum = index;
                                 let button_config =
-                                    &c.configuration.controller_config[cnum as usize];
-                                contr.update_gilrs_buttons(id, gamepad, code, button, button_config);
+                                    &c.local.configuration.controller_config[cnum as usize];
+                                contr.update_gilrs_buttons(
+                                    id,
+                                    gamepad,
+                                    code,
+                                    button,
+                                    button_config,
+                                );
                             }
                         }
                     }
@@ -442,7 +449,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             for contr in controller.get_buttons_iter_mut() {
                                 let cnum = index;
                                 let button_config =
-                                    &c.configuration.controller_config[cnum as usize];
+                                    &c.local.configuration.controller_config[cnum as usize];
                                 contr.update_gilrs_axes(id, gamepad, code, axis, button_config);
                             }
                         }
@@ -498,7 +505,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             .cpu_peripherals
             .ppu_get_frame()
             .to_pixels_egui()
-            .resize(c.configuration.scaler);
+            .resize(c.local.configuration.scaler);
         self.image = image.clone();
         let image = image.to_egui();
 

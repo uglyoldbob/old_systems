@@ -150,6 +150,32 @@ impl EmulatorConfiguration {
     }
 }
 
+/// Stores data local to this particular emulator, not saved into save states
+#[derive(Clone)]
+pub struct LocalEmulatorData {
+    /// This contains the non-volatile configuration of the emulator
+    pub configuration: EmulatorConfiguration,
+    /// The parser for known roms
+    pub parser: crate::romlist::RomListParser,
+    /// The list of roms for the emulator
+    pub roms: RomList,
+    /// This variable is for keeping track of which roms have been manually tested
+    #[cfg(feature = "rom_status")]
+    pub rom_test: crate::rom_status::RomListTestParser,
+}
+
+impl Default for LocalEmulatorData {
+    fn default() -> Self {
+        Self {
+            configuration: EmulatorConfiguration::load("./config.toml".to_string()),
+            parser: crate::romlist::RomListParser::default(),
+            roms: RomList::load_list(),
+            #[cfg(feature = "rom_status")]
+            rom_test: crate::rom_status::RomListTestParser::new(),
+        }
+    }
+}
+
 /// The main struct for the nes emulator.
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -179,23 +205,13 @@ pub struct NesEmulatorData {
     nmi: [bool; 5],
     /// Used for triggering the cpu irq line
     prev_irq: bool,
-    #[serde(skip)]
-    /// The list of roms for the emulator
-    pub roms: RomList,
-    /// The parser for known roms
-    #[serde(skip)]
-    pub parser: crate::romlist::RomListParser,
-    /// This variable is for keeping track of which roms have been manually tested
-    #[cfg(feature = "rom_status")]
-    #[serde(skip)]
-    pub rom_test: crate::rom_status::RomListTestParser,
-    /// This contains the non-volatile configuration of the emulator
-    #[serde(skip)]
-    pub configuration: EmulatorConfiguration,
     /// A large counter used to indicate how many clock cycles have passed. This wraps eventually.
     big_counter: u64,
     /// Indicates vblank was just set
     vblank_just_set: u8,
+    #[serde(skip)]
+    /// Local emulator data that does not get stored into save states
+    pub local: LocalEmulatorData,
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -233,13 +249,9 @@ impl NesEmulatorData {
                 .as_millis(),
             nmi: [false; 5],
             prev_irq: false,
-            roms: RomList::load_list(),
-            parser: crate::romlist::RomListParser::new(),
-            #[cfg(feature = "rom_status")]
-            rom_test: crate::rom_status::RomListTestParser::new(),
-            configuration: EmulatorConfiguration::load("./config.toml".to_string()),
             big_counter: 0,
             vblank_just_set: 0,
+            local: LocalEmulatorData::default(),
         }
     }
 
@@ -252,15 +264,13 @@ impl NesEmulatorData {
     pub fn deserialize(&mut self, data: Vec<u8>) -> Result<(), Box<bincode::ErrorKind>> {
         match bincode::deserialize::<Self>(&data) {
             Ok(r) => {
-                let config = self.configuration.clone();
+                let lcl = self.local.clone();
                 let audio = self.cpu_peripherals.apu.get_buffer();
                 let screen = self.cpu_peripherals.ppu.backup_frame();
                 let controller1 = self.mb.get_controller(0);
                 let controller2 = self.mb.get_controller(1);
                 let controller3 = self.mb.get_controller(2);
                 let controller4 = self.mb.get_controller(3);
-                let config_path = self.configuration.path.to_owned();
-                let romlist = self.roms.clone();
                 let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
                 cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
@@ -268,11 +278,9 @@ impl NesEmulatorData {
                 self.mb.set_controller(1, controller2);
                 self.mb.set_controller(2, controller3);
                 self.mb.set_controller(3, controller4);
-                self.roms = romlist;
-                self.configuration.path = config_path;
+                self.local = lcl;
                 self.cpu_peripherals.apu.restore_buffer(audio);
                 self.cpu_peripherals.ppu.set_frame(screen);
-                self.configuration = config;
                 Ok(())
             }
             Err(e) => Err(e),
@@ -338,7 +346,9 @@ impl NesEmulatorData {
 
     /// Insert a cartridge into the motherboard.
     pub fn insert_cartridge(&mut self, cart: NesCartridge) {
-        self.configuration.set_startup(cart.rom_name().to_owned());
+        self.local
+            .configuration
+            .set_startup(cart.rom_name().to_owned());
         self.mb.insert_cartridge(cart);
     }
 

@@ -109,7 +109,8 @@ impl TrackedWindow<NesEmulatorData> for Window {
                                 .changed()
                             {
                                 changed = true;
-                                c.configuration.controller_type[i as usize] = controller.get_type();
+                                c.local.configuration.controller_type[i as usize] =
+                                    controller.get_type();
                                 controller_mod = Some((i, opt));
                             }
                         }
@@ -119,7 +120,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     save_config = true;
                 }
 
-                let config = &mut c.configuration.controller_config[i as usize];
+                let config = &mut c.local.configuration.controller_config[i as usize];
                 let mut set_turboa = None;
                 let mut set_turbob = None;
 
@@ -377,7 +378,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                 c.mb.set_controller(i, cont);
             }
             if save_config {
-                c.configuration.save();
+                c.local.configuration.save();
             }
         });
         RedrawResponse {

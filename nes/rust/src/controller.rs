@@ -38,7 +38,12 @@ impl UserInput {
                 format!("Gamepad {} {:?}", id, b)
             }
             UserInput::GilrsAxisButton(id, a, dir) => {
-                format!("Gamepad {} {:?} {}", id, a, if dir { " Positive" } else { " Negative" })
+                format!(
+                    "Gamepad {} {:?} {}",
+                    id,
+                    a,
+                    if dir { " Positive" } else { " Negative" }
+                )
             }
             UserInput::NoInput => "None".to_string(),
         }
@@ -221,8 +226,7 @@ impl ButtonCombination {
                         if bcode == code {
                             if button.is_pressed() {
                                 self.set_button(index, 0);
-                            }
-                            else {
+                            } else {
                                 self.clear_button(index);
                             }
                         }
@@ -233,7 +237,8 @@ impl ButtonCombination {
     }
 
     /// Update button information with axis data fromm gilrs
-    pub fn update_gilrs_axes(&mut self,
+    pub fn update_gilrs_axes(
+        &mut self,
         gid: gilrs::GamepadId,
         gp: gilrs::Gamepad,
         code: gilrs::ev::Code,
@@ -255,16 +260,13 @@ impl ButtonCombination {
                                 if *dir {
                                     if axis.value() > 0.5 {
                                         self.set_button(index, 0);
-                                    }
-                                    else {
+                                    } else {
                                         self.clear_button(index);
                                     }
-                                }
-                                else {
+                                } else {
                                     if axis.value() < -0.5 {
                                         self.set_button(index, 0);
-                                    }
-                                    else {
+                                    } else {
                                         self.clear_button(index);
                                     }
                                 }

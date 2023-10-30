@@ -126,6 +126,7 @@ impl RomList {
 }
 
 /// A struct for listing and parsing valid roms for the emulator.
+#[derive(Clone)]
 pub struct RomListParser {
     /// The list of roms
     list: RomList,

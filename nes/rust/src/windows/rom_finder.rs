@@ -58,14 +58,16 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
         let windows_to_create = vec![];
 
         //scan for roms if needed
-        c.parser.find_roms(c.configuration.get_rom_path());
+        c.local
+            .parser
+            .find_roms(c.local.configuration.get_rom_path());
         //process to see if any new roms need to be checked
-        c.parser.process_roms();
+        c.local.parser.process_roms();
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 let mut new_rom = None;
-                for (p, entry) in c.parser.list().elements.iter() {
+                for (p, entry) in c.local.parser.list().elements.iter() {
                     if let Some(Ok(r)) = &entry.result {
                         let resp = ui.add(
                             egui_multiwin::egui::Label::new(format!(
@@ -91,7 +93,7 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
                     }
                 }
                 ui.label("Unsupported roms below here");
-                for (p, entry) in c.parser.list().elements.iter() {
+                for (p, entry) in c.local.parser.list().elements.iter() {
                     if let Some(Err(r)) = &entry.result {
                         ui.label(format!("Rom: {}: {:?}", p.display(), r));
                     }
