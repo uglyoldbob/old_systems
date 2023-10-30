@@ -627,7 +627,7 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
             hash: hash.to_owned(),
-            save: format!("{}", hash),
+            save: format!("{}", name),
             rom_name: name.to_owned(),
         })
     }
@@ -732,7 +732,7 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
             hash: hash.to_owned(),
-            save: format!("{}", hash),
+            save: format!("{}", name),
             rom_name: name.to_owned(),
         })
     }
