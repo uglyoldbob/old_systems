@@ -192,6 +192,16 @@ impl LocalEmulatorDataClone {
         pb
     }
 
+    /// Returns the path of where to save recordings to
+    pub fn record_path(&self) -> std::path::PathBuf {
+        let mut pb = self.dirs.data_dir().to_path_buf();
+        pb.push("recordings");
+        if !pb.exists() {
+            std::fs::create_dir_all(&pb);
+        }
+        pb
+    }
+
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
         self.parser.find_roms(dir, &self.save_path())

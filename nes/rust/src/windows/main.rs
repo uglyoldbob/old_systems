@@ -685,14 +685,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             rewind_state = true;
         }
 
-        let mut save_path = c.local.save_path();
-
+        let mut record_path = c.local.record_path();
         if let Some(rec) = start_stop_recording {
             if rec {
                 c.local.resolution_locked = true;
                 let sampling_frequency = 21.47727e6 / 12.0;
                 let tn = chrono::Local::now();
-                let mut recpath = save_path.clone();
+                let mut recpath = record_path.clone();
                 recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H:%M:%S")));
                 self.recording.start(
                     &self.have_gstreamer,
@@ -713,6 +712,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             "state.bin".to_string()
         };
         let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+        let mut save_path = c.local.save_path();
         save_path.push(ppp.file_name().unwrap());
         if save_state {
             let mut path = save_path.clone();
