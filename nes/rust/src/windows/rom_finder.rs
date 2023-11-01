@@ -58,11 +58,10 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
         let windows_to_create = vec![];
 
         //scan for roms if needed
-        c.local
-            .parser
-            .find_roms(c.local.configuration.get_rom_path());
+        let rp = c.local.configuration.get_rom_path().to_owned();
+        c.find_roms(&rp);
         //process to see if any new roms need to be checked
-        c.local.parser.process_roms();
+        c.process_roms();
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
@@ -86,7 +85,7 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
 
                         if resp.double_clicked() {
                             new_rom = Some(
-                                NesCartridge::load_cartridge(p.to_str().unwrap().into()).unwrap(),
+                                NesCartridge::load_cartridge(p.to_str().unwrap().into(), &c.local.save_path()).unwrap()
                             );
                             quit = true;
                         }

@@ -96,9 +96,9 @@ impl EmulatorConfiguration {
     }
 
     ///Load a configuration file
-    pub fn load(name: String) -> Self {
+    pub fn load(name: std::path::PathBuf) -> Self {
         let mut result = EmulatorConfiguration {
-            path: name.to_owned(),
+            path: name.clone().into_os_string().into_string().unwrap(),
             ..Default::default()
         };
         if let Ok(a) = std::fs::read(&name) {
@@ -106,7 +106,7 @@ impl EmulatorConfiguration {
                 match toml::from_str(buf) {
                     Ok(p) => {
                         result = p;
-                        result.path = name.to_owned();
+                        result.path = name.into_os_string().into_string().unwrap();
                     }
                     Err(e) => {
                         println!("Failed to load config file: {}", e);
@@ -177,17 +177,51 @@ pub struct LocalEmulatorDataClone {
     pub rom_test: crate::rom_status::RomListTestParser,
     /// Indicates that the screen resolution is locked
     pub resolution_locked: bool,
+    /// The way to get system specific paths
+    dirs: directories::ProjectDirs,
+}
+
+impl LocalEmulatorDataClone {
+    /// Returns the path to use for save states
+    pub fn save_path(&self) -> std::path::PathBuf {
+        let mut pb = self.dirs.data_dir().to_path_buf();
+        pb.push("saves");
+        if !pb.exists() {
+            std::fs::create_dir_all(&pb);
+        }
+        pb
+    }
+
+    /// Finds roms for the system
+    pub fn find_roms(&mut self, dir: &str) {
+        self.parser.find_roms(dir, &self.save_path())
+    }
+
+    /// Process the list of roms
+    pub fn process_roms(&mut self) {
+        self.parser.process_roms(&self.save_path())
+    }
 }
 
 impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
+
+        let dirs = directories::ProjectDirs::from("com", "uglyoldbob",  "nes_emulator").unwrap();
+
+        let mut user_path = dirs.config_dir().to_path_buf();
+        user_path.push("config.toml");
+        println!("Config path is {}", user_path.display());
+        let user_config = EmulatorConfiguration::load(user_path);
+
+        let config = user_config;
         Self {
-            configuration: EmulatorConfiguration::load("./config.toml".to_string()),
+            configuration: config,
             parser: crate::romlist::RomListParser::default(),
             roms: RomList::load_list(),
             #[cfg(feature = "rom_status")]
             rom_test: crate::rom_status::RomListTestParser::new(),
             resolution_locked: false,
+            dirs,
         }
     }
 }
@@ -275,6 +309,16 @@ impl NesEmulatorData {
         }
     }
 
+    /// Finds roms for the system
+    pub fn find_roms(&mut self, dir: &str) {
+        self.local.find_roms(dir)
+    }
+
+    /// Process the list of roms
+    pub fn process_roms(&mut self) {
+        self.local.process_roms()
+    }
+
     /// serialize the structure, returning the raw data
     pub fn serialize(&self) -> Vec<u8> {
         bincode::serialize(&self).unwrap()
@@ -347,7 +391,7 @@ impl NesEmulatorData {
         self.prev_irq = false;
         if let Some(cart) = cart {
             let name = cart.rom_name();
-            let cart = NesCartridge::load_cartridge(name);
+            let cart = NesCartridge::load_cartridge(name, &self.local.save_path());
             if let Ok(cart) = cart {
                 self.insert_cartridge(cart);
             }

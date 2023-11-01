@@ -14,6 +14,8 @@ use mapper04::Mapper04;
 
 use serde::{Deserialize, Serialize};
 
+use crate::emulator_data::LocalEmulatorDataClone;
+
 /// All mappers must implement this.
 #[enum_dispatch::enum_dispatch]
 trait NesMapperTrait {
@@ -514,7 +516,7 @@ impl NesCartridge {
         }
         let prg_rom_size = rom_contents[4] as usize * 16384;
 
-        let mut chr_rom_size = rom_contents[5] as usize * 8192;
+        let chr_rom_size = rom_contents[5] as usize * 8192;
         let mut file_offset: usize = 16;
         let trainer = if (rom_contents[6] & 4) != 0 {
             let mut trainer = Vec::with_capacity(512);
@@ -553,8 +555,8 @@ impl NesCartridge {
             }
             file_offset += chr_rom_size;
         } else {
-            let mut chr_ram_size = 8192;
-            for i in 0..chr_ram_size {
+            let chr_ram_size = 8192;
+            for _i in 0..chr_ram_size {
                 let data = rand::random();
                 chr_ram.push(data);
             }
@@ -621,13 +623,16 @@ impl NesCartridge {
             );*/
         }
         let hash = calc_sha256(rom_contents);
+
+        let pb = <PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+
         Ok(Self {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
             hash: hash.to_owned(),
-            save: format!("{}", name),
+            save: format!("{}", pb.file_name().unwrap().to_os_string().into_string().unwrap()),
             rom_name: name.to_owned(),
         })
     }
@@ -725,6 +730,8 @@ impl NesCartridge {
 
         let mapper = NesCartridge::get_mapper(mappernum as u32, &rom_data)?;
 
+        let pb = <PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+
         let hash = calc_sha256(rom_contents);
         Ok(Self {
             data: rom_data,
@@ -732,13 +739,13 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
             hash: hash.to_owned(),
-            save: format!("{}", name),
+            save: format!("{}", pb.file_name().unwrap().to_os_string().into_string().unwrap()),
             rom_name: name.to_owned(),
         })
     }
 
     /// Load a cartridge, returning an error or the new cartridge
-    pub fn load_cartridge(name: String) -> Result<Self, CartridgeError> {
+    pub fn load_cartridge(name: String, sp: &PathBuf) -> Result<Self, CartridgeError> {
         let rom_contents = std::fs::read(name.clone());
         if let Err(e) = rom_contents {
             return Err(CartridgeError::FsError(e.kind().to_string()));
@@ -771,8 +778,9 @@ impl NesCartridge {
         };
 
         if let Ok(c) = &mut cart {
-            let mut pb: PathBuf = PathBuf::from("./saves");
+            let mut pb: PathBuf = sp.clone();
             pb.push(format!("{}.prgram", c.save));
+            println!("PRGRAM IS AT {} {}", pb.display(), c.save);
             if c.data.volatile.battery_backup {
                 c.data.volatile.prg_ram.convert_to_nonvolatile(pb);
                 c.data.volatile.prg_ram.print_type();

@@ -1,7 +1,7 @@
 //! This is responsible for parsing roms from the filesystem, determining which ones are valid for the emulator to load.
 //! Emulator inaccuracies may prevent a rom that this module determines to be valid fromm operating correctly.
 
-use crate::cartridge::{CartridgeError, NesCartridge};
+use crate::{cartridge::{CartridgeError, NesCartridge}, emulator_data::{NesEmulatorData, LocalEmulatorDataClone}};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -158,7 +158,7 @@ impl RomListParser {
     }
 
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
-    pub fn find_roms(&mut self, dir: &str) {
+    pub fn find_roms(&mut self, dir: &str, sp: &PathBuf) {
         if !self.scan_complete {
             for entry in walkdir::WalkDir::new(dir)
                 .into_iter()
@@ -169,7 +169,7 @@ impl RomListParser {
                 if meta.is_ok() {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
-                    let cart = NesCartridge::load_cartridge(name.clone());
+                    let cart = NesCartridge::load_cartridge(name.clone(), sp);
                     match cart {
                         Ok(_cart) => {
                             self.list.elements.entry(m).or_insert_with(|| RomListEntry {
@@ -192,7 +192,7 @@ impl RomListParser {
     }
 
     /// Responsbile for checking to see if an update has been performed. An update consists of checking to see if any roms have changed since the last scan through the filesystem.
-    pub fn process_roms(&mut self) {
+    pub fn process_roms(&mut self, sp: &PathBuf) {
         if !self.update_complete {
             for (p, entry) in self.list.elements.iter_mut() {
                 let metadata = p.metadata();
@@ -202,6 +202,7 @@ impl RomListParser {
                     if modified > last_modified {
                         let romcheck = NesCartridge::load_cartridge(
                             p.as_os_str().to_str().unwrap().to_string(),
+                            sp
                         );
                         entry.result = Some(romcheck.map(|i| RomListResult {
                             mapper: i.mappernum(),

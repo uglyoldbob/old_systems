@@ -1,5 +1,7 @@
 //! This is the module for recording related code
 
+use std::path::PathBuf;
+
 use gstreamer::{
     prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
     ClockTime,
@@ -43,7 +45,7 @@ impl Recording {
         have_gstreamer: &Result<(), gstreamer::glib::Error>,
         image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>,
         framerate: u8,
-        name: String,
+        name: PathBuf,
         interval: f32,
     ) {
         if self.record_pipeline.is_none() {
@@ -111,7 +113,7 @@ impl Recording {
 
                 let sink = gstreamer::ElementFactory::make("filesink")
                     .name("sink")
-                    .property_from_str("location", name.as_str())
+                    .property_from_str("location", &name.into_os_string().into_string().unwrap())
                     .build()
                     .expect("Could not create sink element");
 

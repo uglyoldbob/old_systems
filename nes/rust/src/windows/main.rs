@@ -685,16 +685,20 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             rewind_state = true;
         }
 
+        let mut save_path = c.local.save_path();
+
         if let Some(rec) = start_stop_recording {
             if rec {
                 c.local.resolution_locked = true;
                 let sampling_frequency = 21.47727e6 / 12.0;
                 let tn = chrono::Local::now();
+                let mut recpath = save_path.clone();
+                recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H:%M:%S")));
                 self.recording.start(
                     &self.have_gstreamer,
                     &self.image,
                     60,
-                    format!("./{}.avi", tn.format("%Y-%m-%d %H:%M:%S")),
+                    recpath,
                     sampling_frequency / 44100.0,
                 );
             } else {
@@ -708,9 +712,10 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         } else {
             "state.bin".to_string()
         };
-        let name = format!("./saves/{}", name);
+        let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+        save_path.push(ppp.file_name().unwrap());
         if save_state {
-            let mut path = std::path::PathBuf::from(&name);
+            let mut path = save_path.clone();
             path.pop();
             let _ = std::fs::create_dir_all(path);
             let state = Box::new(c.serialize());
@@ -718,13 +723,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 .write(true)
                 .create(true)
                 .truncate(true)
-                .open(&name)
+                .open(save_path.clone())
                 .unwrap()
                 .write_all(&state);
         }
 
         if load_state {
-            if let Ok(a) = std::fs::read(&name) {
+            if let Ok(a) = std::fs::read(save_path) {
                 let e = c.deserialize(a);
                 if e.is_err() {
                     println!("Error loading state {:?}", e);

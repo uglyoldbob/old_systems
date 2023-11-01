@@ -19,6 +19,7 @@ biquad = "0.4.2"
 chrono = "0.4.31"
 cpal = {version = "0.15.2", optional=true}
 data-encoding = "2.4.0"
+directories = "5.0.1"
 enum_dispatch = "0.3.12"
 gilrs = {version = "0.10.2", features = ["serde-serialize"]}
 rand = "0.8.5"
