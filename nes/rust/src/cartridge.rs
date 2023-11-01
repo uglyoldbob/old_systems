@@ -221,14 +221,7 @@ impl Drop for PersistentStorage {
 }
 
 impl PersistentStorage {
-    fn print_type(&self) {
-        match self {
-            PersistentStorage::Persistent(_pb, _v) => println!("Persistant storage"),
-            PersistentStorage::ShouldBePersistent(_v) => println!("Should be persistent storage"),
-            PersistentStorage::Volatile(_v) => println!("Volatile storage"),
-        }
-    }
-
+    /// Create a persistent storage object using the specified path and data. Overwrite will overwrite the contents of the file if set to true. 
     fn make_persistent(p: PathBuf, v: Vec<u8>, overwrite: bool) -> Option<Self> {
         let file = if p.exists() {
             let file = std::fs::OpenOptions::new()
@@ -463,11 +456,9 @@ impl NesCartridge {
     /// Restore previously saved data after loading a save state.
     pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
         self.data.nonvolatile = old_data.data;
-        self.data.volatile.prg_ram.print_type();
         let mut pb: PathBuf = PathBuf::from("./saves");
         pb.push(format!("{}.prgram", self.save));
         self.data.volatile.prg_ram.upgrade_to_persistent(pb);
-        self.data.volatile.prg_ram.print_type();
         self.rom_name = old_data.rom_name;
     }
 
@@ -780,10 +771,8 @@ impl NesCartridge {
         if let Ok(c) = &mut cart {
             let mut pb: PathBuf = sp.clone();
             pb.push(format!("{}.prgram", c.save));
-            println!("PRGRAM IS AT {} {}", pb.display(), c.save);
             if c.data.volatile.battery_backup {
                 c.data.volatile.prg_ram.convert_to_nonvolatile(pb);
-                c.data.volatile.prg_ram.print_type();
             }
         }
 

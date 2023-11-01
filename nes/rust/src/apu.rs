@@ -11,6 +11,7 @@ enum AudioProducerMethod {
 }
 
 impl AudioProducerMethod {
+    /// Push a slice of data to the audio producer
     fn push_slice(&mut self, slice: &[f32]) {
         match self {
             AudioProducerMethod::RingBuffer(rb) => {

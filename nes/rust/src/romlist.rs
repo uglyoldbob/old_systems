@@ -36,6 +36,7 @@ impl RomList {
         }
     }
 
+    /// Returns the quantity of roms that are unknown.
     pub fn get_unknown_quantity(&self) -> u32 {
         let mut quant = 0;
         for (_s, rs) in &self.elements {
@@ -46,6 +47,7 @@ impl RomList {
         quant
     }
 
+    /// Returns the quantity of roms that are broken
     pub fn get_broken_quantity(&self) -> u32 {
         let mut quant = 0;
         for (s, rs) in &self.elements {

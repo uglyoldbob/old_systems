@@ -152,6 +152,7 @@ impl EmulatorConfiguration {
 
 /// Just like LocalEmulatorDataClone, but the members must do not implement Clone
 pub struct LocalEmulatorData {
+    /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
 }
 
