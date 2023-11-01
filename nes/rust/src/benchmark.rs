@@ -22,6 +22,13 @@ use emulator_data::NesEmulatorData;
 use criterion::Criterion;
 use std::io::BufRead;
 
+/// A convenience type for the type used in the ringbuf crate.
+pub type AudioProducer =
+    ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
+/// A convenience type for the type used in the ringbuf crate.
+pub type AudioConsumer =
+    ringbuf::Consumer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
+
 struct CpuBench1 {
     cpu: NesCpu,
     cpu_peripherals: NesCpuPeripherals,
@@ -38,7 +45,7 @@ pub fn cpu_bench(c: &mut Criterion) {
     let mut nes_data = NesEmulatorData::new();
     group.bench_function("basic 2", |b| {
         b.iter(|| 'emulator_loop: loop {
-            nes_data.cycle_step(&mut None, &mut None);
+            nes_data.cycle_step(&mut Vec::new(), &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;
@@ -54,7 +61,10 @@ pub fn cpu_bench(c: &mut Criterion) {
                 let apu: NesApu = NesApu::new();
                 let cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu, apu);
                 let mut mb: NesMotherboard = NesMotherboard::new();
-                let nc = NesCartridge::load_cartridge("../test_roms/other/nestest.nes".to_string());
+                let nc = NesCartridge::load_cartridge(
+                    "../test_roms/other/nestest.nes".to_string(),
+                    &std::path::PathBuf::new(),
+                );
                 let goldenlog = std::fs::File::open("../test_roms/other/nestest.log").unwrap();
                 let goldenlog = std::io::BufReader::new(goldenlog).lines();
 
@@ -134,7 +144,7 @@ pub fn bench1(c: &mut Criterion) {
     let mut nes_data = NesEmulatorData::new();
     group.bench_function("basic 1", |b| {
         b.iter(|| 'emulator_loop: loop {
-            nes_data.cycle_step(&mut None, &mut None);
+            nes_data.cycle_step(&mut Vec::new(), &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 let _data = nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;
@@ -152,16 +162,16 @@ pub fn romlist_bench(c: &mut Criterion) {
         b.iter(|| {
             let _e = std::fs::remove_file("./roms.bin");
             let mut list = romlist::RomListParser::new();
-            list.find_roms("../test_roms");
-            list.process_roms();
+            list.find_roms("../test_roms", &std::path::PathBuf::new());
+            list.process_roms(&std::path::PathBuf::new());
         });
     });
 
     group.bench_function("second run", |b| {
         b.iter(|| {
             let mut list = romlist::RomListParser::new();
-            list.find_roms("../test_roms");
-            list.process_roms();
+            list.find_roms("../test_roms", &std::path::PathBuf::new());
+            list.process_roms(&std::path::PathBuf::new());
         });
     });
 }
