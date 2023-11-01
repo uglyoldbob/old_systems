@@ -692,7 +692,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                 let sampling_frequency = 21.47727e6 / 12.0;
                 let tn = chrono::Local::now();
                 let mut recpath = record_path.clone();
-                recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H:%M:%S")));
+                recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
                 self.recording.start(
                     &self.have_gstreamer,
                     &self.image,
