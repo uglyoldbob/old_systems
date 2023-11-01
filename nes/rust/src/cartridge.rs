@@ -221,7 +221,7 @@ impl Drop for PersistentStorage {
 }
 
 impl PersistentStorage {
-    /// Create a persistent storage object using the specified path and data. Overwrite will overwrite the contents of the file if set to true. 
+    /// Create a persistent storage object using the specified path and data. Overwrite will overwrite the contents of the file if set to true.
     fn make_persistent(p: PathBuf, v: Vec<u8>, overwrite: bool) -> Option<Self> {
         let file = if p.exists() {
             let file = std::fs::OpenOptions::new()
@@ -623,7 +623,14 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
             hash: hash.to_owned(),
-            save: format!("{}", pb.file_name().unwrap().to_os_string().into_string().unwrap()),
+            save: format!(
+                "{}",
+                pb.file_name()
+                    .unwrap()
+                    .to_os_string()
+                    .into_string()
+                    .unwrap()
+            ),
             rom_name: name.to_owned(),
         })
     }
@@ -730,7 +737,14 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
             hash: hash.to_owned(),
-            save: format!("{}", pb.file_name().unwrap().to_os_string().into_string().unwrap()),
+            save: format!(
+                "{}",
+                pb.file_name()
+                    .unwrap()
+                    .to_os_string()
+                    .into_string()
+                    .unwrap()
+            ),
             rom_name: name.to_owned(),
         })
     }

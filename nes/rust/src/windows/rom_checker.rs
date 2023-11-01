@@ -137,9 +137,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
 
                 if self.next_rom.is_none() {
                     if let Some((path, _romentry)) = c.local.roms.elements.iter().nth(self.index) {
-                        if let Ok(cart) =
-                            crate::NesCartridge::load_cartridge(path.to_str().unwrap().into(), &c.local.save_path())
-                        {
+                        if let Ok(cart) = crate::NesCartridge::load_cartridge(
+                            path.to_str().unwrap().into(),
+                            &c.local.save_path(),
+                        ) {
                             let hash = cart.hash();
                             match c.local.rom_test.list().elements.get_key_value(&hash) {
                                 Some((_hash, status)) => {
@@ -218,9 +219,10 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         for (i, (path, _entry)) in c.local.roms.elements.iter().enumerate() {
                             let mut rom_found = false;
                             let mut rom_valid = false;
-                            if let Ok(cart) =
-                                crate::NesCartridge::load_cartridge(path.to_str().unwrap().into(), &c.local.save_path())
-                            {
+                            if let Ok(cart) = crate::NesCartridge::load_cartridge(
+                                path.to_str().unwrap().into(),
+                                &c.local.save_path(),
+                            ) {
                                 rom_valid = true;
                                 for (romhash, status) in &c.local.rom_test.list().elements {
                                     if cart.hash() == *romhash {

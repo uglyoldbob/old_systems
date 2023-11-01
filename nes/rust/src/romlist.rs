@@ -1,7 +1,10 @@
 //! This is responsible for parsing roms from the filesystem, determining which ones are valid for the emulator to load.
 //! Emulator inaccuracies may prevent a rom that this module determines to be valid fromm operating correctly.
 
-use crate::{cartridge::{CartridgeError, NesCartridge}, emulator_data::{NesEmulatorData, LocalEmulatorDataClone}};
+use crate::{
+    cartridge::{CartridgeError, NesCartridge},
+    emulator_data::{LocalEmulatorDataClone, NesEmulatorData},
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -204,7 +207,7 @@ impl RomListParser {
                     if modified > last_modified {
                         let romcheck = NesCartridge::load_cartridge(
                             p.as_os_str().to_str().unwrap().to_string(),
-                            sp
+                            sp,
                         );
                         entry.result = Some(romcheck.map(|i| RomListResult {
                             mapper: i.mappernum(),

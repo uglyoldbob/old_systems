@@ -384,10 +384,10 @@ fn main() {
     let event_loop = event_loop.build();
 
     let mut nes_data = NesEmulatorData::new();
-    nes_data
-        .local
-        .parser
-        .find_roms(nes_data.local.configuration.get_rom_path(), &nes_data.local.save_path());
+    nes_data.local.parser.find_roms(
+        nes_data.local.configuration.get_rom_path(),
+        &nes_data.local.save_path(),
+    );
     let mut multi_window = MultiWindow::new();
 
     let host = cpal::default_host();

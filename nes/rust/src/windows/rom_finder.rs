@@ -85,7 +85,11 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
 
                         if resp.double_clicked() {
                             new_rom = Some(
-                                NesCartridge::load_cartridge(p.to_str().unwrap().into(), &c.local.save_path()).unwrap()
+                                NesCartridge::load_cartridge(
+                                    p.to_str().unwrap().into(),
+                                    &c.local.save_path(),
+                                )
+                                .unwrap(),
                             );
                             quit = true;
                         }
