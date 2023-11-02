@@ -6,6 +6,7 @@ mod controller;
 mod cpu;
 mod emulator_data;
 mod motherboard;
+mod network;
 mod ppu;
 mod rom_status;
 mod romlist;

@@ -154,12 +154,15 @@ impl EmulatorConfiguration {
 pub struct LocalEmulatorData {
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
+    /// The network object for interacting with other emulators
+    pub network: crate::network::Network,
 }
 
 impl Default for LocalEmulatorData {
     fn default() -> Self {
         Self {
             gilrs: gilrs::GilrsBuilder::new().build().unwrap(),
+            network: crate::network::Network::new(),
         }
     }
 }

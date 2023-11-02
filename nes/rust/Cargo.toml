@@ -22,6 +22,7 @@ data-encoding = "2.4.0"
 directories = "5.0.1"
 enum_dispatch = "0.3.12"
 gilrs = {version = "0.10.2", features = ["serde-serialize"]}
+libp2p = { version = "0.52.4", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux"] }
 rand = "0.8.5"
 ringbuf = "0.3.3"
 egui-multiwin = { version = "0.1.12", features = ["serde"], optional=true }
@@ -37,6 +38,7 @@ puffin_egui = { version = "0.23", optional=true }
 egui_sdl2_gl = { version="0.22.1", optional=true }
 ring = "0.17.4"
 strum = { version = "0.25", features = ["derive"] }
+tokio = "1.33.0"
 toml = "0.8.2"
 walkdir = "2.4"
 serde = {version = "1.0.189", features = ["derive"]}

@@ -19,6 +19,7 @@ mod controller;
 mod cpu;
 mod emulator_data;
 mod motherboard;
+mod network;
 mod ppu;
 mod recording;
 mod romlist;
@@ -484,9 +485,11 @@ fn main() {
         nes_data.local.configuration.controller_type[3].make_controller(),
     );
 
-    if let Some(c) = nes_data.local.configuration.start_rom() {
-        let nc = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
-        nes_data.insert_cartridge(nc);
+    if nes_data.local.configuration.sticky_rom {
+        if let Some(c) = nes_data.local.configuration.start_rom() {
+            let nc = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
+            nes_data.insert_cartridge(nc);
+        }
     }
 
     let _e = multi_window.add(root_window, &event_loop);
