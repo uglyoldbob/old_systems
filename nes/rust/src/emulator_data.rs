@@ -1,6 +1,9 @@
 //! This is the main implementation of the nes emulator. It provides most of the functionality of the emulator.
 
-use std::{io::Write, path::{Path, PathBuf}};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     apu::{AudioProducerWithRate, NesApu},
@@ -15,8 +18,9 @@ use crate::{
 use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
+
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::multi_window::CommonEventHandler;
+use crate::egui_multiwin_dynamic::multi_window::NewWindowRequest;
 
 /// Persistent configuration for the emulator
 #[non_exhaustive]
@@ -199,20 +203,17 @@ impl LocalEmulatorDataClone {
         self.dirs.data_dir().to_path_buf()
     }
 
-
     /// Retrieve the default path for roms. The user folder
     pub fn default_rom_path(&self) -> std::path::PathBuf {
         if let Some(pdirs) = directories::UserDirs::new() {
             if let Some(d) = pdirs.document_dir() {
                 d.to_path_buf()
-            }
-            else {
+            } else {
                 pdirs.home_dir().to_path_buf()
             }
         } else if let Some(bdirs) = directories::BaseDirs::new() {
             bdirs.home_dir().to_path_buf()
-        }
-        else {
+        } else {
             self.dirs.data_local_dir().to_path_buf()
         }
     }
@@ -313,11 +314,8 @@ pub struct NesEmulatorData {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
-    fn process_event(
-        &mut self,
-        _event: u32,
-    ) -> Vec<egui_multiwin::multi_window::NewWindowRequest<NesEmulatorData>> {
+impl NesEmulatorData {
+    pub fn process_event(&mut self, _event: egui_multiwin::NoEvent) -> Vec<NewWindowRequest> {
         vec![]
     }
 }

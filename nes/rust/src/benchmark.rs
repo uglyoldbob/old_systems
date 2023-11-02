@@ -7,9 +7,39 @@ mod cpu;
 mod emulator_data;
 mod motherboard;
 mod ppu;
+mod recording;
 mod rom_status;
 mod romlist;
 mod utility;
+pub mod windows;
+
+use windows::Windows;
+
+#[cfg(feature = "egui-multiwin")]
+/// Dynamically generated code for the egui-multiwin module allows for use of enum_dispatch for speed gains.
+pub mod egui_multiwin_dynamic {
+    egui_multiwin::tracked_window!(
+        crate::emulator_data::NesEmulatorData,
+        egui_multiwin::NoEvent,
+        crate::Windows
+    );
+    egui_multiwin::multi_window!(
+        crate::emulator_data::NesEmulatorData,
+        egui_multiwin::NoEvent,
+        crate::windows::Windows
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + Send + 'static>(f: F) {
+    std::thread::spawn(move || futures::executor::block_on(f));
+}
+#[cfg(target_arch = "wasm32")]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
 
 use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;

@@ -5,9 +5,9 @@ use crate::{ppu::RgbImage, NesEmulatorData};
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui,
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
+
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -29,9 +29,9 @@ pub struct DumpWindow {
 impl DumpWindow {
     /// Create a request to create a new window of self.
     #[cfg(feature = "egui-multiwin")]
-    pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
+    pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: Box::new(DumpWindow {
+            window_state: super::Windows::SpriteDump(DumpWindow {
                 buf: Box::new(RgbImage::new(128, 64)),
                 palette: Box::new(RgbImage::new(16, 2)),
                 texture: None,
@@ -48,12 +48,13 @@ impl DumpWindow {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for DumpWindow {
+impl TrackedWindow for DumpWindow {
     fn is_root(&self) -> bool {
         false
     }
@@ -65,7 +66,8 @@ impl TrackedWindow<NesEmulatorData> for DumpWindow {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];

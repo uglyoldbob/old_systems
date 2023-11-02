@@ -7,9 +7,10 @@ use strum::IntoEnumIterator;
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui,
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
+
+#[cfg(feature = "egui-multiwin")]
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -32,9 +33,9 @@ pub struct Window {
 impl Window {
     /// Create a request to create a new window of self.
     #[cfg(feature = "egui-multiwin")]
-    pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
+    pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: Box::new(Window {
+            window_state: super::Windows::Configuration(Window {
                 message_channel: std::sync::mpsc::channel(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
@@ -48,12 +49,13 @@ impl Window {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for Window {
+impl TrackedWindow for Window {
     fn is_root(&self) -> bool {
         false
     }
@@ -65,7 +67,8 @@ impl TrackedWindow<NesEmulatorData> for Window {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];
@@ -138,9 +141,7 @@ impl TrackedWindow<NesEmulatorData> for Window {
                     let file = f.await;
                     if let Some(file) = file {
                         let fname = file.path().to_path_buf();
-                        message_sender
-                            .send(Message::NewRomPath(fname))
-                            .ok();
+                        message_sender.send(Message::NewRomPath(fname)).ok();
                     }
                 });
             }

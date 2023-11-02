@@ -25,7 +25,7 @@ enum_dispatch = "0.3.12"
 gilrs = {version = "0.10.2", features = ["serde-serialize"]}
 rand = "0.8.5"
 ringbuf = "0.3.3"
-egui-multiwin = { version = "0.1.12", features = ["serde"], optional=true }
+egui-multiwin = { version = "0.3.0", features = ["serde"], optional=true }
 egui = { version = "0.23.0", optional=true }
 eframe = { version = "0.23.0", optional=true }
 futures = "0.3.28"

@@ -6,9 +6,9 @@ use crate::{cartridge::NesCartridge, NesEmulatorData};
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui::Sense,
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui::Sense, egui_glow::EguiGlow};
+
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -22,9 +22,9 @@ pub struct RomFinder {
 #[cfg(feature = "egui-multiwin")]
 impl RomFinder {
     /// Create a new request to make a RomFinder window.
-    pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
+    pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: Box::new(RomFinder { scrolled: false }),
+            window_state: super::Windows::RomFinder(RomFinder { scrolled: false }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
@@ -36,12 +36,13 @@ impl RomFinder {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for RomFinder {
+impl TrackedWindow for RomFinder {
     fn is_root(&self) -> bool {
         false
     }
@@ -53,7 +54,8 @@ impl TrackedWindow<NesEmulatorData> for RomFinder {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         let mut quit = false;
         let windows_to_create = vec![];
 

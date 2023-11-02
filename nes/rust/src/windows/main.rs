@@ -14,9 +14,10 @@ use cpal::traits::StreamTrait;
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui,
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
+
+#[cfg(feature = "egui-multiwin")]
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -96,7 +97,7 @@ impl MainNesWindow {
         rate: u32,
         producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
-    ) -> NewWindowRequest<NesEmulatorData> {
+    ) -> NewWindowRequest {
         use std::time::Duration;
 
         let have_gstreamer = gstreamer::init();
@@ -109,7 +110,7 @@ impl MainNesWindow {
         }
 
         NewWindowRequest {
-            window_state: Box::new(MainNesWindow {
+            window_state: super::Windows::Main(MainNesWindow {
                 have_gstreamer,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
@@ -142,6 +143,7 @@ impl MainNesWindow {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
@@ -305,7 +307,7 @@ impl eframe::App for MainNesWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for MainNesWindow {
+impl TrackedWindow for MainNesWindow {
     fn is_root(&self) -> bool {
         true
     }
@@ -323,7 +325,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
 
         #[cfg(feature = "puffin")]
