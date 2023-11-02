@@ -13,15 +13,13 @@ mod romlist;
 mod utility;
 pub mod windows;
 
-use windows::Windows;
-
 #[cfg(feature = "egui-multiwin")]
 /// Dynamically generated code for the egui-multiwin module allows for use of enum_dispatch for speed gains.
 pub mod egui_multiwin_dynamic {
     egui_multiwin::tracked_window!(
         crate::emulator_data::NesEmulatorData,
         egui_multiwin::NoEvent,
-        crate::Windows
+        crate::windows::Windows
     );
     egui_multiwin::multi_window!(
         crate::emulator_data::NesEmulatorData,

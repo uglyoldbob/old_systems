@@ -1,9 +1,6 @@
 //! The module containing all of the windows for the emulator
 
-use crate::{
-    egui_multiwin_dynamic::tracked_window::{RedrawResponse, TrackedWindow},
-    ppu,
-};
+use crate::egui_multiwin_dynamic::tracked_window::{RedrawResponse, TrackedWindow};
 use egui_multiwin::egui_glow::EguiGlow;
 use egui_multiwin::enum_dispatch::enum_dispatch;
 use std::sync::Arc;
@@ -26,17 +23,17 @@ pub mod rom_checker;
 
 #[enum_dispatch(TrackedWindow)]
 pub enum Windows {
-    Main(main::MainNesWindow),
-    CartridgeDump(cartridge_dump::CartridgeMemoryDumpWindow),
-    CartridgePrgRamDump(cartridge_prg_ram_dump::CartridgeMemoryDumpWindow),
-    Configuration(configuration::Window),
-    Controllers(controllers::Window),
-    CpuMemoryDumpWindow(cpu_memory_dump_window::CpuMemoryDumpWindow),
-    Debug(debug_window::DebugNesWindow),
-    NametableDump(name_table_dump_window::DumpWindow),
-    PatternTableDump(pattern_table_dump_window::DumpWindow),
-    PpuMemoryDump(ppu_memory_dump_window::PpuMemoryDumpWindow),
-    RomChecker(rom_checker::Window),
-    RomFinder(rom_finder::RomFinder),
-    SpriteDump(sprite_dump_window::DumpWindow),
+    Main(crate::windows::main::MainNesWindow),
+    CartridgeDump(crate::windows::cartridge_dump::CartridgeMemoryDumpWindow),
+    CartridgePrgRamDump(crate::windows::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow),
+    Configuration(crate::windows::configuration::Window),
+    Controllers(crate::windows::controllers::Window),
+    CpuMemoryDumpWindow(crate::windows::cpu_memory_dump_window::CpuMemoryDumpWindow),
+    Debug(crate::windows::debug_window::DebugNesWindow),
+    NametableDump(crate::windows::name_table_dump_window::DumpWindow),
+    PatternTableDump(crate::windows::pattern_table_dump_window::DumpWindow),
+    PpuMemoryDump(crate::windows::ppu_memory_dump_window::PpuMemoryDumpWindow),
+    RomChecker(crate::windows::rom_checker::Window),
+    RomFinder(crate::windows::rom_finder::RomFinder),
+    SpriteDump(crate::windows::sprite_dump_window::DumpWindow),
 }
