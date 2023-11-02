@@ -456,7 +456,7 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let rb = ringbuf::HeapRb::new(num_samples * 2);
+            let rb = ringbuf::HeapRb::new(num_samples * 4);
             let (producer, mut consumer) = rb.split();
 
             let user_audio = AudioProducerWithRate::new(producer, num_samples * 2);
