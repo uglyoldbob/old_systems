@@ -111,18 +111,25 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         }
                     }
                     if ui.button("Set status to no bugs").clicked() {
-                        c.local.rom_test.put_entry(rom.hash(), RomStatus::Working);
+                        c.local.rom_test.put_entry(
+                            rom.hash(),
+                            RomStatus::Working,
+                            c.local.get_save_other(),
+                        );
                     }
                     if ui.button("Set status to completely broken").clicked() {
-                        c.local
-                            .rom_test
-                            .put_entry(rom.hash(), RomStatus::CompletelyBroken);
+                        c.local.rom_test.put_entry(
+                            rom.hash(),
+                            RomStatus::CompletelyBroken,
+                            c.local.get_save_other(),
+                        );
                     }
                     ui.text_edit_multiline(&mut self.bug);
                     if ui.button("Set status to has a bug").clicked() {
                         c.local.rom_test.put_entry(
                             rom.hash(),
                             RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())),
+                            c.local.get_save_other(),
                         );
                         self.bug = "".to_string();
                     }

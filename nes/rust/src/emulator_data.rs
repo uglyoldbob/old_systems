@@ -215,7 +215,8 @@ impl LocalEmulatorDataClone {
 
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
-        self.parser.find_roms(dir, self.save_path(), self.get_save_other())
+        self.parser
+            .find_roms(dir, self.save_path(), self.get_save_other())
     }
 
     /// Process the list of roms
@@ -239,7 +240,7 @@ impl Default for LocalEmulatorDataClone {
             parser: crate::romlist::RomListParser::default(),
             roms: RomList::load_list(Self::get_save_path(&dirs)),
             #[cfg(feature = "rom_status")]
-            rom_test: crate::rom_status::RomListTestParser::new(),
+            rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
             resolution_locked: false,
             dirs,
         }
@@ -357,7 +358,11 @@ impl NesEmulatorData {
                 let controller4 = self.mb.get_controller(3);
                 let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
-                cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd, self.local.save_path())));
+                cd.and_then(|cd| {
+                    self.mb
+                        .cartridge_mut()
+                        .map(|c| c.restore_cart_data(cd, self.local.save_path()))
+                });
                 self.mb.set_controller(0, controller1);
                 self.mb.set_controller(1, controller2);
                 self.mb.set_controller(2, controller3);
