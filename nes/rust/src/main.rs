@@ -487,7 +487,8 @@ fn main() {
 
     if nes_data.local.configuration.sticky_rom {
         if let Some(c) = nes_data.local.configuration.start_rom() {
-            let nc = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
+            let nc =
+                NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
             nes_data.insert_cartridge(nc);
         }
     }
