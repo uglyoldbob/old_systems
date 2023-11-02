@@ -15,6 +15,8 @@ pub enum Role {
 /// The main networking struct for the emulator
 pub struct Network {
     role: Option<Role>,
+    tokio: tokio::runtime::Runtime,
+    thread: tokio::task::JoinHandle<()>,
 }
 
 /// The object used internally to this module to manage network state
@@ -39,18 +41,18 @@ impl InternalNetwork {
                     println!("Gateway is not exposed directly to the public Internet, i.e. it itself has a private IP address.");
                     break;
                 }
+                libp2p::swarm::SwarmEvent::Behaviour(libp2p::upnp::Event::ExpiredExternalAddr(addr)) => {
+                    println!("Expired address: {}", addr);
+                }
                 _ => {}
             }
         }
         Some(())
     }
 
-    fn start() {
-        tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async {
+    fn start(runtime: &mut tokio::runtime::Runtime) -> tokio::task::JoinHandle<()> {
+        runtime.spawn(async {
+            println!("Started async code");
             let mut i = InternalNetwork {};
             if let Some(mut swarm) = i.make_swarm() {
                 i.do_the_thing(&mut swarm).await;
@@ -72,9 +74,15 @@ impl InternalNetwork {
 impl Network {
     ///Create a new instance of network with the given role
     pub fn new() -> Self {
-        InternalNetwork::start();
+        let mut t = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let t2 = InternalNetwork::start(&mut t);
         Self {
             role: None,
+            tokio: t,
+            thread: t2,
         }
     }
 
