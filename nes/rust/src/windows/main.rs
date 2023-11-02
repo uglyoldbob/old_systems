@@ -572,7 +572,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             .egui_ctx
                             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
                     {
-                        println!("Loading state");
                         load_state = true;
                         ui.close_menu();
                     }
@@ -598,6 +597,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             start_stop_recording = Some(false);
                             ui.close_menu();
                         }
+                    }
+
+                    let button = egui_multiwin::egui::Button::new("Open data path");
+                    if ui.add_enabled(true, button).clicked()
+                    {
+                        open::that_in_background(c.local.get_save_other());
+                        ui.close_menu();
                     }
                 });
                 ui.menu_button("Edit", |ui| {
@@ -685,7 +691,7 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             rewind_state = true;
         }
 
-        let mut record_path = c.local.record_path();
+        let record_path = c.local.record_path();
         if let Some(rec) = start_stop_recording {
             if rec {
                 c.local.resolution_locked = true;
