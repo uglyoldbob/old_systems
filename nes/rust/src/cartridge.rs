@@ -266,7 +266,6 @@ impl PersistentStorage {
     fn upgrade_to_persistent(&mut self, p: PathBuf) {
         if let PersistentStorage::ShouldBePersistent(v) = self {
             if let Some(ps) = Self::make_persistent(p, v.clone(), true) {
-                println!("Have upgraded to persistent storage again");
                 *self = ps;
             }
         }
@@ -454,9 +453,8 @@ impl NesCartridge {
     }
 
     /// Restore previously saved data after loading a save state.
-    pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
+    pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup, mut pb: PathBuf) {
         self.data.nonvolatile = old_data.data;
-        let mut pb: PathBuf = PathBuf::from("./saves");
         pb.push(format!("{}.prgram", self.save));
         self.data.volatile.prg_ram.upgrade_to_persistent(pb);
         self.rom_name = old_data.rom_name;

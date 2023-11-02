@@ -183,9 +183,9 @@ impl Recording {
     /// Stop recording
     pub fn stop(&mut self) {
         if let Some(pipeline) = &mut self.record_pipeline {
-            let dot =
+            let _dot =
                 gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-            std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
+            //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
 
             if let Some(source) = &mut self.record_source {
                 source.end_of_stream();

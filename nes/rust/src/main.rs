@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
 
@@ -35,6 +35,17 @@ pub type AudioConsumer =
 
 use emulator_data::NesEmulatorData;
 
+#[cfg(not(target_arch = "wasm32"))]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + Send + 'static>(f: F) {
+    std::thread::spawn(move || futures::executor::block_on(f));
+}
+#[cfg(target_arch = "wasm32")]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+
 #[cfg(test)]
 mod tests;
 
@@ -47,8 +58,21 @@ pub mod rom_status;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[cfg(feature = "eframe")]
 use eframe::egui;
+
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::multi_window::MultiWindow;
+/// Dynamically generated code for the egui-multiwin module allows for use of enum_dispatch for speed gains.
+pub mod egui_multiwin_dynamic {
+    egui_multiwin::tracked_window!(
+        crate::emulator_data::NesEmulatorData,
+        egui_multiwin::NoEvent,
+        crate::windows::Windows
+    );
+    egui_multiwin::multi_window!(
+        crate::emulator_data::NesEmulatorData,
+        egui_multiwin::NoEvent,
+        crate::windows::Windows
+    );
+}
 
 #[cfg(feature = "sdl2")]
 use sdl2::event::Event;
@@ -374,6 +398,9 @@ fn main() {
 }
 
 #[cfg(feature = "egui-multiwin")]
+use crate::egui_multiwin_dynamic::multi_window::MultiWindow;
+
+#[cfg(feature = "egui-multiwin")]
 fn main() {
     use crate::apu::AudioProducerWithRate;
 
@@ -387,7 +414,8 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     nes_data.local.parser.find_roms(
         nes_data.local.configuration.get_rom_path(),
-        &nes_data.local.save_path(),
+        nes_data.local.save_path(),
+        nes_data.local.get_save_other(),
     );
     let mut multi_window = MultiWindow::new();
 
@@ -493,12 +521,12 @@ fn main() {
         }
     }
 
-    let _e = multi_window.add(root_window, &event_loop);
+    let _e = multi_window.add(root_window, &mut nes_data, &event_loop);
     #[cfg(feature = "debugger")]
     {
         if nes_data.paused {
             let debug_win = windows::debug_window::DebugNesWindow::new_request();
-            let _e = multi_window.add(debug_win, &event_loop);
+            let _e = multi_window.add(debug_win, &mut nes_data, &event_loop);
         }
     }
 
@@ -506,6 +534,7 @@ fn main() {
     {
         let _e = multi_window.add(
             windows::rom_checker::Window::new_request(&nes_data),
+            &mut nes_data,
             &event_loop,
         );
     }

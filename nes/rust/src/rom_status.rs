@@ -40,8 +40,9 @@ impl RomList {
     }
 
     /// Load the rom list from disk
-    pub fn load_list() -> Self {
-        let contents = std::fs::read("./testing.bin");
+    pub fn load_list(mut pb: std::path::PathBuf) -> Self {
+        pb.push("testing.bin");
+        let contents = std::fs::read(pb);
         if let Err(_e) = contents {
             return RomList::new();
         }
@@ -51,9 +52,10 @@ impl RomList {
     }
 
     /// Save the rom list to disk
-    pub fn save_list(&self) -> std::io::Result<()> {
+    pub fn save_list(&self, mut pb: std::path::PathBuf) -> std::io::Result<()> {
+        pb.push("testing.bin");
         let encoded = bincode::serialize(&self).unwrap();
-        std::fs::write("./testing.bin", encoded)
+        std::fs::write(pb, encoded)
     }
 }
 
@@ -64,17 +66,11 @@ pub struct RomListTestParser {
     list: RomList,
 }
 
-impl Default for RomListTestParser {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl RomListTestParser {
     /// Create a new rom list parser object. It loads the file that lists previously parsed roms.
-    pub fn new() -> Self {
+    pub fn new(pb: std::path::PathBuf) -> Self {
         Self {
-            list: RomList::load_list(),
+            list: RomList::load_list(pb),
         }
     }
 
@@ -84,8 +80,8 @@ impl RomListTestParser {
     }
 
     /// Put an entry into the list, over-writing any previously existing entry
-    pub fn put_entry(&mut self, hash: String, r: RomStatus) {
+    pub fn put_entry(&mut self, hash: String, r: RomStatus, pb: std::path::PathBuf) {
         self.list.elements.insert(hash, r);
-        let _e = self.list.save_list();
+        let _e = self.list.save_list(pb);
     }
 }

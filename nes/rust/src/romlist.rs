@@ -6,7 +6,7 @@ use crate::{
     emulator_data::{LocalEmulatorDataClone, NesEmulatorData},
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 /// Data gathered from a successful rom load
 #[derive(Clone, Serialize, Deserialize)]
@@ -113,8 +113,9 @@ impl RomList {
     }
 
     /// Load the rom list from disk
-    pub fn load_list() -> Self {
-        let contents = std::fs::read("./roms.bin");
+    pub fn load_list(mut pb: PathBuf) -> Self {
+        pb.push("roms.bin");
+        let contents = std::fs::read(pb);
         if let Err(_e) = contents {
             return RomList::new();
         }
@@ -124,9 +125,10 @@ impl RomList {
     }
 
     /// Save the rom list to disk
-    pub fn save_list(&self) -> std::io::Result<()> {
+    pub fn save_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
+        pb.push("roms.bin");
         let encoded = bincode::serialize(&self).unwrap();
-        std::fs::write("./roms.bin", encoded)
+        std::fs::write(pb, encoded)
     }
 }
 
@@ -143,15 +145,15 @@ pub struct RomListParser {
 
 impl Default for RomListParser {
     fn default() -> Self {
-        Self::new()
+        Self::new(PathBuf::from_str("./").unwrap())
     }
 }
 
 impl RomListParser {
     /// Create a new rom list parser object. It loads the file that lists previously parsed roms.
-    pub fn new() -> Self {
+    pub fn new(pb: PathBuf) -> Self {
         Self {
-            list: RomList::load_list(),
+            list: RomList::load_list(pb),
             scan_complete: false,
             update_complete: false,
         }
@@ -163,7 +165,7 @@ impl RomListParser {
     }
 
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
-    pub fn find_roms(&mut self, dir: &str, sp: &PathBuf) {
+    pub fn find_roms(&mut self, dir: &str, sp: PathBuf, bin: PathBuf) {
         if !self.scan_complete {
             for entry in walkdir::WalkDir::new(dir)
                 .into_iter()
@@ -174,7 +176,7 @@ impl RomListParser {
                 if meta.is_ok() {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
-                    let cart = NesCartridge::load_cartridge(name.clone(), sp);
+                    let cart = NesCartridge::load_cartridge(name.clone(), &sp);
                     match cart {
                         Ok(_cart) => {
                             self.list.elements.entry(m).or_insert_with(|| RomListEntry {
@@ -191,13 +193,13 @@ impl RomListParser {
                     }
                 }
             }
-            let _e = self.list.save_list();
+            let _e = self.list.save_list(bin);
             self.scan_complete = true;
         }
     }
 
     /// Responsbile for checking to see if an update has been performed. An update consists of checking to see if any roms have changed since the last scan through the filesystem.
-    pub fn process_roms(&mut self, sp: &PathBuf) {
+    pub fn process_roms(&mut self, sp: PathBuf) {
         if !self.update_complete {
             for (p, entry) in self.list.elements.iter_mut() {
                 let metadata = p.metadata();
@@ -207,7 +209,7 @@ impl RomListParser {
                     if modified > last_modified {
                         let romcheck = NesCartridge::load_cartridge(
                             p.as_os_str().to_str().unwrap().to_string(),
-                            sp,
+                            &sp,
                         );
                         entry.result = Some(romcheck.map(|i| RomListResult {
                             mapper: i.mappernum(),
@@ -216,7 +218,7 @@ impl RomListParser {
                     }
                 }
             }
-            let _e = self.list.save_list();
+            let _e = self.list.save_list(sp);
             self.update_complete = true;
         }
     }

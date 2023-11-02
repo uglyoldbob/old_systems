@@ -8,9 +8,12 @@ use crate::{cartridge::NesCartridge, rom_status::RomStatus, NesEmulatorData};
 use eframe::egui;
 
 use egui_multiwin::egui::ScrollArea;
+
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui_glow::EguiGlow};
+
+#[cfg(feature = "egui-multiwin")]
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -30,7 +33,7 @@ pub struct Window {
 #[cfg(feature = "egui-multiwin")]
 impl Window {
     /// Create a new request for a Debug window.
-    pub fn new_request(data: &NesEmulatorData) -> NewWindowRequest<NesEmulatorData> {
+    pub fn new_request(data: &NesEmulatorData) -> NewWindowRequest {
         let mut index = 0;
         let mut max_i = 0;
         for (i, (path, _entry)) in data.local.roms.elements.iter().enumerate() {
@@ -47,7 +50,7 @@ impl Window {
         }
 
         NewWindowRequest {
-            window_state: Box::new(Window {
+            window_state: super::Windows::RomChecker(Window {
                 index,
                 next_rom: None,
                 bug: "".to_string(),
@@ -64,12 +67,13 @@ impl Window {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for Window {
+impl TrackedWindow for Window {
     fn is_root(&self) -> bool {
         false
     }
@@ -81,7 +85,8 @@ impl TrackedWindow<NesEmulatorData> for Window {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];
@@ -111,18 +116,25 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         }
                     }
                     if ui.button("Set status to no bugs").clicked() {
-                        c.local.rom_test.put_entry(rom.hash(), RomStatus::Working);
+                        c.local.rom_test.put_entry(
+                            rom.hash(),
+                            RomStatus::Working,
+                            c.local.get_save_other(),
+                        );
                     }
                     if ui.button("Set status to completely broken").clicked() {
-                        c.local
-                            .rom_test
-                            .put_entry(rom.hash(), RomStatus::CompletelyBroken);
+                        c.local.rom_test.put_entry(
+                            rom.hash(),
+                            RomStatus::CompletelyBroken,
+                            c.local.get_save_other(),
+                        );
                     }
                     ui.text_edit_multiline(&mut self.bug);
                     if ui.button("Set status to has a bug").clicked() {
                         c.local.rom_test.put_entry(
                             rom.hash(),
                             RomStatus::Bug(self.bug.to_owned(), Some(c.serialize())),
+                            c.local.get_save_other(),
                         );
                         self.bug = "".to_string();
                     }
@@ -173,8 +185,6 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         } else {
                             self.index += 1;
                         }
-                    } else {
-                        println!("No roms?");
                     }
                 }
 

@@ -14,9 +14,10 @@ use cpal::traits::StreamTrait;
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui,
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
+
+#[cfg(feature = "egui-multiwin")]
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -96,7 +97,7 @@ impl MainNesWindow {
         rate: u32,
         producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
-    ) -> NewWindowRequest<NesEmulatorData> {
+    ) -> NewWindowRequest {
         use std::time::Duration;
 
         let have_gstreamer = gstreamer::init();
@@ -109,7 +110,7 @@ impl MainNesWindow {
         }
 
         NewWindowRequest {
-            window_state: Box::new(MainNesWindow {
+            window_state: super::Windows::Main(MainNesWindow {
                 have_gstreamer,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
@@ -142,6 +143,7 @@ impl MainNesWindow {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
@@ -305,7 +307,7 @@ impl eframe::App for MainNesWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for MainNesWindow {
+impl TrackedWindow for MainNesWindow {
     fn is_root(&self) -> bool {
         true
     }
@@ -323,7 +325,8 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
 
         #[cfg(feature = "puffin")]
@@ -572,7 +575,6 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             .egui_ctx
                             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F6))
                     {
-                        println!("Loading state");
                         load_state = true;
                         ui.close_menu();
                     }
@@ -598,6 +600,13 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
                             start_stop_recording = Some(false);
                             ui.close_menu();
                         }
+                    }
+
+                    let button = egui_multiwin::egui::Button::new("Open data path");
+                    if ui.add_enabled(true, button).clicked()
+                    {
+                        open::that_in_background(c.local.get_save_other());
+                        ui.close_menu();
                     }
                 });
                 ui.menu_button("Edit", |ui| {
@@ -685,14 +694,14 @@ impl TrackedWindow<NesEmulatorData> for MainNesWindow {
             rewind_state = true;
         }
 
-        let mut record_path = c.local.record_path();
+        let record_path = c.local.record_path();
         if let Some(rec) = start_stop_recording {
             if rec {
                 c.local.resolution_locked = true;
                 let sampling_frequency = 21.47727e6 / 12.0;
                 let tn = chrono::Local::now();
                 let mut recpath = record_path.clone();
-                recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H:%M:%S")));
+                recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
                 self.recording.start(
                     &self.have_gstreamer,
                     &self.image,

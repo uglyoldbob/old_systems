@@ -1,6 +1,9 @@
 //! This is the main implementation of the nes emulator. It provides most of the functionality of the emulator.
 
-use std::io::Write;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     apu::{AudioProducerWithRate, NesApu},
@@ -15,8 +18,9 @@ use crate::{
 use eframe::egui;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
+
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::multi_window::CommonEventHandler;
+use crate::egui_multiwin_dynamic::multi_window::NewWindowRequest;
 
 /// Persistent configuration for the emulator
 #[non_exhaustive]
@@ -93,6 +97,12 @@ impl EmulatorConfiguration {
     /// Retrieve the root path for roms.
     pub fn get_rom_path(&self) -> &str {
         &self.rom_path
+    }
+
+    /// Set the new path for roms
+    pub fn set_rom_path(&mut self, pb: PathBuf) {
+        self.rom_path = pb.into_os_string().into_string().unwrap();
+        self.save();
     }
 
     ///Load a configuration file
@@ -188,7 +198,32 @@ pub struct LocalEmulatorDataClone {
 impl LocalEmulatorDataClone {
     /// Returns the path to use for save states
     pub fn save_path(&self) -> std::path::PathBuf {
-        let mut pb = self.dirs.data_dir().to_path_buf();
+        Self::get_save_path(&self.dirs)
+    }
+
+    /// Retrieve the path for other files that get saved
+    pub fn get_save_other(&self) -> std::path::PathBuf {
+        self.dirs.data_dir().to_path_buf()
+    }
+
+    /// Retrieve the default path for roms. The user folder
+    pub fn default_rom_path(&self) -> std::path::PathBuf {
+        if let Some(pdirs) = directories::UserDirs::new() {
+            if let Some(d) = pdirs.document_dir() {
+                d.to_path_buf()
+            } else {
+                pdirs.home_dir().to_path_buf()
+            }
+        } else if let Some(bdirs) = directories::BaseDirs::new() {
+            bdirs.home_dir().to_path_buf()
+        } else {
+            self.dirs.data_local_dir().to_path_buf()
+        }
+    }
+
+    /// Convenience function for the new function
+    fn get_save_path(dirs: &directories::ProjectDirs) -> std::path::PathBuf {
+        let mut pb = dirs.data_dir().to_path_buf();
         pb.push("saves");
         if !pb.exists() {
             std::fs::create_dir_all(&pb);
@@ -208,12 +243,13 @@ impl LocalEmulatorDataClone {
 
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
-        self.parser.find_roms(dir, &self.save_path())
+        self.parser
+            .find_roms(dir, self.save_path(), self.get_save_other())
     }
 
     /// Process the list of roms
     pub fn process_roms(&mut self) {
-        self.parser.process_roms(&self.save_path())
+        self.parser.process_roms(self.save_path())
     }
 }
 
@@ -230,9 +266,9 @@ impl Default for LocalEmulatorDataClone {
         Self {
             configuration: config,
             parser: crate::romlist::RomListParser::default(),
-            roms: RomList::load_list(),
+            roms: RomList::load_list(Self::get_save_path(&dirs)),
             #[cfg(feature = "rom_status")]
-            rom_test: crate::rom_status::RomListTestParser::new(),
+            rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
             resolution_locked: false,
             dirs,
         }
@@ -281,11 +317,8 @@ pub struct NesEmulatorData {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl CommonEventHandler<NesEmulatorData, u32> for NesEmulatorData {
-    fn process_event(
-        &mut self,
-        _event: u32,
-    ) -> Vec<egui_multiwin::multi_window::NewWindowRequest<NesEmulatorData>> {
+impl NesEmulatorData {
+    pub fn process_event(&mut self, _event: egui_multiwin::NoEvent) -> Vec<NewWindowRequest> {
         vec![]
     }
 }
@@ -350,7 +383,11 @@ impl NesEmulatorData {
                 let controller4 = self.mb.get_controller(3);
                 let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
-                cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
+                cd.and_then(|cd| {
+                    self.mb
+                        .cartridge_mut()
+                        .map(|c| c.restore_cart_data(cd, self.local.save_path()))
+                });
                 self.mb.set_controller(0, controller1);
                 self.mb.set_controller(1, controller2);
                 self.mb.set_controller(2, controller3);

@@ -8,9 +8,37 @@ mod emulator_data;
 mod motherboard;
 mod network;
 mod ppu;
+mod recording;
 mod rom_status;
 mod romlist;
 mod utility;
+pub mod windows;
+
+#[cfg(feature = "egui-multiwin")]
+/// Dynamically generated code for the egui-multiwin module allows for use of enum_dispatch for speed gains.
+pub mod egui_multiwin_dynamic {
+    egui_multiwin::tracked_window!(
+        crate::emulator_data::NesEmulatorData,
+        egui_multiwin::NoEvent,
+        crate::windows::Windows
+    );
+    egui_multiwin::multi_window!(
+        crate::emulator_data::NesEmulatorData,
+        egui_multiwin::NoEvent,
+        crate::windows::Windows
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + Send + 'static>(f: F) {
+    std::thread::spawn(move || futures::executor::block_on(f));
+}
+#[cfg(target_arch = "wasm32")]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
 
 use crate::apu::NesApu;
 use crate::cartridge::NesCartridge;
@@ -162,17 +190,25 @@ pub fn romlist_bench(c: &mut Criterion) {
     group.bench_function("first run", |b| {
         b.iter(|| {
             let _e = std::fs::remove_file("./roms.bin");
-            let mut list = romlist::RomListParser::new();
-            list.find_roms("../test_roms", &std::path::PathBuf::new());
-            list.process_roms(&std::path::PathBuf::new());
+            let mut list = romlist::RomListParser::new(std::path::PathBuf::new());
+            list.find_roms(
+                "../test_roms",
+                std::path::PathBuf::new(),
+                std::path::PathBuf::new(),
+            );
+            list.process_roms(std::path::PathBuf::new());
         });
     });
 
     group.bench_function("second run", |b| {
         b.iter(|| {
-            let mut list = romlist::RomListParser::new();
-            list.find_roms("../test_roms", &std::path::PathBuf::new());
-            list.process_roms(&std::path::PathBuf::new());
+            let mut list = romlist::RomListParser::new(std::path::PathBuf::new());
+            list.find_roms(
+                "../test_roms",
+                std::path::PathBuf::new(),
+                std::path::PathBuf::new(),
+            );
+            list.process_roms(std::path::PathBuf::new());
         });
     });
 }

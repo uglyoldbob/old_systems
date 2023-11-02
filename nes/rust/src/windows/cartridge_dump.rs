@@ -6,8 +6,10 @@ use crate::NesEmulatorData;
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{
-    egui_glow::EguiGlow,
+use egui_multiwin::{arboard, egui_glow::EguiGlow};
+
+#[cfg(feature = "egui-multiwin")]
+use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
@@ -19,9 +21,9 @@ pub struct CartridgeMemoryDumpWindow {}
 #[cfg(feature = "egui-multiwin")]
 impl CartridgeMemoryDumpWindow {
     /// Create a request to create a new window of self.
-    pub fn new_request() -> NewWindowRequest<NesEmulatorData> {
+    pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: Box::new(CartridgeMemoryDumpWindow {}),
+            window_state: super::Windows::CartridgeDump(CartridgeMemoryDumpWindow {}),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
@@ -33,12 +35,13 @@ impl CartridgeMemoryDumpWindow {
                 vsync: false,
                 shader: None,
             },
+            id: egui_multiwin::multi_window::new_id(),
         }
     }
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow<NesEmulatorData> for CartridgeMemoryDumpWindow {
+impl TrackedWindow for CartridgeMemoryDumpWindow {
     fn is_root(&self) -> bool {
         false
     }
@@ -50,7 +53,8 @@ impl TrackedWindow<NesEmulatorData> for CartridgeMemoryDumpWindow {
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
-    ) -> RedrawResponse<NesEmulatorData> {
+        _clipboard: &mut arboard::Clipboard,
+    ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
         let quit = false;
         let windows_to_create = vec![];

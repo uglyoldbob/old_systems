@@ -1,6 +1,8 @@
 [package]
 name = "nes"
 version = "0.1.0"
+authors = ["Thomas Epperson <thomas.epperson@gmail.com>"]
+description = "A NES emulator written in Rust"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -25,17 +27,20 @@ gilrs = {version = "0.10.2", features = ["serde-serialize"]}
 libp2p = { version = "0.52.4", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux"] }
 rand = "0.8.5"
 ringbuf = "0.3.3"
-egui-multiwin = { version = "0.1.12", features = ["serde"], optional=true }
+egui-multiwin = { version = "0.3.1", features = ["serde"], optional=true }
 egui = { version = "0.23.0", optional=true }
 eframe = { version = "0.23.0", optional=true }
+futures = "0.3.28"
 gstreamer = "0.21.1"
 gstreamer-app = "0.21.1"
 gstreamer-audio = "0.21.1"
 gstreamer-video = "0.21.1"
 memmap2 = "0.9.0"
+open = "5.0.0"
 puffin = { version = "0.17", optional=true}
 puffin_egui = { version = "0.23", optional=true }
 egui_sdl2_gl = { version="0.22.1", optional=true }
+rfd = "0.11.4"
 ring = "0.17.4"
 strum = { version = "0.25", features = ["derive"] }
 tokio = "1.33.0"
@@ -57,3 +62,6 @@ criterion = "0.3.6"
 name="nes_bench"
 path="src/benchmark.rs"
 harness = false
+
+[package.metadata.bundle]
+identifier = "com.uglyoldbob.nes_emulator"
