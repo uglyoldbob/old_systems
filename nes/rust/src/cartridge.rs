@@ -223,7 +223,6 @@ impl Drop for PersistentStorage {
 impl PersistentStorage {
     /// Create a persistent storage object using the specified path and data. Overwrite will overwrite the contents of the file if set to true.
     fn make_persistent(p: PathBuf, v: Vec<u8>, overwrite: bool) -> Option<Self> {
-        println!("Making persistent with {}", p.display());
         let file = if p.exists() {
             let file = std::fs::OpenOptions::new()
                 .read(true)
@@ -267,7 +266,6 @@ impl PersistentStorage {
     fn upgrade_to_persistent(&mut self, p: PathBuf) {
         if let PersistentStorage::ShouldBePersistent(v) = self {
             if let Some(ps) = Self::make_persistent(p, v.clone(), true) {
-                println!("Have upgraded to persistent storage again");
                 *self = ps;
             }
         }
