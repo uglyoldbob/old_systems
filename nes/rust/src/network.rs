@@ -4,19 +4,20 @@ use std::net::TcpStream;
 
 use libp2p::{futures::StreamExt, Swarm};
 
-/// The types of roles that can occur for the network object
-pub enum Role {
-    /// The host contains the actual emulator implementation. It sends video streams to all Player and received controller inputs.
-    Host,
-    /// A player instance receives a video feed from a host and sends controller data.
-    Player,
+pub enum MessageToNetwork {
+    ControllerData(u8, crate::controller::ButtonCombination),
+}
+
+pub enum MessageFromNetwork {
+    EmulatorVideoStream(Vec<u8>),
 }
 
 /// The main networking struct for the emulator
 pub struct Network {
-    role: Option<Role>,
     tokio: tokio::runtime::Runtime,
     thread: tokio::task::JoinHandle<()>,
+    sender: std::sync::mpsc::Sender<MessageToNetwork>,
+    recvr: std::sync::mpsc::Receiver<MessageFromNetwork>,
 }
 
 // This describes the behaviour of a libp2p swarm
@@ -28,12 +29,23 @@ struct SwarmBehavior {
 /// The object used internally to this module to manage network state
 struct InternalNetwork {
     swarm: Swarm<SwarmBehavior>,
+    sender: std::sync::mpsc::Sender<MessageFromNetwork>,
+    recvr: std::sync::mpsc::Receiver<MessageToNetwork>,
 }
 
 impl InternalNetwork {
     async fn do_the_thing(&mut self) -> Option<()> {
-        self.swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?).ok()?;
+        self.swarm
+            .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?)
+            .ok()?;
         loop {
+            while let Ok(a) = self.recvr.try_recv() {
+                match a {
+                    MessageToNetwork::ControllerData(i, buttons) => {
+
+                    }
+                }
+            }
             match self.swarm.select_next_some().await {
                 libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Listening on {address:?}")
@@ -66,17 +78,24 @@ impl InternalNetwork {
         Some(())
     }
 
-    fn start(runtime: &mut tokio::runtime::Runtime) -> tokio::task::JoinHandle<()> {
+    fn start(
+        runtime: &mut tokio::runtime::Runtime,
+        s: std::sync::mpsc::Sender<MessageFromNetwork>,
+        r: std::sync::mpsc::Receiver<MessageToNetwork>,
+    ) -> tokio::task::JoinHandle<()> {
         runtime.spawn(async {
             println!("Started async code");
-            if let Some(mut i) = Self::try_new() {
+            if let Some(mut i) = Self::try_new(s, r) {
                 i.do_the_thing().await;
             }
         })
     }
 
     /// Create a new object
-    fn try_new() -> Option<Self> {
+    fn try_new(
+        s: std::sync::mpsc::Sender<MessageFromNetwork>,
+        r: std::sync::mpsc::Receiver<MessageToNetwork>,
+    ) -> Option<Self> {
         let swarm = libp2p::SwarmBuilder::with_new_identity()
             .with_tokio()
             .with_tcp(
@@ -95,6 +114,8 @@ impl InternalNetwork {
             .build();
         Some(Self {
             swarm,
+            recvr: r,
+            sender: s,
         })
     }
 }
@@ -102,15 +123,22 @@ impl InternalNetwork {
 impl Network {
     ///Create a new instance of network with the given role
     pub fn new() -> Self {
+        let (s1, r1) = std::sync::mpsc::channel();
+        let (s2, r2) = std::sync::mpsc::channel();
         let mut t = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
-        let t2 = InternalNetwork::start(&mut t);
+        let t2 = InternalNetwork::start(&mut t, s2, r1);
         Self {
-            role: None,
             tokio: t,
             thread: t2,
+            sender: s1,
+            recvr: r2,
         }
+    }
+
+    pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {
+        self.sender.send(MessageToNetwork::ControllerData(i, data));
     }
 }
