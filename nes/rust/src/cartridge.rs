@@ -223,6 +223,7 @@ impl Drop for PersistentStorage {
 impl PersistentStorage {
     /// Create a persistent storage object using the specified path and data. Overwrite will overwrite the contents of the file if set to true.
     fn make_persistent(p: PathBuf, v: Vec<u8>, overwrite: bool) -> Option<Self> {
+        println!("Making persistent with {}", p.display());
         let file = if p.exists() {
             let file = std::fs::OpenOptions::new()
                 .read(true)
@@ -454,9 +455,8 @@ impl NesCartridge {
     }
 
     /// Restore previously saved data after loading a save state.
-    pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup) {
+    pub fn restore_cart_data(&mut self, old_data: NesCartridgeBackup, mut pb: PathBuf) {
         self.data.nonvolatile = old_data.data;
-        let mut pb: PathBuf = PathBuf::from("./saves");
         pb.push(format!("{}.prgram", self.save));
         self.data.volatile.prg_ram.upgrade_to_persistent(pb);
         self.rom_name = old_data.rom_name;

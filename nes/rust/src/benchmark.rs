@@ -161,17 +161,17 @@ pub fn romlist_bench(c: &mut Criterion) {
     group.bench_function("first run", |b| {
         b.iter(|| {
             let _e = std::fs::remove_file("./roms.bin");
-            let mut list = romlist::RomListParser::new();
-            list.find_roms("../test_roms", &std::path::PathBuf::new());
-            list.process_roms(&std::path::PathBuf::new());
+            let mut list = romlist::RomListParser::new(std::path::PathBuf::new());
+            list.find_roms("../test_roms", std::path::PathBuf::new(), std::path::PathBuf::new());
+            list.process_roms(std::path::PathBuf::new());
         });
     });
 
     group.bench_function("second run", |b| {
         b.iter(|| {
-            let mut list = romlist::RomListParser::new();
-            list.find_roms("../test_roms", &std::path::PathBuf::new());
-            list.process_roms(&std::path::PathBuf::new());
+            let mut list = romlist::RomListParser::new(std::path::PathBuf::new());
+            list.find_roms("../test_roms", std::path::PathBuf::new(), std::path::PathBuf::new());
+            list.process_roms(std::path::PathBuf::new());
         });
     });
 }

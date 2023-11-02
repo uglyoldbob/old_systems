@@ -173,8 +173,6 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         } else {
                             self.index += 1;
                         }
-                    } else {
-                        println!("No roms?");
                     }
                 }
 

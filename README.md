@@ -15,3 +15,4 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] Add pal support
 - [ ] wix installer for windows
 - [ ] Add a list of instructions to the debugger
+- [ ] Create link to recordings folder

@@ -185,7 +185,17 @@ pub struct LocalEmulatorDataClone {
 impl LocalEmulatorDataClone {
     /// Returns the path to use for save states
     pub fn save_path(&self) -> std::path::PathBuf {
-        let mut pb = self.dirs.data_dir().to_path_buf();
+        Self::get_save_path(&self.dirs)
+    }
+
+    /// Retrieve the path for other files that get saved
+    pub fn get_save_other(&self) -> std::path::PathBuf {
+        self.dirs.data_dir().to_path_buf()
+    }
+
+    /// Convenience function for the new function
+    fn get_save_path(dirs: &directories::ProjectDirs) -> std::path::PathBuf {
+        let mut pb = dirs.data_dir().to_path_buf();
         pb.push("saves");
         if !pb.exists() {
             std::fs::create_dir_all(&pb);
@@ -205,12 +215,12 @@ impl LocalEmulatorDataClone {
 
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
-        self.parser.find_roms(dir, &self.save_path())
+        self.parser.find_roms(dir, self.save_path(), self.get_save_other())
     }
 
     /// Process the list of roms
     pub fn process_roms(&mut self) {
-        self.parser.process_roms(&self.save_path())
+        self.parser.process_roms(self.save_path())
     }
 }
 
@@ -227,7 +237,7 @@ impl Default for LocalEmulatorDataClone {
         Self {
             configuration: config,
             parser: crate::romlist::RomListParser::default(),
-            roms: RomList::load_list(),
+            roms: RomList::load_list(Self::get_save_path(&dirs)),
             #[cfg(feature = "rom_status")]
             rom_test: crate::rom_status::RomListTestParser::new(),
             resolution_locked: false,
@@ -347,7 +357,7 @@ impl NesEmulatorData {
                 let controller4 = self.mb.get_controller(3);
                 let cd = self.mb.cartridge_mut().map(|c| c.save_cart_data());
                 *self = r;
-                cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd)));
+                cd.and_then(|cd| self.mb.cartridge_mut().map(|c| c.restore_cart_data(cd, self.local.save_path())));
                 self.mb.set_controller(0, controller1);
                 self.mb.set_controller(1, controller2);
                 self.mb.set_controller(2, controller3);

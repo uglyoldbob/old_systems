@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
 
@@ -386,7 +386,8 @@ fn main() {
     let mut nes_data = NesEmulatorData::new();
     nes_data.local.parser.find_roms(
         nes_data.local.configuration.get_rom_path(),
-        &nes_data.local.save_path(),
+        nes_data.local.save_path(),
+        nes_data.local.get_save_other(),
     );
     let mut multi_window = MultiWindow::new();
 
