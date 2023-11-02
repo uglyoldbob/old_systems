@@ -13,6 +13,6 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] AI driven controllers
 - [ ] Fix currently broken games
 - [ ] Add pal support
-- [ ] wix installer for windows
+- [x] wix installer for windows
 - [ ] Add a list of instructions to the debugger
-- [ ] Create link to recordings folder
+- [x] Create link to recordings folder
