@@ -98,6 +98,12 @@ impl TrackedWindow<NesEmulatorData> for Window {
                         .to_string()
                 ));
             }
+
+            ui.label("Folder for roms:");
+            if ui.add(egui::Label::new(c.local.configuration.get_rom_path()).sense(egui::Sense::click())).clicked() {
+                println!("Clicked to change rom path");
+            }
+
             if save_config {
                 c.local.configuration.save();
             }
