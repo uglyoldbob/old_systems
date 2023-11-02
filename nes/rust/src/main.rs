@@ -34,6 +34,17 @@ pub type AudioConsumer =
 
 use emulator_data::NesEmulatorData;
 
+#[cfg(not(target_arch = "wasm32"))]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + Send + 'static>(f: F) {
+    std::thread::spawn(move || futures::executor::block_on(f));
+}
+#[cfg(target_arch = "wasm32")]
+///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
+pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+
 #[cfg(test)]
 mod tests;
 

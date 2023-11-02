@@ -1,6 +1,6 @@
 //! This is the main implementation of the nes emulator. It provides most of the functionality of the emulator.
 
-use std::io::Write;
+use std::{io::Write, path::{Path, PathBuf}};
 
 use crate::{
     apu::{AudioProducerWithRate, NesApu},
@@ -93,6 +93,12 @@ impl EmulatorConfiguration {
     /// Retrieve the root path for roms.
     pub fn get_rom_path(&self) -> &str {
         &self.rom_path
+    }
+
+    /// Set the new path for roms
+    pub fn set_rom_path(&mut self, pb: PathBuf) {
+        self.rom_path = pb.into_os_string().into_string().unwrap();
+        self.save();
     }
 
     ///Load a configuration file
@@ -191,6 +197,24 @@ impl LocalEmulatorDataClone {
     /// Retrieve the path for other files that get saved
     pub fn get_save_other(&self) -> std::path::PathBuf {
         self.dirs.data_dir().to_path_buf()
+    }
+
+
+    /// Retrieve the default path for roms. The user folder
+    pub fn default_rom_path(&self) -> std::path::PathBuf {
+        if let Some(pdirs) = directories::UserDirs::new() {
+            if let Some(d) = pdirs.document_dir() {
+                d.to_path_buf()
+            }
+            else {
+                pdirs.home_dir().to_path_buf()
+            }
+        } else if let Some(bdirs) = directories::BaseDirs::new() {
+            bdirs.home_dir().to_path_buf()
+        }
+        else {
+            self.dirs.data_local_dir().to_path_buf()
+        }
     }
 
     /// Convenience function for the new function
