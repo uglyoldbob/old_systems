@@ -107,7 +107,7 @@ impl ControllerConfig {
 }
 
 /// The various buttons used by controllers
-#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq, Debug)]
 pub enum Button {
     /// The A button on standard controllers.
     A,
@@ -187,7 +187,7 @@ pub const BUTTON_COMBO_POTENTIOMETER: usize = 13;
 pub const BUTTON_COMBO_POWERPAD: usize = 14;
 
 /// The combination of all possible buttons on a controller.
-#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq, Debug)]
 pub struct ButtonCombination {
     /// The buttons for a controller. None generally means a button is not pressed, there are a few exceptions.
     buttons: [Button; 15],

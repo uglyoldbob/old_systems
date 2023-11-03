@@ -1,13 +1,15 @@
 //! This is the module for network play related code.
 
-use std::net::TcpStream;
+mod emulator;
 
 use libp2p::{futures::StreamExt, Swarm};
 
+#[derive(Debug)]
 pub enum MessageToNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
 }
 
+#[derive(Debug)]
 pub enum MessageFromNetwork {
     EmulatorVideoStream(Vec<u8>),
 }
@@ -24,6 +26,7 @@ pub struct Network {
 #[derive(libp2p::swarm::NetworkBehaviour)]
 struct SwarmBehavior {
     upnp: libp2p::upnp::tokio::Behaviour,
+    emulator: emulator::Behavior,
 }
 
 /// The object used internally to this module to manage network state
@@ -41,9 +44,7 @@ impl InternalNetwork {
         loop {
             while let Ok(a) = self.recvr.try_recv() {
                 match a {
-                    MessageToNetwork::ControllerData(i, buttons) => {
-
-                    }
+                    MessageToNetwork::ControllerData(i, buttons) => {}
                 }
             }
             match self.swarm.select_next_some().await {
@@ -107,6 +108,7 @@ impl InternalNetwork {
             .with_behaviour(|_key| {
                 let beh = SwarmBehavior {
                     upnp: libp2p::upnp::tokio::Behaviour::default(),
+                    emulator: emulator::Behavior::new(),
                 };
                 beh
             })

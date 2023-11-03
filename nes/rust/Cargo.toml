@@ -24,6 +24,7 @@ data-encoding = "2.4.0"
 directories = "5.0.1"
 enum_dispatch = "0.3.12"
 gilrs = {version = "0.10.2", features = ["serde-serialize"]}
+hex_fmt = "0.3.0"
 libp2p = { version = "0.52.4", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux"] }
 rand = "0.8.5"
 ringbuf = "0.3.3"
