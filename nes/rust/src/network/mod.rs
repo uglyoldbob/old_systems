@@ -5,14 +5,16 @@ mod emulator;
 use std::collections::HashSet;
 
 use futures::FutureExt;
-use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 use libp2p::core::transport::ListenerId;
+use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
 #[derive(Debug)]
 pub enum MessageToNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
     StartServer,
     StopServer,
+    Connect(String),
+    Test,
 }
 
 #[derive(Debug)]
@@ -21,6 +23,7 @@ pub enum MessageFromNetwork {
     NewAddress(Multiaddr),
     ExpiredAddress(Multiaddr),
     ServerStatus(bool),
+    Test,
 }
 
 /// The main networking struct for the emulator
@@ -61,7 +64,24 @@ impl InternalNetwork {
                             r = f2 => {
                                 if let Ok(m) = r {
                                     match m {
-                                        MessageToNetwork::ControllerData(i, buttons) => {}
+                                        MessageToNetwork::Test => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.send_message();
+                                        }
+                                        MessageToNetwork::Connect(cs) => {
+                                            match cs.parse::<Multiaddr>() {
+                                                Ok(addr) => {
+                                                    println!("Attempt to connect to {} {:?}", cs, self.swarm.dial(addr));
+                                                }
+                                                Err(e) => {
+                                                    println!("Error parsing multiaddr {:?}", e);
+                                                }
+                                            }
+                                        }
+                                        MessageToNetwork::ControllerData(i, buttons) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.send_message();
+                                        }
                                         MessageToNetwork::StopServer => {
                                             if let Some(list) = &mut self.listener {
                                                 self.swarm.remove_listener(*list);
@@ -119,13 +139,11 @@ impl InternalNetwork {
                                         libp2p::upnp::Event::GatewayNotFound,
                                     )) => {
                                         println!("Gateway does not support UPnP");
-                                        break;
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
                                         libp2p::upnp::Event::NonRoutableGateway,
                                     )) => {
                                         println!("Gateway is not exposed directly to the public Internet, i.e. it itself has a private IP address.");
-                                        break;
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
                                         libp2p::upnp::Event::ExpiredExternalAddr(addr),
@@ -138,6 +156,15 @@ impl InternalNetwork {
                                             crate::event::EventType::CheckNetwork,
                                         ));
                                         self.addresses.remove(&addr);
+                                    }
+                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
+                                        match e {
+                                            emulator::Event::Message(_, _, _) => todo!(),
+                                            emulator::Event::TestEvent => {
+                                                self.sender.send(MessageFromNetwork::Test).await;
+                                            }
+                                            emulator::Event::UnsupportedPeer(_) => todo!(),
+                                        }
                                     }
                                     _ => {}
                                 }
@@ -224,6 +251,9 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetwork::Test => {
+                    println!("Received test message from network");
+                }
                 MessageFromNetwork::EmulatorVideoStream(_) => {}
                 MessageFromNetwork::NewAddress(a) => {
                     self.addresses.insert(a);
@@ -251,6 +281,11 @@ impl Network {
 
     pub fn stop_server(&mut self) {
         self.sender.send_blocking(MessageToNetwork::StopServer);
+    }
+
+    pub fn try_connect(&mut self, cs: &String) {
+        self.sender
+            .send_blocking(MessageToNetwork::Connect(cs.to_owned()));
     }
 
     pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {

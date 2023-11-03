@@ -1,9 +1,15 @@
-use std::{fmt::Display, pin::Pin};
+use std::{
+    collections::VecDeque,
+    fmt::Display,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Waker,
+};
 
 use futures::{future, Future};
 use libp2p::{
     core::UpgradeInfo,
-    swarm::{ConnectionHandler, NetworkBehaviour},
+    swarm::{ConnectionHandler, NetworkBehaviour, SubstreamProtocol, ToSwarm},
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
@@ -22,8 +28,19 @@ impl AsRef<str> for ProtocolId {
     }
 }
 
+#[derive(Clone)]
 pub struct Protocol {
     protocols: Vec<ProtocolId>,
+}
+
+impl Default for Protocol {
+    fn default() -> Self {
+        Self {
+            protocols: vec![ProtocolId {
+                protocol: StreamProtocol::new("/nes/0.0.1"),
+            }],
+        }
+    }
 }
 
 impl UpgradeInfo for Protocol {
@@ -68,11 +85,19 @@ impl Display for ConnectionError {
     }
 }
 
-pub struct Handler {}
+pub struct Handler {
+    listen_protocol: Protocol,
+}
 
 impl Handler {
-    fn new() -> Self {
-        Self {}
+    fn new(protocol: Protocol) -> Self {
+        Self {
+            listen_protocol: protocol,
+        }
+    }
+
+    fn do_stuff(&mut self) {
+        println!("Handler is just doing stuff, don't worry");
     }
 }
 
@@ -94,11 +119,11 @@ impl ConnectionHandler for Handler {
     fn listen_protocol(
         &self,
     ) -> libp2p::swarm::SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
-        todo!()
+        SubstreamProtocol::new(self.listen_protocol.clone(), ())
     }
 
     fn connection_keep_alive(&self) -> libp2p::swarm::KeepAlive {
-        todo!()
+        libp2p::swarm::KeepAlive::Yes
     }
 
     fn poll(
@@ -112,7 +137,7 @@ impl ConnectionHandler for Handler {
             Self::Error,
         >,
     > {
-        todo!()
+        std::task::Poll::Pending
     }
 
     fn on_behaviour_event(&mut self, _event: Self::FromBehaviour) {
@@ -128,7 +153,6 @@ impl ConnectionHandler for Handler {
             Self::OutboundOpenInfo,
         >,
     ) {
-        todo!()
     }
 }
 
@@ -189,14 +213,45 @@ impl std::fmt::Debug for MessageId {
 #[derive(Debug)]
 pub enum Event {
     Message(PeerId, MessageId, Message),
+    TestEvent,
     UnsupportedPeer(PeerId),
 }
 
-pub struct Behavior {}
+#[derive(Clone)]
+pub struct Config {
+    protocol: Protocol,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            protocol: Protocol::default(),
+        }
+    }
+}
+
+pub struct Behavior {
+    config: Config,
+    /// Events that need to be yielded to the outside when polling.
+    events: VecDeque<ToSwarm<Event, MessageFromNetwork>>,
+    messages: VecDeque<MessageToNetwork>,
+    waker: Arc<Mutex<Option<Waker>>>,
+}
 
 impl Behavior {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            config: Config::default(),
+            events: VecDeque::new(),
+            messages: VecDeque::new(),
+            waker: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
+impl Behavior {
+    pub fn send_message(&mut self) {
+        self.messages.push_back(MessageToNetwork::Test);
     }
 }
 
@@ -212,7 +267,7 @@ impl NetworkBehaviour for Behavior {
         _local_addr: &libp2p::Multiaddr,
         _remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        Ok(Handler::new())
+        Ok(Handler::new(self.config.protocol.clone()))
     }
 
     fn handle_established_outbound_connection(
@@ -222,10 +277,17 @@ impl NetworkBehaviour for Behavior {
         _addr: &libp2p::Multiaddr,
         _role_override: libp2p::core::Endpoint,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        Ok(Handler::new())
+        Ok(Handler::new(self.config.protocol.clone()))
     }
 
-    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {}
+    fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {
+        let mut waker = self.waker.lock().unwrap();
+        self.events
+            .push_back(ToSwarm::GenerateEvent(Event::TestEvent));
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
 
     fn on_connection_handler_event(
         &mut self,
@@ -237,10 +299,16 @@ impl NetworkBehaviour for Behavior {
 
     fn poll(
         &mut self,
-        _cx: &mut std::task::Context<'_>,
+        cx: &mut std::task::Context<'_>,
         _params: &mut impl libp2p::swarm::PollParameters,
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
     {
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(event) = self.events.pop_front() {
+            println!("There is an event {:?}", event);
+            return std::task::Poll::Ready(event);
+        }
+        *waker = Some(cx.waker().clone());
         std::task::Poll::Pending
     }
 }

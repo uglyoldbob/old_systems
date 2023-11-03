@@ -14,14 +14,18 @@ use crate::egui_multiwin_dynamic::{
 };
 use crate::emulator_data::NesEmulatorData;
 
-pub struct Window {}
+pub struct Window {
+    server: String,
+}
 
 #[cfg(feature = "egui-multiwin")]
 impl Window {
     /// Create a request to create a new window of self.
     pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: super::Windows::Network(Window {}),
+            window_state: super::Windows::Network(Window {
+                server: "".to_string(),
+            }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
@@ -87,8 +91,16 @@ impl TrackedWindow for Window {
                         if ui.button("Start server").clicked() {
                             network.start_server();
                         }
-                    }
-                    else {
+
+                        ui.horizontal(|ui| {
+                            let te = TextEdit::singleline(&mut self.server);
+                            ui.label("Server to connect to: ");
+                            ui.add(te);
+                        });
+                        if ui.button("Connect").clicked() {
+                            network.try_connect(&self.server);
+                        }
+                    } else {
                         if ui.button("Stop server").clicked() {
                             network.stop_server();
                         }
