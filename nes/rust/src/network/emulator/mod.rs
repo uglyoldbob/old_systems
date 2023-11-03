@@ -9,7 +9,10 @@ use std::{
 use futures::{future, Future};
 use libp2p::{
     core::UpgradeInfo,
-    swarm::{ConnectionHandler, NetworkBehaviour, SubstreamProtocol, ToSwarm},
+    swarm::{
+        handler::{ConnectionEvent, FullyNegotiatedOutbound},
+        ConnectionHandler, ConnectionHandlerEvent, NetworkBehaviour, SubstreamProtocol, ToSwarm,
+    },
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
@@ -62,13 +65,16 @@ impl<Stream> InboundUpgrade<Stream> for Protocol {
     }
 }
 
-impl<Stream> OutboundUpgrade<Stream> for Protocol {
-    type Output = u16;
+impl<Stream> OutboundUpgrade<Stream> for Protocol
+where
+    Stream: Send + 'static,
+{
+    type Output = (Stream, Self::Info);
     type Error = ();
     type Future = Pin<Box<dyn Future<Output = Result<Self::Output, Self::Error>> + Send>>;
 
     fn upgrade_outbound(self, io: Stream, protocol: Self::Info) -> Self::Future {
-        Box::pin(future::ok(42))
+        Box::pin(future::ok((io, protocol)))
     }
 }
 
@@ -85,14 +91,27 @@ impl Display for ConnectionError {
     }
 }
 
+pub struct OutboundSubstreamState {
+    stream: libp2p::Stream,
+}
+
 pub struct Handler {
     listen_protocol: Protocol,
+    waker: Arc<Mutex<Option<Waker>>>,
+    /// The single long-lived outbound substream.
+    outbound_substream: Option<OutboundSubstreamState>,
+    /// Flag indicating that an outbound substream is being established to prevent duplicate
+    /// requests.
+    outbound_substream_establishing: bool,
 }
 
 impl Handler {
     fn new(protocol: Protocol) -> Self {
         Self {
             listen_protocol: protocol,
+            waker: Arc::new(Mutex::new(None)),
+            outbound_substream: None,
+            outbound_substream_establishing: false,
         }
     }
 
@@ -137,6 +156,18 @@ impl ConnectionHandler for Handler {
             Self::Error,
         >,
     > {
+        let mut waker = self.waker.lock().unwrap();
+
+        // determine if we need to create the outbound stream
+        if self.outbound_substream.is_none() && !self.outbound_substream_establishing {
+            self.outbound_substream_establishing = true;
+            println!("Requesting a new outbound substream");
+            return std::task::Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
+                protocol: SubstreamProtocol::new(self.listen_protocol.clone(), ()),
+            });
+        }
+
+        *waker = Some(cx.waker().clone());
         std::task::Poll::Pending
     }
 
@@ -153,6 +184,18 @@ impl ConnectionHandler for Handler {
             Self::OutboundOpenInfo,
         >,
     ) {
+        if event.is_outbound() {
+            self.outbound_substream_establishing = false;
+        }
+        match event {
+            ConnectionEvent::FullyNegotiatedOutbound(fully_negotiated_outbound) => {
+                println!("Got a new outbound substream");
+                let FullyNegotiatedOutbound { protocol, info } = fully_negotiated_outbound;
+                let (a, b) = protocol;
+                self.outbound_substream = Some(OutboundSubstreamState { stream: a });
+            }
+            _ => {}
+        }
     }
 }
 
@@ -280,7 +323,7 @@ impl NetworkBehaviour for Behavior {
         Ok(Handler::new(self.config.protocol.clone()))
     }
 
-    fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {
+    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {
         let mut waker = self.waker.lock().unwrap();
         self.events
             .push_back(ToSwarm::GenerateEvent(Event::TestEvent));
@@ -293,8 +336,15 @@ impl NetworkBehaviour for Behavior {
         &mut self,
         _peer_id: libp2p::PeerId,
         _connection_id: libp2p::swarm::ConnectionId,
-        _event: libp2p::swarm::THandlerOutEvent<Self>,
+        event: libp2p::swarm::THandlerOutEvent<Self>,
     ) {
+        println!("Recieved connection handler event {:?}", event);
+        let mut waker = self.waker.lock().unwrap();
+        self.events
+            .push_back(ToSwarm::GenerateEvent(Event::TestEvent));
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
     }
 
     fn poll(
@@ -305,7 +355,6 @@ impl NetworkBehaviour for Behavior {
     {
         let mut waker = self.waker.lock().unwrap();
         if let Some(event) = self.events.pop_front() {
-            println!("There is an event {:?}", event);
             return std::task::Poll::Ready(event);
         }
         *waker = Some(cx.waker().clone());
