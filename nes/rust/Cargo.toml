@@ -17,6 +17,7 @@ eframe = ["dep:eframe", "dep:cpal", "egui/serde"]
 sdl2 = ["dep:sdl2", "dep:egui_sdl2_gl"]
 
 [dependencies]
+async-channel = "2.0.0"
 biquad = "0.4.2"
 chrono = "0.4.31"
 cpal = {version = "0.15.2", optional=true}

@@ -3,6 +3,7 @@
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
+use egui_multiwin::egui::TextEdit;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
 
@@ -72,9 +73,18 @@ impl TrackedWindow for Window {
                     }
                 }
                 if let Some(network) = &mut olocal.network {
-                    ui.label("Currently listening on:");
-                    for a in network.get_addresses() {
-                        ui.label(format!("{}", a));
+                    let na = network.get_addresses();
+                    if na.len() > 0 {
+                        ui.label("Currently listening on:");
+                        for a in na {
+                            let mut t = a.to_string();
+                            let te = TextEdit::singleline(&mut t);
+                            ui.add(te);
+                        }
+                    }
+
+                    if ui.button("Start server").clicked() {
+                        network.start_server();
                     }
                 }
             }
