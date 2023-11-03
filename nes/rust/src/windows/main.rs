@@ -608,6 +608,12 @@ impl TrackedWindow for MainNesWindow {
                         open::that_in_background(c.local.get_save_other());
                         ui.close_menu();
                     }
+
+                    let button = egui_multiwin::egui::Button::new("Networking");
+                    if ui.add_enabled(true, button).clicked() {
+                        windows_to_create.push(super::network::Window::new_request());
+                        ui.close_menu();
+                    }
                 });
                 ui.menu_button("Edit", |ui| {
                     let button = egui_multiwin::egui::Button::new("Configuration");
@@ -754,48 +760,52 @@ impl TrackedWindow for MainNesWindow {
         }
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            if let Some(t) = &self.texture {
-                let size = ui.available_size();
-                let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
-                let r = ui.add(
-                    egui::Image::from_texture(egui::load::SizedTexture {
-                        id: t.id(),
-                        size: egui_multiwin::egui::Vec2 {
-                            x: t.size()[0] as f32 * zoom,
-                            y: t.size()[1] as f32 * zoom,
-                        },
-                    })
-                    .sense(egui::Sense::click_and_drag()),
-                );
-                if r.clicked() || r.dragged() {
-                    self.mouse = true;
-                    self.mouse_miss = false;
-                    self.mouse_delay = 10;
-                } else if r.clicked_by(egui::PointerButton::Secondary)
-                    || r.dragged_by(egui::PointerButton::Secondary)
-                {
-                    self.mouse = true;
-                    self.mouse_miss = true;
-                    self.mouse_delay = 10;
-                }
-                if r.hovered() {
-                    if let Some(pos) = r.hover_pos() {
-                        let coord = pos - r.rect.left_top();
-                        c.cpu_peripherals.ppu.bg_debug =
-                            Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
+            ui.vertical_centered(|ui| {
+                if let Some(t) = &self.texture {
+                    let size = ui.available_size();
+                    let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
+                    let r = ui.add(
+                        egui::Image::from_texture(egui::load::SizedTexture {
+                            id: t.id(),
+                            size: egui_multiwin::egui::Vec2 {
+                                x: t.size()[0] as f32 * zoom,
+                                y: t.size()[1] as f32 * zoom,
+                            },
+                        })
+                        .sense(egui::Sense::click_and_drag()),
+                    );
+                    if r.clicked() || r.dragged() {
+                        self.mouse = true;
+                        self.mouse_miss = false;
+                        self.mouse_delay = 10;
+                    } else if r.clicked_by(egui::PointerButton::Secondary)
+                        || r.dragged_by(egui::PointerButton::Secondary)
+                    {
+                        self.mouse = true;
+                        self.mouse_miss = true;
+                        self.mouse_delay = 10;
+                    }
+                    if r.hovered() {
+                        if let Some(pos) = r.hover_pos() {
+                            let coord = pos - r.rect.left_top();
+                            c.cpu_peripherals.ppu.bg_debug =
+                                Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
-                        let pixel = self.image.get_pixel(coord / zoom);
-                        self.mouse_vision =
-                            !self.mouse_miss && pixel.r() > 10 && pixel.g() > 10 && pixel.b() > 10;
+                            let pixel = self.image.get_pixel(coord / zoom);
+                            self.mouse_vision = !self.mouse_miss
+                                && pixel.r() > 10
+                                && pixel.g() > 10
+                                && pixel.b() > 10;
 
-                        //println!("Hover at {:?}", pos - r.rect.left_top());
+                            //println!("Hover at {:?}", pos - r.rect.left_top());
+                        } else {
+                            self.mouse_vision = false;
+                        }
                     } else {
                         self.mouse_vision = false;
                     }
-                } else {
-                    self.mouse_vision = false;
                 }
-            }
+            });
             ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
         });
 

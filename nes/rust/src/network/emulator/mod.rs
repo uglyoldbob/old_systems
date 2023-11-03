@@ -70,6 +70,12 @@ impl Display for ConnectionError {
 
 pub struct Handler {}
 
+impl Handler {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
 impl ConnectionHandler for Handler {
     type FromBehaviour = MessageFromNetwork;
 
@@ -202,26 +208,24 @@ impl NetworkBehaviour for Behavior {
     fn handle_established_inbound_connection(
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
-        peer: libp2p::PeerId,
-        local_addr: &libp2p::Multiaddr,
-        remote_addr: &libp2p::Multiaddr,
+        _peer: libp2p::PeerId,
+        _local_addr: &libp2p::Multiaddr,
+        _remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        todo!()
+        Ok(Handler::new())
     }
 
     fn handle_established_outbound_connection(
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
-        peer: libp2p::PeerId,
-        addr: &libp2p::Multiaddr,
-        role_override: libp2p::core::Endpoint,
+        _peer: libp2p::PeerId,
+        _addr: &libp2p::Multiaddr,
+        _role_override: libp2p::core::Endpoint,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        todo!()
+        Ok(Handler::new())
     }
 
-    fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {
-        todo!()
-    }
+    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm<Self::ConnectionHandler>) {}
 
     fn on_connection_handler_event(
         &mut self,
@@ -229,15 +233,14 @@ impl NetworkBehaviour for Behavior {
         _connection_id: libp2p::swarm::ConnectionId,
         _event: libp2p::swarm::THandlerOutEvent<Self>,
     ) {
-        todo!()
     }
 
     fn poll(
         &mut self,
-        cx: &mut std::task::Context<'_>,
-        params: &mut impl libp2p::swarm::PollParameters,
+        _cx: &mut std::task::Context<'_>,
+        _params: &mut impl libp2p::swarm::PollParameters,
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
     {
-        todo!()
+        std::task::Poll::Pending
     }
 }
