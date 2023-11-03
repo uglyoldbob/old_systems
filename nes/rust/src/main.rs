@@ -18,6 +18,7 @@ mod cartridge;
 mod controller;
 mod cpu;
 mod emulator_data;
+mod event;
 mod motherboard;
 mod network;
 mod ppu;
@@ -64,12 +65,12 @@ use eframe::egui;
 pub mod egui_multiwin_dynamic {
     egui_multiwin::tracked_window!(
         crate::emulator_data::NesEmulatorData,
-        egui_multiwin::NoEvent,
+        crate::event::Event,
         crate::windows::Windows
     );
     egui_multiwin::multi_window!(
         crate::emulator_data::NesEmulatorData,
-        egui_multiwin::NoEvent,
+        crate::event::Event,
         crate::windows::Windows
     );
 }
@@ -411,7 +412,10 @@ fn main() {
     egui_multiwin::winit::platform::x11::EventLoopBuilderExtX11::with_x11(&mut event_loop);
     let event_loop = event_loop.build();
 
-    let mut nes_data = NesEmulatorData::new();
+    let proxy: egui_multiwin::winit::event_loop::EventLoopProxy<event::Event> =
+        event_loop.create_proxy();
+
+    let mut nes_data = NesEmulatorData::new(Some(proxy));
     nes_data.local.parser.find_roms(
         nes_data.local.configuration.get_rom_path(),
         nes_data.local.save_path(),

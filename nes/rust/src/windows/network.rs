@@ -58,18 +58,23 @@ impl TrackedWindow for Window {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             if let Some(olocal) = &mut c.olocal {
-                match &olocal.network {
-                    None => {
-                        ui.label("Network is not active");
-                        if ui.button("Enable networking").clicked() {
-                            olocal.network = Some(crate::network::Network::new());
+                if olocal.network.is_none() {
+                    ui.label("Network is not active");
+                    if ui.button("Enable networking").clicked() {
+                        if let Some(proxy) = c.local.get_proxy() {
+                            olocal.network = Some(crate::network::Network::new(proxy));
                         }
                     }
-                    Some(network) => {
-                        ui.label("Network is active");
-                        if ui.button("Disable networking").clicked() {
-                            olocal.network = None;
-                        }
+                } else {
+                    ui.label("Network is active");
+                    if ui.button("Disable networking").clicked() {
+                        olocal.network = None;
+                    }
+                }
+                if let Some(network) = &mut olocal.network {
+                    ui.label("Currently listening on:");
+                    for a in network.get_addresses() {
+                        ui.label(format!("{}", a));
                     }
                 }
             }

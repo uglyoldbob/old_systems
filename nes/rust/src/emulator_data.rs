@@ -193,9 +193,18 @@ pub struct LocalEmulatorDataClone {
     pub resolution_locked: bool,
     /// The way to get system specific paths
     dirs: directories::ProjectDirs,
+    /// The proxy for sending internal messages
+    proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
 }
 
 impl LocalEmulatorDataClone {
+    /// Returns a clone of the proxy
+    pub fn get_proxy(
+        &self,
+    ) -> Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>> {
+        self.proxy.clone()
+    }
+
     /// Returns the path to use for save states
     pub fn save_path(&self) -> std::path::PathBuf {
         Self::get_save_path(&self.dirs)
@@ -255,11 +264,18 @@ impl LocalEmulatorDataClone {
 
 impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+impl LocalEmulatorDataClone {
+    fn new(
+        proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+    ) -> Self {
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
 
         let mut user_path = dirs.config_dir().to_path_buf();
         user_path.push("config.toml");
-        println!("Config path is {}", user_path.display());
         let user_config = EmulatorConfiguration::load(user_path);
 
         let config = user_config;
@@ -271,6 +287,7 @@ impl Default for LocalEmulatorDataClone {
             rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
             resolution_locked: false,
             dirs,
+            proxy,
         }
     }
 }
@@ -318,14 +335,25 @@ pub struct NesEmulatorData {
 
 #[cfg(feature = "egui-multiwin")]
 impl NesEmulatorData {
-    pub fn process_event(&mut self, _event: egui_multiwin::NoEvent) -> Vec<NewWindowRequest> {
+    pub fn process_event(&mut self, event: crate::event::Event) -> Vec<NewWindowRequest> {
+        match event.message {
+            crate::event::EventType::CheckNetwork => {
+                if let Some(olocal) = &mut self.olocal {
+                    if let Some(network) = &mut olocal.network {
+                        network.process_messages();
+                    }
+                }
+            }
+        }
         vec![]
     }
 }
 
 impl NesEmulatorData {
     /// Create a new nes emulator
-    pub fn new() -> Self {
+    pub fn new(
+        proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+    ) -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let apu = NesApu::new();
@@ -350,7 +378,7 @@ impl NesEmulatorData {
             prev_irq: false,
             big_counter: 0,
             vblank_just_set: 0,
-            local: LocalEmulatorDataClone::default(),
+            local: LocalEmulatorDataClone::new(proxy),
             olocal: Some(LocalEmulatorData::default()),
         }
     }
