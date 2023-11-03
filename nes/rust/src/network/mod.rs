@@ -6,11 +6,13 @@ use std::collections::HashSet;
 
 use futures::FutureExt;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
+use libp2p::core::transport::ListenerId;
 
 #[derive(Debug)]
 pub enum MessageToNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
     StartServer,
+    StopServer,
 }
 
 #[derive(Debug)]
@@ -18,6 +20,7 @@ pub enum MessageFromNetwork {
     EmulatorVideoStream(Vec<u8>),
     NewAddress(Multiaddr),
     ExpiredAddress(Multiaddr),
+    ServerStatus(bool),
 }
 
 /// The main networking struct for the emulator
@@ -27,6 +30,7 @@ pub struct Network {
     sender: async_channel::Sender<MessageToNetwork>,
     recvr: async_channel::Receiver<MessageFromNetwork>,
     addresses: HashSet<Multiaddr>,
+    server_running: bool,
 }
 
 // This describes the behaviour of a libp2p swarm
@@ -43,6 +47,7 @@ struct InternalNetwork {
     recvr: async_channel::Receiver<MessageToNetwork>,
     addresses: HashSet<Multiaddr>,
     proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
+    listener: Option<ListenerId>,
 }
 
 impl InternalNetwork {
@@ -57,10 +62,31 @@ impl InternalNetwork {
                                 if let Ok(m) = r {
                                     match m {
                                         MessageToNetwork::ControllerData(i, buttons) => {}
+                                        MessageToNetwork::StopServer => {
+                                            if let Some(list) = &mut self.listener {
+                                                self.swarm.remove_listener(*list);
+                                            }
+                                            self.listener = None;
+                                            self.addresses.clear();
+                                            self.sender.send(MessageFromNetwork::ServerStatus(false)).await;
+                                            self.proxy.send_event(crate::event::Event::new_general(
+                                                crate::event::EventType::CheckNetwork,
+                                            ));
+                                        }
                                         MessageToNetwork::StartServer => {
-                                            self.swarm
-                                                .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?)
-                                                .ok()?;
+                                            if self.listener.is_none() {
+                                                let listenres = self.swarm
+                                                .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
+                                                if let Ok(lis) = listenres {
+                                                    self.listener = Some(lis);
+                                                }
+                                                println!("Server start result is {:?}", listenres);
+                                                let s = self.listener.is_some();
+                                                self.sender.send(MessageFromNetwork::ServerStatus(s)).await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
                                         }
             }
                                 }
@@ -164,6 +190,7 @@ impl InternalNetwork {
             sender: s,
             addresses: HashSet::new(),
             proxy,
+            listener: None,
         })
     }
 }
@@ -186,6 +213,7 @@ impl Network {
             sender: s1,
             recvr: r2,
             addresses: HashSet::new(),
+            server_running: false,
         }
     }
 
@@ -203,15 +231,26 @@ impl Network {
                 MessageFromNetwork::ExpiredAddress(a) => {
                     self.addresses.remove(&a);
                 }
+                MessageFromNetwork::ServerStatus(s) => {
+                    self.server_running = s;
+                    if !s {
+                        self.addresses.clear();
+                    }
+                }
             }
         }
     }
 
+    pub fn is_server_running(&self) -> bool {
+        self.server_running
+    }
+
     pub fn start_server(&mut self) {
-        println!(
-            "Start server: {:?}",
-            self.sender.send_blocking(MessageToNetwork::StartServer)
-        );
+        self.sender.send_blocking(MessageToNetwork::StartServer);
+    }
+
+    pub fn stop_server(&mut self) {
+        self.sender.send_blocking(MessageToNetwork::StopServer);
     }
 
     pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {

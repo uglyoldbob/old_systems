@@ -83,8 +83,15 @@ impl TrackedWindow for Window {
                         }
                     }
 
-                    if ui.button("Start server").clicked() {
-                        network.start_server();
+                    if !network.is_server_running() {
+                        if ui.button("Start server").clicked() {
+                            network.start_server();
+                        }
+                    }
+                    else {
+                        if ui.button("Stop server").clicked() {
+                            network.stop_server();
+                        }
                     }
                 }
             }
