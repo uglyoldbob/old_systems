@@ -6,7 +6,7 @@ use std::{
     task::Waker,
 };
 
-use futures::{future, Future};
+use futures::{future, Future, StreamExt, SinkExt};
 use libp2p::{
     core::UpgradeInfo,
     swarm::{
@@ -67,13 +67,16 @@ impl UpgradeInfo for Protocol {
     }
 }
 
-impl<Stream> InboundUpgrade<Stream> for Protocol {
-    type Output = u16;
+impl<Stream> InboundUpgrade<Stream> for Protocol
+where
+    Stream: Send + 'static,
+{
+    type Output = (Stream, Self::Info);
     type Error = ();
     type Future = Pin<Box<dyn Future<Output = Result<Self::Output, Self::Error>> + Send>>;
 
     fn upgrade_inbound(self, io: Stream, protocol: Self::Info) -> Self::Future {
-        Box::pin(future::ok(42))
+        Box::pin(future::ok((io, protocol)))
     }
 }
 
@@ -90,18 +93,68 @@ where
     }
 }
 
-pub struct OutboundSubstreamState {
-    stream: libp2p::Stream,
+pub struct Codec {
+    received: VecDeque<u8>,
+}
+
+impl Codec {
+    fn new() -> Self {
+        Self {
+            received: VecDeque::new(),
+        }
+    }
+}
+
+impl asynchronous_codec::Decoder for Codec {
+    type Item = u8;
+
+    type Error = std::io::Error;
+
+    fn decode(
+        &mut self,
+        src: &mut asynchronous_codec::BytesMut,
+    ) -> Result<Option<Self::Item>, Self::Error> {
+        for el in src.iter() {
+            self.received.push_back(*el);
+        }
+        if self.received.len() > 0 {
+            Ok(Some(self.received.pop_front().unwrap()))
+        }
+        else {
+            Ok(None)
+        }
+    }
+}
+
+impl asynchronous_codec::Encoder for Codec {
+    type Item<'a> = u8;
+
+    type Error = std::io::Error;
+
+    fn encode(
+        &mut self,
+        item: Self::Item<'_>,
+        dst: &mut asynchronous_codec::BytesMut,
+    ) -> Result<(), Self::Error> {
+        libp2p::bytes::BufMut::put_u8(dst, item);
+        Ok(())
+    }
+}
+
+pub struct InboundSubstreamState {
+    stream: asynchronous_codec::Framed<libp2p::Stream, Codec>,
+}
+
+pub enum OutboundSubstreamState {
+    Establishing,
+    Established(asynchronous_codec::Framed<libp2p::Stream, Codec>),
 }
 
 pub struct Handler {
     listen_protocol: Protocol,
     waker: Arc<Mutex<Option<Waker>>>,
-    /// The single long-lived outbound substream.
-    outbound_substream: Option<OutboundSubstreamState>,
-    /// Flag indicating that an outbound substream is being established to prevent duplicate
-    /// requests.
-    outbound_substream_establishing: bool,
+    inbound_stream: Option<InboundSubstreamState>,
+    outbound_stream: Option<OutboundSubstreamState>,
 }
 
 impl Handler {
@@ -109,8 +162,8 @@ impl Handler {
         Self {
             listen_protocol: protocol,
             waker: Arc::new(Mutex::new(None)),
-            outbound_substream: None,
-            outbound_substream_establishing: false,
+            inbound_stream: None,
+            outbound_stream: None,
         }
     }
 
@@ -160,13 +213,56 @@ impl ConnectionHandler for Handler {
     > {
         let mut waker = self.waker.lock().unwrap();
 
-        // determine if we need to create the outbound stream
-        if self.outbound_substream.is_none() && !self.outbound_substream_establishing {
-            self.outbound_substream_establishing = true;
-            println!("Requesting a new outbound substream");
+        if self.outbound_stream.is_none() {
+            self.outbound_stream = Some(OutboundSubstreamState::Establishing);
             return std::task::Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
-                protocol: SubstreamProtocol::new(self.listen_protocol.clone(), ()),
+                protocol: self.listen_protocol(),
             });
+        }
+        if let Some(OutboundSubstreamState::Established(out)) = &mut self.outbound_stream {
+            println!("outbound established");
+            match out.poll_ready_unpin(cx) {
+                std::task::Poll::Ready(Ok(())) => {
+                    println!("Sending message");
+                    match out.start_send_unpin(42) {
+                        Ok(()) => {
+                            println!("Message sent?");
+                            return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(MessageToBehavior::Test));
+                        }
+                        Err(e) => {
+                            println!("Failed to send message");
+                        }
+                    }
+                }
+                std::task::Poll::Ready(Err(e)) => {
+                    println!("ERROR 2: {:?}", e);
+                }
+                std::task::Poll::Pending => {
+                    println!("poll ready pending");
+                }
+            }
+        }
+
+        if let Some(inb) = &mut self.inbound_stream {
+            let a = &mut inb.stream;
+            match a.poll_next_unpin(cx) {
+                std::task::Poll::Ready(m) => {
+                    match m {
+                        Some(Ok(m)) => {
+                            return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                                MessageToBehavior::Test,
+                            ));
+                        }
+                        Some(Err(e)) => {
+                            println!("Error receiving message");
+                        }
+                        None => {
+
+                        }
+                    }
+                }
+                std::task::Poll::Pending => {}
+            }
         }
 
         *waker = Some(cx.waker().clone());
@@ -192,20 +288,30 @@ impl ConnectionHandler for Handler {
             Self::OutboundOpenInfo,
         >,
     ) {
-        if event.is_outbound() {
-            self.outbound_substream_establishing = false;
-        }
         match event {
             ConnectionEvent::FullyNegotiatedInbound(inb) => {
                 println!(
                     "Got a fully negotiated inbound substream {:?}",
                     inb.protocol
                 );
+                let (a, _b) = inb.protocol;
+                let c = Codec::new();
+                if self.inbound_stream.is_none() {
+                    self.inbound_stream = Some(InboundSubstreamState {
+                        stream: asynchronous_codec::Framed::new(a, c),
+                    });
+                }
             }
             ConnectionEvent::FullyNegotiatedOutbound(fully_negotiated_outbound) => {
-                println!("Got a new outbound substream");
-                let (a, b) = fully_negotiated_outbound.protocol;
-                self.outbound_substream = Some(OutboundSubstreamState { stream: a });
+                println!(
+                    "Got a new outbound substream {:?}",
+                    fully_negotiated_outbound.protocol
+                );
+                let (a, _b) = fully_negotiated_outbound.protocol;
+                let c = Codec::new();
+                self.outbound_stream = Some(OutboundSubstreamState::Established(
+                    asynchronous_codec::Framed::new(a, c),
+                ));
             }
             _ => {}
         }
