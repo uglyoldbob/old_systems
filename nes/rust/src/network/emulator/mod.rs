@@ -111,24 +111,15 @@ impl asynchronous_codec::Decoder for Codec {
         &mut self,
         src: &mut asynchronous_codec::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
-        println!("Receive {} bytes from network", src.len());
         for el in src.iter() {
-            print!("{:X} ", el);
             self.received.push_back(*el);
         }
         src.clear();
-        println!(" : <- Received");
 
-        print!("PARSE1: ");
-        for el in self.received.iter() {
-            print!("{:X} ", el);
-        }
-        println!("");
         if self.length.is_none() {
             if self.received.len() >= 4 {
                 let v = (self.received[3] as u32) | (self.received[2] as u32) << 8
                 | (self.received[1] as u32) << 16 | (self.received[0] as u32) << 24;
-                println!("Expecting {} bytes from the network", v);
                 self.length = Some(v);
                 self.received.pop_front();
                 self.received.pop_front();
@@ -136,18 +127,13 @@ impl asynchronous_codec::Decoder for Codec {
                 self.received.pop_front();
             }
         }
-        print!("PARSE2: ");
-        for el in self.received.iter() {
-            print!("{:X} ", el);
-        }
-        println!("");
         if let Some(l) = &self.length {
             if self.received.len() >= *l as usize {
                 match bincode::deserialize::<MessageToFromNetwork>(&Vec::from(
                     self.received.clone(),
                 )) {
                     Ok(i) => {
-                        println!("Success deserializing to {:?}", i);
+                        println!("Success deserializing");
                         self.length = None;
                         self.received.clear();
                         Ok(Some(i))
@@ -182,7 +168,6 @@ impl asynchronous_codec::Encoder for Codec {
         let data = bincode::serialize(&item).unwrap();
         libp2p::bytes::BufMut::put_u32(dst, data.len() as u32);
         libp2p::bytes::BufMut::put_slice(dst, &data);
-        println!("Encode {} bytes for sending network", data.len() + 4);
         Ok(())
     }
 }
@@ -448,6 +433,13 @@ impl Behavior {
 impl Behavior {
     pub fn send_message(&mut self) {
         for pid in &self.clients {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageFromBehavior::Test,
+            });
+        }
+        for pid in &self.servers {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
