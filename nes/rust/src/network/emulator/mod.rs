@@ -116,6 +116,7 @@ impl asynchronous_codec::Decoder for Codec {
             print!("{:X} ", el);
             self.received.push_back(*el);
         }
+        src.clear();
         println!(" : <- Received");
 
         print!("PARSE1: ");
@@ -323,7 +324,10 @@ impl ConnectionHandler for Handler {
                         Some(Err(e)) => {
                             println!("Error receiving message from network");
                         }
-                        None => {}
+                        None => {
+                            println!("Stream closed on remote side");
+                            self.inbound_stream = None;
+                        }
                     }
                 }
                 std::task::Poll::Pending => {
