@@ -3,8 +3,8 @@
 use std::io::Write;
 
 use crate::{
-    apu::AudioProducerWithRate, controller::NesControllerTrait, recording::Recording,
-    NesEmulatorData,
+    apu::AudioProducerWithRate, controller::NesControllerTrait, network::NodeRole,
+    recording::Recording, NesEmulatorData,
 };
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
@@ -450,6 +450,18 @@ impl TrackedWindow for MainNesWindow {
                                     contr.update_gilrs_axes(id, code, axis, button_config);
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            if let Some(olocal) = &mut c.olocal {
+                if let Some(network) = &mut olocal.network {
+                    if network.role() == NodeRole::Player {
+                        println!("Sending controller data");
+                        for i in 0..4 {
+                            let controller = c.mb.get_controller_ref(i);
+                            network.send_controller_data(i, controller.button_data());
                         }
                     }
                 }

@@ -8,6 +8,7 @@ use futures::FutureExt;
 use libp2p::core::transport::ListenerId;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
+#[derive(PartialEq, Copy, Clone)]
 pub enum NodeRole {
     DedicatedHost,
     PlayerHost,
@@ -41,6 +42,7 @@ pub struct Network {
     recvr: async_channel::Receiver<MessageFromNetworkThread>,
     addresses: HashSet<Multiaddr>,
     server_running: bool,
+    role: NodeRole,
 }
 
 // This describes the behaviour of a libp2p swarm
@@ -87,7 +89,7 @@ impl InternalNetwork {
                                         }
                                         MessageToNetworkThread::ControllerData(i, buttons) => {
                                             let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.send_message();
+                                            behavior.emulator.send_controller_data(i, buttons);
                                         }
                                         MessageToNetworkThread::StopServer => {
                                             if let Some(list) = &mut self.listener {
@@ -246,6 +248,7 @@ impl Network {
             recvr: r2,
             addresses: HashSet::new(),
             server_running: false,
+            role: NodeRole::Observer,
         }
     }
 
@@ -274,6 +277,10 @@ impl Network {
                 }
             }
         }
+    }
+
+    pub fn role(&self) -> NodeRole {
+        self.role
     }
 
     pub fn is_server_running(&self) -> bool {

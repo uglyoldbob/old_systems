@@ -436,6 +436,8 @@ pub trait NesControllerTrait {
     fn dump_data(&self) -> u8;
     /// Read data from the controller.
     fn read_data(&mut self) -> u8;
+    /// Return the data for all button states
+    fn button_data(&self) -> ButtonCombination;
 }
 
 /// A generic implementation of a NES controller
@@ -534,6 +536,11 @@ impl FourScore {
         &mut self.controllers[index as usize]
     }
 
+    /// Return a reference of the requested controller
+    pub fn get_controller_ref(&self, index: u8) -> &NesController {
+        self.controllers[index as usize].as_ref()
+    }
+
     /// Return a clone of the requested controller
     pub fn get_controller(&self, index: u8) -> NesController {
         (*self.controllers[index as usize]).clone()
@@ -587,6 +594,10 @@ impl NesControllerTrait for FourScore {
         self.controllers[1].parallel_signal(s);
     }
 
+    fn button_data(&self) -> ButtonCombination {
+        self.combo[0]
+    }
+
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
         self.combo.iter_mut()
@@ -634,6 +645,10 @@ impl NesControllerTrait for DummyController {
 
     #[doc = " Update the serial/parallel input"]
     fn parallel_signal(&mut self, _s: bool) {}
+
+    fn button_data(&self) -> ButtonCombination {
+        self.combo[0]
+    }
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
@@ -688,6 +703,10 @@ impl NesControllerTrait for Zapper {
 
     #[doc = " Update the serial/parallel input"]
     fn parallel_signal(&mut self, _s: bool) {}
+
+    fn button_data(&self) -> ButtonCombination {
+        self.combo[0]
+    }
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {
@@ -852,6 +871,10 @@ impl NesControllerTrait for StandardController {
                 *flag = !*flag;
             }
         }
+    }
+
+    fn button_data(&self) -> ButtonCombination {
+        self.combo[0]
     }
 
     fn get_buttons_iter_mut(&mut self) -> std::slice::IterMut<'_, ButtonCombination> {

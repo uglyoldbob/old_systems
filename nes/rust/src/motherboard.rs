@@ -93,6 +93,20 @@ impl NesMotherboard {
         }
     }
 
+    /// Get one of the four possible controllers, non-mutably
+    pub fn get_controller_ref(&mut self, index: u8) -> &NesController {
+        match index {
+            0 | 2 => match &self.controllers[0] {
+                NesController::FourScore(fs) => fs.get_controller_ref(index >> 1),
+                any => any,
+            },
+            _ => match &self.controllers[1] {
+                NesController::FourScore(fs) => fs.get_controller_ref(index >> 1),
+                any => any,
+            },
+        }
+    }
+
     /// Get one of the four possible controllers, mutably
     pub fn get_controller_mut(&mut self, index: u8) -> &mut NesController {
         match index {

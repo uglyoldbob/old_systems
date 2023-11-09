@@ -16,6 +16,8 @@ use libp2p::{
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
+use crate::controller::ButtonCombination;
+
 use super::NodeRole;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -118,8 +120,10 @@ impl asynchronous_codec::Decoder for Codec {
 
         if self.length.is_none() {
             if self.received.len() >= 4 {
-                let v = (self.received[3] as u32) | (self.received[2] as u32) << 8
-                | (self.received[1] as u32) << 16 | (self.received[0] as u32) << 24;
+                let v = (self.received[3] as u32)
+                    | (self.received[2] as u32) << 8
+                    | (self.received[1] as u32) << 16
+                    | (self.received[0] as u32) << 24;
                 self.length = Some(v);
                 self.received.pop_front();
                 self.received.pop_front();
@@ -148,8 +152,7 @@ impl asynchronous_codec::Decoder for Codec {
             } else {
                 Ok(None)
             }
-        }
-        else {
+        } else {
             Ok(None)
         }
     }
@@ -207,12 +210,16 @@ impl Handler {
 
 #[derive(Debug)]
 pub enum MessageToBehavior {
+    ControllerData(u8, ButtonCombination),
+    VideoStream(Vec<u8>),
     Test,
 }
 
 #[derive(Debug)]
 pub enum MessageFromBehavior {
     Test,
+    VideoStream(Vec<u8>),
+    ControllerData(u8, ButtonCombination),
 }
 
 impl ConnectionHandler for Handler {
@@ -256,32 +263,37 @@ impl ConnectionHandler for Handler {
             match out.poll_ready_unpin(cx) {
                 std::task::Poll::Ready(Ok(())) => {
                     if let Some(m) = self.pending_out.pop_front() {
-                        println!("Sending message?");
-                        match m {
+                        let m2 = match m {
+                            MessageFromBehavior::ControllerData(i, d) => {
+                                out.start_send_unpin(MessageToFromNetwork::ControllerData(i, d))
+                            }
                             MessageFromBehavior::Test => {
-                                match out.start_send_unpin(MessageToFromNetwork::Test) {
-                                    Ok(()) => match out.poll_flush_unpin(cx) {
-                                        std::task::Poll::Ready(Ok(())) => {
-                                            println!("Message flushed");
-                                            return std::task::Poll::Ready(
-                                                ConnectionHandlerEvent::NotifyBehaviour(
-                                                    MessageToBehavior::Test,
-                                                ),
-                                            );
-                                        }
-                                        std::task::Poll::Ready(Err(e)) => {
-                                            println!("Error flushing message {:?}", e);
-                                        }
-                                        std::task::Poll::Pending => {
-                                            println!("Message flush pending");
-                                        }
-                                    },
-                                    Err(e) => {
-                                        println!("Failed to send message {:?}", e);
-                                    }
+                                out.start_send_unpin(MessageToFromNetwork::Test)
+                            }
+                            MessageFromBehavior::VideoStream(d) => {
+                                out.start_send_unpin(MessageToFromNetwork::EmulatorVideoStream(d))
+                            }
+                        };
+                        match m2 {
+                            Ok(()) => match out.poll_flush_unpin(cx) {
+                                std::task::Poll::Ready(Ok(())) => {
+                                    return std::task::Poll::Ready(
+                                        ConnectionHandlerEvent::NotifyBehaviour(
+                                            MessageToBehavior::Test,
+                                        ),
+                                    );
                                 }
+                                std::task::Poll::Ready(Err(e)) => {
+                                    println!("Error flushing message {:?}", e);
+                                }
+                                std::task::Poll::Pending => {}
+                            },
+                            Err(e) => {
+                                println!("Failed to send message {:?}", e);
                             }
                         }
+                    } else {
+                        println!("NOT SURE WHAT TO DO HERE!");
                     }
                 }
                 std::task::Poll::Ready(Err(e)) => {
@@ -302,8 +314,17 @@ impl ConnectionHandler for Handler {
                     match m {
                         Some(Ok(m)) => {
                             println!("Received message from network {:?}", m);
+                            let mr = match m {
+                                MessageToFromNetwork::Test => MessageToBehavior::Test,
+                                MessageToFromNetwork::ControllerData(i, d) => {
+                                    MessageToBehavior::ControllerData(i, d)
+                                }
+                                MessageToFromNetwork::EmulatorVideoStream(d) => {
+                                    MessageToBehavior::VideoStream(d)
+                                }
+                            };
                             return std::task::Poll::Ready(
-                                ConnectionHandlerEvent::NotifyBehaviour(MessageToBehavior::Test),
+                                ConnectionHandlerEvent::NotifyBehaviour(mr),
                             );
                         }
                         Some(Err(e)) => {
@@ -444,6 +465,16 @@ impl Behavior {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
                 event: MessageFromBehavior::Test,
+            });
+        }
+    }
+
+    pub fn send_controller_data(&mut self, index: u8, data: ButtonCombination) {
+        for pid in &self.servers {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageFromBehavior::ControllerData(index, data),
             });
         }
     }
