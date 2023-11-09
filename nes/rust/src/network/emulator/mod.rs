@@ -16,7 +16,19 @@ use libp2p::{
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
-use super::{MessageFromNetwork, MessageToNetwork};
+use super::NodeRole;
+
+#[derive(Debug)]
+pub enum MessageToNetwork {
+    ControllerData(u8, crate::controller::ButtonCombination),
+    Test,
+}
+
+#[derive(Debug)]
+pub enum MessageFromNetwork {
+    EmulatorVideoStream(Vec<u8>),
+    Test,
+}
 
 /// The protocol ID
 #[derive(Clone, Debug, PartialEq)]
@@ -87,8 +99,6 @@ pub struct Handler {
     waker: Arc<Mutex<Option<Waker>>>,
     /// The single long-lived outbound substream.
     outbound_substream: Option<OutboundSubstreamState>,
-    /// Requests pending to go out to the user
-    pending_out: VecDeque<MessageFromBehavior>,
     /// Flag indicating that an outbound substream is being established to prevent duplicate
     /// requests.
     outbound_substream_establishing: bool,
@@ -101,7 +111,6 @@ impl Handler {
             waker: Arc::new(Mutex::new(None)),
             outbound_substream: None,
             outbound_substream_establishing: false,
-            pending_out: VecDeque::new(),
         }
     }
 
@@ -165,7 +174,13 @@ impl ConnectionHandler for Handler {
     }
 
     fn on_behaviour_event(&mut self, event: Self::FromBehaviour) {
-        self.pending_out.push_back(event);
+        println!(
+            "Connection handler received {:?} from networkbehaviour",
+            event
+        );
+        match event {
+            MessageFromBehavior::Test => {}
+        }
     }
 
     fn on_connection_event(
@@ -181,10 +196,15 @@ impl ConnectionHandler for Handler {
             self.outbound_substream_establishing = false;
         }
         match event {
+            ConnectionEvent::FullyNegotiatedInbound(inb) => {
+                println!(
+                    "Got a fully negotiated inbound substream {:?}",
+                    inb.protocol
+                );
+            }
             ConnectionEvent::FullyNegotiatedOutbound(fully_negotiated_outbound) => {
                 println!("Got a new outbound substream");
-                let FullyNegotiatedOutbound { protocol, info } = fully_negotiated_outbound;
-                let (a, b) = protocol;
+                let (a, b) = fully_negotiated_outbound.protocol;
                 self.outbound_substream = Some(OutboundSubstreamState { stream: a });
             }
             _ => {}
@@ -272,6 +292,7 @@ pub struct Behavior {
     waker: Arc<Mutex<Option<Waker>>>,
     clients: Vec<PeerId>,
     servers: Vec<PeerId>,
+    role: super::NodeRole,
 }
 
 impl Behavior {
@@ -282,6 +303,7 @@ impl Behavior {
             waker: Arc::new(Mutex::new(None)),
             clients: Vec::new(),
             servers: Vec::new(),
+            role: super::NodeRole::Observer,
         }
     }
 }
@@ -289,6 +311,10 @@ impl Behavior {
 impl Behavior {
     pub fn send_message(&mut self) {
         self.messages.push_back(MessageToNetwork::Test);
+    }
+
+    pub fn set_role(&mut self, role: NodeRole) {
+        self.role = role;
     }
 }
 
@@ -347,6 +373,13 @@ impl NetworkBehaviour for Behavior {
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
     {
         let mut waker = self.waker.lock().unwrap();
+
+        if let Some(a) = self.messages.pop_front() {
+            match a {
+                MessageToNetwork::ControllerData(_, _) => todo!(),
+                MessageToNetwork::Test => todo!(),
+            }
+        }
 
         *waker = Some(cx.waker().clone());
         std::task::Poll::Pending

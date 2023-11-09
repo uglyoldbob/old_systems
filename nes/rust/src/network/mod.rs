@@ -16,7 +16,7 @@ pub enum NodeRole {
 }
 
 #[derive(Debug)]
-pub enum MessageToNetwork {
+pub enum MessageToNetworkThread {
     ControllerData(u8, crate::controller::ButtonCombination),
     StartServer,
     StopServer,
@@ -25,7 +25,7 @@ pub enum MessageToNetwork {
 }
 
 #[derive(Debug)]
-pub enum MessageFromNetwork {
+pub enum MessageFromNetworkThread {
     EmulatorVideoStream(Vec<u8>),
     NewAddress(Multiaddr),
     ExpiredAddress(Multiaddr),
@@ -37,8 +37,8 @@ pub enum MessageFromNetwork {
 pub struct Network {
     tokio: tokio::runtime::Runtime,
     thread: tokio::task::JoinHandle<()>,
-    sender: async_channel::Sender<MessageToNetwork>,
-    recvr: async_channel::Receiver<MessageFromNetwork>,
+    sender: async_channel::Sender<MessageToNetworkThread>,
+    recvr: async_channel::Receiver<MessageFromNetworkThread>,
     addresses: HashSet<Multiaddr>,
     server_running: bool,
 }
@@ -53,8 +53,8 @@ struct SwarmBehavior {
 /// The object used internally to this module to manage network state
 struct InternalNetwork {
     swarm: Swarm<SwarmBehavior>,
-    sender: async_channel::Sender<MessageFromNetwork>,
-    recvr: async_channel::Receiver<MessageToNetwork>,
+    sender: async_channel::Sender<MessageFromNetworkThread>,
+    recvr: async_channel::Receiver<MessageToNetworkThread>,
     addresses: HashSet<Multiaddr>,
     proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
     listener: Option<ListenerId>,
@@ -71,11 +71,11 @@ impl InternalNetwork {
                             r = f2 => {
                                 if let Ok(m) = r {
                                     match m {
-                                        MessageToNetwork::Test => {
+                                        MessageToNetworkThread::Test => {
                                             let behavior = self.swarm.behaviour_mut();
                                             behavior.emulator.send_message();
                                         }
-                                        MessageToNetwork::Connect(cs) => {
+                                        MessageToNetworkThread::Connect(cs) => {
                                             match cs.parse::<Multiaddr>() {
                                                 Ok(addr) => {
                                                     println!("Attempt to connect to {} {:?}", cs, self.swarm.dial(addr));
@@ -85,22 +85,22 @@ impl InternalNetwork {
                                                 }
                                             }
                                         }
-                                        MessageToNetwork::ControllerData(i, buttons) => {
+                                        MessageToNetworkThread::ControllerData(i, buttons) => {
                                             let behavior = self.swarm.behaviour_mut();
                                             behavior.emulator.send_message();
                                         }
-                                        MessageToNetwork::StopServer => {
+                                        MessageToNetworkThread::StopServer => {
                                             if let Some(list) = &mut self.listener {
                                                 self.swarm.remove_listener(*list);
                                             }
                                             self.listener = None;
                                             self.addresses.clear();
-                                            self.sender.send(MessageFromNetwork::ServerStatus(false)).await;
+                                            self.sender.send(MessageFromNetworkThread::ServerStatus(false)).await;
                                             self.proxy.send_event(crate::event::Event::new_general(
                                                 crate::event::EventType::CheckNetwork,
                                             ));
                                         }
-                                        MessageToNetwork::StartServer => {
+                                        MessageToNetworkThread::StartServer => {
                                             if self.listener.is_none() {
                                                 let listenres = self.swarm
                                                 .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
@@ -109,7 +109,7 @@ impl InternalNetwork {
                                                 }
                                                 println!("Server start result is {:?}", listenres);
                                                 let s = self.listener.is_some();
-                                                self.sender.send(MessageFromNetwork::ServerStatus(s)).await;
+                                                self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
                                                 self.proxy.send_event(crate::event::Event::new_general(
                                                     crate::event::EventType::CheckNetwork,
                                                 ));
@@ -123,7 +123,7 @@ impl InternalNetwork {
                                     libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
                                         println!("Listening on {address:?}");
                                         self.sender
-                                            .send(MessageFromNetwork::NewAddress(address.clone()))
+                                            .send(MessageFromNetworkThread::NewAddress(address.clone()))
                                             .await;
                                         self.proxy.send_event(crate::event::Event::new_general(
                                             crate::event::EventType::CheckNetwork,
@@ -135,7 +135,7 @@ impl InternalNetwork {
                                     )) => {
                                         println!("New external address: {addr}");
                                         self.sender
-                                            .send(MessageFromNetwork::NewAddress(addr.clone()))
+                                            .send(MessageFromNetworkThread::NewAddress(addr.clone()))
                                             .await;
                                         self.proxy.send_event(crate::event::Event::new_general(
                                             crate::event::EventType::CheckNetwork,
@@ -157,7 +157,7 @@ impl InternalNetwork {
                                     )) => {
                                         println!("Expired address: {}", addr);
                                         self.sender
-                                            .send(MessageFromNetwork::ExpiredAddress(addr.clone()))
+                                            .send(MessageFromNetworkThread::ExpiredAddress(addr.clone()))
                                             .await;
                                         self.proxy.send_event(crate::event::Event::new_general(
                                             crate::event::EventType::CheckNetwork,
@@ -168,7 +168,7 @@ impl InternalNetwork {
                                         match e {
                                             emulator::Event::Message(_, _, _) => todo!(),
                                             emulator::Event::TestEvent => {
-                                                self.sender.send(MessageFromNetwork::Test).await;
+                                                self.sender.send(MessageFromNetworkThread::Test).await;
                                             }
                                             emulator::Event::UnsupportedPeer(_) => todo!(),
                                         }
@@ -183,8 +183,8 @@ impl InternalNetwork {
 
     fn start(
         runtime: &mut tokio::runtime::Runtime,
-        s: async_channel::Sender<MessageFromNetwork>,
-        r: async_channel::Receiver<MessageToNetwork>,
+        s: async_channel::Sender<MessageFromNetworkThread>,
+        r: async_channel::Receiver<MessageToNetworkThread>,
         proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
     ) -> tokio::task::JoinHandle<()> {
         runtime.spawn(async {
@@ -197,8 +197,8 @@ impl InternalNetwork {
 
     /// Create a new object
     fn try_new(
-        s: async_channel::Sender<MessageFromNetwork>,
-        r: async_channel::Receiver<MessageToNetwork>,
+        s: async_channel::Sender<MessageFromNetworkThread>,
+        r: async_channel::Receiver<MessageToNetworkThread>,
         proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
     ) -> Option<Self> {
         let swarm = libp2p::SwarmBuilder::with_new_identity()
@@ -258,17 +258,17 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
-                MessageFromNetwork::Test => {
+                MessageFromNetworkThread::Test => {
                     println!("Received test message from network");
                 }
-                MessageFromNetwork::EmulatorVideoStream(_) => {}
-                MessageFromNetwork::NewAddress(a) => {
+                MessageFromNetworkThread::EmulatorVideoStream(_) => {}
+                MessageFromNetworkThread::NewAddress(a) => {
                     self.addresses.insert(a);
                 }
-                MessageFromNetwork::ExpiredAddress(a) => {
+                MessageFromNetworkThread::ExpiredAddress(a) => {
                     self.addresses.remove(&a);
                 }
-                MessageFromNetwork::ServerStatus(s) => {
+                MessageFromNetworkThread::ServerStatus(s) => {
                     self.server_running = s;
                     if !s {
                         self.addresses.clear();
@@ -283,20 +283,22 @@ impl Network {
     }
 
     pub fn start_server(&mut self) {
-        self.sender.send_blocking(MessageToNetwork::StartServer);
+        self.sender
+            .send_blocking(MessageToNetworkThread::StartServer);
     }
 
     pub fn stop_server(&mut self) {
-        self.sender.send_blocking(MessageToNetwork::StopServer);
+        self.sender
+            .send_blocking(MessageToNetworkThread::StopServer);
     }
 
     pub fn try_connect(&mut self, cs: &String) {
         self.sender
-            .send_blocking(MessageToNetwork::Connect(cs.to_owned()));
+            .send_blocking(MessageToNetworkThread::Connect(cs.to_owned()));
     }
 
     pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {
         self.sender
-            .send_blocking(MessageToNetwork::ControllerData(i, data));
+            .send_blocking(MessageToNetworkThread::ControllerData(i, data));
     }
 }
