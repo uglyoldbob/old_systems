@@ -18,14 +18,9 @@ use libp2p::{
 
 use super::NodeRole;
 
-#[derive(Debug)]
-pub enum MessageToNetwork {
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub enum MessageToFromNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
-    Test,
-}
-
-#[derive(Debug)]
-pub enum MessageFromNetwork {
     EmulatorVideoStream(Vec<u8>),
     Test,
 }
@@ -94,19 +89,21 @@ where
 }
 
 pub struct Codec {
+    length: Option<u32>,
     received: VecDeque<u8>,
 }
 
 impl Codec {
     fn new() -> Self {
         Self {
+            length: None,
             received: VecDeque::new(),
         }
     }
 }
 
 impl asynchronous_codec::Decoder for Codec {
-    type Item = u8;
+    type Item = MessageToFromNetwork;
 
     type Error = std::io::Error;
 
@@ -117,17 +114,31 @@ impl asynchronous_codec::Decoder for Codec {
         for el in src.iter() {
             self.received.push_back(*el);
         }
-        if self.received.len() > 0 {
-            Ok(Some(self.received.pop_front().unwrap()))
-        }
-        else {
-            Ok(None)
+        match self.length {
+            None => {
+                if self.received.len() >= 4 {
+                    let v = 42;
+                    self.length = Some(v);
+                }
+                Ok(None)
+            }
+            Some(l) => {
+                if self.received.len() >= l as usize {
+                    match bincode::deserialize::<MessageToFromNetwork>(&Vec::from(self.received.clone())) {
+                        Ok(i) => Ok(Some(i)),
+                        Err(e) => Ok(None), //TODO convert into an actual error
+                    }
+                }
+                else {
+                    Ok(None)
+                }
+            }
         }
     }
 }
 
 impl asynchronous_codec::Encoder for Codec {
-    type Item<'a> = u8;
+    type Item<'a> = MessageToFromNetwork;
 
     type Error = std::io::Error;
 
@@ -136,7 +147,9 @@ impl asynchronous_codec::Encoder for Codec {
         item: Self::Item<'_>,
         dst: &mut asynchronous_codec::BytesMut,
     ) -> Result<(), Self::Error> {
-        libp2p::bytes::BufMut::put_u8(dst, item);
+        let data = bincode::serialize(&item).unwrap();
+        libp2p::bytes::BufMut::put_u32(dst, data.len() as u32);
+        libp2p::bytes::BufMut::put_slice(dst, &data);
         Ok(())
     }
 }
@@ -224,7 +237,7 @@ impl ConnectionHandler for Handler {
             match out.poll_ready_unpin(cx) {
                 std::task::Poll::Ready(Ok(())) => {
                     println!("Sending message");
-                    match out.start_send_unpin(42) {
+                    match out.start_send_unpin(MessageToFromNetwork::Test) {
                         Ok(()) => {
                             println!("Message sent?");
                             return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(MessageToBehavior::Test));
@@ -394,7 +407,7 @@ impl Default for Config {
 
 pub struct Behavior {
     config: Config,
-    messages: VecDeque<MessageToNetwork>,
+    messages: VecDeque<MessageToFromNetwork>,
     waker: Arc<Mutex<Option<Waker>>>,
     clients: Vec<PeerId>,
     servers: Vec<PeerId>,
@@ -416,7 +429,7 @@ impl Behavior {
 
 impl Behavior {
     pub fn send_message(&mut self) {
-        self.messages.push_back(MessageToNetwork::Test);
+        self.messages.push_back(MessageToFromNetwork::Test);
     }
 
     pub fn set_role(&mut self, role: NodeRole) {
@@ -482,8 +495,9 @@ impl NetworkBehaviour for Behavior {
 
         if let Some(a) = self.messages.pop_front() {
             match a {
-                MessageToNetwork::ControllerData(_, _) => todo!(),
-                MessageToNetwork::Test => todo!(),
+                MessageToFromNetwork::ControllerData(_, _) => todo!(),
+                MessageToFromNetwork::Test => todo!(),
+                MessageToFromNetwork::EmulatorVideoStream(_) => todo!(),
             }
         }
 
