@@ -6,7 +6,7 @@ use std::{
     task::Waker,
 };
 
-use futures::{future, Future, StreamExt, SinkExt};
+use futures::{future, Future, SinkExt, StreamExt};
 use libp2p::{
     core::UpgradeInfo,
     swarm::{
@@ -111,28 +111,59 @@ impl asynchronous_codec::Decoder for Codec {
         &mut self,
         src: &mut asynchronous_codec::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
+        println!("Receive {} bytes from network", src.len());
         for el in src.iter() {
+            print!("{:X} ", el);
             self.received.push_back(*el);
         }
-        match self.length {
-            None => {
-                if self.received.len() >= 4 {
-                    let v = 42;
-                    self.length = Some(v);
-                }
-                Ok(None)
+        println!(" : <- Received");
+
+        print!("PARSE1: ");
+        for el in self.received.iter() {
+            print!("{:X} ", el);
+        }
+        println!("");
+        if self.length.is_none() {
+            if self.received.len() >= 4 {
+                let v = (self.received[3] as u32) | (self.received[2] as u32) << 8
+                | (self.received[1] as u32) << 16 | (self.received[0] as u32) << 24;
+                println!("Expecting {} bytes from the network", v);
+                self.length = Some(v);
+                self.received.pop_front();
+                self.received.pop_front();
+                self.received.pop_front();
+                self.received.pop_front();
             }
-            Some(l) => {
-                if self.received.len() >= l as usize {
-                    match bincode::deserialize::<MessageToFromNetwork>(&Vec::from(self.received.clone())) {
-                        Ok(i) => Ok(Some(i)),
-                        Err(e) => Ok(None), //TODO convert into an actual error
+        }
+        print!("PARSE2: ");
+        for el in self.received.iter() {
+            print!("{:X} ", el);
+        }
+        println!("");
+        if let Some(l) = &self.length {
+            if self.received.len() >= *l as usize {
+                match bincode::deserialize::<MessageToFromNetwork>(&Vec::from(
+                    self.received.clone(),
+                )) {
+                    Ok(i) => {
+                        println!("Success deserializing to {:?}", i);
+                        self.length = None;
+                        self.received.clear();
+                        Ok(Some(i))
+                    }
+                    Err(e) => {
+                        println!("Error deserializing data {:?}", e);
+                        self.length = None;
+                        self.received.clear();
+                        Ok(None) //TODO convert into an actual error
                     }
                 }
-                else {
-                    Ok(None)
-                }
+            } else {
+                Ok(None)
             }
+        }
+        else {
+            Ok(None)
         }
     }
 }
@@ -150,6 +181,7 @@ impl asynchronous_codec::Encoder for Codec {
         let data = bincode::serialize(&item).unwrap();
         libp2p::bytes::BufMut::put_u32(dst, data.len() as u32);
         libp2p::bytes::BufMut::put_slice(dst, &data);
+        println!("Encode {} bytes for sending network", data.len() + 4);
         Ok(())
     }
 }
@@ -168,6 +200,7 @@ pub struct Handler {
     waker: Arc<Mutex<Option<Waker>>>,
     inbound_stream: Option<InboundSubstreamState>,
     outbound_stream: Option<OutboundSubstreamState>,
+    pending_out: VecDeque<MessageFromBehavior>,
 }
 
 impl Handler {
@@ -177,6 +210,7 @@ impl Handler {
             waker: Arc::new(Mutex::new(None)),
             inbound_stream: None,
             outbound_stream: None,
+            pending_out: VecDeque::new(),
         }
     }
 
@@ -233,17 +267,34 @@ impl ConnectionHandler for Handler {
             });
         }
         if let Some(OutboundSubstreamState::Established(out)) = &mut self.outbound_stream {
-            println!("outbound established");
             match out.poll_ready_unpin(cx) {
                 std::task::Poll::Ready(Ok(())) => {
-                    println!("Sending message");
-                    match out.start_send_unpin(MessageToFromNetwork::Test) {
-                        Ok(()) => {
-                            println!("Message sent?");
-                            return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(MessageToBehavior::Test));
-                        }
-                        Err(e) => {
-                            println!("Failed to send message");
+                    if let Some(m) = self.pending_out.pop_front() {
+                        println!("Sending message?");
+                        match m {
+                            MessageFromBehavior::Test => {
+                                match out.start_send_unpin(MessageToFromNetwork::Test) {
+                                    Ok(()) => match out.poll_flush_unpin(cx) {
+                                        std::task::Poll::Ready(Ok(())) => {
+                                            println!("Message flushed");
+                                            return std::task::Poll::Ready(
+                                                ConnectionHandlerEvent::NotifyBehaviour(
+                                                    MessageToBehavior::Test,
+                                                ),
+                                            );
+                                        }
+                                        std::task::Poll::Ready(Err(e)) => {
+                                            println!("Error flushing message {:?}", e);
+                                        }
+                                        std::task::Poll::Pending => {
+                                            println!("Message flush pending");
+                                        }
+                                    },
+                                    Err(e) => {
+                                        println!("Failed to send message {:?}", e);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -257,24 +308,27 @@ impl ConnectionHandler for Handler {
         }
 
         if let Some(inb) = &mut self.inbound_stream {
+            println!("Need to check inbound stream");
             let a = &mut inb.stream;
             match a.poll_next_unpin(cx) {
                 std::task::Poll::Ready(m) => {
+                    println!("Inbound stream is ready");
                     match m {
                         Some(Ok(m)) => {
-                            return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                                MessageToBehavior::Test,
-                            ));
+                            println!("Received message from network {:?}", m);
+                            return std::task::Poll::Ready(
+                                ConnectionHandlerEvent::NotifyBehaviour(MessageToBehavior::Test),
+                            );
                         }
                         Some(Err(e)) => {
-                            println!("Error receiving message");
+                            println!("Error receiving message from network");
                         }
-                        None => {
-
-                        }
+                        None => {}
                     }
                 }
-                std::task::Poll::Pending => {}
+                std::task::Poll::Pending => {
+                    println!("Inbound stream is pending");
+                }
             }
         }
 
@@ -287,8 +341,10 @@ impl ConnectionHandler for Handler {
             "Connection handler received {:?} from networkbehaviour",
             event
         );
-        match event {
-            MessageFromBehavior::Test => {}
+        self.pending_out.push_back(event);
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
         }
     }
 
@@ -333,63 +389,21 @@ impl ConnectionHandler for Handler {
 
 /// The message sent to the user after a [`RawMessage`] has been transformed by a
 /// [`crate::DataTransform`].
-#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Message {
     /// Id of the peer that published this message.
     pub source: Option<PeerId>,
 
     /// Content of the message.
-    pub data: Vec<u8>,
-
-    /// A random sequence number.
-    pub sequence_number: Option<u64>,
+    pub data: MessageToFromNetwork,
 }
 
 impl std::fmt::Debug for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Message")
-            .field(
-                "data",
-                &format_args!("{:<20}", &hex_fmt::HexFmt(&self.data)),
-            )
+            .field("data", &format_args!("{:?}", self.data))
             .field("source", &self.source)
-            .field("sequence_number", &self.sequence_number)
             .finish()
     }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct MessageId(pub Vec<u8>);
-
-impl MessageId {
-    pub fn new(value: &[u8]) -> Self {
-        Self(value.to_vec())
-    }
-}
-
-impl<T: Into<Vec<u8>>> From<T> for MessageId {
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
-}
-
-impl std::fmt::Display for MessageId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex_fmt::HexFmt(&self.0))
-    }
-}
-
-impl std::fmt::Debug for MessageId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MessageId({})", hex_fmt::HexFmt(&self.0))
-    }
-}
-
-#[derive(Debug)]
-pub enum Event {
-    Message(PeerId, MessageId, Message),
-    TestEvent,
-    UnsupportedPeer(PeerId),
 }
 
 #[derive(Clone)]
@@ -407,7 +421,7 @@ impl Default for Config {
 
 pub struct Behavior {
     config: Config,
-    messages: VecDeque<MessageToFromNetwork>,
+    messages: VecDeque<ToSwarm<MessageToSwarm, MessageFromBehavior>>,
     waker: Arc<Mutex<Option<Waker>>>,
     clients: Vec<PeerId>,
     servers: Vec<PeerId>,
@@ -429,7 +443,13 @@ impl Behavior {
 
 impl Behavior {
     pub fn send_message(&mut self) {
-        self.messages.push_back(MessageToFromNetwork::Test);
+        for pid in &self.clients {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageFromBehavior::Test,
+            });
+        }
     }
 
     pub fn set_role(&mut self, role: NodeRole) {
@@ -437,10 +457,20 @@ impl Behavior {
     }
 }
 
+#[derive(Debug)]
+pub enum MessageToSwarm {
+    Test,
+}
+
+#[derive(Debug)]
+pub enum MessageFromSwarm {
+    Test,
+}
+
 impl NetworkBehaviour for Behavior {
     type ConnectionHandler = Handler;
 
-    type ToSwarm = Event;
+    type ToSwarm = MessageToSwarm;
 
     fn handle_established_inbound_connection(
         &mut self,
@@ -494,11 +524,8 @@ impl NetworkBehaviour for Behavior {
         let mut waker = self.waker.lock().unwrap();
 
         if let Some(a) = self.messages.pop_front() {
-            match a {
-                MessageToFromNetwork::ControllerData(_, _) => todo!(),
-                MessageToFromNetwork::Test => todo!(),
-                MessageToFromNetwork::EmulatorVideoStream(_) => todo!(),
-            }
+            println!("Processing message {:?}", a);
+            return std::task::Poll::Ready(a);
         }
 
         *waker = Some(cx.waker().clone());

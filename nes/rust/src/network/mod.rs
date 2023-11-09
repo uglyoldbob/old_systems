@@ -166,11 +166,9 @@ impl InternalNetwork {
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
                                         match e {
-                                            emulator::Event::Message(_, _, _) => todo!(),
-                                            emulator::Event::TestEvent => {
-                                                self.sender.send(MessageFromNetworkThread::Test).await;
+                                            emulator::MessageToSwarm::Test => {
+                                                println!("Received test message");
                                             }
-                                            emulator::Event::UnsupportedPeer(_) => todo!(),
                                         }
                                     }
                                     _ => {}
@@ -295,6 +293,10 @@ impl Network {
     pub fn try_connect(&mut self, cs: &String) {
         self.sender
             .send_blocking(MessageToNetworkThread::Connect(cs.to_owned()));
+    }
+
+    pub fn send_test(&mut self) {
+        self.sender.send_blocking(MessageToNetworkThread::Test);
     }
 
     pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {

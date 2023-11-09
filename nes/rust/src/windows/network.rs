@@ -105,6 +105,9 @@ impl TrackedWindow for Window {
                             network.stop_server();
                         }
                     }
+                    if ui.button("Send test message").clicked() {
+                        network.send_test();
+                    }
                 }
             }
         });
