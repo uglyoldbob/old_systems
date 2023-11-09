@@ -14,6 +14,7 @@ pub enum NodeRole {
     PlayerHost,
     Player,
     Observer,
+    Unknown,
 }
 
 #[derive(Debug)]
@@ -248,7 +249,7 @@ impl Network {
             recvr: r2,
             addresses: HashSet::new(),
             server_running: false,
-            role: NodeRole::Observer,
+            role: NodeRole::Unknown,
         }
     }
 
@@ -271,6 +272,12 @@ impl Network {
                 }
                 MessageFromNetworkThread::ServerStatus(s) => {
                     self.server_running = s;
+                    if s {
+                        self.role = NodeRole::PlayerHost;
+                    }
+                    else {
+                        self.role = NodeRole::Unknown;
+                    }
                     if !s {
                         self.addresses.clear();
                     }
