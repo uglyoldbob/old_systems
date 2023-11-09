@@ -8,6 +8,13 @@ use futures::FutureExt;
 use libp2p::core::transport::ListenerId;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
+pub enum NodeRole {
+    DedicatedHost,
+    PlayerHost,
+    Player,
+    Observer,
+}
+
 #[derive(Debug)]
 pub enum MessageToNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
