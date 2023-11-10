@@ -334,7 +334,7 @@ impl Network {
         &self.addresses
     }
 
-    pub fn get_button_data_ref(&mut self, i: u8) -> Option<ButtonCombination> {
+    pub fn get_button_data(&mut self, i: u8) -> Option<ButtonCombination> {
         self.buttons[i as usize].clone()
     }
 
@@ -350,6 +350,14 @@ impl Network {
                 }
                 MessageFromNetworkThread::RequestController(p, c) => {
                     if let Some(c) = c {
+                        for i in 0..4 {
+                            if let Some(peer) = self.controller_holder[i] {
+                                if peer == p {
+                                    self.controller_holder[i] = None;
+                                    break;
+                                }
+                            }
+                        }
                         if self.controller_holder[c as usize].is_none() {
                             self.controller_holder[c as usize] = Some(p);
                             self.sender

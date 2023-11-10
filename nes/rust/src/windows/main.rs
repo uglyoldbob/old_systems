@@ -466,7 +466,7 @@ impl TrackedWindow for MainNesWindow {
                         }
                         NodeRole::PlayerHost => {
                             for i in 0..4 {
-                                if let Some(bc) = network.get_button_data_ref(i) {
+                                if let Some(bc) = network.get_button_data(i) {
                                     let controller = c.mb.get_controller_mut(i);
                                     if let Some(con) = controller.get_buttons_iter_mut().next() {
                                         *con = bc;
@@ -476,6 +476,17 @@ impl TrackedWindow for MainNesWindow {
                         }
                         _ => {}
                     }
+                }
+            }
+        }
+
+        if let Some(olocal) = &mut c.olocal {
+            if let Some(network) = &mut olocal.network {
+                match network.role() {
+                    NodeRole::Observer | NodeRole::Player => {
+                        render = false;
+                    }
+                    _ => {}
                 }
             }
         }
@@ -865,6 +876,13 @@ impl TrackedWindow for MainNesWindow {
                 });
             });
             ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
+            if c.mb
+                .get_controller_ref(0)
+                .button_data()
+                .pressed(crate::controller::BUTTON_COMBO_LEFT)
+            {
+                ui.label("LEFT");
+            }
         });
 
         if let Some(s) = &mut self.sound_stream {
