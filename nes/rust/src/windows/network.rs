@@ -14,7 +14,9 @@ use crate::egui_multiwin_dynamic::{
 };
 use crate::emulator_data::NesEmulatorData;
 
+/// The network configuration window.
 pub struct Window {
+    /// The server that the user desires to connect to.
     server: String,
 }
 

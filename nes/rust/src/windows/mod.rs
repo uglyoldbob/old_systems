@@ -22,6 +22,7 @@ pub mod sprite_dump_window;
 #[cfg(feature = "rom_status")]
 pub mod rom_checker;
 
+/// The list of windows that can exist in the emulator.
 #[enum_dispatch(TrackedWindow)]
 pub enum Windows {
     Main(crate::windows::main::MainNesWindow),

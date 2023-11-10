@@ -1,3 +1,5 @@
+//! A module that implements a custom protocl for libp2p.
+
 use std::{
     collections::VecDeque,
     fmt::Display,
@@ -18,22 +20,29 @@ use libp2p::{
 
 use crate::controller::ButtonCombination;
 
-use super::NodeRole;
+use super::{streaming::Streaming, NodeRole};
 
+/// Represents a message that can be sent to and from other nodes in the network.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageToFromNetwork {
+    /// Controller data for a specific controller.
     ControllerData(u8, crate::controller::ButtonCombination),
+    /// Part of the emulator audio video stream.
     EmulatorVideoStream(Vec<u8>),
+    /// A request for a specific role in the network.
     RequestRole(PeerId, NodeRole),
+    /// A request to own a specific controller in the emulator network.
     RequestController(PeerId, Option<u8>),
+    /// A command to set the role of the recipient of the command.
     SetRole(NodeRole),
+    /// A command to set the controller of the recipient of the command.
     SetController(Option<u8>),
 }
 
 /// The protocol ID
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProtocolId {
-    /// The RPC message type/name.
+    /// The message type/name.
     pub protocol: StreamProtocol,
 }
 
@@ -43,8 +52,10 @@ impl AsRef<str> for ProtocolId {
     }
 }
 
+/// Represents the protocols compatible with the node.
 #[derive(Clone)]
 pub struct Protocol {
+    /// The list of compatible protocols.
     protocols: Vec<ProtocolId>,
 }
 
@@ -93,12 +104,16 @@ where
     }
 }
 
+/// This is used to translate messages to and from the network.
 pub struct Codec {
+    /// The length to be received from the network.
     length: Option<u32>,
+    /// The received data from the network.
     received: VecDeque<u8>,
 }
 
 impl Codec {
+    /// Create a new object.
     fn new() -> Self {
         Self {
             length: None,
@@ -177,42 +192,70 @@ impl asynchronous_codec::Encoder for Codec {
     }
 }
 
+/// A struct representing an inbound substream
 pub struct InboundSubstreamState {
+    /// The stream
     stream: asynchronous_codec::Framed<libp2p::Stream, Codec>,
 }
 
+/// A struct representing an outbound substream
 pub enum OutboundSubstreamState {
+    /// The substream is being established
     Establishing,
+    /// The substream has been established, and has a stream
     Established(asynchronous_codec::Framed<libp2p::Stream, Codec>),
 }
 
+/// The libp2p handler struct
 pub struct Handler {
+    /// The role played by this node in the network.
+    role: NodeRole,
+    /// The protocol to use for communication.
     listen_protocol: Protocol,
+    /// The waker used to wake up the poll stuff when is is marked pending.
     waker: Arc<Mutex<Option<Waker>>>,
+    /// The inbound stream
     inbound_stream: Option<InboundSubstreamState>,
+    /// The outbound stream
     outbound_stream: Option<OutboundSubstreamState>,
+    /// Messages that are pending to be sent to the network.
     pending_out: VecDeque<MessageToFromBehavior>,
+    /// The struct used for converting video and audio data into a format that can be streamed.
+    streaming: Streaming,
+    /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
+    avsource: Option<gstreamer_app::AppSink>,
 }
 
 impl Handler {
-    fn new(protocol: Protocol) -> Self {
+    /// Construct a new struct.
+    fn new(protocol: Protocol, role: NodeRole) -> Self {
         Self {
+            role,
             listen_protocol: protocol,
             waker: Arc::new(Mutex::new(None)),
             inbound_stream: None,
             outbound_stream: None,
             pending_out: VecDeque::new(),
+            streaming: Streaming::new(),
+            avsource: None,
         }
     }
 }
 
+/// Represents messages that can be send between the networkbehaviour and the connectionhandler.
 #[derive(Debug)]
 pub enum MessageToFromBehavior {
+    /// Controller data for a specific controller.
     ControllerData(u8, ButtonCombination),
+    /// A request for a specific role on the network.
     RequestRole(PeerId, NodeRole),
+    /// A request for a specific controller on the emulator.
     RequestController(PeerId, Option<u8>),
+    /// A command to give a specific controller to a node on the network.
     SetController(Option<u8>),
+    /// A command to set the role of a node on the network.
     SetRole(NodeRole),
+    /// Audio video data for the emulator.
     VideoStream(Vec<u8>),
 }
 
@@ -288,6 +331,33 @@ impl ConnectionHandler for Handler {
                             Err(e) => {
                                 println!("Failed to send message {:?}", e);
                             }
+                        }
+                    }
+                    if let Some(source) = &mut self.avsource {
+                        match source.pull_sample() {
+                            Ok(a) => {
+                                let c = a.buffer();
+                                if let Some(buf) = c {
+                                    let mut v: Vec<u8> = Vec::with_capacity(buf.size());
+                                    if let Ok(()) = buf.copy_to_slice(buf.size(), &mut v) {
+                                        match out.start_send_unpin(
+                                            MessageToFromNetwork::EmulatorVideoStream(v),
+                                        ) {
+                                            Ok(()) => match out.poll_flush_unpin(cx) {
+                                                std::task::Poll::Ready(Ok(())) => {}
+                                                std::task::Poll::Ready(Err(e)) => {
+                                                    println!("Error flushing message {:?}", e);
+                                                }
+                                                std::task::Poll::Pending => {}
+                                            },
+                                            Err(e) => {
+                                                println!("Failed to send message {:?}", e);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => {}
                         }
                     }
                 }
@@ -407,8 +477,10 @@ impl std::fmt::Debug for Message {
     }
 }
 
+/// Represents a protocol configuration for the behavior.
 #[derive(Clone)]
 pub struct Config {
+    /// The supported protocol
     protocol: Protocol,
 }
 
@@ -420,15 +492,22 @@ impl Default for Config {
     }
 }
 
+/// The struct for the network behavior
 pub struct Behavior {
+    /// The protocool configuration for the node.
     config: Config,
+    /// Messages to be sent to the swarm.
     messages: VecDeque<ToSwarm<MessageToSwarm, MessageToFromBehavior>>,
+    /// The waker to wake up the poll routine for this struct.
     waker: Arc<Mutex<Option<Waker>>>,
+    /// The list of clients connected to this node.
     clients: Vec<PeerId>,
+    /// The list of servers that this node is connected to. This might be converted to an Option<PeerId>
     servers: Vec<PeerId>,
 }
 
 impl Behavior {
+    /// Construct a new Self
     pub fn new() -> Self {
         Self {
             config: Config::default(),
@@ -441,6 +520,7 @@ impl Behavior {
 }
 
 impl Behavior {
+    /// Send the given controller data to the host.
     pub fn send_controller_data(&mut self, index: u8, data: ButtonCombination) {
         for pid in &self.servers {
             self.messages.push_back(ToSwarm::NotifyHandler {
@@ -455,6 +535,7 @@ impl Behavior {
         }
     }
 
+    /// Used by a host to set the role of a connected user.
     pub fn set_user_role(&mut self, p: PeerId, r: NodeRole) {
         self.messages.push_back(ToSwarm::NotifyHandler {
             peer_id: p,
@@ -463,6 +544,7 @@ impl Behavior {
         });
     }
 
+    /// Used by a player to request observer status.
     pub fn request_observer_status(&mut self, p: PeerId) {
         for pid in &self.servers {
             self.messages.push_back(ToSwarm::NotifyHandler {
@@ -477,6 +559,7 @@ impl Behavior {
         }
     }
 
+    /// Used by a player to request posession of a specific controller in the emulator.
     pub fn request_controller(&mut self, p: PeerId, c: Option<u8>) {
         for pid in &self.servers {
             self.messages.push_back(ToSwarm::NotifyHandler {
@@ -491,6 +574,7 @@ impl Behavior {
         }
     }
 
+    /// Used by a host to set the controller of a user.
     pub fn set_controller(&mut self, p: PeerId, c: Option<u8>) {
         self.messages.push_back(ToSwarm::NotifyHandler {
             peer_id: p,
@@ -500,13 +584,20 @@ impl Behavior {
     }
 }
 
+/// Represents the types of messages that can be sent to the swarm from the network behaviour.
 #[derive(Debug)]
 pub enum MessageToSwarm {
+    /// Controller data from a user
     ControllerData(u8, ButtonCombination),
+    /// A role request from a user.
     RequestRole(PeerId, NodeRole),
+    /// A command from a host to set the role of a user.
     SetRole(NodeRole),
+    /// A request from a user to have a certain controller. None means to be just an observer.
     RequestController(PeerId, Option<u8>),
+    /// A command from a host that sets the controller of a user.
     SetController(Option<u8>),
+    /// A singal that indicates the node is connected to a host.
     ConnectedToHost,
 }
 
@@ -524,7 +615,7 @@ impl NetworkBehaviour for Behavior {
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         println!("Received inbound connection from {:?}", peer);
         self.clients.push(peer);
-        Ok(Handler::new(self.config.protocol.clone()))
+        Ok(Handler::new(self.config.protocol.clone(), NodeRole::PlayerHost))
     }
 
     fn handle_established_outbound_connection(
@@ -538,7 +629,7 @@ impl NetworkBehaviour for Behavior {
         self.servers.push(peer);
         self.messages
             .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ConnectedToHost));
-        Ok(Handler::new(self.config.protocol.clone()))
+        Ok(Handler::new(self.config.protocol.clone(), NodeRole::Unknown))
     }
 
     fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm) {}

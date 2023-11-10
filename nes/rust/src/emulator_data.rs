@@ -269,6 +269,7 @@ impl Default for LocalEmulatorDataClone {
 }
 
 impl LocalEmulatorDataClone {
+    /// Create a new Self object with the given event loop proxy
     fn new(
         proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
     ) -> Self {
@@ -335,6 +336,7 @@ pub struct NesEmulatorData {
 
 #[cfg(feature = "egui-multiwin")]
 impl NesEmulatorData {
+    /// Process any events received from the main event loop
     pub fn process_event(&mut self, event: crate::event::Event) -> Vec<NewWindowRequest> {
         match event.message {
             crate::event::EventType::CheckNetwork => {
