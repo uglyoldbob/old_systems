@@ -99,15 +99,11 @@ impl TrackedWindow for Window {
                         });
                         if ui.button("Connect").clicked() {
                             network.try_connect(&self.server);
-                            network.request_observer();
                         }
                     } else {
                         if ui.button("Stop server").clicked() {
                             network.stop_server();
                         }
-                    }
-                    if ui.button("Send test message").clicked() {
-                        network.send_test();
                     }
                 }
             }

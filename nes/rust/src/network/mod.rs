@@ -29,7 +29,6 @@ pub enum MessageToNetworkThread {
     SetUserRole(libp2p::PeerId, NodeRole),
     RequestController(Option<u8>),
     SetController(libp2p::PeerId, Option<u8>),
-    Test,
 }
 
 #[derive(Debug)]
@@ -39,11 +38,11 @@ pub enum MessageFromNetworkThread {
     NewAddress(Multiaddr),
     ExpiredAddress(Multiaddr),
     ServerStatus(bool),
+    ConnectedToHost,
     NewRole(NodeRole),
     RequestRole(libp2p::PeerId, NodeRole),
     RequestController(libp2p::PeerId, Option<u8>),
     SetController(Option<u8>),
-    Test,
 }
 
 // This describes the behaviour of a libp2p swarm
@@ -91,10 +90,6 @@ impl InternalNetwork {
                                             let myid = *self.swarm.local_peer_id();
                                             let behavior = self.swarm.behaviour_mut();
                                             behavior.emulator.request_observer_status(myid);
-                                        }
-                                        MessageToNetworkThread::Test => {
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.send_message();
                                         }
                                         MessageToNetworkThread::Connect(cs) => {
                                             match cs.parse::<Multiaddr>() {
@@ -187,6 +182,14 @@ impl InternalNetwork {
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
                                         match e {
+                                            emulator::MessageToSwarm::ConnectedToHost => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::ConnectedToHost)
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
                                             emulator::MessageToSwarm::RequestController(i, c) => {
                                                 self.sender
                                                     .send(MessageFromNetworkThread::RequestController(i, c))
@@ -218,9 +221,6 @@ impl InternalNetwork {
                                                 self.proxy.send_event(crate::event::Event::new_general(
                                                     crate::event::EventType::CheckNetwork,
                                                 ));
-                                            }
-                                            emulator::MessageToSwarm::Test => {
-                                                println!("Received test message");
                                             }
                                             emulator::MessageToSwarm::ControllerData(i, d) => {
                                                 self.sender
@@ -300,6 +300,7 @@ pub struct Network {
     buttons: [Option<ButtonCombination>; 4],
     my_controller: Option<u8>,
     controller_holder: [Option<libp2p::PeerId>; 4],
+    connected: bool,
 }
 
 impl Network {
@@ -325,6 +326,7 @@ impl Network {
             buttons: [None; 4],
             my_controller: None,
             controller_holder: [None; 4],
+            connected: false,
         }
     }
 
@@ -339,6 +341,13 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetworkThread::ConnectedToHost => {
+                    self.connected = true;
+                    let s = self
+                        .sender
+                        .send_blocking(MessageToNetworkThread::RequestObserverStatus);
+                    println!("Request observer {:?}", s);
+                }
                 MessageFromNetworkThread::RequestController(p, c) => {
                     if let Some(c) = c {
                         if self.controller_holder[c as usize].is_none() {
@@ -371,22 +380,21 @@ impl Network {
                 MessageFromNetworkThread::RequestRole(p, r) => match self.role {
                     NodeRole::DedicatedHost | NodeRole::PlayerHost => match r {
                         NodeRole::Player | NodeRole::Observer => {
-                            self.sender
+                            let s = self
+                                .sender
                                 .send_blocking(MessageToNetworkThread::SetUserRole(p, r));
+                            println!("Setting user role message {:?}", s);
                         }
                         _ => {}
                     },
                     _ => {}
                 },
                 MessageFromNetworkThread::NewRole(r) => {
+                    println!("Role is now {:?}", r);
                     self.role = r;
                 }
                 MessageFromNetworkThread::ControllerData(i, d) => {
-                    println!("Received button data for controller {}", i);
                     self.buttons[i as usize] = Some(d);
-                }
-                MessageFromNetworkThread::Test => {
-                    println!("Received test message from network");
                 }
                 MessageFromNetworkThread::EmulatorVideoStream(_) => {}
                 MessageFromNetworkThread::NewAddress(a) => {
@@ -432,11 +440,6 @@ impl Network {
             .send_blocking(MessageToNetworkThread::RequestController(None));
     }
 
-    pub fn request_observer(&mut self) {
-        self.sender
-            .send_blocking(MessageToNetworkThread::RequestObserverStatus);
-    }
-
     pub fn start_server(&mut self) {
         self.sender
             .send_blocking(MessageToNetworkThread::StartServer);
@@ -450,10 +453,6 @@ impl Network {
     pub fn try_connect(&mut self, cs: &String) {
         self.sender
             .send_blocking(MessageToNetworkThread::Connect(cs.to_owned()));
-    }
-
-    pub fn send_test(&mut self) {
-        self.sender.send_blocking(MessageToNetworkThread::Test);
     }
 
     pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {
