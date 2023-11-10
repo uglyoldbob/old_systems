@@ -1,10 +1,7 @@
 //! This is responsible for parsing roms from the filesystem, determining which ones are valid for the emulator to load.
 //! Emulator inaccuracies may prevent a rom that this module determines to be valid fromm operating correctly.
 
-use crate::{
-    cartridge::{CartridgeError, NesCartridge},
-    emulator_data::{LocalEmulatorDataClone, NesEmulatorData},
-};
+use crate::cartridge::{CartridgeError, NesCartridge};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, str::FromStr};
 
@@ -53,13 +50,13 @@ impl RomList {
     /// Returns the quantity of roms that are broken
     pub fn get_broken_quantity(&self) -> u32 {
         let mut quant = 0;
-        for (s, rs) in &self.elements {
+        for (_s, rs) in &self.elements {
             if let Some(rs) = &rs.result {
                 match rs {
-                    Ok(rom) => {}
+                    Ok(_rom) => {}
                     Err(romerr) => match romerr {
-                        CartridgeError::IncompatibleMapper(m) => {}
-                        CartridgeError::FsError(e) => {}
+                        CartridgeError::IncompatibleMapper(_m) => {}
+                        CartridgeError::FsError(_e) => {}
                         _ => {
                             quant += 1;
                         }
@@ -73,13 +70,13 @@ impl RomList {
     /// Retrieves the number of roms that are not usable
     pub fn get_bad_quantity(&self) -> u32 {
         let mut quant = 0;
-        for (s, rs) in &self.elements {
+        for (_s, rs) in &self.elements {
             if let Some(rs) = &rs.result {
                 match rs {
-                    Ok(rom) => {}
+                    Ok(_rom) => {}
                     Err(romerr) => match romerr {
-                        CartridgeError::IncompatibleMapper(m) => {}
-                        CartridgeError::FsError(e) => {}
+                        CartridgeError::IncompatibleMapper(_m) => {}
+                        CartridgeError::FsError(_e) => {}
                         CartridgeError::InvalidRom => {}
                         _ => {
                             quant += 1;
@@ -94,7 +91,7 @@ impl RomList {
     /// Get a mapper count tree. Maps mappernumber to quantity
     pub fn get_mapper_quantity(&self) -> std::collections::BTreeMap<u32, u32> {
         let mut mq = std::collections::BTreeMap::new();
-        for (s, rs) in &self.elements {
+        for (_s, rs) in &self.elements {
             if let Some(rs) = &rs.result {
                 match rs {
                     Ok(rom) => {

@@ -236,13 +236,11 @@ impl ButtonCombination {
                 self.try_set_rate(index, config.rates[1]);
             }
             if let UserInput::GilrsButton(id, c) = b {
-                if *id == gid {
-                    if *c == code {
-                        if button.is_pressed() {
-                            self.set_button(index, 0);
-                        } else {
-                            self.clear_button(index);
-                        }
+                if *id == gid && *c == code {
+                    if button.is_pressed() {
+                        self.set_button(index, 0);
+                    } else {
+                        self.clear_button(index);
                     }
                 }
             }
@@ -266,21 +264,17 @@ impl ButtonCombination {
             }
             match b {
                 UserInput::GilrsAxisButton(id, a, dir) => {
-                    if *id == gid {
-                        if *a == code {
-                            if *dir {
-                                if axis.value() > 0.5 {
-                                    self.set_button(index, 0);
-                                } else {
-                                    self.clear_button(index);
-                                }
+                    if *id == gid && *a == code {
+                        if *dir {
+                            if axis.value() > 0.5 {
+                                self.set_button(index, 0);
                             } else {
-                                if axis.value() < -0.5 {
-                                    self.set_button(index, 0);
-                                } else {
-                                    self.clear_button(index);
-                                }
+                                self.clear_button(index);
                             }
+                        } else if axis.value() < -0.5 {
+                            self.set_button(index, 0);
+                        } else {
+                            self.clear_button(index);
                         }
                     }
                 }
@@ -558,7 +552,7 @@ impl FourScore {
 
     /// Returns true if the second controller is present
     pub fn has_second_controller(&self) -> bool {
-        !matches!(*self.controllers[1], NesController::DummyController(d))
+        !matches!(*self.controllers[1], NesController::DummyController(_d))
     }
 }
 
@@ -575,10 +569,8 @@ impl NesControllerTrait for FourScore {
             }
             _ => {}
         }
-        if active_high_edge && !self.strobe {
-            if self.clock_counter < 24 {
-                self.clock_counter += 1;
-            }
+        if active_high_edge && !self.strobe && self.clock_counter < 24 {
+            self.clock_counter += 1;
         }
         self.prevclk = c;
     }

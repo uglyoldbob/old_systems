@@ -305,12 +305,9 @@ impl InternalNetwork {
                 libp2p::yamux::Config::default,
             )
             .ok()?
-            .with_behaviour(|_key| {
-                let beh = SwarmBehavior {
-                    upnp: libp2p::upnp::tokio::Behaviour::default(),
-                    emulator: emulator::Behavior::new(),
-                };
-                beh
+            .with_behaviour(|_key| SwarmBehavior {
+                upnp: libp2p::upnp::tokio::Behaviour::default(),
+                emulator: emulator::Behavior::new(),
             })
             .ok()?
             .build();
@@ -385,7 +382,7 @@ impl Network {
 
     /// Retrieve the specified index of button data, cloned.
     pub fn get_button_data(&mut self, i: u8) -> Option<ButtonCombination> {
-        self.buttons[i as usize].clone()
+        self.buttons[i as usize]
     }
 
     /// Process all messages received from the network thread.

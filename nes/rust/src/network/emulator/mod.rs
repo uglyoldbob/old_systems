@@ -2,7 +2,6 @@
 
 use std::{
     collections::VecDeque,
-    fmt::Display,
     pin::Pin,
     sync::{Arc, Mutex},
     task::Waker,
@@ -12,8 +11,8 @@ use futures::{future, Future, SinkExt, StreamExt};
 use libp2p::{
     core::UpgradeInfo,
     swarm::{
-        handler::{ConnectionEvent, FullyNegotiatedOutbound},
-        ConnectionHandler, ConnectionHandlerEvent, NetworkBehaviour, SubstreamProtocol, ToSwarm,
+        handler::ConnectionEvent, ConnectionHandler, ConnectionHandlerEvent, NetworkBehaviour,
+        SubstreamProtocol, ToSwarm,
     },
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
@@ -136,18 +135,16 @@ impl asynchronous_codec::Decoder for Codec {
         }
         src.clear();
 
-        if self.length.is_none() {
-            if self.received.len() >= 4 {
-                let v = (self.received[3] as u32)
-                    | (self.received[2] as u32) << 8
-                    | (self.received[1] as u32) << 16
-                    | (self.received[0] as u32) << 24;
-                self.length = Some(v);
-                self.received.pop_front();
-                self.received.pop_front();
-                self.received.pop_front();
-                self.received.pop_front();
-            }
+        if self.length.is_none() && self.received.len() >= 4 {
+            let v = (self.received[3] as u32)
+                | (self.received[2] as u32) << 8
+                | (self.received[1] as u32) << 16
+                | (self.received[0] as u32) << 24;
+            self.length = Some(v);
+            self.received.pop_front();
+            self.received.pop_front();
+            self.received.pop_front();
+            self.received.pop_front();
         }
         if let Some(l) = &self.length {
             if self.received.len() >= *l as usize {
@@ -357,7 +354,7 @@ impl ConnectionHandler for Handler {
                                     }
                                 }
                             }
-                            Err(e) => {}
+                            Err(_e) => {}
                         }
                     }
                 }
@@ -395,7 +392,7 @@ impl ConnectionHandler for Handler {
                         };
                         return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(mr));
                     }
-                    Some(Err(e)) => {
+                    Some(Err(_e)) => {
                         println!("Error receiving message from network");
                     }
                     None => {
@@ -478,18 +475,10 @@ impl std::fmt::Debug for Message {
 }
 
 /// Represents a protocol configuration for the behavior.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Config {
     /// The supported protocol
     protocol: Protocol,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            protocol: Protocol::default(),
-        }
-    }
 }
 
 /// The struct for the network behavior
@@ -615,7 +604,10 @@ impl NetworkBehaviour for Behavior {
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         println!("Received inbound connection from {:?}", peer);
         self.clients.push(peer);
-        Ok(Handler::new(self.config.protocol.clone(), NodeRole::PlayerHost))
+        Ok(Handler::new(
+            self.config.protocol.clone(),
+            NodeRole::PlayerHost,
+        ))
     }
 
     fn handle_established_outbound_connection(
@@ -629,7 +621,10 @@ impl NetworkBehaviour for Behavior {
         self.servers.push(peer);
         self.messages
             .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ConnectedToHost));
-        Ok(Handler::new(self.config.protocol.clone(), NodeRole::Unknown))
+        Ok(Handler::new(
+            self.config.protocol.clone(),
+            NodeRole::Unknown,
+        ))
     }
 
     fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm) {}
@@ -660,7 +655,7 @@ impl NetworkBehaviour for Behavior {
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ControllerData(i, d)));
             }
-            MessageToFromBehavior::VideoStream(v) => todo!(),
+            MessageToFromBehavior::VideoStream(_v) => todo!(),
             MessageToFromBehavior::RequestRole(p, r) => {
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::RequestRole(p, r)));

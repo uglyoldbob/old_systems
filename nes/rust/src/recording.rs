@@ -2,12 +2,11 @@
 
 use std::path::PathBuf;
 
-use gstreamer::{
-    prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
-    ClockTime,
+use gstreamer::prelude::{
+    Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
 };
 
-use crate::{apu::AudioProducerWithRate, AudioConsumer};
+use crate::apu::AudioProducerWithRate;
 
 /// The main struct for recording related activities
 pub struct Recording {
@@ -48,116 +47,110 @@ impl Recording {
         name: PathBuf,
         interval: f32,
     ) {
-        if self.record_pipeline.is_none() {
-            if have_gstreamer.is_ok() {
-                let version = gstreamer::version_string().as_str().to_string();
-                println!("GStreamer version is {}", version);
-                let vinfo = gstreamer_video::VideoInfo::builder(
-                    gstreamer_video::VideoFormat::Rgb,
-                    image.width as u32,
-                    image.height as u32,
-                )
-                .fps(framerate as i32)
-                .build()
-                .unwrap();
-                let video_caps = vinfo.to_caps().unwrap();
-                let app_source = gstreamer_app::AppSrc::builder()
-                    .name("emulator_video")
-                    .caps(&video_caps)
-                    .format(gstreamer::Format::Time)
-                    .build();
-                let ainfo = gstreamer_audio::AudioInfo::builder(
-                    gstreamer_audio::AudioFormat::F32le,
-                    44100,
-                    2,
-                )
-                .build()
-                .unwrap();
-                let audio_caps = ainfo.to_caps().unwrap();
-                let audio_source = gstreamer_app::AppSrc::builder()
-                    .name("emulator_audio")
-                    .caps(&audio_caps)
-                    .format(gstreamer::Format::Time)
-                    .build();
-                audio_source.set_block(true);
-                app_source.set_do_timestamp(true);
-                app_source.set_is_live(true);
-                audio_source.set_is_live(true);
-                app_source.set_block(false);
-                audio_source.set_do_timestamp(true);
-                let vconv = gstreamer::ElementFactory::make("videoconvert")
-                    .name("vconvert")
+        if self.record_pipeline.is_none() && have_gstreamer.is_ok() {
+            let version = gstreamer::version_string().as_str().to_string();
+            println!("GStreamer version is {}", version);
+            let vinfo = gstreamer_video::VideoInfo::builder(
+                gstreamer_video::VideoFormat::Rgb,
+                image.width as u32,
+                image.height as u32,
+            )
+            .fps(framerate as i32)
+            .build()
+            .unwrap();
+            let video_caps = vinfo.to_caps().unwrap();
+            let app_source = gstreamer_app::AppSrc::builder()
+                .name("emulator_video")
+                .caps(&video_caps)
+                .format(gstreamer::Format::Time)
+                .build();
+            let ainfo =
+                gstreamer_audio::AudioInfo::builder(gstreamer_audio::AudioFormat::F32le, 44100, 2)
                     .build()
-                    .expect("Could not create source element.");
-                let aconv = gstreamer::ElementFactory::make("audioconvert")
-                    .name("aconvert")
-                    .build()
-                    .expect("Could not create source element.");
-                let aencoder = gstreamer::ElementFactory::make("alawenc")
-                    .name("aencode")
-                    .build()
-                    .expect("Could not create source element.");
-                let vencoder = gstreamer::ElementFactory::make("openh264enc")
-                    .name("vencode")
-                    .build()
-                    .expect("Could not create source element.");
-                let avimux = gstreamer::ElementFactory::make("avimux")
-                    .name("avi")
-                    .build()
-                    .expect("Could not create source element.");
-
-                let aresample = gstreamer::ElementFactory::make("audioresample")
-                    .name("aresample")
-                    .build()
-                    .expect("Could not create source element.");
-
-                let sink = gstreamer::ElementFactory::make("filesink")
-                    .name("sink")
-                    .property_from_str("location", &name.into_os_string().into_string().unwrap())
-                    .build()
-                    .expect("Could not create sink element");
-
-                let pipeline = gstreamer::Pipeline::with_name("recording-pipeline");
-                pipeline
-                    .add_many([
-                        app_source.upcast_ref(),
-                        audio_source.upcast_ref(),
-                        &aencoder,
-                        &vconv,
-                        &aconv,
-                        &aresample,
-                        &vencoder,
-                        &avimux,
-                        &sink,
-                    ])
                     .unwrap();
-                gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder])
-                    .unwrap();
-                gstreamer::Element::link_many([
+            let audio_caps = ainfo.to_caps().unwrap();
+            let audio_source = gstreamer_app::AppSrc::builder()
+                .name("emulator_audio")
+                .caps(&audio_caps)
+                .format(gstreamer::Format::Time)
+                .build();
+            audio_source.set_block(true);
+            app_source.set_do_timestamp(true);
+            app_source.set_is_live(true);
+            audio_source.set_is_live(true);
+            app_source.set_block(false);
+            audio_source.set_do_timestamp(true);
+            let vconv = gstreamer::ElementFactory::make("videoconvert")
+                .name("vconvert")
+                .build()
+                .expect("Could not create source element.");
+            let aconv = gstreamer::ElementFactory::make("audioconvert")
+                .name("aconvert")
+                .build()
+                .expect("Could not create source element.");
+            let aencoder = gstreamer::ElementFactory::make("alawenc")
+                .name("aencode")
+                .build()
+                .expect("Could not create source element.");
+            let vencoder = gstreamer::ElementFactory::make("openh264enc")
+                .name("vencode")
+                .build()
+                .expect("Could not create source element.");
+            let avimux = gstreamer::ElementFactory::make("avimux")
+                .name("avi")
+                .build()
+                .expect("Could not create source element.");
+
+            let aresample = gstreamer::ElementFactory::make("audioresample")
+                .name("aresample")
+                .build()
+                .expect("Could not create source element.");
+
+            let sink = gstreamer::ElementFactory::make("filesink")
+                .name("sink")
+                .property_from_str("location", &name.into_os_string().into_string().unwrap())
+                .build()
+                .expect("Could not create sink element");
+
+            let pipeline = gstreamer::Pipeline::with_name("recording-pipeline");
+            pipeline
+                .add_many([
+                    app_source.upcast_ref(),
                     audio_source.upcast_ref(),
+                    &aencoder,
+                    &vconv,
                     &aconv,
                     &aresample,
-                    &aencoder,
+                    &vencoder,
+                    &avimux,
+                    &sink,
                 ])
                 .unwrap();
+            gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder]).unwrap();
+            gstreamer::Element::link_many([
+                audio_source.upcast_ref(),
+                &aconv,
+                &aresample,
+                &aencoder,
+            ])
+            .unwrap();
 
-                aencoder.link(&avimux).unwrap();
-                vencoder.link(&avimux).unwrap();
-                avimux.link(&sink).unwrap();
+            aencoder.link(&avimux).unwrap();
+            vencoder.link(&avimux).unwrap();
+            avimux.link(&sink).unwrap();
 
-                pipeline
-                    .set_state(gstreamer::State::Playing)
-                    .expect("Unable to set the pipeline to the `Playing` state");
+            pipeline
+                .set_state(gstreamer::State::Playing)
+                .expect("Unable to set the pipeline to the `Playing` state");
 
-                self.record_source = Some(app_source);
-                self.record_pipeline = Some(pipeline);
+            self.record_source = Some(app_source);
+            self.record_pipeline = Some(pipeline);
 
-                self.audio = Some(AudioProducerWithRate::new_gstreamer(
-                    44100,
-                    interval,
-                    audio_source,
-                ));
-            }
+            self.audio = Some(AudioProducerWithRate::new_gstreamer(
+                44100,
+                interval,
+                audio_source,
+            ));
         }
     }
 
@@ -171,7 +164,7 @@ impl Recording {
                 image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
                 source.do_timestamp();
                 match source.push_buffer(buf) {
-                    Ok(a) => {}
+                    Ok(_a) => {}
                     Err(e) => {
                         println!("Error pushing video data: {:?}", e);
                     }

@@ -89,10 +89,9 @@ impl TrackedWindow for Window {
             if ui
                 .checkbox(&mut c.local.configuration.sticky_rom, "Remember last rom")
                 .changed()
+                && !c.local.configuration.sticky_rom
             {
-                if !c.local.configuration.sticky_rom {
-                    c.local.configuration.set_startup("".to_string());
-                }
+                c.local.configuration.set_startup("".to_string());
             }
 
             let mut scaler = c.local.configuration.scaler;
@@ -120,7 +119,6 @@ impl TrackedWindow for Window {
                     scaler
                         .map(|i| format!("{}", i))
                         .unwrap_or("None".to_string())
-                        .to_string()
                 ));
             }
 

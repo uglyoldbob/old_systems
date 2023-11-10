@@ -33,7 +33,7 @@ pub struct Mapper04 {
 
 impl Mapper04 {
     /// Create a new Mapper04
-    pub fn new(d: &NesCartridgeData) -> NesMapper {
+    pub fn new(_d: &NesCartridgeData) -> NesMapper {
         NesMapper::from(Self {
             ppu_address: 0,
             registers: [0; 8],

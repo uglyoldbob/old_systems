@@ -5,7 +5,7 @@ use eframe::egui;
 
 use egui_multiwin::egui::TextEdit;
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
+use egui_multiwin::{arboard, egui_glow::EguiGlow};
 
 #[cfg(feature = "egui-multiwin")]
 use crate::egui_multiwin_dynamic::{
@@ -80,7 +80,7 @@ impl TrackedWindow for Window {
                 }
                 if let Some(network) = &mut olocal.network {
                     let na = network.get_addresses();
-                    if na.len() > 0 {
+                    if !na.is_empty() {
                         ui.label("Currently listening on:");
                         for a in na {
                             let mut t = a.to_string();
@@ -102,10 +102,8 @@ impl TrackedWindow for Window {
                         if ui.button("Connect").clicked() {
                             network.try_connect(&self.server);
                         }
-                    } else {
-                        if ui.button("Stop server").clicked() {
-                            network.stop_server();
-                        }
+                    } else if ui.button("Stop server").clicked() {
+                        network.stop_server();
                     }
                 }
             }

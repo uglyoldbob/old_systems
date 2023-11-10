@@ -1,13 +1,10 @@
 //! The streaming module contains gstreamer code that allows an emulator session to be streamed to other participants
 
-use std::path::PathBuf;
-
-use gstreamer::{
-    prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt},
-    ClockTime,
+use gstreamer::prelude::{
+    Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
 };
 
-use crate::{apu::AudioProducerWithRate, AudioConsumer};
+use crate::apu::AudioProducerWithRate;
 
 /// The main struct for recording related activities
 pub struct Streaming {
@@ -170,7 +167,7 @@ impl Streaming {
                 image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
                 source.do_timestamp();
                 match source.push_buffer(buf) {
-                    Ok(a) => {}
+                    Ok(_a) => {}
                     Err(e) => {
                         println!("Error pushing video data: {:?}", e);
                     }

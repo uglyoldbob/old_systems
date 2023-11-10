@@ -20,12 +20,11 @@ impl AudioProducerMethod {
             AudioProducerMethod::GStreamer(appsrc) => {
                 let b: Vec<u8> = slice
                     .iter()
-                    .map(|a| {
+                    .flat_map(|a| {
                         let f = a + 1.0;
                         let u = f.to_bits();
                         u.to_le_bytes()
                     })
-                    .flatten()
                     .collect();
                 let buf = gstreamer::Buffer::from_slice(b);
                 appsrc.do_timestamp();
@@ -203,8 +202,6 @@ use triangle::ApuTriangleChannel;
 
 mod dmc;
 use dmc::ApuDmcChannel;
-
-use crate::AudioConsumer;
 
 /// The nes apu
 #[non_exhaustive]

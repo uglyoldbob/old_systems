@@ -14,8 +14,6 @@ use mapper04::Mapper04;
 
 use serde::{Deserialize, Serialize};
 
-use crate::emulator_data::LocalEmulatorDataClone;
-
 /// All mappers must implement this.
 #[enum_dispatch::enum_dispatch]
 trait NesMapperTrait {
@@ -157,7 +155,7 @@ pub enum PersistentStorage {
 impl Clone for PersistentStorage {
     fn clone(&self) -> Self {
         match self {
-            Self::Persistent(pb, arg0) => Self::ShouldBePersistent(arg0.to_vec()),
+            Self::Persistent(_pb, arg0) => Self::ShouldBePersistent(arg0.to_vec()),
             Self::ShouldBePersistent(v) => Self::ShouldBePersistent(v.clone()),
             Self::Volatile(arg0) => Self::Volatile(arg0.clone()),
         }
@@ -173,13 +171,13 @@ impl serde::Serialize for PersistentStorage {
         let mut seq = serializer.serialize_seq(Some(elem.len() + 1))?;
         match self {
             PersistentStorage::Volatile(_v) => {
-                serde::ser::SerializeSeq::serialize_element(&mut seq, &(2 as u8))?;
+                serde::ser::SerializeSeq::serialize_element(&mut seq, &2_u8)?;
             }
             PersistentStorage::Persistent(_pb, _v) => {
-                serde::ser::SerializeSeq::serialize_element(&mut seq, &(0 as u8))?;
+                serde::ser::SerializeSeq::serialize_element(&mut seq, &0_u8)?;
             }
-            PersistentStorage::ShouldBePersistent(v) => {
-                serde::ser::SerializeSeq::serialize_element(&mut seq, &(1 as u8))?;
+            PersistentStorage::ShouldBePersistent(_v) => {
+                serde::ser::SerializeSeq::serialize_element(&mut seq, &1_u8)?;
             }
         }
         for e in elem {
@@ -214,7 +212,7 @@ impl std::ops::IndexMut<usize> for PersistentStorage {
 
 impl Drop for PersistentStorage {
     fn drop(&mut self) {
-        if let PersistentStorage::Persistent(p, v) = self {
+        if let PersistentStorage::Persistent(_p, v) = self {
             v.flush();
         }
     }
@@ -566,12 +564,10 @@ impl NesCartridge {
 
         let ram_size = if (rom_contents[6] & 2) != 0 {
             0x2000
+        } else if rom_contents[8] != 0 {
+            rom_contents[8] as usize * 8192
         } else {
-            if rom_contents[8] != 0 {
-                rom_contents[8] as usize * 8192
-            } else {
-                8192
-            }
+            8192
         };
         let mut prg_ram = Vec::with_capacity(ram_size);
         for _i in 0..ram_size {
@@ -621,14 +617,13 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines1,
             hash: hash.to_owned(),
-            save: format!(
-                "{}",
-                pb.file_name()
-                    .unwrap()
-                    .to_os_string()
-                    .into_string()
-                    .unwrap()
-            ),
+            save: pb
+                .file_name()
+                .unwrap()
+                .to_os_string()
+                .into_string()
+                .unwrap()
+                .to_string(),
             rom_name: name.to_owned(),
         })
     }
@@ -735,14 +730,13 @@ impl NesCartridge {
             mappernum: mappernum as u32,
             rom_format: RomFormat::Ines2,
             hash: hash.to_owned(),
-            save: format!(
-                "{}",
-                pb.file_name()
-                    .unwrap()
-                    .to_os_string()
-                    .into_string()
-                    .unwrap()
-            ),
+            save: pb
+                .file_name()
+                .unwrap()
+                .to_os_string()
+                .into_string()
+                .unwrap()
+                .to_string(),
             rom_name: name.to_owned(),
         })
     }

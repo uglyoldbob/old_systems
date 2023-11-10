@@ -1,9 +1,6 @@
 //! This is the main implementation of the nes emulator. It provides most of the functionality of the emulator.
 
-use std::{
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{io::Write, path::PathBuf};
 
 use crate::{
     apu::{AudioProducerWithRate, NesApu},
@@ -447,7 +444,7 @@ impl NesEmulatorData {
         let controller4 = self.mb.get_controller(3);
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
-        let mut apu = NesApu::new();
+        let apu = NesApu::new();
 
         let breakpoints = self.cpu.breakpoints.clone();
         self.cpu = NesCpu::new();

@@ -427,7 +427,7 @@ impl TrackedWindow for MainNesWindow {
                     for (code, button) in gs.buttons() {
                         for index in 0..4 {
                             let controller = c.mb.get_controller_mut(index);
-                            if let crate::controller::NesController::Zapper(z) = controller {
+                            if let crate::controller::NesController::Zapper(_z) = controller {
                             } else {
                                 for contr in controller.get_buttons_iter_mut() {
                                     let cnum = index;
@@ -441,7 +441,7 @@ impl TrackedWindow for MainNesWindow {
                     for (code, axis) in gs.axes() {
                         for index in 0..4 {
                             let controller = c.mb.get_controller_mut(index);
-                            if let crate::controller::NesController::Zapper(z) = controller {
+                            if let crate::controller::NesController::Zapper(_z) = controller {
                             } else {
                                 for contr in controller.get_buttons_iter_mut() {
                                     let cnum = index;
@@ -818,7 +818,7 @@ impl TrackedWindow for MainNesWindow {
                                     }
                                     if ui
                                         .add(egui::SelectableLabel::new(
-                                            myc == None,
+                                            myc.is_none(),
                                             "No controller",
                                         ))
                                         .clicked()

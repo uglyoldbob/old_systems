@@ -2,10 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    controller::{DummyController, NesController},
-    NesEmulatorData,
-};
+use crate::{controller::NesController, NesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -116,7 +113,7 @@ impl TrackedWindow for Window {
                 .collect();
 
             let first_joy_button = diff_b.next();
-            let first_joy_axis = diff_a.iter().next();
+            let first_joy_axis = diff_a.first();
 
             let newkeys = ui.input(|i| i.keys_down.clone());
 

@@ -1793,9 +1793,9 @@ impl NesPpu {
                 let cycle = self.scanline_cycle - 1;
                 //background fetches
                 if self.should_fetch_background() || Some(PpuMode::Background) == self.mode {
-                    self.background_fetch(bus, cycle as u16);
+                    self.background_fetch(bus, cycle);
                 } else {
-                    self.idle_operation(bus, cycle as u16);
+                    self.idle_operation(bus, cycle);
                 }
             } else if self.scanline_cycle <= 320 {
                 //sprite fetches
