@@ -460,8 +460,8 @@ impl TrackedWindow for MainNesWindow {
                     match network.role() {
                         NodeRole::Player => {
                             println!("Sending controller data");
+                            let controller = c.mb.get_controller_ref(0);
                             for i in 0..4 {
-                                let controller = c.mb.get_controller_ref(i);
                                 network.send_controller_data(i, controller.button_data());
                             }
                         }
@@ -786,50 +786,84 @@ impl TrackedWindow for MainNesWindow {
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.vertical_centered(|ui| {
-                if let Some(t) = &self.texture {
-                    let size = ui.available_size();
-                    let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
-                    let r = ui.add(
-                        egui::Image::from_texture(egui::load::SizedTexture {
-                            id: t.id(),
-                            size: egui_multiwin::egui::Vec2 {
-                                x: t.size()[0] as f32 * zoom,
-                                y: t.size()[1] as f32 * zoom,
-                            },
-                        })
-                        .sense(egui::Sense::click_and_drag()),
-                    );
-                    if r.clicked() || r.dragged() {
-                        self.mouse = true;
-                        self.mouse_miss = false;
-                        self.mouse_delay = 10;
-                    } else if r.clicked_by(egui::PointerButton::Secondary)
-                        || r.dragged_by(egui::PointerButton::Secondary)
-                    {
-                        self.mouse = true;
-                        self.mouse_miss = true;
-                        self.mouse_delay = 10;
+                let size = ui.available_size();
+                ui.horizontal(|ui| {
+                    if let Some(olocal) = &mut c.olocal {
+                        if let Some(network) = &mut olocal.network {
+                            let myc = network.get_controller_id();
+                            if network.role() == NodeRole::Observer
+                                || network.role() == NodeRole::Player
+                            {
+                                ui.vertical(|ui| {
+                                    for i in 0..4 {
+                                        if ui
+                                            .add(egui::SelectableLabel::new(
+                                                myc == Some(i),
+                                                format!("Controller {}", i),
+                                            ))
+                                            .clicked()
+                                        {
+                                            network.request_controller(i);
+                                        }
+                                    }
+                                    if ui
+                                        .add(egui::SelectableLabel::new(
+                                            myc == None,
+                                            "No controller",
+                                        ))
+                                        .clicked()
+                                    {
+                                        network.release_controller();
+                                    }
+                                });
+                            }
+                        }
                     }
-                    if r.hovered() {
-                        if let Some(pos) = r.hover_pos() {
-                            let coord = pos - r.rect.left_top();
-                            c.cpu_peripherals.ppu.bg_debug =
-                                Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
-                            let pixel = self.image.get_pixel(coord / zoom);
-                            self.mouse_vision = !self.mouse_miss
-                                && pixel.r() > 10
-                                && pixel.g() > 10
-                                && pixel.b() > 10;
+                    if let Some(t) = &self.texture {
+                        let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
+                        let r = ui.add(
+                            egui::Image::from_texture(egui::load::SizedTexture {
+                                id: t.id(),
+                                size: egui_multiwin::egui::Vec2 {
+                                    x: t.size()[0] as f32 * zoom,
+                                    y: t.size()[1] as f32 * zoom,
+                                },
+                            })
+                            .sense(egui::Sense::click_and_drag()),
+                        );
+                        if r.clicked() || r.dragged() {
+                            self.mouse = true;
+                            self.mouse_miss = false;
+                            self.mouse_delay = 10;
+                        } else if r.clicked_by(egui::PointerButton::Secondary)
+                            || r.dragged_by(egui::PointerButton::Secondary)
+                        {
+                            self.mouse = true;
+                            self.mouse_miss = true;
+                            self.mouse_delay = 10;
+                        }
+                        if r.hovered() {
+                            if let Some(pos) = r.hover_pos() {
+                                let coord = pos - r.rect.left_top();
+                                c.cpu_peripherals.ppu.bg_debug =
+                                    Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
-                            //println!("Hover at {:?}", pos - r.rect.left_top());
+                                let pixel = self.image.get_pixel(coord / zoom);
+                                self.mouse_vision = !self.mouse_miss
+                                    && pixel.r() > 10
+                                    && pixel.g() > 10
+                                    && pixel.b() > 10;
+
+                                //println!("Hover at {:?}", pos - r.rect.left_top());
+                            } else {
+                                self.mouse_vision = false;
+                            }
                         } else {
                             self.mouse_vision = false;
                         }
-                    } else {
-                        self.mouse_vision = false;
                     }
-                }
+                });
             });
             ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
         });
