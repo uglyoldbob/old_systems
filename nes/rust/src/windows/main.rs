@@ -62,8 +62,6 @@ pub struct MainNesWindow {
     mouse_delay: u8,
     /// The zapper was fired "off-screen"
     mouse_miss: bool,
-    /// The stored resized image for the emulator
-    image: crate::ppu::PixelImage<egui::Color32>,
     /// The result of opening gstreamer
     have_gstreamer: Result<(), gstreamer::glib::Error>,
     /// The recording object
@@ -129,7 +127,6 @@ impl MainNesWindow {
                 mouse_vision: false,
                 mouse_delay: 0,
                 mouse_miss: false,
-                image: crate::ppu::PixelImage::<egui::Color32>::default(),
                 recording: Recording::new(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
@@ -527,9 +524,9 @@ impl TrackedWindow for MainNesWindow {
                                 .ppu_get_frame()
                                 .to_pixels_egui()
                                 .resize(c.local.configuration.scaler);
-                            self.image = image;
+                            c.local.image = image;
                         }
-                        self.recording.send_frame(&self.image);
+                        self.recording.send_frame(&c.local.image);
 
                         if self.mouse_delay > 0 {
                             self.mouse_delay -= 1;
@@ -557,9 +554,9 @@ impl TrackedWindow for MainNesWindow {
                 .ppu_get_frame()
                 .to_pixels_egui()
                 .resize(c.local.configuration.scaler);
-            self.image = image;
+            c.local.image = image;
         }
-        let image = self.image.clone().to_egui();
+        let image = c.local.image.clone().to_egui();
 
         if self.texture.is_none() {
             self.texture = Some(egui.egui_ctx.load_texture(
@@ -745,7 +742,7 @@ impl TrackedWindow for MainNesWindow {
                 recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
                 self.recording.start(
                     &self.have_gstreamer,
-                    &self.image,
+                    &c.local.image,
                     60,
                     recpath,
                     sampling_frequency / 44100.0,
@@ -859,7 +856,7 @@ impl TrackedWindow for MainNesWindow {
                                 c.cpu_peripherals.ppu.bg_debug =
                                     Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
 
-                                let pixel = self.image.get_pixel(coord / zoom);
+                                let pixel = c.local.image.get_pixel(coord / zoom);
                                 self.mouse_vision = !self.mouse_miss
                                     && pixel.r() > 10
                                     && pixel.g() > 10

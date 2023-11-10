@@ -221,11 +221,18 @@ pub struct Handler {
     streaming: Streaming,
     /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
     avsource: Option<gstreamer_app::AppSink>,
+    /// The optional details for when running a host
+    host: Option<ServerDetails>,
 }
 
 impl Handler {
     /// Construct a new struct.
-    fn new(protocol: Protocol, role: NodeRole) -> Self {
+    fn new(protocol: Protocol, role: NodeRole, host: Option<ServerDetails>) -> Self {
+        let mut s = Streaming::new();
+        if let Some(h) = host {
+            println!("Starting a gstreamer pipeline for a user");
+            s.start(h.width, h.height, h.framerate, h.audio_interval);
+        }
         Self {
             role,
             listen_protocol: protocol,
@@ -233,8 +240,9 @@ impl Handler {
             inbound_stream: None,
             outbound_stream: None,
             pending_out: VecDeque::new(),
-            streaming: Streaming::new(),
+            streaming: s,
             avsource: None,
+            host,
         }
     }
 }
@@ -481,6 +489,19 @@ pub struct Config {
     protocol: Protocol,
 }
 
+#[derive(Copy, Clone)]
+/// The details necessary to run an emulator host.
+struct ServerDetails {
+    /// The width of the emulator image
+    width: u16,
+    /// The height of the emulator image
+    height: u16,
+    /// The framerate of the emulator
+    framerate: u8,
+    /// The interval between audio samples for the emulator
+    audio_interval: f32,
+}
+
 /// The struct for the network behavior
 pub struct Behavior {
     /// The protocool configuration for the node.
@@ -493,6 +514,10 @@ pub struct Behavior {
     clients: Vec<PeerId>,
     /// The list of servers that this node is connected to. This might be converted to an Option<PeerId>
     servers: Vec<PeerId>,
+    /// Optional image data used for running a server
+    img: Option<u32>,
+    /// The optional details for when running a host
+    host: Option<ServerDetails>,
 }
 
 impl Behavior {
@@ -504,11 +529,29 @@ impl Behavior {
             waker: Arc::new(Mutex::new(None)),
             clients: Vec::new(),
             servers: Vec::new(),
+            img: None,
+            host: None,
         }
     }
 }
 
 impl Behavior {
+    /// Give relevant information for running a host on the network
+    pub fn send_server_details(
+        &mut self,
+        width: u16,
+        height: u16,
+        framerate: u8,
+        audio_interval: f32,
+    ) {
+        self.host = Some(ServerDetails {
+            width,
+            height,
+            framerate,
+            audio_interval,
+        });
+    }
+
     /// Send the given controller data to the host.
     pub fn send_controller_data(&mut self, index: u8, data: Box<ButtonCombination>) {
         for pid in &self.servers {
@@ -607,6 +650,7 @@ impl NetworkBehaviour for Behavior {
         Ok(Handler::new(
             self.config.protocol.clone(),
             NodeRole::PlayerHost,
+            self.host,
         ))
     }
 
@@ -624,6 +668,7 @@ impl NetworkBehaviour for Behavior {
         Ok(Handler::new(
             self.config.protocol.clone(),
             NodeRole::Unknown,
+            None,
         ))
     }
 

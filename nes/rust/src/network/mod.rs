@@ -32,7 +32,12 @@ pub enum MessageToNetworkThread {
     /// Controller data from the player, with which controller index and the button data.
     ControllerData(u8, Box<ButtonCombination>),
     /// Signal to start PlayerHost mode
-    StartServer,
+    StartServer {
+        width: u16,
+        height: u16,
+        framerate: u8,
+        audio_interval: f32,
+    },
     /// Signal to stop PlayerHost mode
     StopServer,
     /// This is a signal to connect to a host, starting unknown mode.
@@ -152,7 +157,7 @@ impl InternalNetwork {
                                                 crate::event::EventType::CheckNetwork,
                                             ));
                                         }
-                                        MessageToNetworkThread::StartServer => {
+                                        MessageToNetworkThread::StartServer{ width, height, framerate, audio_interval } => {
                                             if self.listener.is_none() {
                                                 let listenres = self.swarm
                                                 .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
@@ -161,6 +166,8 @@ impl InternalNetwork {
                                                 }
                                                 println!("Server start result is {:?}", listenres);
                                                 let s = self.listener.is_some();
+                                                let behavior = self.swarm.behaviour_mut();
+                                                behavior.emulator.send_server_details(width, height, framerate, audio_interval);
                                                 self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
                                                 self.proxy.send_event(crate::event::Event::new_general(
                                                     crate::event::EventType::CheckNetwork,
@@ -502,9 +509,14 @@ impl Network {
     }
 
     /// Starts an emulator host.
-    pub fn start_server(&mut self) {
+    pub fn start_server(&mut self, width: u16, height: u16, framerate: u8, audio_interval: f32) {
         self.sender
-            .send_blocking(MessageToNetworkThread::StartServer);
+            .send_blocking(MessageToNetworkThread::StartServer {
+                width,
+                height,
+                framerate,
+                audio_interval,
+            });
     }
 
     /// Stops an emulator host.

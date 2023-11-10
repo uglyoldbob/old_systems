@@ -91,7 +91,12 @@ impl TrackedWindow for Window {
 
                     if !network.is_server_running() {
                         if ui.button("Start server").clicked() {
-                            network.start_server();
+                            network.start_server(
+                                c.local.image.width,
+                                c.local.image.height,
+                                60,
+                                42.0,
+                            );
                         }
 
                         ui.horizontal(|ui| {

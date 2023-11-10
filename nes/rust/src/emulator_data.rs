@@ -192,6 +192,8 @@ pub struct LocalEmulatorDataClone {
     dirs: directories::ProjectDirs,
     /// The proxy for sending internal messages
     proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+    /// The stored resized image for the emulator
+    pub image: crate::ppu::PixelImage<egui::Color32>,
 }
 
 impl LocalEmulatorDataClone {
@@ -286,6 +288,7 @@ impl LocalEmulatorDataClone {
             resolution_locked: false,
             dirs,
             proxy,
+            image: crate::ppu::PixelImage::<egui::Color32>::default(),
         }
     }
 }

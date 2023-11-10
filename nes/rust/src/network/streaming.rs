@@ -45,19 +45,14 @@ impl Streaming {
     }
 
     /// Start recording by setting up the necessary objects.
-    pub fn start(
-        &mut self,
-        image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>,
-        framerate: u8,
-        interval: f32,
-    ) {
+    pub fn start(&mut self, width: u16, height: u16, framerate: u8, interval: f32) {
         if self.record_pipeline.is_none() {
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
             let vinfo = gstreamer_video::VideoInfo::builder(
                 gstreamer_video::VideoFormat::Rgb,
-                image.width as u32,
-                image.height as u32,
+                width as u32,
+                height as u32,
             )
             .fps(framerate as i32)
             .build()
