@@ -25,7 +25,9 @@ pub enum MessageToFromNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
     EmulatorVideoStream(Vec<u8>),
     RequestRole(PeerId, NodeRole),
+    RequestController(PeerId, Option<u8>),
     SetRole(NodeRole),
+    SetController(Option<u8>),
     Test,
 }
 
@@ -214,6 +216,8 @@ impl Handler {
 pub enum MessageToFromBehavior {
     ControllerData(u8, ButtonCombination),
     RequestRole(PeerId, NodeRole),
+    RequestController(PeerId, Option<u8>),
+    SetController(Option<u8>),
     SetRole(NodeRole),
     VideoStream(Vec<u8>),
     Test,
@@ -261,6 +265,12 @@ impl ConnectionHandler for Handler {
                 std::task::Poll::Ready(Ok(())) => {
                     if let Some(m) = self.pending_out.pop_front() {
                         let m2 = match m {
+                            MessageToFromBehavior::RequestController(i, c) => {
+                                out.start_send_unpin(MessageToFromNetwork::RequestController(i, c))
+                            }
+                            MessageToFromBehavior::SetController(c) => {
+                                out.start_send_unpin(MessageToFromNetwork::SetController(c))
+                            }
                             MessageToFromBehavior::SetRole(r) => {
                                 out.start_send_unpin(MessageToFromNetwork::SetRole(r))
                             }
@@ -318,6 +328,12 @@ impl ConnectionHandler for Handler {
                         Some(Ok(m)) => {
                             println!("Received message from network {:?}", m);
                             let mr = match m {
+                                MessageToFromNetwork::RequestController(i, c) => {
+                                    MessageToFromBehavior::RequestController(i, c)
+                                }
+                                MessageToFromNetwork::SetController(c) => {
+                                    MessageToFromBehavior::SetController(c)
+                                }
                                 MessageToFromNetwork::SetRole(r) => {
                                     MessageToFromBehavior::SetRole(r)
                                 }
@@ -521,6 +537,28 @@ impl Behavior {
             waker.wake();
         }
     }
+
+    pub fn request_controller(&mut self, p: PeerId, c: Option<u8>) {
+        for pid in &self.servers {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageToFromBehavior::RequestController(p, c),
+            });
+        }
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
+
+    pub fn set_controller(&mut self, p: PeerId, c: Option<u8>) {
+        self.messages.push_back(ToSwarm::NotifyHandler {
+            peer_id: p,
+            handler: libp2p::swarm::NotifyHandler::Any,
+            event: MessageToFromBehavior::SetController(c),
+        });
+    }
 }
 
 #[derive(Debug)]
@@ -529,6 +567,8 @@ pub enum MessageToSwarm {
     ControllerData(u8, ButtonCombination),
     RequestRole(PeerId, NodeRole),
     SetRole(NodeRole),
+    RequestController(PeerId, Option<u8>),
+    SetController(Option<u8>),
 }
 
 #[derive(Debug)]
@@ -576,6 +616,16 @@ impl NetworkBehaviour for Behavior {
         println!("Recieved connection handler event {:?}", event);
         let mut waker = self.waker.lock().unwrap();
         match event {
+            MessageToFromBehavior::RequestController(i, c) => {
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::RequestController(
+                        i, c,
+                    )));
+            }
+            MessageToFromBehavior::SetController(c) => {
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetController(c)));
+            }
             MessageToFromBehavior::SetRole(r) => {
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetRole(r)));

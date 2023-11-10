@@ -27,6 +27,8 @@ pub enum MessageToNetworkThread {
     Connect(String),
     RequestObserverStatus,
     SetUserRole(libp2p::PeerId, NodeRole),
+    RequestController(Option<u8>),
+    SetController(libp2p::PeerId, Option<u8>),
     Test,
 }
 
@@ -39,6 +41,8 @@ pub enum MessageFromNetworkThread {
     ServerStatus(bool),
     NewRole(NodeRole),
     RequestRole(libp2p::PeerId, NodeRole),
+    RequestController(libp2p::PeerId, Option<u8>),
+    SetController(Option<u8>),
     Test,
 }
 
@@ -70,6 +74,15 @@ impl InternalNetwork {
                             r = f2 => {
                                 if let Ok(m) = r {
                                     match m {
+                                        MessageToNetworkThread::SetController(p, c) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.set_controller(p, c);
+                                        }
+                                        MessageToNetworkThread::RequestController(c) => {
+                                            let myid = *self.swarm.local_peer_id();
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.request_controller(myid, c);
+                                        }
                                         MessageToNetworkThread::SetUserRole(p, r) => {
                                             let behavior = self.swarm.behaviour_mut();
                                             behavior.emulator.set_user_role(p, r);
@@ -174,6 +187,22 @@ impl InternalNetwork {
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
                                         match e {
+                                            emulator::MessageToSwarm::RequestController(i, c) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::RequestController(i, c))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
+                                            emulator::MessageToSwarm::SetController(c) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::SetController(c))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
                                             emulator::MessageToSwarm::SetRole(r) => {
                                                 self.sender
                                                     .send(MessageFromNetworkThread::NewRole(r))
@@ -270,6 +299,7 @@ pub struct Network {
     role: NodeRole,
     buttons: [Option<ButtonCombination>; 4],
     my_controller: Option<u8>,
+    controller_holder: [Option<libp2p::PeerId>; 4],
 }
 
 impl Network {
@@ -294,6 +324,7 @@ impl Network {
             role: NodeRole::Unknown,
             buttons: [None; 4],
             my_controller: None,
+            controller_holder: [None; 4],
         }
     }
 
@@ -308,6 +339,35 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetworkThread::RequestController(p, c) => {
+                    if let Some(c) = c {
+                        if self.controller_holder[c as usize].is_none() {
+                            self.controller_holder[c as usize] = Some(p);
+                            self.sender
+                                .send_blocking(MessageToNetworkThread::SetController(p, Some(c)));
+                        }
+                    } else {
+                        for i in 0..4 {
+                            if let Some(peer) = self.controller_holder[i] {
+                                if peer == p {
+                                    self.controller_holder[i] = None;
+                                    self.sender.send_blocking(
+                                        MessageToNetworkThread::SetController(p, None),
+                                    );
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                MessageFromNetworkThread::SetController(c) => {
+                    if c.is_some() && self.role == NodeRole::Observer {
+                        self.role = NodeRole::Player;
+                    } else if c.is_none() && self.role == NodeRole::Player {
+                        self.role = NodeRole::Observer;
+                    }
+                    self.my_controller = c;
+                }
                 MessageFromNetworkThread::RequestRole(p, r) => match self.role {
                     NodeRole::DedicatedHost | NodeRole::PlayerHost => match r {
                         NodeRole::Player | NodeRole::Observer => {
@@ -354,8 +414,22 @@ impl Network {
         self.role
     }
 
+    pub fn get_controller_id(&self) -> Option<u8> {
+        self.my_controller
+    }
+
     pub fn is_server_running(&self) -> bool {
         self.server_running
+    }
+
+    pub fn request_controller(&mut self, i: u8) {
+        self.sender
+            .send_blocking(MessageToNetworkThread::RequestController(Some(i)));
+    }
+
+    pub fn release_controller(&mut self) {
+        self.sender
+            .send_blocking(MessageToNetworkThread::RequestController(None));
     }
 
     pub fn request_observer(&mut self) {
