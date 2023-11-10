@@ -25,7 +25,7 @@ use super::{streaming::Streaming, NodeRole};
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageToFromNetwork {
     /// Controller data for a specific controller.
-    ControllerData(u8, crate::controller::ButtonCombination),
+    ControllerData(u8, Box<crate::controller::ButtonCombination>),
     /// Part of the emulator audio video stream.
     EmulatorVideoStream(Vec<u8>),
     /// A request for a specific role in the network.
@@ -200,7 +200,7 @@ pub enum OutboundSubstreamState {
     /// The substream is being established
     Establishing,
     /// The substream has been established, and has a stream
-    Established(asynchronous_codec::Framed<libp2p::Stream, Codec>),
+    Established(Box<asynchronous_codec::Framed<libp2p::Stream, Codec>>),
 }
 
 /// The libp2p handler struct
@@ -243,7 +243,7 @@ impl Handler {
 #[derive(Debug)]
 pub enum MessageToFromBehavior {
     /// Controller data for a specific controller.
-    ControllerData(u8, ButtonCombination),
+    ControllerData(u8, Box<ButtonCombination>),
     /// A request for a specific role on the network.
     RequestRole(PeerId, NodeRole),
     /// A request for a specific controller on the emulator.
@@ -446,9 +446,9 @@ impl ConnectionHandler for Handler {
                 );
                 let (a, _b) = fully_negotiated_outbound.protocol;
                 let c = Codec::new();
-                self.outbound_stream = Some(OutboundSubstreamState::Established(
+                self.outbound_stream = Some(OutboundSubstreamState::Established(Box::new(
                     asynchronous_codec::Framed::new(a, c),
-                ));
+                )));
             }
             _ => {}
         }
@@ -510,12 +510,12 @@ impl Behavior {
 
 impl Behavior {
     /// Send the given controller data to the host.
-    pub fn send_controller_data(&mut self, index: u8, data: ButtonCombination) {
+    pub fn send_controller_data(&mut self, index: u8, data: Box<ButtonCombination>) {
         for pid in &self.servers {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
-                event: MessageToFromBehavior::ControllerData(index, data),
+                event: MessageToFromBehavior::ControllerData(index, data.clone()),
             });
         }
         let mut waker = self.waker.lock().unwrap();
@@ -577,7 +577,7 @@ impl Behavior {
 #[derive(Debug)]
 pub enum MessageToSwarm {
     /// Controller data from a user
-    ControllerData(u8, ButtonCombination),
+    ControllerData(u8, Box<ButtonCombination>),
     /// A role request from a user.
     RequestRole(PeerId, NodeRole),
     /// A command from a host to set the role of a user.

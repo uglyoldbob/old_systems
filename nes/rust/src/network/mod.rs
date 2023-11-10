@@ -30,7 +30,7 @@ pub enum NodeRole {
 #[derive(Debug)]
 pub enum MessageToNetworkThread {
     /// Controller data from the player, with which controller index and the button data.
-    ControllerData(u8, crate::controller::ButtonCombination),
+    ControllerData(u8, Box<ButtonCombination>),
     /// Signal to start PlayerHost mode
     StartServer,
     /// Signal to stop PlayerHost mode
@@ -53,7 +53,7 @@ pub enum MessageFromNetworkThread {
     /// Emulator video and audio data.
     EmulatorVideoStream(Vec<u8>),
     /// Controller data from one of the players.
-    ControllerData(u8, ButtonCombination),
+    ControllerData(u8, Box<ButtonCombination>),
     /// Indicates that the host has a new address
     NewAddress(Multiaddr),
     /// Indicates that the host no longer has the specified address
@@ -450,7 +450,7 @@ impl Network {
                     self.role = r;
                 }
                 MessageFromNetworkThread::ControllerData(i, d) => {
-                    self.buttons[i as usize] = Some(d);
+                    self.buttons[i as usize] = Some(*d);
                 }
                 MessageFromNetworkThread::EmulatorVideoStream(_) => {}
                 MessageFromNetworkThread::NewAddress(a) => {
@@ -524,7 +524,7 @@ impl Network {
         if let Some(id) = &self.my_controller {
             if *id == i {
                 self.sender
-                    .send_blocking(MessageToNetworkThread::ControllerData(i, data));
+                    .send_blocking(MessageToNetworkThread::ControllerData(i, Box::new(data)));
             }
         }
     }
