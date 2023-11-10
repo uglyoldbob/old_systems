@@ -326,6 +326,11 @@ impl ButtonCombination {
         }
     }
 
+    /// Is the specified button pressed?
+    pub fn pressed(&self, i: usize) -> bool {
+        self.buttons[i].is_some()
+    }
+
     /// Set the status of a single button for a button combination. val is for the potentiometer value. Only applies for index BUTTON_COMBO_POTENTIOMETER
     pub fn set_button(&mut self, i: usize, val: u16) {
         match i {

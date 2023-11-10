@@ -335,7 +335,7 @@ impl Network {
     }
 
     pub fn get_button_data_ref(&mut self, i: u8) -> Option<ButtonCombination> {
-        self.buttons[i as usize].take()
+        self.buttons[i as usize].clone()
     }
 
     pub fn process_messages(&mut self) {
