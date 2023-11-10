@@ -457,12 +457,25 @@ impl TrackedWindow for MainNesWindow {
 
             if let Some(olocal) = &mut c.olocal {
                 if let Some(network) = &mut olocal.network {
-                    if network.role() == NodeRole::Player {
-                        println!("Sending controller data");
-                        for i in 0..4 {
-                            let controller = c.mb.get_controller_ref(i);
-                            network.send_controller_data(i, controller.button_data());
+                    match network.role() {
+                        NodeRole::Player => {
+                            println!("Sending controller data");
+                            for i in 0..4 {
+                                let controller = c.mb.get_controller_ref(i);
+                                network.send_controller_data(i, controller.button_data());
+                            }
                         }
+                        NodeRole::PlayerHost => {
+                            for i in 0..4 {
+                                if let Some(bc) = network.get_button_data_ref(i) {
+                                    let controller = c.mb.get_controller_mut(i);
+                                    if let Some(con) = controller.get_buttons_iter_mut().next() {
+                                        *con = bc;
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }

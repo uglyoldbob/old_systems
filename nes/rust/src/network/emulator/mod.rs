@@ -24,6 +24,8 @@ use super::NodeRole;
 pub enum MessageToFromNetwork {
     ControllerData(u8, crate::controller::ButtonCombination),
     EmulatorVideoStream(Vec<u8>),
+    RequestRole(PeerId, NodeRole),
+    SetRole(NodeRole),
     Test,
 }
 
@@ -189,7 +191,7 @@ pub struct Handler {
     waker: Arc<Mutex<Option<Waker>>>,
     inbound_stream: Option<InboundSubstreamState>,
     outbound_stream: Option<OutboundSubstreamState>,
-    pending_out: VecDeque<MessageFromBehavior>,
+    pending_out: VecDeque<MessageToFromBehavior>,
 }
 
 impl Handler {
@@ -209,23 +211,18 @@ impl Handler {
 }
 
 #[derive(Debug)]
-pub enum MessageToBehavior {
+pub enum MessageToFromBehavior {
     ControllerData(u8, ButtonCombination),
+    RequestRole(PeerId, NodeRole),
+    SetRole(NodeRole),
     VideoStream(Vec<u8>),
     Test,
-}
-
-#[derive(Debug)]
-pub enum MessageFromBehavior {
-    Test,
-    VideoStream(Vec<u8>),
-    ControllerData(u8, ButtonCombination),
 }
 
 impl ConnectionHandler for Handler {
-    type FromBehaviour = MessageFromBehavior;
+    type FromBehaviour = MessageToFromBehavior;
 
-    type ToBehaviour = MessageToBehavior;
+    type ToBehaviour = MessageToFromBehavior;
 
     type InboundProtocol = Protocol;
 
@@ -264,14 +261,20 @@ impl ConnectionHandler for Handler {
                 std::task::Poll::Ready(Ok(())) => {
                     if let Some(m) = self.pending_out.pop_front() {
                         let m2 = match m {
-                            MessageFromBehavior::ControllerData(i, d) => {
+                            MessageToFromBehavior::SetRole(r) => {
+                                out.start_send_unpin(MessageToFromNetwork::SetRole(r))
+                            }
+                            MessageToFromBehavior::ControllerData(i, d) => {
                                 out.start_send_unpin(MessageToFromNetwork::ControllerData(i, d))
                             }
-                            MessageFromBehavior::Test => {
+                            MessageToFromBehavior::Test => {
                                 out.start_send_unpin(MessageToFromNetwork::Test)
                             }
-                            MessageFromBehavior::VideoStream(d) => {
+                            MessageToFromBehavior::VideoStream(d) => {
                                 out.start_send_unpin(MessageToFromNetwork::EmulatorVideoStream(d))
+                            }
+                            MessageToFromBehavior::RequestRole(p, r) => {
+                                out.start_send_unpin(MessageToFromNetwork::RequestRole(p, r))
                             }
                         };
                         match m2 {
@@ -279,7 +282,7 @@ impl ConnectionHandler for Handler {
                                 std::task::Poll::Ready(Ok(())) => {
                                     return std::task::Poll::Ready(
                                         ConnectionHandlerEvent::NotifyBehaviour(
-                                            MessageToBehavior::Test,
+                                            MessageToFromBehavior::Test,
                                         ),
                                     );
                                 }
@@ -315,12 +318,18 @@ impl ConnectionHandler for Handler {
                         Some(Ok(m)) => {
                             println!("Received message from network {:?}", m);
                             let mr = match m {
-                                MessageToFromNetwork::Test => MessageToBehavior::Test,
+                                MessageToFromNetwork::SetRole(r) => {
+                                    MessageToFromBehavior::SetRole(r)
+                                }
+                                MessageToFromNetwork::RequestRole(p, r) => {
+                                    MessageToFromBehavior::RequestRole(p, r)
+                                }
+                                MessageToFromNetwork::Test => MessageToFromBehavior::Test,
                                 MessageToFromNetwork::ControllerData(i, d) => {
-                                    MessageToBehavior::ControllerData(i, d)
+                                    MessageToFromBehavior::ControllerData(i, d)
                                 }
                                 MessageToFromNetwork::EmulatorVideoStream(d) => {
-                                    MessageToBehavior::VideoStream(d)
+                                    MessageToFromBehavior::VideoStream(d)
                                 }
                             };
                             return std::task::Poll::Ready(
@@ -431,7 +440,7 @@ impl Default for Config {
 
 pub struct Behavior {
     config: Config,
-    messages: VecDeque<ToSwarm<MessageToSwarm, MessageFromBehavior>>,
+    messages: VecDeque<ToSwarm<MessageToSwarm, MessageToFromBehavior>>,
     waker: Arc<Mutex<Option<Waker>>>,
     clients: Vec<PeerId>,
     servers: Vec<PeerId>,
@@ -457,15 +466,19 @@ impl Behavior {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
-                event: MessageFromBehavior::Test,
+                event: MessageToFromBehavior::Test,
             });
         }
         for pid in &self.servers {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
-                event: MessageFromBehavior::Test,
+                event: MessageToFromBehavior::Test,
             });
+        }
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
         }
     }
 
@@ -474,19 +487,48 @@ impl Behavior {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
-                event: MessageFromBehavior::ControllerData(index, data),
+                event: MessageToFromBehavior::ControllerData(index, data),
             });
+        }
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
         }
     }
 
     pub fn set_role(&mut self, role: NodeRole) {
         self.role = role;
     }
+
+    pub fn set_user_role(&mut self, p: PeerId, r: NodeRole) {
+        self.messages.push_back(ToSwarm::NotifyHandler {
+            peer_id: p,
+            handler: libp2p::swarm::NotifyHandler::Any,
+            event: MessageToFromBehavior::SetRole(r),
+        });
+    }
+
+    pub fn request_observer_status(&mut self, p: PeerId) {
+        for pid in &self.servers {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageToFromBehavior::RequestRole(p, NodeRole::Observer),
+            });
+        }
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum MessageToSwarm {
     Test,
+    ControllerData(u8, ButtonCombination),
+    RequestRole(PeerId, NodeRole),
+    SetRole(NodeRole),
 }
 
 #[derive(Debug)]
@@ -523,12 +565,7 @@ impl NetworkBehaviour for Behavior {
         Ok(Handler::new(self.config.protocol.clone()))
     }
 
-    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm) {
-        let mut waker = self.waker.lock().unwrap();
-        if let Some(waker) = waker.take() {
-            waker.wake();
-        }
-    }
+    fn on_swarm_event(&mut self, _event: libp2p::swarm::FromSwarm) {}
 
     fn on_connection_handler_event(
         &mut self,
@@ -538,6 +575,22 @@ impl NetworkBehaviour for Behavior {
     ) {
         println!("Recieved connection handler event {:?}", event);
         let mut waker = self.waker.lock().unwrap();
+        match event {
+            MessageToFromBehavior::SetRole(r) => {
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetRole(r)));
+            }
+            MessageToFromBehavior::ControllerData(i, d) => {
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ControllerData(i, d)));
+            }
+            MessageToFromBehavior::VideoStream(v) => todo!(),
+            MessageToFromBehavior::Test => todo!(),
+            MessageToFromBehavior::RequestRole(p, r) => {
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::RequestRole(p, r)));
+            }
+        }
         if let Some(waker) = waker.take() {
             waker.wake();
         }

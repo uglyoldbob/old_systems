@@ -8,7 +8,9 @@ use futures::FutureExt;
 use libp2p::core::transport::ListenerId;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
-#[derive(PartialEq, Copy, Clone)]
+use crate::controller::ButtonCombination;
+
+#[derive(PartialEq, Copy, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub enum NodeRole {
     DedicatedHost,
     PlayerHost,
@@ -23,27 +25,21 @@ pub enum MessageToNetworkThread {
     StartServer,
     StopServer,
     Connect(String),
+    RequestObserverStatus,
+    SetUserRole(libp2p::PeerId, NodeRole),
     Test,
 }
 
 #[derive(Debug)]
 pub enum MessageFromNetworkThread {
     EmulatorVideoStream(Vec<u8>),
+    ControllerData(u8, ButtonCombination),
     NewAddress(Multiaddr),
     ExpiredAddress(Multiaddr),
     ServerStatus(bool),
+    NewRole(NodeRole),
+    RequestRole(libp2p::PeerId, NodeRole),
     Test,
-}
-
-/// The main networking struct for the emulator
-pub struct Network {
-    tokio: tokio::runtime::Runtime,
-    thread: tokio::task::JoinHandle<()>,
-    sender: async_channel::Sender<MessageToNetworkThread>,
-    recvr: async_channel::Receiver<MessageFromNetworkThread>,
-    addresses: HashSet<Multiaddr>,
-    server_running: bool,
-    role: NodeRole,
 }
 
 // This describes the behaviour of a libp2p swarm
@@ -74,6 +70,15 @@ impl InternalNetwork {
                             r = f2 => {
                                 if let Ok(m) = r {
                                     match m {
+                                        MessageToNetworkThread::SetUserRole(p, r) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.set_user_role(p, r);
+                                        }
+                                        MessageToNetworkThread::RequestObserverStatus => {
+                                            let myid = *self.swarm.local_peer_id();
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.request_observer_status(myid);
+                                        }
                                         MessageToNetworkThread::Test => {
                                             let behavior = self.swarm.behaviour_mut();
                                             behavior.emulator.send_message();
@@ -169,8 +174,32 @@ impl InternalNetwork {
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
                                         match e {
+                                            emulator::MessageToSwarm::SetRole(r) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::NewRole(r))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
+                                            emulator::MessageToSwarm::RequestRole(p, r) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::RequestRole(p, r))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
                                             emulator::MessageToSwarm::Test => {
                                                 println!("Received test message");
+                                            }
+                                            emulator::MessageToSwarm::ControllerData(i, d) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::ControllerData(i, d))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
                                             }
                                         }
                                     }
@@ -230,6 +259,19 @@ impl InternalNetwork {
     }
 }
 
+/// The main networking struct for the emulator
+pub struct Network {
+    tokio: tokio::runtime::Runtime,
+    thread: tokio::task::JoinHandle<()>,
+    sender: async_channel::Sender<MessageToNetworkThread>,
+    recvr: async_channel::Receiver<MessageFromNetworkThread>,
+    addresses: HashSet<Multiaddr>,
+    server_running: bool,
+    role: NodeRole,
+    buttons: [Option<ButtonCombination>; 4],
+    my_controller: Option<u8>,
+}
+
 impl Network {
     ///Create a new instance of network with the given role
     pub fn new(
@@ -250,6 +292,8 @@ impl Network {
             addresses: HashSet::new(),
             server_running: false,
             role: NodeRole::Unknown,
+            buttons: [None; 4],
+            my_controller: None,
         }
     }
 
@@ -257,9 +301,30 @@ impl Network {
         &self.addresses
     }
 
+    pub fn get_button_data_ref(&mut self, i: u8) -> Option<ButtonCombination> {
+        self.buttons[i as usize].take()
+    }
+
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetworkThread::RequestRole(p, r) => match self.role {
+                    NodeRole::DedicatedHost | NodeRole::PlayerHost => match r {
+                        NodeRole::Player | NodeRole::Observer => {
+                            self.sender
+                                .send_blocking(MessageToNetworkThread::SetUserRole(p, r));
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                },
+                MessageFromNetworkThread::NewRole(r) => {
+                    self.role = r;
+                }
+                MessageFromNetworkThread::ControllerData(i, d) => {
+                    println!("Received button data for controller {}", i);
+                    self.buttons[i as usize] = Some(d);
+                }
                 MessageFromNetworkThread::Test => {
                     println!("Received test message from network");
                 }
@@ -274,8 +339,7 @@ impl Network {
                     self.server_running = s;
                     if s {
                         self.role = NodeRole::PlayerHost;
-                    }
-                    else {
+                    } else {
                         self.role = NodeRole::Unknown;
                     }
                     if !s {
@@ -292,6 +356,11 @@ impl Network {
 
     pub fn is_server_running(&self) -> bool {
         self.server_running
+    }
+
+    pub fn request_observer(&mut self) {
+        self.sender
+            .send_blocking(MessageToNetworkThread::RequestObserverStatus);
     }
 
     pub fn start_server(&mut self) {
@@ -314,7 +383,11 @@ impl Network {
     }
 
     pub fn send_controller_data(&mut self, i: u8, data: crate::controller::ButtonCombination) {
-        self.sender
-            .send_blocking(MessageToNetworkThread::ControllerData(i, data));
+        if let Some(id) = &self.my_controller {
+            if *id == i {
+                self.sender
+                    .send_blocking(MessageToNetworkThread::ControllerData(i, data));
+            }
+        }
     }
 }
