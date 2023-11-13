@@ -25,13 +25,6 @@ mod romlist;
 #[cfg(test)]
 mod utility;
 
-/// A convenience type for the type used in the ringbuf crate.
-pub type AudioProducer =
-    ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
-/// A convenience type for the type used in the ringbuf crate.
-pub type AudioConsumer =
-    ringbuf::Consumer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
-
 use emulator_data::NesEmulatorData;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -401,7 +394,7 @@ use crate::egui_multiwin_dynamic::multi_window::MultiWindow;
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
-    use crate::apu::AudioProducerWithRate;
+    use crate::apu::{AudioProducer, AudioProducerWithRate};
 
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
@@ -455,28 +448,115 @@ fn main() {
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate.0
             );
-            let rb = ringbuf::HeapRb::new(num_samples * 2);
-            let (producer, mut consumer) = rb.split();
 
-            let user_audio = AudioProducerWithRate::new(producer, num_samples * 2);
+            let (mut stream, user_audio) = match format {
+                cpal::SampleFormat::U8 => {
+                    let rb = ringbuf::HeapRb::new(num_samples * 2);
+                    let (producer, mut consumer) = rb.split();
 
-            let mut stream = d
-                .build_output_stream(
-                    &config,
-                    move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
-                        let mut index = 0;
-                        while index < data.len() {
-                            let c = consumer.pop_slice(&mut data[index..]);
-                            if c == 0 {
-                                break;
-                            }
-                            index += c;
-                        }
-                    },
-                    move |_err| {},
-                    None,
-                )
-                .ok();
+                    let user_audio =
+                        AudioProducerWithRate::new(AudioProducer::U8(producer), num_samples * 2);
+
+                    let mut stream = d
+                        .build_output_stream(
+                            &config,
+                            move |data: &mut [u8], _cb: &cpal::OutputCallbackInfo| {
+                                let mut index = 0;
+                                while index < data.len() {
+                                    let c = consumer.pop_slice(&mut data[index..]);
+                                    if c == 0 {
+                                        break;
+                                    }
+                                    index += c;
+                                }
+                            },
+                            move |_err| {},
+                            None,
+                        )
+                        .ok();
+                    (stream, user_audio)
+                }
+                cpal::SampleFormat::U16 => {
+                    let rb = ringbuf::HeapRb::new(num_samples * 2);
+                    let (producer, mut consumer) = rb.split();
+
+                    let user_audio =
+                        AudioProducerWithRate::new(AudioProducer::U16(producer), num_samples * 2);
+
+                    let mut stream = d
+                        .build_output_stream(
+                            &config,
+                            move |data: &mut [u16], _cb: &cpal::OutputCallbackInfo| {
+                                let mut index = 0;
+                                while index < data.len() {
+                                    let c = consumer.pop_slice(&mut data[index..]);
+                                    if c == 0 {
+                                        break;
+                                    }
+                                    index += c;
+                                }
+                            },
+                            move |_err| {},
+                            None,
+                        )
+                        .ok();
+                    (stream, user_audio)
+                }
+                cpal::SampleFormat::U32 => {
+                    let rb = ringbuf::HeapRb::new(num_samples * 2);
+                    let (producer, mut consumer) = rb.split();
+
+                    let user_audio =
+                        AudioProducerWithRate::new(AudioProducer::U32(producer), num_samples * 2);
+
+                    let mut stream = d
+                        .build_output_stream(
+                            &config,
+                            move |data: &mut [u32], _cb: &cpal::OutputCallbackInfo| {
+                                let mut index = 0;
+                                while index < data.len() {
+                                    let c = consumer.pop_slice(&mut data[index..]);
+                                    if c == 0 {
+                                        break;
+                                    }
+                                    index += c;
+                                }
+                            },
+                            move |_err| {},
+                            None,
+                        )
+                        .ok();
+                    (stream, user_audio)
+                }
+                cpal::SampleFormat::F32 => {
+                    let rb = ringbuf::HeapRb::new(num_samples * 2);
+                    let (producer, mut consumer) = rb.split();
+
+                    let user_audio =
+                        AudioProducerWithRate::new(AudioProducer::F32(producer), num_samples * 2);
+
+                    let mut stream = d
+                        .build_output_stream(
+                            &config,
+                            move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
+                                let mut index = 0;
+                                while index < data.len() {
+                                    let c = consumer.pop_slice(&mut data[index..]);
+                                    if c == 0 {
+                                        break;
+                                    }
+                                    index += c;
+                                }
+                            },
+                            move |_err| {},
+                            None,
+                        )
+                        .ok();
+                    (stream, user_audio)
+                }
+                _ => todo!(),
+            };
+
             if let Some(s) = &mut stream {
                 s.play().unwrap();
                 sound_rate = config.sample_rate.0;

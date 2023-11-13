@@ -7,7 +7,7 @@ use gstreamer::{
     ClockTime,
 };
 
-use crate::{apu::AudioProducerWithRate, AudioConsumer};
+use crate::apu::AudioProducerWithRate;
 
 /// The main struct for recording related activities
 pub struct Recording {
