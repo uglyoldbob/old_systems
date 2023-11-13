@@ -11,6 +11,8 @@ use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
 use crate::controller::ButtonCombination;
 
+use self::streaming::StreamingIn;
+
 #[derive(PartialEq, Copy, Clone, Debug, serde::Deserialize, serde::Serialize)]
 /// The roles that a node on the network can have
 pub enum NodeRole {
@@ -60,7 +62,7 @@ pub enum MessageToNetworkThread {
 #[derive(Debug)]
 pub enum MessageFromNetworkThread {
     /// Emulator video and audio data.
-    EmulatorVideoStream(Vec<u8>),
+    AvStream(Vec<u8>),
     /// Controller data from one of the players.
     ControllerData(u8, Box<ButtonCombination>),
     /// Indicates that the host has a new address
@@ -237,6 +239,14 @@ impl InternalNetwork {
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
                                         match e {
+                                            emulator::MessageToSwarm::AvStream(d) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::AvStream(d))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
                                             emulator::MessageToSwarm::ConnectedToHost => {
                                                 self.sender
                                                     .send(MessageFromNetworkThread::ConnectedToHost)
@@ -365,6 +375,8 @@ pub struct Network {
     controller_holder: [Option<libp2p::PeerId>; 4],
     /// Indicates that this node is connected to another server.
     connected: bool,
+    /// The receiving pipeline for a stream from a host
+    streamin: StreamingIn,
 }
 
 impl Network {
@@ -391,6 +403,7 @@ impl Network {
             my_controller: None,
             controller_holder: [None; 4],
             connected: false,
+            streamin: StreamingIn::new(),
         }
     }
 
@@ -408,7 +421,11 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetworkThread::AvStream(d) => {
+                    self.streamin.send_data(d);
+                }
                 MessageFromNetworkThread::ConnectedToHost => {
+                    self.streamin.start();
                     self.connected = true;
                     let s = self
                         .sender
@@ -471,7 +488,6 @@ impl Network {
                 MessageFromNetworkThread::ControllerData(i, d) => {
                     self.buttons[i as usize] = Some(*d);
                 }
-                MessageFromNetworkThread::EmulatorVideoStream(_) => {}
                 MessageFromNetworkThread::NewAddress(a) => {
                     self.addresses.insert(a);
                 }

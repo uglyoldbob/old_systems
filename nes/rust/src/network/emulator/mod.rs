@@ -222,8 +222,6 @@ pub struct Handler {
     pending_out: VecDeque<MessageToFromBehavior>,
     /// The struct used for converting video and audio data into a format that can be streamed.
     streamout: StreamingOut,
-    /// The struct used for converting receiving a stream into separate audio and video streams.
-    streamin: StreamingIn,
     /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
     avsource: Option<gstreamer_app::AppSink>,
     /// The optional details for when running a host
@@ -248,7 +246,6 @@ impl Handler {
             outbound_stream: None,
             pending_out: VecDeque::new(),
             streamout: s,
-            streamin: s2,
             avsource,
             host,
         }
@@ -272,6 +269,8 @@ pub enum MessageToFromBehavior {
     VideoStream(Vec<u8>),
     /// Audio data from the emulator
     AudioStream(Vec<u8>),
+    /// A combined stream of audio and video data from a host
+    AvStream(Vec<u8>),
 }
 
 impl ConnectionHandler for Handler {
@@ -335,6 +334,9 @@ impl ConnectionHandler for Handler {
                             MessageToFromBehavior::AudioStream(d) => {
                                 self.streamout.send_audio_buffer(d);
                                 Ok(())
+                            }
+                            MessageToFromBehavior::AvStream(d) => {
+                                out.start_send_unpin(MessageToFromNetwork::EmulatorVideoStream(d))
                             }
                             MessageToFromBehavior::RequestRole(p, r) => {
                                 out.start_send_unpin(MessageToFromNetwork::RequestRole(p, r))
@@ -412,8 +414,7 @@ impl ConnectionHandler for Handler {
                                 Some(MessageToFromBehavior::ControllerData(i, d))
                             }
                             MessageToFromNetwork::EmulatorVideoStream(d) => {
-                                self.streamin.send_data(d);
-                                None
+                                Some(MessageToFromBehavior::AvStream(d))
                             }
                         };
                         if let Some(msg) = mr {
@@ -687,6 +688,8 @@ pub enum MessageToSwarm {
     SetController(Option<u8>),
     /// A singal that indicates the node is connected to a host.
     ConnectedToHost,
+    /// A combined stream of audio and video data from a host
+    AvStream(Vec<u8>),
 }
 
 impl NetworkBehaviour for Behavior {
@@ -738,6 +741,10 @@ impl NetworkBehaviour for Behavior {
     ) {
         let mut waker = self.waker.lock().unwrap();
         match event {
+            MessageToFromBehavior::AvStream(d) => {
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::AvStream(d)));
+            }
             MessageToFromBehavior::RequestController(i, c) => {
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::RequestController(

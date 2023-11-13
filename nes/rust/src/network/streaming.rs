@@ -207,8 +207,8 @@ impl StreamingIn {
         }
     }
 
-    /// Returns true if recording
-    pub fn is_recording(&self) -> bool {
+    /// Returns true if streaming
+    pub fn is_streaming(&self) -> bool {
         self.pipeline.is_some()
     }
 
@@ -217,17 +217,31 @@ impl StreamingIn {
         if self.pipeline.is_none() {
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
-            
+            let source = gstreamer_app::AppSink::builder()
+                .name("emulator_av_mpeg")
+                .build();
+
+            let sconv = gstreamer::ElementFactory::make("tsparse")
+                .name("tsparse")
+                .build()
+                .expect("Could not create element.");
+
+            let demux = gstreamer::ElementFactory::make("tsdemux")
+                .name("tsdemux")
+                .build()
+                .expect("Could not create element.");
 
             let pipeline = gstreamer::Pipeline::with_name("receiving-pipeline");
-            
+            pipeline
+                .add_many([&sconv, source.upcast_ref(), &demux])
+                .unwrap();
+            gstreamer::Element::link_many([source.upcast_ref(), &sconv, &demux]).unwrap();
 
             pipeline
                 .set_state(gstreamer::State::Playing)
                 .expect("Unable to set the pipeline to the `Playing` state");
 
             self.pipeline = Some(pipeline);
-
         }
     }
 
