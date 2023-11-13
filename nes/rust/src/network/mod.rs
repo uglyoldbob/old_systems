@@ -9,6 +9,7 @@ use futures::FutureExt;
 use libp2p::core::transport::ListenerId;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
+use crate::apu::AudioProducerWithRate;
 use crate::controller::ButtonCombination;
 
 use self::streaming::StreamingIn;
@@ -59,7 +60,6 @@ pub enum MessageToNetworkThread {
 }
 
 /// Represents a message sent from the network thread back to the main thread.
-#[derive(Debug)]
 pub enum MessageFromNetworkThread {
     /// Emulator video and audio data.
     AvStream(Vec<u8>),
@@ -81,6 +81,8 @@ pub enum MessageFromNetworkThread {
     RequestController(libp2p::PeerId, Option<u8>),
     /// The held controller for the node is to be changed to what is indicated. None means the player becomes an observer.
     SetController(Option<u8>),
+    /// An audio producer for an emulator host
+    AudioProducer(AudioProducerWithRate),
 }
 
 /// This describes the behaviour of a libp2p swarm
@@ -239,6 +241,14 @@ impl InternalNetwork {
                                     }
                                     libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
                                         match e {
+                                            emulator::MessageToSwarm::AudioProducer(a) => {
+                                                self.sender
+                                                    .send(MessageFromNetworkThread::AudioProducer(a))
+                                                    .await;
+                                                self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
+                                                ));
+                                            }
                                             emulator::MessageToSwarm::AvStream(d) => {
                                                 self.sender
                                                     .send(MessageFromNetworkThread::AvStream(d))
@@ -377,6 +387,8 @@ pub struct Network {
     connected: bool,
     /// The receiving pipeline for a stream from a host
     streamin: StreamingIn,
+    /// Placeholder for transferring the audio producer to the host
+    audio: Option<AudioProducerWithRate>,
 }
 
 impl Network {
@@ -404,6 +416,7 @@ impl Network {
             controller_holder: [None; 4],
             connected: false,
             streamin: StreamingIn::new(),
+            audio: None,
         }
     }
 
@@ -421,6 +434,9 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetworkThread::AudioProducer(a) => {
+                    self.audio = Some(a);
+                }
                 MessageFromNetworkThread::AvStream(d) => {
                     self.streamin.send_data(d);
                 }
@@ -507,6 +523,14 @@ impl Network {
                 }
             }
         }
+    }
+
+    /// Take the sound stream used to deliver sound stream to clients.
+    pub fn get_sound_stream(&mut self) -> Option<AudioProducerWithRate> {
+        self.audio.take()
+    }
+
+    pub fn get_video_data(&mut self, i: &mut crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
     }
 
     /// Provide video data as a server to all clients.

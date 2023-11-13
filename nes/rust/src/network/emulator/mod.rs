@@ -17,7 +17,7 @@ use libp2p::{
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
-use crate::controller::ButtonCombination;
+use crate::{apu::AudioProducerWithRate, controller::ButtonCombination};
 
 use super::{
     streaming::{StreamingIn, StreamingOut},
@@ -223,7 +223,9 @@ pub struct Handler {
     /// The struct used for converting video and audio data into a format that can be streamed.
     streamout: StreamingOut,
     /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
-    avsource: Option<gstreamer_app::AppSink>,
+    avsink: Option<gstreamer_app::AppSink>,
+    /// The audio source for the host
+    asource: Option<crate::apu::AudioProducerWithRate>,
     /// The optional details for when running a host
     host: Option<ServerDetails>,
 }
@@ -237,7 +239,8 @@ impl Handler {
             println!("Starting a gstreamer pipeline for a user");
             s.start(h.width, h.height, h.framerate, h.cpu_frequency);
         }
-        let avsource = s.take_sink();
+        let avsink = s.take_sink();
+        let asource = s.get_sound();
         Self {
             role,
             listen_protocol: protocol,
@@ -246,14 +249,14 @@ impl Handler {
             outbound_stream: None,
             pending_out: VecDeque::new(),
             streamout: s,
-            avsource,
+            avsink,
+            asource,
             host,
         }
     }
 }
 
 /// Represents messages that can be send between the networkbehaviour and the connectionhandler.
-#[derive(Debug)]
 pub enum MessageToFromBehavior {
     /// Controller data for a specific controller.
     ControllerData(u8, Box<ButtonCombination>),
@@ -271,6 +274,36 @@ pub enum MessageToFromBehavior {
     AudioStream(Vec<u8>),
     /// A combined stream of audio and video data from a host
     AvStream(Vec<u8>),
+    /// The audio producer for the host
+    AudioProducer(crate::apu::AudioProducerWithRate),
+}
+
+impl std::fmt::Debug for MessageToFromBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ControllerData(arg0, arg1) => f
+                .debug_tuple("ControllerData")
+                .field(arg0)
+                .field(arg1)
+                .finish(),
+            Self::RequestRole(arg0, arg1) => f
+                .debug_tuple("RequestRole")
+                .field(arg0)
+                .field(arg1)
+                .finish(),
+            Self::RequestController(arg0, arg1) => f
+                .debug_tuple("RequestController")
+                .field(arg0)
+                .field(arg1)
+                .finish(),
+            Self::SetController(arg0) => f.debug_tuple("SetController").field(arg0).finish(),
+            Self::SetRole(arg0) => f.debug_tuple("SetRole").field(arg0).finish(),
+            Self::VideoStream(arg0) => f.debug_tuple("VideoStream").field(arg0).finish(),
+            Self::AudioStream(arg0) => f.debug_tuple("AudioStream").field(arg0).finish(),
+            Self::AvStream(arg0) => f.debug_tuple("AvStream").field(arg0).finish(),
+            Self::AudioProducer(_arg0) => Ok(()),
+        }
+    }
 }
 
 impl ConnectionHandler for Handler {
@@ -304,6 +337,12 @@ impl ConnectionHandler for Handler {
     > {
         let mut waker = self.waker.lock().unwrap();
 
+        if let Some(a) = self.asource.take() {
+            return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                MessageToFromBehavior::AudioProducer(a),
+            ));
+        }
+
         if self.outbound_stream.is_none() {
             self.outbound_stream = Some(OutboundSubstreamState::Establishing);
             return std::task::Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
@@ -315,6 +354,9 @@ impl ConnectionHandler for Handler {
                 std::task::Poll::Ready(Ok(())) => {
                     if let Some(m) = self.pending_out.pop_front() {
                         let m2 = match m {
+                            MessageToFromBehavior::AudioProducer(a) => {
+                                panic!("Cannot send audio producer to network device");
+                            }
                             MessageToFromBehavior::RequestController(i, c) => {
                                 out.start_send_unpin(MessageToFromNetwork::RequestController(i, c))
                             }
@@ -355,11 +397,16 @@ impl ConnectionHandler for Handler {
                             }
                         }
                     }
-                    if let Some(source) = &mut self.avsource {
+                    if let Some(source) = &mut self.avsink {
                         match source.pull_sample() {
                             Ok(a) => {
+                                println!("Got a sample to send to network");
                                 let c = a.buffer();
                                 if let Some(buf) = c {
+                                    println!(
+                                        "Got a buffer to send to network of {} bytes",
+                                        buf.size()
+                                    );
                                     let mut v: Vec<u8> = Vec::with_capacity(buf.size());
                                     if let Ok(()) = buf.copy_to_slice(buf.size(), &mut v) {
                                         match out.start_send_unpin(
@@ -379,7 +426,9 @@ impl ConnectionHandler for Handler {
                                     }
                                 }
                             }
-                            Err(_e) => {}
+                            Err(e) => {
+                                println!("Failed to pull sample {}", e);
+                            }
                         }
                     }
                 }
@@ -541,6 +590,8 @@ pub struct Behavior {
     img: Option<u32>,
     /// The optional details for when running a host
     host: Option<ServerDetails>,
+    /// Placeholder for transferring the audio producer back to the main thread
+    audio: Option<AudioProducerWithRate>,
 }
 
 impl Behavior {
@@ -554,6 +605,7 @@ impl Behavior {
             servers: Vec::new(),
             img: None,
             host: None,
+            audio: None,
         }
     }
 }
@@ -573,6 +625,11 @@ impl Behavior {
             framerate,
             cpu_frequency,
         });
+    }
+
+    /// Take the audio producer
+    pub fn take_audio(&mut self) -> Option<AudioProducerWithRate> {
+        self.audio.take()
     }
 
     /// Send the given controller data to the host.
@@ -674,7 +731,6 @@ impl Behavior {
 }
 
 /// Represents the types of messages that can be sent to the swarm from the network behaviour.
-#[derive(Debug)]
 pub enum MessageToSwarm {
     /// Controller data from a user
     ControllerData(u8, Box<ButtonCombination>),
@@ -690,6 +746,35 @@ pub enum MessageToSwarm {
     ConnectedToHost,
     /// A combined stream of audio and video data from a host
     AvStream(Vec<u8>),
+    /// An audio producer used by a host
+    AudioProducer(AudioProducerWithRate),
+}
+
+impl std::fmt::Debug for MessageToSwarm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ControllerData(arg0, arg1) => f
+                .debug_tuple("ControllerData")
+                .field(arg0)
+                .field(arg1)
+                .finish(),
+            Self::RequestRole(arg0, arg1) => f
+                .debug_tuple("RequestRole")
+                .field(arg0)
+                .field(arg1)
+                .finish(),
+            Self::SetRole(arg0) => f.debug_tuple("SetRole").field(arg0).finish(),
+            Self::RequestController(arg0, arg1) => f
+                .debug_tuple("RequestController")
+                .field(arg0)
+                .field(arg1)
+                .finish(),
+            Self::SetController(arg0) => f.debug_tuple("SetController").field(arg0).finish(),
+            Self::ConnectedToHost => write!(f, "ConnectedToHost"),
+            Self::AvStream(arg0) => f.debug_tuple("AvStream").field(arg0).finish(),
+            Self::AudioProducer(arg0) => Ok(()),
+        }
+    }
 }
 
 impl NetworkBehaviour for Behavior {
@@ -741,6 +826,9 @@ impl NetworkBehaviour for Behavior {
     ) {
         let mut waker = self.waker.lock().unwrap();
         match event {
+            MessageToFromBehavior::AudioProducer(a) => {
+                self.audio = Some(a);
+            }
             MessageToFromBehavior::AvStream(d) => {
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::AvStream(d)));
@@ -781,6 +869,12 @@ impl NetworkBehaviour for Behavior {
     ) -> std::task::Poll<libp2p::swarm::ToSwarm<Self::ToSwarm, libp2p::swarm::THandlerInEvent<Self>>>
     {
         let mut waker = self.waker.lock().unwrap();
+
+        if let Some(a) = self.audio.take() {
+            return std::task::Poll::Ready(ToSwarm::GenerateEvent(MessageToSwarm::AudioProducer(
+                a,
+            )));
+        }
 
         if let Some(a) = self.messages.pop_front() {
             return std::task::Poll::Ready(a);

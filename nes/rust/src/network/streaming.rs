@@ -34,9 +34,9 @@ impl StreamingOut {
         self.sink.take()
     }
 
-    /// Returns an optional sound source
-    pub fn get_sound(&mut self) -> &mut Option<crate::apu::AudioProducerWithRate> {
-        &mut self.audio
+    /// Takes the optional sound source
+    pub fn get_sound(&mut self) -> Option<crate::apu::AudioProducerWithRate> {
+        self.audio.take()
     }
 
     /// Returns true if recording
@@ -144,8 +144,13 @@ impl StreamingOut {
 
     /// Send a chunk of video data to the pipeline
     pub fn send_video_buffer(&mut self, buffer: Vec<u8>) {
-        if let Some(_pipeline) = &mut self.record_pipeline {
+        if let Some(pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
+                let dot =
+                    gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
+                std::fs::write("./pipeline_stream_out.dot", dot)
+                    .expect("Unable to write pipeline file");
+
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
                 for (a, b) in buffer.iter().zip(p.iter_mut()) {
@@ -196,6 +201,10 @@ pub struct StreamingIn {
     pipeline: Option<gstreamer::Pipeline>,
     /// The source for video data from the emulator
     stream_source: Option<gstreamer_app::AppSrc>,
+    /// The audio sink for the pipeline
+    audio: Option<gstreamer_app::AppSink>,
+    /// The video sink for the pipeline
+    video: Option<gstreamer_app::AppSink>,
 }
 
 impl StreamingIn {
@@ -204,6 +213,8 @@ impl StreamingIn {
         Self {
             pipeline: None,
             stream_source: None,
+            audio: None,
+            video: None,
         }
     }
 
@@ -217,7 +228,8 @@ impl StreamingIn {
         if self.pipeline.is_none() {
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
-            let source = gstreamer_app::AppSink::builder()
+
+            let source = gstreamer_app::AppSrc::builder()
                 .name("emulator_av_mpeg")
                 .build();
 
@@ -231,17 +243,90 @@ impl StreamingIn {
                 .build()
                 .expect("Could not create element.");
 
+            let vdecoder = gstreamer::ElementFactory::make("openh264dec")
+                .name("vdecode")
+                .build()
+                .expect("Could not create source element.");
+
+            let adecoder = gstreamer::ElementFactory::make("avdec_ac3")
+                .name("adecode")
+                .build()
+                .expect("Could not create source element.");
+
+            let asink = gstreamer_app::AppSink::builder().name("audio_sink").build();
+            let vsink = gstreamer_app::AppSink::builder().name("video_sink").build();
+
             let pipeline = gstreamer::Pipeline::with_name("receiving-pipeline");
             pipeline
-                .add_many([&sconv, source.upcast_ref(), &demux])
+                .add_many([
+                    &sconv,
+                    source.upcast_ref(),
+                    &demux,
+                    asink.upcast_ref(),
+                    vsink.upcast_ref(),
+                    &vdecoder,
+                    &adecoder,
+                ])
                 .unwrap();
             gstreamer::Element::link_many([source.upcast_ref(), &sconv, &demux]).unwrap();
+            vdecoder.link(&vsink).expect("Failed to link to vsink");
+
+            let video_sink_pad = vdecoder
+                .static_pad("sink")
+                .expect("could not get sink pad from vdecoder");
+            let audio_sink_pad = adecoder
+                .static_pad("sink")
+                .expect("could not get sink pad from adecoder");
+            demux.connect_pad_added(move |_src, src_pad| {
+                let is_video = if src_pad.name().starts_with("video") {
+                    true
+                } else {
+                    false
+                };
+
+                let is_audio = if src_pad.name().starts_with("audio") {
+                    true
+                } else {
+                    false
+                };
+
+                let connect_demux = || -> Result<(), u8> {
+                    src_pad
+                        .link(&video_sink_pad)
+                        .expect("failed to link tsdemux.video->h264parse.sink");
+                    println!("linked tsdemux->h264parse");
+                    Ok(())
+                };
+
+                let connect_demux2 = || -> Result<(), u8> {
+                    src_pad
+                        .link(&audio_sink_pad)
+                        .expect("failed to link audio to audio decoder");
+                    println!("linked tsdemux->h264parse");
+                    Ok(())
+                };
+
+                if is_video {
+                    match connect_demux() {
+                        Ok(_) => println!("video connected"),
+                        Err(e) => println!("could not connect video e:{}", e),
+                    }
+                }
+                if is_audio {
+                    match connect_demux2() {
+                        Ok(_) => println!("audio connected"),
+                        Err(e) => println!("could not connect audio e:{}", e),
+                    }
+                }
+            });
 
             pipeline
                 .set_state(gstreamer::State::Playing)
                 .expect("Unable to set the pipeline to the `Playing` state");
 
             self.pipeline = Some(pipeline);
+            self.video = Some(vsink);
+            self.audio = Some(asink);
         }
     }
 
@@ -249,6 +334,7 @@ impl StreamingIn {
     pub fn send_data(&mut self, buffer: Vec<u8>) {
         if let Some(_pipeline) = &mut self.pipeline {
             if let Some(source) = &mut self.stream_source {
+                println!("Received {} bytes of data from host", buffer.len());
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
                 for (a, b) in buffer.iter().zip(p.iter_mut()) {

@@ -66,6 +66,8 @@ pub struct MainNesWindow {
     have_gstreamer: Result<(), gstreamer::glib::Error>,
     /// The recording object
     recording: Recording,
+    /// The audio object for a streaming server
+    audio_streaming: Option<AudioProducerWithRate>,
 }
 
 impl MainNesWindow {
@@ -128,6 +130,7 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 recording: Recording::new(),
+                audio_streaming: None,
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -483,6 +486,11 @@ impl TrackedWindow for MainNesWindow {
                     NodeRole::Observer | NodeRole::Player => {
                         render = false;
                     }
+                    NodeRole::PlayerHost => {
+                        if let Some(a) = network.get_sound_stream() {
+                            self.audio_streaming = Some(a);
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -495,6 +503,9 @@ impl TrackedWindow for MainNesWindow {
             }
             if let Some(s) = self.recording.get_sound() {
                 sound.push(s);
+            }
+            if let Some(a) = &mut self.audio_streaming {
+                sound.push(a);
             }
             'emulator_loop: loop {
                 #[cfg(feature = "debugger")]
