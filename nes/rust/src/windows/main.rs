@@ -527,6 +527,13 @@ impl TrackedWindow for MainNesWindow {
                             c.local.image = image;
                         }
                         self.recording.send_frame(&c.local.image);
+                        if let Some(olocal) = &mut c.olocal {
+                            if let Some(network) = &mut olocal.network {
+                                if network.role() == NodeRole::PlayerHost {
+                                    network.video_data(&c.local.image);
+                                }
+                            }
+                        }
 
                         if self.mouse_delay > 0 {
                             self.mouse_delay -= 1;

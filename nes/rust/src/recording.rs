@@ -80,6 +80,13 @@ impl Recording {
             audio_source.set_is_live(true);
             app_source.set_block(false);
             audio_source.set_do_timestamp(true);
+
+            let vbitrate = &format!(
+                "{}",
+                image.width as u32 * image.height as u32 * framerate as u32 / 64
+            );
+            println!("Video birate is calculated as {}", vbitrate);
+
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
                 .build()
@@ -94,6 +101,7 @@ impl Recording {
                 .expect("Could not create source element.");
             let vencoder = gstreamer::ElementFactory::make("openh264enc")
                 .name("vencode")
+                .property_from_str("bitrate", vbitrate)
                 .build()
                 .expect("Could not create source element.");
             let avimux = gstreamer::ElementFactory::make("avimux")
@@ -161,7 +169,7 @@ impl Recording {
                 let mut buf =
                     gstreamer::Buffer::with_size(image.width as usize * image.height as usize * 3)
                         .unwrap();
-                image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
+                image.to_gstreamer(&mut buf);
                 source.do_timestamp();
                 match source.push_buffer(buf) {
                     Ok(_a) => {}

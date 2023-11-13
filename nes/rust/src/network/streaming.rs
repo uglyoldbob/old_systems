@@ -6,8 +6,8 @@ use gstreamer::prelude::{
 
 use crate::apu::AudioProducerWithRate;
 
-/// The main struct for recording related activities
-pub struct Streaming {
+/// The main struct for sending a video stream over an arbitrary stream
+pub struct StreamingOut {
     /// The pipeline
     record_pipeline: Option<gstreamer::Pipeline>,
     /// The source for video data from the emulator
@@ -18,7 +18,7 @@ pub struct Streaming {
     audio: Option<crate::apu::AudioProducerWithRate>,
 }
 
-impl Streaming {
+impl StreamingOut {
     /// Create a recording object
     pub fn new() -> Self {
         Self {
@@ -88,11 +88,7 @@ impl Streaming {
                 .name("vconvert")
                 .build()
                 .expect("Could not create source element.");
-            let aconv = gstreamer::ElementFactory::make("audioconvert")
-                .name("aconvert")
-                .build()
-                .expect("Could not create source element.");
-            let aencoder = gstreamer::ElementFactory::make("alawenc")
+            let aencoder = gstreamer::ElementFactory::make("avenc_ac3")
                 .name("aencode")
                 .build()
                 .expect("Could not create source element.");
@@ -117,7 +113,6 @@ impl Streaming {
                     audio_source.upcast_ref(),
                     &aencoder,
                     &vconv,
-                    &aconv,
                     &aresample,
                     &vencoder,
                     &mux,
@@ -125,13 +120,8 @@ impl Streaming {
                 ])
                 .unwrap();
             gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder]).unwrap();
-            gstreamer::Element::link_many([
-                audio_source.upcast_ref(),
-                &aconv,
-                &aresample,
-                &aencoder,
-            ])
-            .unwrap();
+            gstreamer::Element::link_many([audio_source.upcast_ref(), &aresample, &aencoder])
+                .unwrap();
 
             aencoder.link(&mux).unwrap();
             vencoder.link(&mux).unwrap();
@@ -152,14 +142,16 @@ impl Streaming {
         }
     }
 
-    /// Send a frame of data to the recording
-    pub fn send_frame(&mut self, image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
+    /// Send a chunk of video data to the pipeline
+    pub fn send_video_buffer(&mut self, buffer: Vec<u8>) {
         if let Some(_pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
-                let mut buf =
-                    gstreamer::Buffer::with_size(image.width as usize * image.height as usize * 3)
-                        .unwrap();
-                image.to_gstreamer(image.width as usize, image.height as usize, &mut buf);
+                let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
+                let mut p = buf.make_mut().map_writable().unwrap();
+                for (a, b) in buffer.iter().zip(p.iter_mut()) {
+                    *b = *a;
+                }
+                drop(p);
                 source.do_timestamp();
                 match source.push_buffer(buf) {
                     Ok(_a) => {}
@@ -168,6 +160,13 @@ impl Streaming {
                     }
                 }
             }
+        }
+    }
+
+    /// Send a chunk of audio data to the pipeline
+    pub fn send_audio_buffer(&mut self, buffer: Vec<u8>) {
+        if let Some(_pipeline) = &mut self.record_pipeline {
+            todo!();
         }
     }
 
@@ -188,5 +187,85 @@ impl Streaming {
         self.record_pipeline = None;
         self.record_source = None;
         self.audio = None;
+    }
+}
+
+/// The main struct for receiving a stream from StreamingOut
+pub struct StreamingIn {
+    /// The pipeline
+    pipeline: Option<gstreamer::Pipeline>,
+    /// The source for video data from the emulator
+    stream_source: Option<gstreamer_app::AppSrc>,
+}
+
+impl StreamingIn {
+    /// Create a recording object
+    pub fn new() -> Self {
+        Self {
+            pipeline: None,
+            stream_source: None,
+        }
+    }
+
+    /// Returns true if recording
+    pub fn is_recording(&self) -> bool {
+        self.pipeline.is_some()
+    }
+
+    /// Start stream receiving by setting up the necessary objects.
+    pub fn start(&mut self) {
+        if self.pipeline.is_none() {
+            let version = gstreamer::version_string().as_str().to_string();
+            println!("GStreamer version is {}", version);
+            
+
+            let pipeline = gstreamer::Pipeline::with_name("receiving-pipeline");
+            
+
+            pipeline
+                .set_state(gstreamer::State::Playing)
+                .expect("Unable to set the pipeline to the `Playing` state");
+
+            self.pipeline = Some(pipeline);
+
+        }
+    }
+
+    /// Send data to the receiving end of the pipeline
+    pub fn send_data(&mut self, buffer: Vec<u8>) {
+        if let Some(_pipeline) = &mut self.pipeline {
+            if let Some(source) = &mut self.stream_source {
+                let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
+                let mut p = buf.make_mut().map_writable().unwrap();
+                for (a, b) in buffer.iter().zip(p.iter_mut()) {
+                    *b = *a;
+                }
+                drop(p);
+                source.do_timestamp();
+                match source.push_buffer(buf) {
+                    Ok(_a) => {}
+                    Err(e) => {
+                        println!("Error pushing video data: {:?}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Stop recording
+    pub fn stop(&mut self) {
+        if let Some(pipeline) = &mut self.pipeline {
+            let _dot =
+                gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
+            //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
+
+            if let Some(source) = &mut self.stream_source {
+                source.end_of_stream();
+            }
+            pipeline
+                .set_state(gstreamer::State::Null)
+                .expect("Unable to set the recording pipeline to the `Null` state");
+        }
+        self.pipeline = None;
     }
 }

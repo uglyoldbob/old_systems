@@ -6,7 +6,7 @@ use biquad::Biquad;
 enum AudioProducerMethod {
     /// A ring buffer is used to produce the audio
     RingBuffer(crate::AudioProducer),
-    /// The audio is pushed directly to gstreamer
+    /// The audio is pushed directly to gstreamer for recordings
     GStreamer(gstreamer_app::AppSrc),
 }
 

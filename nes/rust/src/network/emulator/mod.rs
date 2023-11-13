@@ -19,7 +19,10 @@ use libp2p::{
 
 use crate::controller::ButtonCombination;
 
-use super::{streaming::Streaming, NodeRole};
+use super::{
+    streaming::{StreamingIn, StreamingOut},
+    NodeRole,
+};
 
 /// Represents a message that can be sent to and from other nodes in the network.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -218,7 +221,9 @@ pub struct Handler {
     /// Messages that are pending to be sent to the network.
     pending_out: VecDeque<MessageToFromBehavior>,
     /// The struct used for converting video and audio data into a format that can be streamed.
-    streaming: Streaming,
+    streamout: StreamingOut,
+    /// The struct used for converting receiving a stream into separate audio and video streams.
+    streamin: StreamingIn,
     /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
     avsource: Option<gstreamer_app::AppSink>,
     /// The optional details for when running a host
@@ -228,11 +233,13 @@ pub struct Handler {
 impl Handler {
     /// Construct a new struct.
     fn new(protocol: Protocol, role: NodeRole, host: Option<ServerDetails>) -> Self {
-        let mut s = Streaming::new();
+        let mut s = StreamingOut::new();
+        let mut s2 = StreamingIn::new();
         if let Some(h) = host {
             println!("Starting a gstreamer pipeline for a user");
             s.start(h.width, h.height, h.framerate, h.cpu_frequency);
         }
+        let avsource = s.take_sink();
         Self {
             role,
             listen_protocol: protocol,
@@ -240,8 +247,9 @@ impl Handler {
             inbound_stream: None,
             outbound_stream: None,
             pending_out: VecDeque::new(),
-            streaming: s,
-            avsource: None,
+            streamout: s,
+            streamin: s2,
+            avsource,
             host,
         }
     }
@@ -260,8 +268,10 @@ pub enum MessageToFromBehavior {
     SetController(Option<u8>),
     /// A command to set the role of a node on the network.
     SetRole(NodeRole),
-    /// Audio video data for the emulator.
+    /// Video data from the emulator.
     VideoStream(Vec<u8>),
+    /// Audio data from the emulator
+    AudioStream(Vec<u8>),
 }
 
 impl ConnectionHandler for Handler {
@@ -319,7 +329,12 @@ impl ConnectionHandler for Handler {
                                 out.start_send_unpin(MessageToFromNetwork::ControllerData(i, d))
                             }
                             MessageToFromBehavior::VideoStream(d) => {
-                                out.start_send_unpin(MessageToFromNetwork::EmulatorVideoStream(d))
+                                self.streamout.send_video_buffer(d);
+                                Ok(())
+                            }
+                            MessageToFromBehavior::AudioStream(d) => {
+                                self.streamout.send_audio_buffer(d);
+                                Ok(())
                             }
                             MessageToFromBehavior::RequestRole(p, r) => {
                                 out.start_send_unpin(MessageToFromNetwork::RequestRole(p, r))
@@ -382,23 +397,30 @@ impl ConnectionHandler for Handler {
                     Some(Ok(m)) => {
                         let mr = match m {
                             MessageToFromNetwork::RequestController(i, c) => {
-                                MessageToFromBehavior::RequestController(i, c)
+                                Some(MessageToFromBehavior::RequestController(i, c))
                             }
                             MessageToFromNetwork::SetController(c) => {
-                                MessageToFromBehavior::SetController(c)
+                                Some(MessageToFromBehavior::SetController(c))
                             }
-                            MessageToFromNetwork::SetRole(r) => MessageToFromBehavior::SetRole(r),
+                            MessageToFromNetwork::SetRole(r) => {
+                                Some(MessageToFromBehavior::SetRole(r))
+                            }
                             MessageToFromNetwork::RequestRole(p, r) => {
-                                MessageToFromBehavior::RequestRole(p, r)
+                                Some(MessageToFromBehavior::RequestRole(p, r))
                             }
                             MessageToFromNetwork::ControllerData(i, d) => {
-                                MessageToFromBehavior::ControllerData(i, d)
+                                Some(MessageToFromBehavior::ControllerData(i, d))
                             }
                             MessageToFromNetwork::EmulatorVideoStream(d) => {
-                                MessageToFromBehavior::VideoStream(d)
+                                self.streamin.send_data(d);
+                                None
                             }
                         };
-                        return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(mr));
+                        if let Some(msg) = mr {
+                            return std::task::Poll::Ready(
+                                ConnectionHandlerEvent::NotifyBehaviour(msg),
+                            );
+                        }
                     }
                     Some(Err(_e)) => {
                         println!("Error receiving message from network");
@@ -613,6 +635,40 @@ impl Behavior {
             handler: libp2p::swarm::NotifyHandler::Any,
             event: MessageToFromBehavior::SetController(c),
         });
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
+
+    /// Send a chunk of video data to all clients on the swarm
+    pub fn video_data(&mut self, v: Vec<u8>) {
+        for pid in &self.clients {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageToFromBehavior::VideoStream(v.clone()),
+            });
+        }
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
+    }
+
+    /// Send a chunk of audio data to all clients on the swarm
+    pub fn audio_data(&mut self, d: Vec<u8>) {
+        for pid in &self.clients {
+            self.messages.push_back(ToSwarm::NotifyHandler {
+                peer_id: *pid,
+                handler: libp2p::swarm::NotifyHandler::Any,
+                event: MessageToFromBehavior::AudioStream(d.clone()),
+            });
+        }
+        let mut waker = self.waker.lock().unwrap();
+        if let Some(waker) = waker.take() {
+            waker.wake();
+        }
     }
 }
 
@@ -701,6 +757,7 @@ impl NetworkBehaviour for Behavior {
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ControllerData(i, d)));
             }
             MessageToFromBehavior::VideoStream(_v) => todo!(),
+            MessageToFromBehavior::AudioStream(_d) => todo!(),
             MessageToFromBehavior::RequestRole(p, r) => {
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::RequestRole(p, r)));

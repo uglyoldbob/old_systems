@@ -50,6 +50,10 @@ pub enum MessageToNetworkThread {
     RequestController(Option<u8>),
     /// Used by hosts to set the held controller of a player or observer.
     SetController(libp2p::PeerId, Option<u8>),
+    /// Send some video data to all client pipelines.
+    VideoData(Vec<u8>),
+    /// Send some audio data to all client pipelines
+    AudioData(Vec<u8>),
 }
 
 /// Represents a message sent from the network thread back to the main thread.
@@ -114,6 +118,14 @@ impl InternalNetwork {
                             r = f2 => {
                                 if let Ok(m) = r {
                                     match m {
+                                        MessageToNetworkThread::VideoData(v) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.video_data(v);
+                                        }
+                                        MessageToNetworkThread::AudioData(d) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.audio_data(d);
+                                        }
                                         MessageToNetworkThread::SetController(p, c) => {
                                             let behavior = self.swarm.behaviour_mut();
                                             behavior.emulator.set_controller(p, c);
@@ -479,6 +491,18 @@ impl Network {
                 }
             }
         }
+    }
+
+    /// Provide video data as a server to all clients.
+    pub fn video_data(&mut self, i: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
+        self.sender
+            .send_blocking(MessageToNetworkThread::VideoData(i.to_gstreamer_vec()));
+    }
+
+    /// Provide audio data as a server to all clients
+    pub fn audio_data(&mut self, d: Vec<u8>) {
+        self.sender
+            .send_blocking(MessageToNetworkThread::AudioData(d));
     }
 
     /// What is my role in the network?

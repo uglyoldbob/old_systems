@@ -54,28 +54,21 @@ impl PixelImage<egui::Color32> {
         }
     }
 
-    /// Converts to a slice that gstreamer can use
-    pub fn to_gstreamer(&self, w: usize, h: usize, buf: &mut gstreamer::Buffer) {
+    /// Converts to a vector that can be eventually passed to a gstreamer pipeline
+    pub fn to_gstreamer_vec(&self) -> Vec<u8> {
         let oc = self.width as usize * self.height as usize;
-        let ac = w * h;
-        let mut v = Vec::with_capacity(ac * 3);
-        for (i, p) in self.pixels.iter().enumerate() {
+        let mut v = Vec::with_capacity(oc * 3);
+        for p in self.pixels.iter() {
             v.push(p.r());
             v.push(p.g());
             v.push(p.b());
-            if (i as u16 % self.width) == (self.width - 1) {
-                for _index in self.width..w as u16 {
-                    v.push(0);
-                    v.push(0);
-                    v.push(0);
-                }
-            }
         }
-        for _ in oc..ac {
-            v.push(255);
-            v.push(255);
-            v.push(255);
-        }
+        v
+    }
+
+    /// Converts to a slice that gstreamer can use
+    pub fn to_gstreamer(&self, buf: &mut gstreamer::Buffer) {
+        let v = self.to_gstreamer_vec();
         let mut p = buf.make_mut().map_writable().unwrap();
         for (a, b) in v.iter().zip(p.iter_mut()) {
             *b = *a;
