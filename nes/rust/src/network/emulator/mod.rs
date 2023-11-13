@@ -231,7 +231,7 @@ impl Handler {
         let mut s = Streaming::new();
         if let Some(h) = host {
             println!("Starting a gstreamer pipeline for a user");
-            s.start(h.width, h.height, h.framerate, h.audio_interval);
+            s.start(h.width, h.height, h.framerate, h.cpu_frequency);
         }
         Self {
             role,
@@ -498,8 +498,8 @@ struct ServerDetails {
     height: u16,
     /// The framerate of the emulator
     framerate: u8,
-    /// The interval between audio samples for the emulator
-    audio_interval: f32,
+    /// The cpu frequency of the emulator
+    cpu_frequency: f32,
 }
 
 /// The struct for the network behavior
@@ -542,13 +542,13 @@ impl Behavior {
         width: u16,
         height: u16,
         framerate: u8,
-        audio_interval: f32,
+        cpu_frequency: f32,
     ) {
         self.host = Some(ServerDetails {
             width,
             height,
             framerate,
-            audio_interval,
+            cpu_frequency,
         });
     }
 

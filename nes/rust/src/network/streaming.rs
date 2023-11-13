@@ -45,7 +45,7 @@ impl Streaming {
     }
 
     /// Start recording by setting up the necessary objects.
-    pub fn start(&mut self, width: u16, height: u16, framerate: u8, interval: f32) {
+    pub fn start(&mut self, width: u16, height: u16, framerate: u8, cpu_frequency: f32) {
         if self.record_pipeline.is_none() {
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
@@ -146,7 +146,7 @@ impl Streaming {
 
             self.audio = Some(AudioProducerWithRate::new_gstreamer(
                 44100,
-                interval,
+                cpu_frequency / 44100.0,
                 audio_source,
             ));
         }

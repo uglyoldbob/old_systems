@@ -158,7 +158,7 @@ impl eframe::App for MainNesWindow {
         if self.filter.is_none() && self.sound_stream.is_some() {
             println!("Initializing with sample rate {}", self.sound_rate);
             let rf = self.sound_rate as f32;
-            let sampling_frequency = 21.47727e6 / 12.0;
+            let sampling_frequency = c.cpu_frequency();
             let filter_coeff = biquad::Coefficients::<f32>::from_params(
                 biquad::Type::LowPass,
                 biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
@@ -736,7 +736,7 @@ impl TrackedWindow for MainNesWindow {
         if let Some(rec) = start_stop_recording {
             if rec {
                 c.local.resolution_locked = true;
-                let sampling_frequency = 21.47727e6 / 12.0;
+                let sampling_frequency = c.cpu_frequency();
                 let tn = chrono::Local::now();
                 let mut recpath = record_path.clone();
                 recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
@@ -745,7 +745,7 @@ impl TrackedWindow for MainNesWindow {
                     &c.local.image,
                     60,
                     recpath,
-                    sampling_frequency / 44100.0,
+                    sampling_frequency,
                 );
             } else {
                 c.local.resolution_locked = false;

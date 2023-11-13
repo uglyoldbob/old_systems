@@ -385,6 +385,16 @@ impl NesEmulatorData {
         }
     }
 
+    /// Return the framerate of the ppu
+    pub fn ppu_frame_rate(&self) -> f32 {
+        60.0
+    }
+
+    /// Return the cpu frequency.
+    pub fn cpu_frequency(&self) -> f32 {
+        21.47727e6 / 12.0
+    }
+
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
         self.local.find_roms(dir)

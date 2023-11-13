@@ -64,6 +64,9 @@ impl TrackedWindow for Window {
         let windows_to_create = vec![];
 
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
+            let cpu_frequency = c.cpu_frequency();
+            let framerate = c.ppu_frame_rate();
+
             if let Some(olocal) = &mut c.olocal {
                 if olocal.network.is_none() {
                     ui.label("Network is not active");
@@ -78,6 +81,7 @@ impl TrackedWindow for Window {
                         olocal.network = None;
                     }
                 }
+
                 if let Some(network) = &mut olocal.network {
                     let na = network.get_addresses();
                     if !na.is_empty() {
@@ -94,8 +98,8 @@ impl TrackedWindow for Window {
                             network.start_server(
                                 c.local.image.width,
                                 c.local.image.height,
-                                60,
-                                42.0,
+                                framerate as u8,
+                                cpu_frequency,
                             );
                         }
 

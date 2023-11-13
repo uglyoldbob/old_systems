@@ -45,7 +45,7 @@ impl Recording {
         image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>,
         framerate: u8,
         name: PathBuf,
-        interval: f32,
+        cpu_frequency: f32,
     ) {
         if self.record_pipeline.is_none() && have_gstreamer.is_ok() {
             let version = gstreamer::version_string().as_str().to_string();
@@ -148,7 +148,7 @@ impl Recording {
 
             self.audio = Some(AudioProducerWithRate::new_gstreamer(
                 44100,
-                interval,
+                cpu_frequency / 44100.0,
                 audio_source,
             ));
         }
