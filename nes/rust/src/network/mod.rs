@@ -396,8 +396,8 @@ impl Network {
     pub fn new(
         proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
     ) -> Self {
-        let (s1, r1) = async_channel::bounded(10);
-        let (s2, r2) = async_channel::bounded(10);
+        let (s1, r1) = async_channel::bounded(1000);
+        let (s2, r2) = async_channel::bounded(1000);
         let mut t = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -535,6 +535,12 @@ impl Network {
 
     /// Provide video data as a server to all clients.
     pub fn video_data(&mut self, i: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
+        if self.sender.is_full() {
+            println!("Gonna have a bad time since the sender is full");
+        }
+        else {
+            println!("Video sender is not full");
+        }
         self.sender
             .send_blocking(MessageToNetworkThread::VideoData(i.to_gstreamer_vec()));
     }

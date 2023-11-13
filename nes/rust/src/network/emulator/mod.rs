@@ -400,13 +400,8 @@ impl ConnectionHandler for Handler {
                     if let Some(source) = &mut self.avsink {
                         match source.pull_sample() {
                             Ok(a) => {
-                                println!("Got a sample to send to network");
                                 let c = a.buffer();
                                 if let Some(buf) = c {
-                                    println!(
-                                        "Got a buffer to send to network of {} bytes",
-                                        buf.size()
-                                    );
                                     let mut v: Vec<u8> = Vec::with_capacity(buf.size());
                                     if let Ok(()) = buf.copy_to_slice(buf.size(), &mut v) {
                                         match out.start_send_unpin(

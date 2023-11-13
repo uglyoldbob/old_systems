@@ -133,6 +133,7 @@ impl StreamingOut {
 
             self.record_source = Some(app_source);
             self.record_pipeline = Some(pipeline);
+            self.sink = Some(sink);
 
             self.audio = Some(AudioProducerWithRate::new_gstreamer(
                 44100,
@@ -146,10 +147,9 @@ impl StreamingOut {
     pub fn send_video_buffer(&mut self, buffer: Vec<u8>) {
         if let Some(pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
-                let dot =
+                let _dot =
                     gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-                std::fs::write("./pipeline_stream_out.dot", dot)
-                    .expect("Unable to write pipeline file");
+                //std::fs::write("./pipeline_stream_out.dot", dot).expect("Unable to write pipeline file");
 
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
