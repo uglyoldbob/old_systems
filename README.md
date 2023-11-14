@@ -16,4 +16,7 @@ Repository for emulation of old game systems and other old computing systems
 - [x] wix installer for windows
 - [ ] Add a list of instructions to the debugger
 - [x] Create link to recordings folder
-- [ ] Slow motion support
+- [ ] Slow motion
+- [ ] Rom ranking system
+- [ ] Game genie code support
+- [ ] Full screen support

@@ -52,12 +52,61 @@ use emulator_data::NesEmulatorData;
 use criterion::Criterion;
 use std::io::BufRead;
 
-/// A convenience type for the type used in the ringbuf crate.
-pub type AudioProducer =
-    ringbuf::Producer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
-/// A convenience type for the type used in the ringbuf crate.
-pub type AudioConsumer =
-    ringbuf::Consumer<f32, std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>>;
+/// An audio producer of several different kinds of data
+pub enum AudioProducer {
+    U8(
+        ringbuf::Producer<
+            u8,
+            std::sync::Arc<ringbuf::SharedRb<u8, Vec<std::mem::MaybeUninit<u8>>>>,
+        >,
+    ),
+    U16(
+        ringbuf::Producer<
+            u16,
+            std::sync::Arc<ringbuf::SharedRb<u16, Vec<std::mem::MaybeUninit<u16>>>>,
+        >,
+    ),
+    U32(
+        ringbuf::Producer<
+            u32,
+            std::sync::Arc<ringbuf::SharedRb<u32, Vec<std::mem::MaybeUninit<u32>>>>,
+        >,
+    ),
+    F32(
+        ringbuf::Producer<
+            f32,
+            std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+        >,
+    ),
+}
+
+/// An audio consumer of several different kinds of data
+pub enum AudioConsumer {
+    U8(
+        ringbuf::Consumer<
+            u8,
+            std::sync::Arc<ringbuf::SharedRb<u8, Vec<std::mem::MaybeUninit<u8>>>>,
+        >,
+    ),
+    U16(
+        ringbuf::Consumer<
+            u16,
+            std::sync::Arc<ringbuf::SharedRb<u16, Vec<std::mem::MaybeUninit<u16>>>>,
+        >,
+    ),
+    U32(
+        ringbuf::Consumer<
+            u32,
+            std::sync::Arc<ringbuf::SharedRb<u32, Vec<std::mem::MaybeUninit<u32>>>>,
+        >,
+    ),
+    F32(
+        ringbuf::Consumer<
+            f32,
+            std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+        >,
+    ),
+}
 
 struct CpuBench1 {
     cpu: NesCpu,

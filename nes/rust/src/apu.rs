@@ -2,30 +2,275 @@
 
 use biquad::Biquad;
 
+/// An audio producer of several different kinds of data
+pub enum AudioProducer {
+    U8(
+        ringbuf::Producer<
+            u8,
+            std::sync::Arc<ringbuf::SharedRb<u8, Vec<std::mem::MaybeUninit<u8>>>>,
+        >,
+    ),
+    U16(
+        ringbuf::Producer<
+            u16,
+            std::sync::Arc<ringbuf::SharedRb<u16, Vec<std::mem::MaybeUninit<u16>>>>,
+        >,
+    ),
+    U32(
+        ringbuf::Producer<
+            u32,
+            std::sync::Arc<ringbuf::SharedRb<u32, Vec<std::mem::MaybeUninit<u32>>>>,
+        >,
+    ),
+    F32(
+        ringbuf::Producer<
+            f32,
+            std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+        >,
+    ),
+}
+
+/// An audio consumer of several different kinds of data
+pub enum AudioConsumer {
+    U8(
+        ringbuf::Consumer<
+            u8,
+            std::sync::Arc<ringbuf::SharedRb<u8, Vec<std::mem::MaybeUninit<u8>>>>,
+        >,
+    ),
+    U16(
+        ringbuf::Consumer<
+            u16,
+            std::sync::Arc<ringbuf::SharedRb<u16, Vec<std::mem::MaybeUninit<u16>>>>,
+        >,
+    ),
+    U32(
+        ringbuf::Consumer<
+            u32,
+            std::sync::Arc<ringbuf::SharedRb<u32, Vec<std::mem::MaybeUninit<u32>>>>,
+        >,
+    ),
+    F32(
+        ringbuf::Consumer<
+            f32,
+            std::sync::Arc<ringbuf::SharedRb<f32, Vec<std::mem::MaybeUninit<f32>>>>,
+        >,
+    ),
+}
+
+impl AudioProducer {
+    pub fn push_slice(&mut self, slice: &AudioBuffer) {
+        match self {
+            AudioProducer::U8(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    d.push_slice(&s);
+                }
+                AudioBuffer::U16(s) => {
+                    for t in s {
+                        d.push((t >> 8) as u8);
+                    }
+                }
+                AudioBuffer::U32(s) => {
+                    for t in s {
+                        d.push((t >> 24) as u8);
+                    }
+                }
+                AudioBuffer::F32(s) => {
+                    for t in s {
+                        d.push((t / 255.0) as u8);
+                    }
+                }
+            },
+            AudioProducer::U16(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    for t in s {
+                        d.push((*t as u16) * 0x101);
+                    }
+                }
+                AudioBuffer::U16(s) => {
+                    d.push_slice(&s);
+                }
+                AudioBuffer::U32(s) => {
+                    for t in s {
+                        d.push((*t >> 16) as u16);
+                    }
+                }
+                AudioBuffer::F32(s) => {
+                    for t in s {
+                        d.push((t * 65535.0) as u16);
+                    }
+                }
+            },
+            AudioProducer::U32(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    for t in s {
+                        d.push((*t as u32) * 0x1010101);
+                    }
+                }
+                AudioBuffer::U16(s) => {
+                    for t in s {
+                        d.push((*t as u32) * 0x10001);
+                    }
+                }
+                AudioBuffer::U32(s) => {
+                    d.push_slice(&s);
+                }
+                AudioBuffer::F32(s) => {
+                    for t in s {
+                        d.push((t * 4294967295.0) as u32);
+                    }
+                }
+            },
+            AudioProducer::F32(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    for t in s {
+                        d.push((*t as f32) / 255.0);
+                    }
+                }
+                AudioBuffer::U16(s) => {
+                    for t in s {
+                        d.push((*t as f32) / 65535.0);
+                    }
+                }
+                AudioBuffer::U32(s) => {
+                    for t in s {
+                        d.push((*t as f32) / 4294967295.0);
+                    }
+                }
+                AudioBuffer::F32(s) => {
+                    d.push_slice(&s);
+                }
+            },
+        }
+    }
+
+    pub fn make_buffer(&self, size: usize) -> AudioBuffer {
+        match self {
+            AudioProducer::U8(_) => AudioBuffer::U8(vec![0; size]),
+            AudioProducer::U16(_) => AudioBuffer::U16(vec![0; size]),
+            AudioProducer::U32(_) => AudioBuffer::U32(vec![0; size]),
+            AudioProducer::F32(_) => AudioBuffer::F32(vec![0.0; size]),
+        }
+    }
+}
+
+pub enum AudioBuffer {
+    U8(Vec<u8>),
+    U16(Vec<u16>),
+    U32(Vec<u32>),
+    F32(Vec<f32>),
+}
+
+impl AudioBuffer {
+    pub fn gstreamer_slice(&self) -> Vec<u8> {
+        match self {
+            AudioBuffer::U8(d) => d.to_vec(),
+            AudioBuffer::U16(d) => d.iter().map(|a| a.to_le_bytes()).flatten().collect(),
+            AudioBuffer::U32(d) => d.iter().map(|a| a.to_le_bytes()).flatten().collect(),
+            AudioBuffer::F32(d) => d
+                .iter()
+                .map(|a| a.to_bits().to_le_bytes())
+                .flatten()
+                .collect(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            AudioBuffer::U8(d) => d.len(),
+            AudioBuffer::U16(d) => d.len(),
+            AudioBuffer::U32(d) => d.len(),
+            AudioBuffer::F32(d) => d.len(),
+        }
+    }
+
+    pub fn push(&mut self, index: usize, elem: AudioSample) {
+        match self {
+            AudioBuffer::U8(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = s;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = (s >> 8) as u8;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = (s >> 24) as u8;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = (s * 255.0) as u8;
+                }
+            },
+            AudioBuffer::U16(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = s as u16 * 0x101;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = s;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = (s >> 16) as u16;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = (s * 65535.0) as u16;
+                }
+            },
+            AudioBuffer::U32(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = s as u32 * 0x1010101;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = s as u32 * 0x10001;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = s;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = (s * 4294967295.0) as u32;
+                }
+            },
+            AudioBuffer::F32(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = (s as f32) / 255.0;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = (s as f32) / 65535.0;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = (s as f32) / 4294967295.0;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = s;
+                }
+            },
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum AudioSample {
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    F32(f32),
+}
+
 /// The various ways of producing samples of data
 enum AudioProducerMethod {
     /// A ring buffer is used to produce the audio
-    RingBuffer(crate::AudioProducer),
+    RingBuffer(AudioProducer),
     /// The audio is pushed directly to gstreamer for recordings
     GStreamer(gstreamer_app::AppSrc),
 }
 
 impl AudioProducerMethod {
     /// Push a slice of data to the audio producer
-    fn push_slice(&mut self, slice: &[f32]) {
+    fn push_slice(&mut self, slice: &AudioBuffer) {
         match self {
             AudioProducerMethod::RingBuffer(rb) => {
                 rb.push_slice(slice);
             }
             AudioProducerMethod::GStreamer(appsrc) => {
-                let b: Vec<u8> = slice
-                    .iter()
-                    .flat_map(|a| {
-                        let f = a + 1.0;
-                        let u = f.to_bits();
-                        u.to_le_bytes()
-                    })
-                    .collect();
+                let b: Vec<u8> = slice.gstreamer_slice();
                 let buf = gstreamer::Buffer::from_slice(b);
                 appsrc.do_timestamp();
                 let _e = appsrc.push_buffer(buf).is_err();
@@ -43,19 +288,20 @@ pub struct AudioProducerWithRate {
     /// The ringbuffer to put samples into
     producer: AudioProducerMethod,
     /// The buffer to put samples into
-    buffer: Vec<f32>,
+    buffer: AudioBuffer,
     /// The index of where to store samples
     buffer_index: usize,
 }
 
 impl AudioProducerWithRate {
     /// Build a new object
-    pub fn new(producer: crate::AudioProducer, size: usize) -> Self {
+    pub fn new(producer: AudioProducer, size: usize) -> Self {
+        let buf = producer.make_buffer(size);
         Self {
             interval: 1.0,
             counter: 0.0,
             producer: AudioProducerMethod::RingBuffer(producer),
-            buffer: vec![0.0; size],
+            buffer: buf,
             buffer_index: 0,
         }
     }
@@ -66,7 +312,7 @@ impl AudioProducerWithRate {
             interval,
             counter: 0.0,
             producer: AudioProducerMethod::GStreamer(src),
-            buffer: vec![0.0; size],
+            buffer: AudioBuffer::F32(Vec::new()),
             buffer_index: 0,
         }
     }
@@ -77,11 +323,11 @@ impl AudioProducerWithRate {
     }
 
     /// Fill the local audio buffer with data, returning a Some when it is full
-    fn fill_audio_buffer(&mut self, sample: f32) {
+    fn fill_audio_buffer(&mut self, sample: AudioSample) {
         self.counter += 1.0;
         if self.counter >= self.interval {
             self.counter -= self.interval;
-            self.buffer[self.buffer_index] = sample;
+            self.buffer.push(self.buffer_index, sample);
             let out = if self.buffer_index < (self.buffer.len() - 1) {
                 self.buffer_index += 1;
                 None
@@ -398,16 +644,19 @@ impl NesApu {
     }
 
     /// Build an audio sample and run the audio filter
-    fn build_audio_sample(&mut self, filter: &mut Option<biquad::DirectForm1<f32>>) -> Option<f32> {
+    fn build_audio_sample(
+        &mut self,
+        filter: &mut Option<biquad::DirectForm1<f32>>,
+    ) -> Option<AudioSample> {
         let audio = self.squares[0].audio()
             + self.squares[1].audio()
             + self.triangle.audio()
             + self.noise.audio()
             + self.dmc.audio();
         if let Some(filter) = filter {
-            let e = filter.run(audio / 2.5 - 1.0);
+            let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
-            Some(e)
+            Some(AudioSample::F32(e.min(1.0).max(0.0)))
         } else {
             None
         }
