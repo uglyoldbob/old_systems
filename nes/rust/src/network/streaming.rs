@@ -257,6 +257,11 @@ impl StreamingIn {
                 .build()
                 .expect("Could not create element.");
 
+            let vparse = gstreamer::ElementFactory::make("h264parse")
+                .name("vparse")
+                .build()
+                .expect("Could not create source element.");
+
             let vdecoder = gstreamer::ElementFactory::make("openh264dec")
                 .name("vdecode")
                 .build()
@@ -281,19 +286,20 @@ impl StreamingIn {
                     vsink.upcast_ref(),
                     &vdecoder,
                     &adecoder,
+                    &vparse,
                 ])
                 .unwrap();
             gstreamer::Element::link_many([source.upcast_ref(), &queue, &sconv, &demux]).unwrap();
             adecoder.link(&asink).expect("Failed to link to asink");
-            vdecoder.link(&vsink).expect("Failed to link to vsink");
-
-            let video_sink_pad = vdecoder
+            gstreamer::Element::link_many([&vparse, &vdecoder, vsink.upcast_ref()]).expect("Failed to link video parsing");
+            let video_sink_pad = vparse
                 .static_pad("sink")
                 .expect("could not get sink pad from vdecoder");
             let audio_sink_pad = adecoder
                 .static_pad("sink")
                 .expect("could not get sink pad from adecoder");
             demux.connect_pad_added(move |_src, src_pad| {
+                println!("connect pad added");
                 let is_video = if src_pad.name().starts_with("video") {
                     true
                 } else {
@@ -309,8 +315,8 @@ impl StreamingIn {
                 let connect_demux = || -> Result<(), u8> {
                     src_pad
                         .link(&video_sink_pad)
-                        .expect("failed to link tsdemux.video->h264parse.sink");
-                    println!("linked tsdemux->h264parse");
+                        .expect("failed to link tsdemux.video");
+                    println!("linked tsdemux to video decoder");
                     Ok(())
                 };
 
@@ -318,7 +324,7 @@ impl StreamingIn {
                     src_pad
                         .link(&audio_sink_pad)
                         .expect("failed to link audio to audio decoder");
-                    println!("linked tsdemux->h264parse");
+                    println!("linked tsdemux to audio decoder");
                     Ok(())
                 };
 
@@ -343,6 +349,7 @@ impl StreamingIn {
             self.pipeline = Some(pipeline);
             self.video = Some(vsink);
             self.audio = Some(asink);
+            self.stream_source = Some(source);
         }
     }
 
@@ -350,7 +357,6 @@ impl StreamingIn {
     pub fn send_data(&mut self, buffer: Vec<u8>) {
         if let Some(pipeline) = &mut self.pipeline {
             if let Some(source) = &mut self.stream_source {
-                println!("Received {} bytes of data from host", buffer.len());
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
                 for (a, b) in buffer.iter().zip(p.iter_mut()) {

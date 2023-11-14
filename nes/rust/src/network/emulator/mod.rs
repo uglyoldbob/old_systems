@@ -420,7 +420,6 @@ impl ConnectionHandler for Handler {
                                 Some(MessageToFromBehavior::ControllerData(i, d))
                             }
                             MessageToFromNetwork::EmulatorVideoStream(d) => {
-                                println!("Received some video data len {}", d.len());
                                 Some(MessageToFromBehavior::AvStream(d))
                             }
                         };
