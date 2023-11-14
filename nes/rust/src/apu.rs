@@ -145,6 +145,7 @@ impl AudioProducer {
     }
 
     pub fn make_buffer(&self, size: usize) -> AudioBuffer {
+        println!("Make audio buffer size {}", size);
         match self {
             AudioProducer::U8(_) => AudioBuffer::U8(vec![0; size]),
             AudioProducer::U16(_) => AudioBuffer::U16(vec![0; size]),
@@ -162,6 +163,12 @@ pub enum AudioBuffer {
 }
 
 impl AudioBuffer {
+
+    pub fn new_f32(size: usize) -> Self {
+        println!("Make audio bufferf size {}", size);
+        Self::F32(vec![0.0; size])
+    }
+
     pub fn gstreamer_slice(&self) -> Vec<u8> {
         match self {
             AudioBuffer::U8(d) => d.to_vec(),
@@ -312,7 +319,7 @@ impl AudioProducerWithRate {
             interval,
             counter: 0.0,
             producer: AudioProducerMethod::GStreamer(src),
-            buffer: AudioBuffer::F32(Vec::new()),
+            buffer: AudioBuffer::new_f32(size),
             buffer_index: 0,
         }
     }

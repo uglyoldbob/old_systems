@@ -108,18 +108,15 @@ where
 
 /// This is used to translate messages to and from the network.
 pub struct Codec {
-    /// The length to be received from the network.
-    length: Option<u32>,
-    /// The received data from the network.
-    received: VecDeque<u8>,
+    /// The actual worker here.
+    codec: asynchronous_codec::LengthCodec,
 }
 
 impl Codec {
     /// Create a new object.
     fn new() -> Self {
         Self {
-            length: None,
-            received: VecDeque::new(),
+            codec: asynchronous_codec::LengthCodec,
         }
     }
 }
@@ -133,44 +130,14 @@ impl asynchronous_codec::Decoder for Codec {
         &mut self,
         src: &mut asynchronous_codec::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
-        for el in src.iter() {
-            self.received.push_back(*el);
-        }
-        src.clear();
-
-        if self.length.is_none() && self.received.len() >= 4 {
-            let v = (self.received[3] as u32)
-                | (self.received[2] as u32) << 8
-                | (self.received[1] as u32) << 16
-                | (self.received[0] as u32) << 24;
-            self.length = Some(v);
-            self.received.pop_front();
-            self.received.pop_front();
-            self.received.pop_front();
-            self.received.pop_front();
-        }
-        if let Some(l) = &self.length {
-            if self.received.len() >= *l as usize {
-                match bincode::deserialize::<MessageToFromNetwork>(&Vec::from(
-                    self.received.clone(),
-                )) {
-                    Ok(i) => {
-                        self.length = None;
-                        self.received.clear();
-                        Ok(Some(i))
-                    }
-                    Err(e) => {
-                        println!("Error deserializing data {:?}", e);
-                        self.length = None;
-                        self.received.clear();
-                        Ok(None) //TODO convert into an actual error
-                    }
+        match self.codec.decode(src)? {
+            Some(bytes) => {
+                match bincode::deserialize::<MessageToFromNetwork>(&bytes.to_vec()) {
+                    Ok(m) => Ok(Some(m)),
+                    Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
                 }
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
+            },
+            None => Ok(None),
         }
     }
 }
@@ -186,9 +153,7 @@ impl asynchronous_codec::Encoder for Codec {
         dst: &mut asynchronous_codec::BytesMut,
     ) -> Result<(), Self::Error> {
         let data = bincode::serialize(&item).unwrap();
-        libp2p::bytes::BufMut::put_u32(dst, data.len() as u32);
-        libp2p::bytes::BufMut::put_slice(dst, &data);
-        Ok(())
+        self.codec.encode(asynchronous_codec::Bytes::from(data), dst)
     }
 }
 
@@ -402,8 +367,8 @@ impl ConnectionHandler for Handler {
                             Ok(a) => {
                                 let c = a.buffer();
                                 if let Some(buf) = c {
-                                    let mut v: Vec<u8> = Vec::with_capacity(buf.size());
-                                    if let Ok(()) = buf.copy_to_slice(buf.size(), &mut v) {
+                                    let mut v: Vec<u8> = vec![0; buf.size()];
+                                    if let Ok(()) = buf.copy_to_slice(0, &mut v) {
                                         match out.start_send_unpin(
                                             MessageToFromNetwork::EmulatorVideoStream(v),
                                         ) {
@@ -458,6 +423,7 @@ impl ConnectionHandler for Handler {
                                 Some(MessageToFromBehavior::ControllerData(i, d))
                             }
                             MessageToFromNetwork::EmulatorVideoStream(d) => {
+                                println!("Received some video data len {}", d.len());
                                 Some(MessageToFromBehavior::AvStream(d))
                             }
                         };

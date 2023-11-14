@@ -438,6 +438,7 @@ impl Network {
                     self.audio = Some(a);
                 }
                 MessageFromNetworkThread::AvStream(d) => {
+                    println!("Parsing avstream data length {}", d.len());
                     self.streamin.send_data(d);
                 }
                 MessageFromNetworkThread::ConnectedToHost => {
@@ -531,15 +532,21 @@ impl Network {
     }
 
     pub fn get_video_data(&mut self, i: &mut crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
+        let vs = self.streamin.video_source();
+        if let Some(vs) = vs {
+            let s = vs.pull_sample();
+            if let Ok(s) = s {
+                if let Some(sb) = s.buffer() {
+                    println!("Received buffer sized {}", sb.size());
+                }
+            }
+        }
     }
 
     /// Provide video data as a server to all clients.
     pub fn video_data(&mut self, i: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
         if self.sender.is_full() {
             println!("Gonna have a bad time since the sender is full");
-        }
-        else {
-            println!("Video sender is not full");
         }
         self.sender
             .send_blocking(MessageToNetworkThread::VideoData(i.to_gstreamer_vec()));

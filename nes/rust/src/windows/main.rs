@@ -484,6 +484,9 @@ impl TrackedWindow for MainNesWindow {
             if let Some(network) = &mut olocal.network {
                 match network.role() {
                     NodeRole::Observer | NodeRole::Player => {
+                        if render {
+                            network.get_video_data(&mut c.local.image);
+                        }
                         render = false;
                     }
                     NodeRole::PlayerHost => {

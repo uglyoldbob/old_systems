@@ -78,7 +78,7 @@ impl StreamingOut {
                 .name("network_sink")
                 .build();
 
-            audio_source.set_block(true);
+            audio_source.set_block(false);
             app_source.set_do_timestamp(true);
             app_source.set_is_live(true);
             audio_source.set_is_live(true);
@@ -218,6 +218,11 @@ impl StreamingIn {
         }
     }
 
+    /// Return a mutable reference to the source of video
+    pub fn video_source(&mut self) -> &mut Option<gstreamer_app::AppSink> {
+        &mut self.video
+    }
+
     /// Returns true if streaming
     pub fn is_streaming(&self) -> bool {
         self.pipeline.is_some()
@@ -232,6 +237,11 @@ impl StreamingIn {
             let source = gstreamer_app::AppSrc::builder()
                 .name("emulator_av_mpeg")
                 .build();
+
+            let queue = gstreamer::ElementFactory::make("queue")
+                .name("queue")
+                .build()
+                .expect("Could not create element.");
 
             let sconv = gstreamer::ElementFactory::make("tsparse")
                 .name("tsparse")
@@ -260,6 +270,7 @@ impl StreamingIn {
             pipeline
                 .add_many([
                     &sconv,
+                    &queue,
                     source.upcast_ref(),
                     &demux,
                     asink.upcast_ref(),
@@ -268,7 +279,8 @@ impl StreamingIn {
                     &adecoder,
                 ])
                 .unwrap();
-            gstreamer::Element::link_many([source.upcast_ref(), &sconv, &demux]).unwrap();
+            gstreamer::Element::link_many([source.upcast_ref(), &queue, &sconv, &demux]).unwrap();
+            adecoder.link(&asink).expect("Failed to link to asink");
             vdecoder.link(&vsink).expect("Failed to link to vsink");
 
             let video_sink_pad = vdecoder
@@ -332,7 +344,7 @@ impl StreamingIn {
 
     /// Send data to the receiving end of the pipeline
     pub fn send_data(&mut self, buffer: Vec<u8>) {
-        if let Some(_pipeline) = &mut self.pipeline {
+        if let Some(pipeline) = &mut self.pipeline {
             if let Some(source) = &mut self.stream_source {
                 println!("Received {} bytes of data from host", buffer.len());
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
@@ -349,6 +361,9 @@ impl StreamingIn {
                     }
                 }
             }
+            let dot =
+                    gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
+                std::fs::write("./pipeline_stream_in.dot", dot).expect("Unable to write pipeline file");
         }
     }
 
