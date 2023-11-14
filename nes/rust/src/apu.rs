@@ -61,10 +61,82 @@ pub enum AudioConsumer {
 impl AudioProducer {
     pub fn push_slice(&mut self, slice: &AudioBuffer) {
         match self {
-            AudioProducer::U8(d) => todo!(),
-            AudioProducer::U16(d) => todo!(),
-            AudioProducer::U32(d) => todo!(),
-            AudioProducer::F32(d) => todo!(),
+            AudioProducer::U8(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    d.push_slice(&s);
+                }
+                AudioBuffer::U16(s) => {
+                    for t in s {
+                        d.push((t >> 8) as u8);
+                    }
+                }
+                AudioBuffer::U32(s) => for t in s {
+                    d.push((t >> 24) as u8);
+                }
+                AudioBuffer::F32(s) => for t in s {
+                    d.push((t / 255.0) as u8);
+                }
+            }
+            AudioProducer::U16(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    for t in s {
+                        d.push((*t as u16) * 0x101);
+                    }
+                }
+                AudioBuffer::U16(s) => {
+                    d.push_slice(&s);
+                }
+                AudioBuffer::U32(s) => {
+                    for t in s {
+                        d.push((*t >> 16) as u16);
+                    }
+                }
+                AudioBuffer::F32(s) => {
+                    for t in s {
+                        d.push((t * 65535.0) as u16);
+                    }
+                }
+            }
+            AudioProducer::U32(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    for t in s {
+                        d.push((*t as u32) * 0x1010101);
+                    }
+                }
+                AudioBuffer::U16(s) => {
+                    for t in s {
+                        d.push((*t as u32) * 0x10001);
+                    }
+                }
+                AudioBuffer::U32(s) => {
+                    d.push_slice(&s);
+                }
+                AudioBuffer::F32(s) => {
+                    for t in s {
+                        d.push((t * 4294967295.0) as u32);
+                    }
+                }
+            }
+            AudioProducer::F32(d) => match slice {
+                AudioBuffer::U8(s) => {
+                    for t in s {
+                        d.push((*t as f32) / 255.0);
+                    }
+                }
+                AudioBuffer::U16(s) => {
+                    for t in s {
+                        d.push((*t as f32) / 65535.0);
+                    }
+                }
+                AudioBuffer::U32(s) => {
+                    for t in s {
+                        d.push((*t as f32) / 4294967295.0);
+                    }
+                }
+                AudioBuffer::F32(s) => {
+                    d.push_slice(&s);
+                }
+            }
         }
     }
 
@@ -88,16 +160,12 @@ pub enum AudioBuffer {
 impl AudioBuffer {
     pub fn gstreamer_slice(&self) -> Vec<u8> {
         match self {
-            AudioBuffer::U8(d) => todo!(),
-            AudioBuffer::U16(d) => todo!(),
-            AudioBuffer::U32(d) => todo!(),
+            AudioBuffer::U8(d) => d.to_vec(),
+            AudioBuffer::U16(d) => d.iter().map(|a| a.to_le_bytes()).flatten().collect(),
+            AudioBuffer::U32(d) => d.iter().map(|a| a.to_le_bytes()).flatten().collect(),
             AudioBuffer::F32(d) => d
                 .iter()
-                .map(|a| {
-                    let f = a + 1.0;
-                    let u = f.to_bits();
-                    u.to_le_bytes()
-                })
+                .map(|a| a.to_bits().to_le_bytes())
                 .flatten()
                 .collect(),
         }
@@ -128,9 +196,48 @@ impl AudioBuffer {
                     d[index] = (s * 255.0) as u8;
                 }
             },
-            AudioBuffer::U16(d) => todo!(),
-            AudioBuffer::U32(d) => todo!(),
-            AudioBuffer::F32(d) => todo!(),
+            AudioBuffer::U16(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = s as u16 * 0x101;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = s;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = (s >> 16) as u16;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = (s * 65535.0) as u16;
+                }
+            },
+            AudioBuffer::U32(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = s as u32 * 0x1010101;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = s as u32 * 0x10001;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = s;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = (s * 4294967295.0) as u32;
+                }
+            },
+            AudioBuffer::F32(d) => match elem {
+                AudioSample::U8(s) => {
+                    d[index] = (s as f32) / 255.0;
+                }
+                AudioSample::U16(s) => {
+                    d[index] = (s as f32) / 65535.0;
+                }
+                AudioSample::U32(s) => {
+                    d[index] = (s as f32) / 4294967295.0;
+                }
+                AudioSample::F32(s) => {
+                    d[index] = s;
+                }
+            },
         }
     }
 }
