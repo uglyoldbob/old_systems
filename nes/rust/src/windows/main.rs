@@ -486,6 +486,9 @@ impl TrackedWindow for MainNesWindow {
                     NodeRole::Observer | NodeRole::Player => {
                         if render {
                             network.get_video_data(&mut c.local.image);
+                            if let Some(sound) = &mut self.sound {
+                                network.push_audio(sound);
+                            }
                         }
                         render = false;
                     }

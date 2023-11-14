@@ -223,6 +223,11 @@ impl StreamingIn {
         &mut self.video
     }
 
+    /// Return a mutable reference to the source of audio
+    pub fn audio_source(&mut self) -> &mut Option<gstreamer_app::AppSink> {
+        &mut self.audio
+    }
+
     /// Returns true if streaming
     pub fn is_streaming(&self) -> bool {
         self.pipeline.is_some()
@@ -290,7 +295,9 @@ impl StreamingIn {
             let asink = gstreamer_app::AppSink::builder().name("audio_sink").build();
             let vsink = gstreamer_app::AppSink::builder().name("video_sink").build();
 
-            let vcaps = gstreamer_video::VideoCapsBuilder::new().format(gstreamer_video::VideoFormat::Rgb).build();
+            let vcaps = gstreamer_video::VideoCapsBuilder::new()
+                .format(gstreamer_video::VideoFormat::Rgb)
+                .build();
 
             vsink.set_caps(Some(&vcaps));
 

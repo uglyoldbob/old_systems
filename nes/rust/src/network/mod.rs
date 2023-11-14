@@ -389,6 +389,8 @@ pub struct Network {
     streamin: StreamingIn,
     /// Placeholder for transferring the audio producer to the host
     audio: Option<AudioProducerWithRate>,
+    /// The transfer object for moving audio data from the pipeline to the user's ears or whatever.
+    audio_buffer: Vec<u8>,
 }
 
 impl Network {
@@ -417,6 +419,7 @@ impl Network {
             connected: false,
             streamin: StreamingIn::new(),
             audio: None,
+            audio_buffer: Vec::new(),
         }
     }
 
@@ -530,6 +533,37 @@ impl Network {
         self.audio.take()
     }
 
+    pub fn push_audio(&mut self, sound: &mut crate::apu::AudioProducerWithRate) {
+        let a = self.streamin.audio_source();
+        if let Some(a) = a {
+            let sample = a.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
+            if let Some(sample) = sample {
+                if let Some(sb) = sample.buffer() {
+                    println!("Copying {} audio bytes to output?", sb.size());
+                    self.audio_buffer.resize(sb.size(), 0);
+                    sb.copy_to_slice(0, &mut self.audio_buffer)
+                        .expect("Failed to copy audio data from pipeline");
+                    let mut abuf = sound.make_buffer(crate::apu::AudioSample::F32(0.0), &self.audio_buffer);
+                    sound.fill_with_buffer(&mut abuf);
+                }
+            }
+        }
+    }
+
+    pub fn get_audio_data(&mut self, i: &mut Vec<u8>) {
+        let a = self.streamin.audio_source();
+        if let Some(a) = a {
+            let sample = a.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
+            if let Some(sample) = sample {
+                if let Some(sb) = sample.buffer() {
+                    i.resize(sb.size(), 0);
+                    sb.copy_to_slice(0, i)
+                        .expect("Failed to copy audio data from pipeline");
+                }
+            }
+        }
+    }
+
     pub fn get_video_data(&mut self, i: &mut crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
         let vs = self.streamin.video_source();
         if let Some(vs) = vs {
@@ -537,7 +571,8 @@ impl Network {
             if let Some(s) = s {
                 if let Some(sb) = s.buffer() {
                     let mut v: Vec<u8> = vec![0; sb.size()];
-                    sb.copy_to_slice(0, &mut v).expect("Failed to copy frame to vector");
+                    sb.copy_to_slice(0, &mut v)
+                        .expect("Failed to copy frame to vector");
                     i.receive_from_gstreamer(v);
                     println!("Received buffer sized {}", sb.size());
                 }

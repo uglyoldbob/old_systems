@@ -155,6 +155,30 @@ impl AudioProducer {
     }
 }
 
+pub struct AudioBufferIterator<'a> {
+    data: &'a AudioBuffer,
+    index: usize,
+}
+
+impl<'a> Iterator for AudioBufferIterator<'a> {
+    type Item = AudioSample;
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = if self.index < self.data.len() {
+            Some(match self.data {
+                AudioBuffer::U8(d) => AudioSample::U8(d[self.index]),
+                AudioBuffer::U16(d) => AudioSample::U16(d[self.index]),
+                AudioBuffer::U32(d) => AudioSample::U32(d[self.index]),
+                AudioBuffer::F32(d) => AudioSample::F32(d[self.index]),
+            })
+        }
+        else {
+            None
+        };
+        self.index += 1;
+        result
+    }
+}
+
 pub enum AudioBuffer {
     U8(Vec<u8>),
     U16(Vec<u16>),
@@ -163,6 +187,13 @@ pub enum AudioBuffer {
 }
 
 impl AudioBuffer {
+    pub fn iter(&self) -> AudioBufferIterator {
+        AudioBufferIterator {
+            data: &self,
+            index: 0,
+        }
+    }
+
     pub fn new_f32(size: usize) -> Self {
         println!("Make audio bufferf size {}", size);
         Self::F32(vec![0.0; size])
@@ -190,7 +221,7 @@ impl AudioBuffer {
         }
     }
 
-    pub fn push(&mut self, index: usize, elem: AudioSample) {
+    pub fn place(&mut self, index: usize, elem: AudioSample) {
         match self {
             AudioBuffer::U8(d) => match elem {
                 AudioSample::U8(s) => {
@@ -328,12 +359,44 @@ impl AudioProducerWithRate {
         self.interval = i;
     }
 
+    /// Fill the local buffer from another audiobuffer
+    pub fn fill_with_buffer(&mut self, buf: &AudioBuffer) {
+        self.producer.push_slice(buf);
+    }
+
+    pub fn make_buffer(&self, t: AudioSample, d: &Vec<u8>) -> AudioBuffer {
+        match t {
+            AudioSample::U8(_) => AudioBuffer::U8(d.to_vec()),
+            AudioSample::U16(_) => {
+                let a: Vec<u16> = d
+                    .chunks_exact(2)
+                    .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                    .collect();
+                AudioBuffer::U16(a)
+            }
+            AudioSample::U32(_) => {
+                let a: Vec<u32> = d
+                    .chunks_exact(4)
+                    .map(|bytes| u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                    .collect();
+                AudioBuffer::U32(a)
+            }
+            AudioSample::F32(_) => {
+                let a: Vec<f32> = d
+                    .chunks_exact(4)
+                    .map(|bytes| f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+                    .collect();
+                AudioBuffer::F32(a)
+            }
+        }
+    }
+
     /// Fill the local audio buffer with data, returning a Some when it is full
     fn fill_audio_buffer(&mut self, sample: AudioSample) {
         self.counter += 1.0;
         if self.counter >= self.interval {
             self.counter -= self.interval;
-            self.buffer.push(self.buffer_index, sample);
+            self.buffer.place(self.buffer_index, sample);
             let out = if self.buffer_index < (self.buffer.len() - 1) {
                 self.buffer_index += 1;
                 None
