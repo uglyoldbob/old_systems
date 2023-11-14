@@ -438,7 +438,6 @@ impl Network {
                     self.audio = Some(a);
                 }
                 MessageFromNetworkThread::AvStream(d) => {
-                    println!("Parsing avstream data length {}", d.len());
                     self.streamin.send_data(d);
                 }
                 MessageFromNetworkThread::ConnectedToHost => {

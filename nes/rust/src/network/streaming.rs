@@ -272,6 +272,16 @@ impl StreamingIn {
                 .build()
                 .expect("Could not create source element.");
 
+            let aqueue = gstreamer::ElementFactory::make("queue")
+                .name("aqueue")
+                .build()
+                .expect("Could not create element.");
+
+            let vqueue = gstreamer::ElementFactory::make("queue")
+                .name("vqueue")
+                .build()
+                .expect("Could not create element.");
+
             let asink = gstreamer_app::AppSink::builder().name("audio_sink").build();
             let vsink = gstreamer_app::AppSink::builder().name("video_sink").build();
 
@@ -286,12 +296,14 @@ impl StreamingIn {
                     vsink.upcast_ref(),
                     &vdecoder,
                     &adecoder,
+                    &aqueue,
+                    &vqueue,
                     &vparse,
                 ])
                 .unwrap();
             gstreamer::Element::link_many([source.upcast_ref(), &queue, &sconv, &demux]).unwrap();
-            adecoder.link(&asink).expect("Failed to link to asink");
-            gstreamer::Element::link_many([&vparse, &vdecoder, vsink.upcast_ref()]).expect("Failed to link video parsing");
+            gstreamer::Element::link_many([&adecoder, &aqueue, &asink.upcast_ref()]).expect("Failed to link to audio parsing");
+            gstreamer::Element::link_many([&vparse, &vdecoder, &vqueue, vsink.upcast_ref()]).expect("Failed to link video parsing");
             let video_sink_pad = vparse
                 .static_pad("sink")
                 .expect("could not get sink pad from vdecoder");
