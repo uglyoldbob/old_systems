@@ -417,8 +417,41 @@ fn main() {
     let mut sound_producer = None;
     let sound_stream = if let Some(d) = &device {
         let ranges = d.supported_output_configs();
-        if let Ok(mut r) = ranges {
-            let supportedconfig = r.next().unwrap().with_max_sample_rate();
+        if let Ok(r) = ranges {
+            let mut configs: Vec<cpal::SupportedStreamConfigRange> = r.collect();
+            for c in &configs {
+                println!(
+                    "Audio: {:?} {:?}-{:?}",
+                    c.sample_format(),
+                    c.min_sample_rate(),
+                    c.max_sample_rate()
+                );
+            }
+            configs.sort_by(|c, d| {
+                let index = |sf| match sf {
+                    cpal::SampleFormat::I8 => 10,
+                    cpal::SampleFormat::I16 => 10,
+                    cpal::SampleFormat::I32 => 10,
+                    cpal::SampleFormat::I64 => 10,
+                    cpal::SampleFormat::U8 => 3,
+                    cpal::SampleFormat::U16 => 1,
+                    cpal::SampleFormat::U32 => 0,
+                    cpal::SampleFormat::U64 => 10,
+                    cpal::SampleFormat::F32 => 2,
+                    cpal::SampleFormat::F64 => 10,
+                    _ => 10,
+                };
+                let ic = index(c.sample_format());
+                let id = index(d.sample_format());
+                ic.partial_cmp(&id).unwrap()
+            });
+            configs.sort_by(|c, d| {
+                c.max_sample_rate()
+                    .partial_cmp(&d.max_sample_rate())
+                    .unwrap()
+            });
+
+            let supportedconfig = configs[0].clone().with_max_sample_rate();
             let format = supportedconfig.sample_format();
             println!("output format is {:?}", format);
             let mut config = supportedconfig.config();
@@ -457,7 +490,7 @@ fn main() {
                     let user_audio =
                         AudioProducerWithRate::new(AudioProducer::U8(producer), num_samples * 2);
 
-                    let mut stream = d
+                    let stream = d
                         .build_output_stream(
                             &config,
                             move |data: &mut [u8], _cb: &cpal::OutputCallbackInfo| {
@@ -483,7 +516,7 @@ fn main() {
                     let user_audio =
                         AudioProducerWithRate::new(AudioProducer::U16(producer), num_samples * 2);
 
-                    let mut stream = d
+                    let stream = d
                         .build_output_stream(
                             &config,
                             move |data: &mut [u16], _cb: &cpal::OutputCallbackInfo| {
@@ -509,7 +542,7 @@ fn main() {
                     let user_audio =
                         AudioProducerWithRate::new(AudioProducer::U32(producer), num_samples * 2);
 
-                    let mut stream = d
+                    let stream = d
                         .build_output_stream(
                             &config,
                             move |data: &mut [u32], _cb: &cpal::OutputCallbackInfo| {
@@ -535,7 +568,7 @@ fn main() {
                     let user_audio =
                         AudioProducerWithRate::new(AudioProducer::F32(producer), num_samples * 2);
 
-                    let mut stream = d
+                    let stream = d
                         .build_output_stream(
                             &config,
                             move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {

@@ -70,13 +70,17 @@ impl AudioProducer {
                         d.push((t >> 8) as u8);
                     }
                 }
-                AudioBuffer::U32(s) => for t in s {
-                    d.push((t >> 24) as u8);
+                AudioBuffer::U32(s) => {
+                    for t in s {
+                        d.push((t >> 24) as u8);
+                    }
                 }
-                AudioBuffer::F32(s) => for t in s {
-                    d.push((t / 255.0) as u8);
+                AudioBuffer::F32(s) => {
+                    for t in s {
+                        d.push((t / 255.0) as u8);
+                    }
                 }
-            }
+            },
             AudioProducer::U16(d) => match slice {
                 AudioBuffer::U8(s) => {
                     for t in s {
@@ -96,7 +100,7 @@ impl AudioProducer {
                         d.push((t * 65535.0) as u16);
                     }
                 }
-            }
+            },
             AudioProducer::U32(d) => match slice {
                 AudioBuffer::U8(s) => {
                     for t in s {
@@ -116,7 +120,7 @@ impl AudioProducer {
                         d.push((t * 4294967295.0) as u32);
                     }
                 }
-            }
+            },
             AudioProducer::F32(d) => match slice {
                 AudioBuffer::U8(s) => {
                     for t in s {
@@ -136,7 +140,7 @@ impl AudioProducer {
                 AudioBuffer::F32(s) => {
                     d.push_slice(&s);
                 }
-            }
+            },
         }
     }
 
@@ -652,7 +656,7 @@ impl NesApu {
         if let Some(filter) = filter {
             let e = filter.run(audio / 5.0);
             self.output_index += 1.0;
-            Some(AudioSample::F32(e))
+            Some(AudioSample::F32(e.min(1.0).max(0.0)))
         } else {
             None
         }
