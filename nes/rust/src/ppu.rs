@@ -46,6 +46,14 @@ pub struct PixelImage<T> {
 }
 
 impl PixelImage<egui::Color32> {
+    /// Apply data received from gstreamer to this image
+    pub fn receive_from_gstreamer(&mut self, d: Vec<u8>) {
+        for (i, p) in d.chunks(3).enumerate() {
+            let pixel = egui::Color32::from_rgb(p[0], p[1], p[2]);
+            self.pixels[i] = pixel;
+        }
+    }
+
     /// Converts the image to an egui usable format
     pub fn to_egui(self) -> egui::ColorImage {
         egui::ColorImage {
