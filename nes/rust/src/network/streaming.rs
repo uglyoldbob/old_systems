@@ -267,6 +267,11 @@ impl StreamingIn {
                 .build()
                 .expect("Could not create source element.");
 
+            let vconv = gstreamer::ElementFactory::make("videoconvert")
+                .name("vconvert")
+                .build()
+                .expect("Could not create source element.");
+
             let adecoder = gstreamer::ElementFactory::make("avdec_ac3")
                 .name("adecode")
                 .build()
@@ -285,6 +290,10 @@ impl StreamingIn {
             let asink = gstreamer_app::AppSink::builder().name("audio_sink").build();
             let vsink = gstreamer_app::AppSink::builder().name("video_sink").build();
 
+            let vcaps = gstreamer_video::VideoCapsBuilder::new().format(gstreamer_video::VideoFormat::Rgb).build();
+
+            vsink.set_caps(Some(&vcaps));
+
             let pipeline = gstreamer::Pipeline::with_name("receiving-pipeline");
             pipeline
                 .add_many([
@@ -299,11 +308,20 @@ impl StreamingIn {
                     &aqueue,
                     &vqueue,
                     &vparse,
+                    &vconv,
                 ])
                 .unwrap();
             gstreamer::Element::link_many([source.upcast_ref(), &queue, &sconv, &demux]).unwrap();
-            gstreamer::Element::link_many([&adecoder, &aqueue, &asink.upcast_ref()]).expect("Failed to link to audio parsing");
-            gstreamer::Element::link_many([&vparse, &vdecoder, &vqueue, vsink.upcast_ref()]).expect("Failed to link video parsing");
+            gstreamer::Element::link_many([&adecoder, &aqueue, &asink.upcast_ref()])
+                .expect("Failed to link to audio parsing");
+            gstreamer::Element::link_many([
+                &vparse,
+                &vdecoder,
+                &vqueue,
+                &vconv,
+                vsink.upcast_ref(),
+            ])
+            .expect("Failed to link video parsing");
             let video_sink_pad = vparse
                 .static_pad("sink")
                 .expect("could not get sink pad from vdecoder");
