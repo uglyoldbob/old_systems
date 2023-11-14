@@ -363,8 +363,8 @@ impl ConnectionHandler for Handler {
                         }
                     }
                     if let Some(source) = &mut self.avsink {
-                        match source.pull_sample() {
-                            Ok(a) => {
+                        match source.try_pull_sample(gstreamer::ClockTime::from_mseconds(1)) {
+                            Some(a) => {
                                 let c = a.buffer();
                                 if let Some(buf) = c {
                                     let mut v: Vec<u8> = vec![0; buf.size()];
@@ -386,8 +386,8 @@ impl ConnectionHandler for Handler {
                                     }
                                 }
                             }
-                            Err(e) => {
                                 println!("Failed to pull sample {}", e);
+                            None => {
                             }
                         }
                     }

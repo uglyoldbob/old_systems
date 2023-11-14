@@ -238,6 +238,10 @@ impl StreamingIn {
                 .name("emulator_av_mpeg")
                 .build();
 
+            source.set_block(false);
+            source.set_do_timestamp(true);
+            source.set_is_live(true);
+
             let queue = gstreamer::ElementFactory::make("queue")
                 .name("queue")
                 .build()

@@ -534,8 +534,8 @@ impl Network {
     pub fn get_video_data(&mut self, i: &mut crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
         let vs = self.streamin.video_source();
         if let Some(vs) = vs {
-            let s = vs.pull_sample();
-            if let Ok(s) = s {
+            let s = vs.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
+            if let Some(s) = s {
                 if let Some(sb) = s.buffer() {
                     println!("Received buffer sized {}", sb.size());
                 }
