@@ -163,7 +163,6 @@ pub enum AudioBuffer {
 }
 
 impl AudioBuffer {
-
     pub fn new_f32(size: usize) -> Self {
         println!("Make audio bufferf size {}", size);
         Self::F32(vec![0.0; size])

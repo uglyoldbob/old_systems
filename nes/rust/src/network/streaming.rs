@@ -366,8 +366,8 @@ impl StreamingIn {
                 }
             }
             let dot =
-                    gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-                std::fs::write("./pipeline_stream_in.dot", dot).expect("Unable to write pipeline file");
+                gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
+            std::fs::write("./pipeline_stream_in.dot", dot).expect("Unable to write pipeline file");
         }
     }
 

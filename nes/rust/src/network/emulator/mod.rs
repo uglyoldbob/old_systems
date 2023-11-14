@@ -131,11 +131,9 @@ impl asynchronous_codec::Decoder for Codec {
         src: &mut asynchronous_codec::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
         match self.codec.decode(src)? {
-            Some(bytes) => {
-                match bincode::deserialize::<MessageToFromNetwork>(&bytes.to_vec()) {
-                    Ok(m) => Ok(Some(m)),
-                    Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-                }
+            Some(bytes) => match bincode::deserialize::<MessageToFromNetwork>(&bytes.to_vec()) {
+                Ok(m) => Ok(Some(m)),
+                Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
             },
             None => Ok(None),
         }
@@ -153,7 +151,8 @@ impl asynchronous_codec::Encoder for Codec {
         dst: &mut asynchronous_codec::BytesMut,
     ) -> Result<(), Self::Error> {
         let data = bincode::serialize(&item).unwrap();
-        self.codec.encode(asynchronous_codec::Bytes::from(data), dst)
+        self.codec
+            .encode(asynchronous_codec::Bytes::from(data), dst)
     }
 }
 
@@ -386,9 +385,7 @@ impl ConnectionHandler for Handler {
                                     }
                                 }
                             }
-                                println!("Failed to pull sample {}", e);
-                            None => {
-                            }
+                            None => {}
                         }
                     }
                 }
