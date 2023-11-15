@@ -40,6 +40,7 @@ pub enum MessageToNetworkThread {
         height: u16,
         framerate: u8,
         cpu_frequency: f32,
+        role: NodeRole,
     },
     /// Signal to stop PlayerHost mode
     StopServer,
@@ -83,6 +84,8 @@ pub enum MessageFromNetworkThread {
     SetController(Option<u8>),
     /// An audio producer for an emulator host
     AudioProducer(AudioProducerWithRate),
+    /// A player or observer disconnected from a server
+    PlayerObserverDisconnect(libp2p::PeerId),
 }
 
 /// This describes the behaviour of a libp2p swarm
@@ -173,7 +176,7 @@ impl InternalNetwork {
                                                 crate::event::EventType::CheckNetwork,
                                             ));
                                         }
-                                        MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency } => {
+                                        MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency, role } => {
                                             if self.listener.is_none() {
                                                 let listenres = self.swarm
                                                 .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
@@ -183,7 +186,7 @@ impl InternalNetwork {
                                                 println!("Server start result is {:?}", listenres);
                                                 let s = self.listener.is_some();
                                                 let behavior = self.swarm.behaviour_mut();
-                                                behavior.emulator.send_server_details(width, height, framerate, cpu_frequency);
+                                                behavior.emulator.send_server_details(width, height, framerate, cpu_frequency, role);
                                                 self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
                                                 self.proxy.send_event(crate::event::Event::new_general(
                                                     crate::event::EventType::CheckNetwork,
@@ -195,6 +198,10 @@ impl InternalNetwork {
                             },
                             ev = f1 => {
                                 match ev {
+                                    libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, connection_id, endpoint, num_established, cause } => {
+                                        let behavior = self.swarm.behaviour_mut();
+                                        behavior.emulator.disconnect(peer_id);
+                                    }
                                     libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
                                         println!("Listening on {address:?}");
                                         self.sender
@@ -441,6 +448,18 @@ impl Network {
     pub fn process_messages(&mut self) {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
+                MessageFromNetworkThread::PlayerObserverDisconnect(peer) => {
+                    /// Disconnect that players controller and release the buttons
+                    for i in 0..4 {
+                        if let Some(p) = self.controller_holder[i] {
+                            if peer == p {
+                                self.buttons[i].map(|mut b| b.clear_buttons());
+                                self.controller_holder[i] = None;
+                                break;
+                            }
+                        }
+                    }
+                }
                 MessageFromNetworkThread::AudioProducer(a) => {
                     self.audio = Some(a);
                 }
@@ -474,6 +493,7 @@ impl Network {
                         for i in 0..4 {
                             if let Some(peer) = self.controller_holder[i] {
                                 if peer == p {
+                                    self.buttons[i].map(|mut b| b.clear_buttons());
                                     self.controller_holder[i] = None;
                                     self.sender.send_blocking(
                                         MessageToNetworkThread::SetController(p, None),
@@ -543,7 +563,6 @@ impl Network {
             let sample = a.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
             if let Some(sample) = sample {
                 if let Some(sb) = sample.buffer() {
-                    println!("Copying {} audio bytes to output?", sb.size());
                     self.audio_buffer.resize(sb.size(), 0);
                     sb.copy_to_slice(0, &mut self.audio_buffer)
                         .expect("Failed to copy audio data from pipeline");
@@ -579,7 +598,6 @@ impl Network {
                     sb.copy_to_slice(0, &mut v)
                         .expect("Failed to copy frame to vector");
                     i.receive_from_gstreamer(v);
-                    println!("Received buffer sized {}", sb.size());
                 }
             }
         }
@@ -635,6 +653,7 @@ impl Network {
                 height,
                 framerate,
                 cpu_frequency,
+                role: NodeRole::PlayerHost,
             });
     }
 

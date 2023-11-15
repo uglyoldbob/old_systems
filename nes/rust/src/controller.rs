@@ -220,6 +220,13 @@ impl ButtonCombination {
         }
     }
 
+    /// Clear all buttons on a button combo
+    pub fn clear_buttons(&mut self) {
+        for i in BUTTON_COMBO_A..=BUTTON_COMBO_POWERPAD {
+            self.clear_button(i);
+        }
+    }
+
     /// Update button information with button data from gilrs
     pub fn update_gilrs_buttons(
         &mut self,

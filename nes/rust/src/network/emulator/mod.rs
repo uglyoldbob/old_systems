@@ -1,7 +1,7 @@
 //! A module that implements a custom protocl for libp2p.
 
 use std::{
-    collections::VecDeque,
+    collections::{VecDeque, HashSet},
     pin::Pin,
     sync::{Arc, Mutex},
     task::Waker,
@@ -55,7 +55,7 @@ impl AsRef<str> for ProtocolId {
 }
 
 /// Represents the protocols compatible with the node.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Protocol {
     /// The list of compatible protocols.
     protocols: Vec<ProtocolId>,
@@ -267,6 +267,12 @@ impl std::fmt::Debug for MessageToFromBehavior {
             Self::AvStream(arg0) => f.debug_tuple("AvStream").field(arg0).finish(),
             Self::AudioProducer(_arg0) => Ok(()),
         }
+    }
+}
+
+impl Drop for Handler {
+    fn drop(&mut self) {
+        println!("Dropping a handler");
     }
 }
 
@@ -487,7 +493,9 @@ impl ConnectionHandler for Handler {
                     asynchronous_codec::Framed::new(a, c),
                 )));
             }
-            _ => {}
+            e => {
+                println!("Received other connection event {:?}", e);
+            }
         }
     }
 }
@@ -540,15 +548,17 @@ pub struct Behavior {
     /// The waker to wake up the poll routine for this struct.
     waker: Arc<Mutex<Option<Waker>>>,
     /// The list of clients connected to this node.
-    clients: Vec<PeerId>,
+    clients: HashSet<PeerId>,
     /// The list of servers that this node is connected to. This might be converted to an Option<PeerId>
-    servers: Vec<PeerId>,
+    servers: HashSet<PeerId>,
     /// Optional image data used for running a server
     img: Option<u32>,
     /// The optional details for when running a host
     host: Option<ServerDetails>,
     /// Placeholder for transferring the audio producer back to the main thread
     audio: Option<AudioProducerWithRate>,
+    /// The role of self in the swarm
+    role: NodeRole,
 }
 
 impl Behavior {
@@ -558,11 +568,12 @@ impl Behavior {
             config: Config::default(),
             messages: VecDeque::new(),
             waker: Arc::new(Mutex::new(None)),
-            clients: Vec::new(),
-            servers: Vec::new(),
+            clients: HashSet::new(),
+            servers: HashSet::new(),
             img: None,
             host: None,
             audio: None,
+            role: NodeRole::Unknown,
         }
     }
 }
@@ -575,13 +586,39 @@ impl Behavior {
         height: u16,
         framerate: u8,
         cpu_frequency: f32,
+        role: NodeRole
     ) {
+        match role {
+            NodeRole::DedicatedHost | NodeRole::PlayerHost => {
+                self.role = role;
+            }
+            _ => {
+                panic!("Cannot set role to a non-server type with this function");
+            }
+        }
         self.host = Some(ServerDetails {
             width,
             height,
             framerate,
             cpu_frequency,
         });
+    }
+
+    /// Signal a peer disconnect
+    pub fn disconnect(&mut self, peer: PeerId) {
+        match self.role {
+            NodeRole::PlayerHost | NodeRole::DedicatedHost => {
+                println!("Player {:?} disconnected", peer);
+                self.clients.remove(&peer);
+            }
+            NodeRole::Observer | NodeRole::Player => {
+                println!("Server {:?} left us, oh no", peer);
+                self.servers.remove(&peer);
+            }
+            NodeRole::Unknown => {
+                panic!("Not really how there can be a disconnect when my role is unknown");
+            }
+        }
     }
 
     /// Take the audio producer
@@ -729,7 +766,7 @@ impl std::fmt::Debug for MessageToSwarm {
             Self::SetController(arg0) => f.debug_tuple("SetController").field(arg0).finish(),
             Self::ConnectedToHost => write!(f, "ConnectedToHost"),
             Self::AvStream(arg0) => f.debug_tuple("AvStream").field(arg0).finish(),
-            Self::AudioProducer(arg0) => Ok(()),
+            Self::AudioProducer(_arg0) => Ok(()),
         }
     }
 }
@@ -747,7 +784,7 @@ impl NetworkBehaviour for Behavior {
         _remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         println!("Received inbound connection from {:?}", peer);
-        self.clients.push(peer);
+        self.clients.insert(peer);
         Ok(Handler::new(
             self.config.protocol.clone(),
             NodeRole::PlayerHost,
@@ -763,7 +800,7 @@ impl NetworkBehaviour for Behavior {
         _role_override: libp2p::core::Endpoint,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         println!("Established outbound to {:?}", peer);
-        self.servers.push(peer);
+        self.servers.insert(peer);
         self.messages
             .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ConnectedToHost));
         Ok(Handler::new(
@@ -801,6 +838,7 @@ impl NetworkBehaviour for Behavior {
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetController(c)));
             }
             MessageToFromBehavior::SetRole(r) => {
+                self.role = r;
                 self.messages
                     .push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetRole(r)));
             }
