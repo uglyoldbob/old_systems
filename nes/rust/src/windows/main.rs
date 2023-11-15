@@ -324,7 +324,7 @@ impl TrackedWindow for MainNesWindow {
         &mut self,
         c: &mut NesEmulatorData,
         egui: &mut EguiGlow,
-        _window: &egui_multiwin::winit::window::Window,
+        window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,
     ) -> RedrawResponse {
         egui.egui_ctx.request_repaint();
@@ -765,6 +765,20 @@ impl TrackedWindow for MainNesWindow {
             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F7))
         {
             rewind_state = true;
+        }
+
+        if egui
+            .egui_ctx
+            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F12))
+        {
+            match window.fullscreen() {
+                Some(_a) => {
+                    window.set_fullscreen(None)
+                }
+                None => {
+                    window.set_fullscreen(Some(egui_multiwin::winit::window::Fullscreen::Borderless(None)));
+                }
+            }
         }
 
         let record_path = c.local.record_path();
