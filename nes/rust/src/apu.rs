@@ -170,8 +170,7 @@ impl<'a> Iterator for AudioBufferIterator<'a> {
                 AudioBuffer::U32(d) => AudioSample::U32(d[self.index]),
                 AudioBuffer::F32(d) => AudioSample::F32(d[self.index]),
             })
-        }
-        else {
+        } else {
             None
         };
         self.index += 1;

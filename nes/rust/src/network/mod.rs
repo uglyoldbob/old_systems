@@ -391,12 +391,15 @@ pub struct Network {
     audio: Option<AudioProducerWithRate>,
     /// The transfer object for moving audio data from the pipeline to the user's ears or whatever.
     audio_buffer: Vec<u8>,
+    /// The audio bit rate for sound reception
+    audio_rate: u32,
 }
 
 impl Network {
     ///Create a new instance of network with the given role
     pub fn new(
         proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
+        audio_rate: u32,
     ) -> Self {
         let (s1, r1) = async_channel::bounded(1000);
         let (s2, r2) = async_channel::bounded(1000);
@@ -420,6 +423,7 @@ impl Network {
             streamin: StreamingIn::new(),
             audio: None,
             audio_buffer: Vec::new(),
+            audio_rate,
         }
     }
 
@@ -444,7 +448,7 @@ impl Network {
                     self.streamin.send_data(d);
                 }
                 MessageFromNetworkThread::ConnectedToHost => {
-                    self.streamin.start();
+                    self.streamin.start(self.audio_rate);
                     self.connected = true;
                     let s = self
                         .sender
@@ -543,7 +547,8 @@ impl Network {
                     self.audio_buffer.resize(sb.size(), 0);
                     sb.copy_to_slice(0, &mut self.audio_buffer)
                         .expect("Failed to copy audio data from pipeline");
-                    let mut abuf = sound.make_buffer(crate::apu::AudioSample::F32(0.0), &self.audio_buffer);
+                    let mut abuf =
+                        sound.make_buffer(crate::apu::AudioSample::F32(0.0), &self.audio_buffer);
                     sound.fill_with_buffer(&mut abuf);
                 }
             }

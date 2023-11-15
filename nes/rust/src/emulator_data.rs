@@ -194,6 +194,8 @@ pub struct LocalEmulatorDataClone {
     proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
     /// The stored resized image for the emulator
     pub image: crate::ppu::PixelImage<egui::Color32>,
+    /// The number of samples per second of the audio output.
+    sound_rate: u32,
 }
 
 impl LocalEmulatorDataClone {
@@ -268,6 +270,16 @@ impl Default for LocalEmulatorDataClone {
 }
 
 impl LocalEmulatorDataClone {
+    /// Set the sound rate for the emulator
+    pub fn set_sound_rate(&mut self, rate: u32) {
+        self.sound_rate = rate;
+    }
+
+    /// Get the sound rate
+    pub fn get_sound_rate(&self) -> u32 {
+        self.sound_rate
+    }
+
     /// Create a new Self object with the given event loop proxy
     fn new(
         proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
@@ -289,6 +301,7 @@ impl LocalEmulatorDataClone {
             dirs,
             proxy,
             image: crate::ppu::PixelImage::<egui::Color32>::default(),
+            sound_rate: 0,
         }
     }
 }

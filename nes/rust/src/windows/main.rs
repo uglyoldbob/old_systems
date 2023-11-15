@@ -40,8 +40,6 @@ pub struct MainNesWindow {
     fps: f64,
     /// The calculated frames per second performance of the emulator.
     emulator_fps: f64,
-    /// The number of samples per second of the audio output.
-    sound_rate: u32,
     /// The producing half of the ring buffer used for audio.
     sound: Option<AudioProducerWithRate>,
     /// The texture used for rendering the ppu image.
@@ -119,7 +117,6 @@ impl MainNesWindow {
                 emulator_time: Duration::from_millis(0),
                 fps: 0.0,
                 emulator_fps: 0.0,
-                sound_rate: rate,
                 sound: producer,
                 texture: None,
                 filter: None,
@@ -382,9 +379,9 @@ impl TrackedWindow for MainNesWindow {
         puffin::profile_scope!("frame rendering");
 
         if self.filter.is_none() && self.sound_stream.is_some() {
-            println!("Initializing with sample rate {}", self.sound_rate);
-            let rf = self.sound_rate as f32;
-            let sampling_frequency = 21.47727e6 / 12.0;
+            println!("Initializing with sample rate {}", c.local.get_sound_rate());
+            let rf = c.local.get_sound_rate() as f32;
+            let sampling_frequency = c.cpu_frequency();
             let filter_coeff = biquad::Coefficients::<f32>::from_params(
                 biquad::Type::LowPass,
                 biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),

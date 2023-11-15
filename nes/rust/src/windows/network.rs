@@ -72,7 +72,10 @@ impl TrackedWindow for Window {
                     ui.label("Network is not active");
                     if ui.button("Enable networking").clicked() {
                         if let Some(proxy) = c.local.get_proxy() {
-                            olocal.network = Some(crate::network::Network::new(proxy));
+                            olocal.network = Some(crate::network::Network::new(
+                                proxy,
+                                c.local.get_sound_rate(),
+                            ));
                         }
                     }
                 } else {

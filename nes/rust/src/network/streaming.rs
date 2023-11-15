@@ -234,7 +234,7 @@ impl StreamingIn {
     }
 
     /// Start stream receiving by setting up the necessary objects.
-    pub fn start(&mut self) {
+    pub fn start(&mut self, arate: u32) {
         if self.pipeline.is_none() {
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
@@ -292,7 +292,26 @@ impl StreamingIn {
                 .build()
                 .expect("Could not create element.");
 
+            let aresample = gstreamer::ElementFactory::make("audioresample")
+                .name("aresample")
+                .build()
+                .expect("Could not create source element.");
+
+            let aconvert = gstreamer::ElementFactory::make("audioconvert")
+                .name("aconvert")
+                .build()
+                .expect("Could not create source element.");
+
             let asink = gstreamer_app::AppSink::builder().name("audio_sink").build();
+
+            let acaps = gstreamer_audio::AudioCapsBuilder::new_interleaved()
+                .rate(arate as i32)
+                .format(gstreamer_audio::AudioFormat::F32le)
+                .channels(2)
+                .build();
+            asink.set_caps(Some(&acaps));
+            println!("Audio caps: {:?}", acaps);
+
             let vsink = gstreamer_app::AppSink::builder().name("video_sink").build();
 
             let vcaps = gstreamer_video::VideoCapsBuilder::new()
@@ -309,6 +328,8 @@ impl StreamingIn {
                     source.upcast_ref(),
                     &demux,
                     asink.upcast_ref(),
+                    &aresample,
+                    &aconvert,
                     vsink.upcast_ref(),
                     &vdecoder,
                     &adecoder,
@@ -319,8 +340,14 @@ impl StreamingIn {
                 ])
                 .unwrap();
             gstreamer::Element::link_many([source.upcast_ref(), &queue, &sconv, &demux]).unwrap();
-            gstreamer::Element::link_many([&adecoder, &aqueue, &asink.upcast_ref()])
-                .expect("Failed to link to audio parsing");
+            gstreamer::Element::link_many([
+                &adecoder,
+                &aqueue,
+                &aresample,
+                &aconvert,
+                &asink.upcast_ref(),
+            ])
+            .expect("Failed to link to audio parsing");
             gstreamer::Element::link_many([
                 &vparse,
                 &vdecoder,

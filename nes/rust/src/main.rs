@@ -598,6 +598,7 @@ fn main() {
             if let Some(s) = &mut stream {
                 s.play().unwrap();
                 sound_rate = config.sample_rate.0;
+                nes_data.local.set_sound_rate(sound_rate);
                 sound_producer = Some(user_audio);
             }
             stream
