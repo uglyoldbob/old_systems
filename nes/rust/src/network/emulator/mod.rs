@@ -1,7 +1,7 @@
 //! A module that implements a custom protocl for libp2p.
 
 use std::{
-    collections::{VecDeque, HashSet},
+    collections::{HashSet, VecDeque},
     pin::Pin,
     sync::{Arc, Mutex},
     task::Waker,
@@ -189,7 +189,9 @@ pub struct Handler {
     /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
     avsink: Option<gstreamer_app::AppSink>,
     /// The audio source for the host
-    asource: Option<crate::apu::AudioProducerWithRate>,
+    asource: Option<std::sync::Arc<std::sync::Mutex<AudioProducerWithRate>>>,
+    /// Indicates that the audio source has been sent to the user
+    asource_sent: bool,
     /// The optional details for when running a host
     host: Option<ServerDetails>,
 }
@@ -214,7 +216,8 @@ impl Handler {
             pending_out: VecDeque::new(),
             streamout: s,
             avsink,
-            asource,
+            asource: asource.map(|a| std::sync::Arc::new(std::sync::Mutex::new(a))),
+            asource_sent: false,
             host,
         }
     }
@@ -239,7 +242,7 @@ pub enum MessageToFromBehavior {
     /// A combined stream of audio and video data from a host
     AvStream(Vec<u8>),
     /// The audio producer for the host
-    AudioProducer(crate::apu::AudioProducerWithRate),
+    AudioProducer(std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>),
 }
 
 impl std::fmt::Debug for MessageToFromBehavior {
@@ -307,10 +310,13 @@ impl ConnectionHandler for Handler {
     > {
         let mut waker = self.waker.lock().unwrap();
 
-        if let Some(a) = self.asource.take() {
-            return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                MessageToFromBehavior::AudioProducer(a),
-            ));
+        if !self.asource_sent {
+            if let Some(a) = &self.asource {
+                self.asource_sent = true;
+                return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
+                    MessageToFromBehavior::AudioProducer(Arc::<std::sync::Mutex<AudioProducerWithRate>>::downgrade(a)),
+                ));
+            }
         }
 
         if self.outbound_stream.is_none() {
@@ -556,7 +562,7 @@ pub struct Behavior {
     /// The optional details for when running a host
     host: Option<ServerDetails>,
     /// Placeholder for transferring the audio producer back to the main thread
-    audio: Option<AudioProducerWithRate>,
+    audio: Option<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
     /// The role of self in the swarm
     role: NodeRole,
 }
@@ -586,7 +592,7 @@ impl Behavior {
         height: u16,
         framerate: u8,
         cpu_frequency: f32,
-        role: NodeRole
+        role: NodeRole,
     ) {
         match role {
             NodeRole::DedicatedHost | NodeRole::PlayerHost => {
@@ -622,7 +628,9 @@ impl Behavior {
     }
 
     /// Take the audio producer
-    pub fn take_audio(&mut self) -> Option<AudioProducerWithRate> {
+    pub fn take_audio(
+        &mut self,
+    ) -> Option<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>> {
         self.audio.take()
     }
 
@@ -741,7 +749,7 @@ pub enum MessageToSwarm {
     /// A combined stream of audio and video data from a host
     AvStream(Vec<u8>),
     /// An audio producer used by a host
-    AudioProducer(AudioProducerWithRate),
+    AudioProducer(std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>),
 }
 
 impl std::fmt::Debug for MessageToSwarm {

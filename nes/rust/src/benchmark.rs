@@ -124,7 +124,7 @@ pub fn cpu_bench(c: &mut Criterion) {
     let mut nes_data = NesEmulatorData::new(None);
     group.bench_function("basic 2", |b| {
         b.iter(|| 'emulator_loop: loop {
-            nes_data.cycle_step(&mut Vec::new(), &mut None);
+            nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;
@@ -223,7 +223,7 @@ pub fn bench1(c: &mut Criterion) {
     let mut nes_data = NesEmulatorData::new(None);
     group.bench_function("basic 1", |b| {
         b.iter(|| 'emulator_loop: loop {
-            nes_data.cycle_step(&mut Vec::new(), &mut None);
+            nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end() {
                 let _data = nes_data.cpu_peripherals.ppu_get_frame();
                 break 'emulator_loop;

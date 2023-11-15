@@ -734,6 +734,7 @@ impl NesApu {
     pub fn clock_slow(
         &mut self,
         sound: &mut Vec<&mut AudioProducerWithRate>,
+        streams: &mut Vec<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.always_clock = self.always_clock.wrapping_add(1);
@@ -771,6 +772,13 @@ impl NesApu {
             for p in sound {
                 p.fill_audio_buffer(sample);
                 p.fill_audio_buffer(sample);
+            }
+            for (i, p) in streams.iter().enumerate() {
+                if let Some(p2) = p.upgrade() {
+                    let mut a = p2.lock().unwrap();
+                    a.fill_audio_buffer(sample);
+                    a.fill_audio_buffer(sample);
+                }
             }
         }
     }

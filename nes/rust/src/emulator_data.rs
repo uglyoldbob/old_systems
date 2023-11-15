@@ -518,6 +518,7 @@ impl NesEmulatorData {
     pub fn cycle_step(
         &mut self,
         sound: &mut Vec<&mut AudioProducerWithRate>,
+        streams: &mut Vec<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) {
         self.big_counter += 1;
@@ -546,7 +547,7 @@ impl NesEmulatorData {
             self.cpu_clock_counter = 0;
             let nmi = self.nmi[2];
 
-            self.cpu_peripherals.apu.clock_slow(sound, filter);
+            self.cpu_peripherals.apu.clock_slow(sound, streams, filter);
             let irq = self.cpu_peripherals.apu.irq();
             self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
             let cart_irq = self.mb.cartridge().map(|cart| cart.irq()).unwrap_or(false);

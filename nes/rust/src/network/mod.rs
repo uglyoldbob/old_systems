@@ -83,7 +83,7 @@ pub enum MessageFromNetworkThread {
     /// The held controller for the node is to be changed to what is indicated. None means the player becomes an observer.
     SetController(Option<u8>),
     /// An audio producer for an emulator host
-    AudioProducer(AudioProducerWithRate),
+    AudioProducer(std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>),
     /// A player or observer disconnected from a server
     PlayerObserverDisconnect(libp2p::PeerId),
 }
@@ -395,7 +395,7 @@ pub struct Network {
     /// The receiving pipeline for a stream from a host
     streamin: StreamingIn,
     /// Placeholder for transferring the audio producer to the host
-    audio: Option<AudioProducerWithRate>,
+    audio: Option<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
     /// The transfer object for moving audio data from the pipeline to the user's ears or whatever.
     audio_buffer: Vec<u8>,
     /// The audio bit rate for sound reception
@@ -553,7 +553,9 @@ impl Network {
     }
 
     /// Take the sound stream used to deliver sound stream to clients.
-    pub fn get_sound_stream(&mut self) -> Option<AudioProducerWithRate> {
+    pub fn get_sound_stream(
+        &mut self,
+    ) -> Option<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>> {
         self.audio.take()
     }
 

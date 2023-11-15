@@ -64,8 +64,8 @@ pub struct MainNesWindow {
     have_gstreamer: Result<(), gstreamer::glib::Error>,
     /// The recording object
     recording: Recording,
-    /// The audio object for a streaming server
-    audio_streaming: Option<AudioProducerWithRate>,
+    /// The audio objects for a streaming server
+    audio_streaming: Vec<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
 }
 
 impl MainNesWindow {
@@ -127,7 +127,7 @@ impl MainNesWindow {
                 mouse_delay: 0,
                 mouse_miss: false,
                 recording: Recording::new(),
-                audio_streaming: None,
+                audio_streaming: Vec::new(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -491,7 +491,7 @@ impl TrackedWindow for MainNesWindow {
                     }
                     NodeRole::PlayerHost => {
                         if let Some(a) = network.get_sound_stream() {
-                            self.audio_streaming = Some(a);
+                            self.audio_streaming.push(a);
                         }
                     }
                     _ => {}
@@ -507,14 +507,11 @@ impl TrackedWindow for MainNesWindow {
             if let Some(s) = self.recording.get_sound() {
                 sound.push(s);
             }
-            if let Some(a) = &mut self.audio_streaming {
-                sound.push(a);
-            }
             'emulator_loop: loop {
                 #[cfg(feature = "debugger")]
                 {
                     if !c.paused {
-                        c.cycle_step(&mut sound, &mut self.filter);
+                        c.cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
                         if c.cpu_clock_counter == 0
                             && c.cpu.breakpoint_option()
                             && (c.cpu.breakpoint() || c.single_step)

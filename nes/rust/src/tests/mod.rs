@@ -94,7 +94,7 @@ fn vbl_nmi_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 176
         {
@@ -115,7 +115,7 @@ fn vbl_nmi_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 156
         {
@@ -136,7 +136,7 @@ fn vbl_nmi_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 101
         {
@@ -157,7 +157,7 @@ fn vbl_nmi_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 119
         {
@@ -178,7 +178,7 @@ fn vbl_nmi_test5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 168
         {
@@ -199,7 +199,7 @@ fn vbl_nmi_test6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 111
         {
@@ -220,7 +220,7 @@ fn vbl_nmi_test7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 111
         {
@@ -241,7 +241,7 @@ fn cpu_branch_timing1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 14
         {
@@ -262,7 +262,7 @@ fn cpu_branch_timing2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 16
         {
@@ -283,7 +283,7 @@ fn cpu_branch_timing3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 16
         {
@@ -304,7 +304,7 @@ fn ppu_open_bus() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 251
         {
@@ -325,7 +325,7 @@ fn ppu_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 25
         {
@@ -346,7 +346,7 @@ fn ppu_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 40
         {
@@ -367,7 +367,7 @@ fn ppu_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 40
         {
@@ -388,7 +388,7 @@ fn ppu_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 40
         {
@@ -410,7 +410,7 @@ fn ppu_test5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 40
         {
@@ -431,7 +431,7 @@ fn cpu_test_dummy_reads() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -452,7 +452,7 @@ fn cpu_test_dummy_writes_oam() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 350
         {
@@ -473,7 +473,7 @@ fn cpu_test_dummy_writes_ppu() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 250
         {
@@ -494,7 +494,7 @@ fn cpu_test_exec_space_ppu() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 48
         {
@@ -515,7 +515,7 @@ fn cpu_timing_test() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 645
         {
@@ -536,7 +536,7 @@ fn cpu_dma_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -557,7 +557,7 @@ fn cpu_dma_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -589,7 +589,7 @@ fn cpu_dma_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -611,7 +611,7 @@ fn cpu_dma_test5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -645,7 +645,7 @@ fn cpu_dma_test6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -667,7 +667,7 @@ fn cpu_dma_test7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 160
         {
@@ -689,7 +689,7 @@ fn cpu_dma_test8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 190
         {
@@ -710,7 +710,7 @@ fn oam_test() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 33
         {
@@ -731,7 +731,7 @@ fn oam_stress() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 1793
         {
@@ -752,7 +752,7 @@ fn apu_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -773,7 +773,7 @@ fn apu_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -794,7 +794,7 @@ fn apu_test3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -815,7 +815,7 @@ fn apu_test4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -836,7 +836,7 @@ fn apu_test5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 25
         {
@@ -857,7 +857,7 @@ fn apu_test6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 25
         {
@@ -878,7 +878,7 @@ fn apu_test7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -899,7 +899,7 @@ fn apu_test8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -920,7 +920,7 @@ fn apu_test9() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -941,7 +941,7 @@ fn apu_test10() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -953,7 +953,7 @@ fn apu_test10() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -974,7 +974,7 @@ fn apu_test11() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 25
         {
@@ -986,7 +986,7 @@ fn apu_test11() {
         .check_vram(193, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 25
         {
@@ -1007,7 +1007,7 @@ fn apu_test12() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1019,7 +1019,7 @@ fn apu_test12() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1031,7 +1031,7 @@ fn apu_test12() {
         .check_vram(129, "Press RESET again".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1052,7 +1052,7 @@ fn apu_test13() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -1064,7 +1064,7 @@ fn apu_test13() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 50
         {
@@ -1085,7 +1085,7 @@ fn apu_test14() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -1097,7 +1097,7 @@ fn apu_test14() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -1118,7 +1118,7 @@ fn apu_test15() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 50
         {
@@ -1130,7 +1130,7 @@ fn apu_test15() {
         .check_vram(129, "Press RESET".to_string().as_bytes()));
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 150
         {
@@ -1151,7 +1151,7 @@ fn apu_test16_1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1172,7 +1172,7 @@ fn apu_test16_2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1193,7 +1193,7 @@ fn apu_test16_3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1214,7 +1214,7 @@ fn apu_test16_4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1235,7 +1235,7 @@ fn apu_test16_5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 130
         {
@@ -1256,7 +1256,7 @@ fn apu_test16_6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 25
         {
@@ -1277,7 +1277,7 @@ fn apu_test16_7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -1298,7 +1298,7 @@ fn apu_test16_8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -1319,7 +1319,7 @@ fn apu_test17() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1340,7 +1340,7 @@ fn apu_test18() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1361,7 +1361,7 @@ fn cpu_test_exec_space_apu() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 315
         {
@@ -1382,7 +1382,7 @@ fn cpu_test_interrupts() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 510
         {
@@ -1406,7 +1406,7 @@ fn cpu_misc_instruction() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 250
         {
@@ -1427,7 +1427,7 @@ fn cpu_misc_instruction2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 2500
         {
@@ -1450,7 +1450,7 @@ fn cpu_misc_instruction3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 1850
         {
@@ -1473,7 +1473,7 @@ fn cpu_misc_instruction4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 2500
         {
@@ -1496,7 +1496,7 @@ fn cpu_misc_instruction5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 1920
         {
@@ -1519,7 +1519,7 @@ fn cpu_misc_instruction6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -1540,7 +1540,7 @@ fn cpu_misc_instruction7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -1561,7 +1561,7 @@ fn cpu_misc_instruction8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -1582,7 +1582,7 @@ fn cpu_misc_instruction9() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 200
         {
@@ -1603,7 +1603,7 @@ fn cpu_misc_instruction10() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -1624,7 +1624,7 @@ fn cpu_misc_instruction11() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 280
         {
@@ -1645,7 +1645,7 @@ fn cpu_misc_instruction12() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 128
         {
@@ -1666,7 +1666,7 @@ fn cpu_misc_instruction13() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 128
         {
@@ -1687,7 +1687,7 @@ fn cpu_misc_instruction14() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -1708,7 +1708,7 @@ fn cpu_misc_instruction15() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 151
         {
@@ -1729,7 +1729,7 @@ fn cpu_misc_instruction16() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 80
         {
@@ -1750,7 +1750,7 @@ fn cpu_reset() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -1761,7 +1761,7 @@ fn cpu_reset() {
         .mb
         .check_vram(129, "Press reset AFTER".to_string().as_bytes()));
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 145
         {
@@ -1770,7 +1770,7 @@ fn cpu_reset() {
     }
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -1791,7 +1791,7 @@ fn cpu_reset2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 20
         {
@@ -1802,7 +1802,7 @@ fn cpu_reset2() {
         .mb
         .check_vram(193, "Press reset AFTER".to_string().as_bytes()));
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 150
         {
@@ -1811,7 +1811,7 @@ fn cpu_reset2() {
     }
     nes_data.reset();
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 15
         {
@@ -1833,7 +1833,7 @@ fn cpu_timing_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 300
         {
@@ -1856,7 +1856,7 @@ fn ppu_sprite_test_1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -1877,7 +1877,7 @@ fn ppu_sprite_test_2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -1898,7 +1898,7 @@ fn ppu_sprite_test_3() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 150
         {
@@ -1919,7 +1919,7 @@ fn ppu_sprite_test_4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -1940,7 +1940,7 @@ fn ppu_sprite_test_5() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 30
         {
@@ -1961,7 +1961,7 @@ fn ppu_sprite_test_6() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -1982,7 +1982,7 @@ fn ppu_sprite_test_7() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2003,7 +2003,7 @@ fn ppu_sprite_test_8() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2024,7 +2024,7 @@ fn ppu_sprite_test_9() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2045,7 +2045,7 @@ fn ppu_sprite_test_10() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2067,7 +2067,7 @@ fn ppu_sprite_test_11() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2088,7 +2088,7 @@ fn ppu_sprite_test_12() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2109,7 +2109,7 @@ fn ppu_sprite_test_13() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2130,7 +2130,7 @@ fn ppu_sprite_test_14() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 150
         {
@@ -2151,7 +2151,7 @@ fn ppu_sprite_test_15() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 100
         {
@@ -2172,7 +2172,7 @@ fn ppu_sprite_test_16() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 75
         {
@@ -2193,7 +2193,7 @@ fn cpu_test1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 1035
         {
@@ -2216,7 +2216,7 @@ fn cpu_test2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 700
         {
@@ -2239,7 +2239,7 @@ fn ppu_nmi() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 1700
         {
@@ -2267,7 +2267,7 @@ fn controller1() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 112
         {
@@ -2293,7 +2293,7 @@ fn controller2() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 70
         {
@@ -2320,7 +2320,7 @@ fn controller3() {
     let mut frame = 100;
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == frame
         {
@@ -2349,7 +2349,7 @@ fn controller3() {
         }
 
         loop {
-            nes_data.cycle_step(&mut Vec::new(), &mut None);
+            nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end()
                 && nes_data.cpu_peripherals.ppu_frame_number() == (frame + 50)
             {
@@ -2364,7 +2364,7 @@ fn controller3() {
             b.clear_button(thebutton);
         }
         loop {
-            nes_data.cycle_step(&mut Vec::new(), &mut None);
+            nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
             if nes_data.cpu_peripherals.ppu_frame_end()
                 && nes_data.cpu_peripherals.ppu_frame_number() == (frame + 100)
             {
@@ -2390,7 +2390,7 @@ fn controller4() {
     nes_data.insert_cartridge(nc);
 
     loop {
-        nes_data.cycle_step(&mut Vec::new(), &mut None);
+        nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
         if nes_data.cpu_peripherals.ppu_frame_end()
             && nes_data.cpu_peripherals.ppu_frame_number() == 200
         {
