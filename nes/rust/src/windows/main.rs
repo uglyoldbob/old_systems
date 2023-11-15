@@ -499,6 +499,21 @@ impl TrackedWindow for MainNesWindow {
             }
         }
 
+        {
+            let mut tvec = Vec::with_capacity(self.audio_streaming.len());
+            let quantity = self.audio_streaming.len();
+            for _i in 0..quantity {
+                let e = self.audio_streaming.pop().unwrap();
+                if let Some(_a) = e.upgrade() {
+                    tvec.push(e);
+                }
+                else {
+                    println!("Dropping a weak audio producer");
+                }
+            }
+            self.audio_streaming = tvec;
+        }
+
         if render {
             let mut sound = Vec::new();
             if let Some(s) = &mut self.sound {
