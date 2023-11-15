@@ -201,6 +201,12 @@ impl InternalNetwork {
                                     libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, connection_id, endpoint, num_established, cause } => {
                                         let behavior = self.swarm.behaviour_mut();
                                         behavior.emulator.disconnect(peer_id);
+                                        self.sender
+                                            .send(MessageFromNetworkThread::PlayerObserverDisconnect(peer_id))
+                                            .await;
+                                        self.proxy.send_event(crate::event::Event::new_general(
+                                            crate::event::EventType::CheckNetwork,
+                                        ));
                                     }
                                     libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
                                         println!("Listening on {address:?}");
@@ -449,11 +455,13 @@ impl Network {
         while let Ok(m) = self.recvr.try_recv() {
             match m {
                 MessageFromNetworkThread::PlayerObserverDisconnect(peer) => {
-                    /// Disconnect that players controller and release the buttons
+                    // Disconnect that players controller and release the buttons
                     for i in 0..4 {
                         if let Some(p) = self.controller_holder[i] {
                             if peer == p {
-                                self.buttons[i].map(|mut b| b.clear_buttons());
+                                if let Some(b) = &mut self.buttons[i] {
+                                    b.clear_buttons();
+                                }
                                 self.controller_holder[i] = None;
                                 break;
                             }
@@ -479,6 +487,10 @@ impl Network {
                         for i in 0..4 {
                             if let Some(peer) = self.controller_holder[i] {
                                 if peer == p {
+                                    println!("Clear controller {}", i);
+                                    if let Some(b) = &mut self.buttons[i] {
+                                        b.clear_buttons();
+                                    }
                                     self.controller_holder[i] = None;
                                     break;
                                 }
@@ -493,7 +505,9 @@ impl Network {
                         for i in 0..4 {
                             if let Some(peer) = self.controller_holder[i] {
                                 if peer == p {
-                                    self.buttons[i].map(|mut b| b.clear_buttons());
+                                    if let Some(b) = &mut self.buttons[i] {
+                                        b.clear_buttons();
+                                    }
                                     self.controller_holder[i] = None;
                                     self.sender.send_blocking(
                                         MessageToNetworkThread::SetController(p, None),
@@ -529,7 +543,9 @@ impl Network {
                     self.role = r;
                 }
                 MessageFromNetworkThread::ControllerData(i, d) => {
-                    self.buttons[i as usize] = Some(*d);
+                    if self.controller_holder[i as usize].is_some() {
+                        self.buttons[i as usize] = Some(*d);
+                    }
                 }
                 MessageFromNetworkThread::NewAddress(a) => {
                     self.addresses.insert(a);
