@@ -555,8 +555,8 @@ pub struct Behavior {
     waker: Arc<Mutex<Option<Waker>>>,
     /// The list of clients connected to this node.
     clients: HashSet<PeerId>,
-    /// The list of servers that this node is connected to. This might be converted to an Option<PeerId>
-    servers: HashSet<PeerId>,
+    /// The servers that this node might be connected to.
+    server: Option<PeerId>,
     /// Optional image data used for running a server
     img: Option<u32>,
     /// The optional details for when running a host
@@ -575,7 +575,7 @@ impl Behavior {
             messages: VecDeque::new(),
             waker: Arc::new(Mutex::new(None)),
             clients: HashSet::new(),
-            servers: HashSet::new(),
+            server: None,
             img: None,
             host: None,
             audio: None,
@@ -619,7 +619,9 @@ impl Behavior {
             }
             NodeRole::Observer | NodeRole::Player => {
                 println!("Server {:?} left us, oh no", peer);
-                self.servers.remove(&peer);
+                self.server = None;
+                self.role = NodeRole::Unknown;
+                self.messages.push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetRole(NodeRole::Unknown)));
             }
             NodeRole::Unknown => {
                 panic!("Not really how there can be a disconnect when my role is unknown");
@@ -636,7 +638,7 @@ impl Behavior {
 
     /// Send the given controller data to the host.
     pub fn send_controller_data(&mut self, index: u8, data: Box<ButtonCombination>) {
-        for pid in &self.servers {
+        if let Some(pid) = &self.server {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
@@ -660,7 +662,7 @@ impl Behavior {
 
     /// Used by a player to request observer status.
     pub fn request_observer_status(&mut self, p: PeerId) {
-        for pid in &self.servers {
+        if let Some(pid) = &self.server {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
@@ -675,7 +677,7 @@ impl Behavior {
 
     /// Used by a player to request posession of a specific controller in the emulator.
     pub fn request_controller(&mut self, p: PeerId, c: Option<u8>) {
-        for pid in &self.servers {
+        if let Some(pid) = &self.server {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
                 handler: libp2p::swarm::NotifyHandler::Any,
@@ -808,7 +810,7 @@ impl NetworkBehaviour for Behavior {
         _role_override: libp2p::core::Endpoint,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         println!("Established outbound to {:?}", peer);
-        self.servers.insert(peer);
+        self.server = Some(peer);
         self.messages
             .push_back(ToSwarm::GenerateEvent(MessageToSwarm::ConnectedToHost));
         Ok(Handler::new(
