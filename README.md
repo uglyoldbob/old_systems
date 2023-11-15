@@ -19,4 +19,4 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] Slow motion
 - [ ] Rom ranking system
 - [ ] Game genie code support
-- [ ] Full screen support
+- [x] Full screen support
