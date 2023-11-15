@@ -98,7 +98,7 @@ impl TrackedWindow for Window {
 
                     if !network.is_server_running() {
                         if ui.button("Start server").clicked() {
-                            network.start_server(
+                            let _e = network.start_server(
                                 c.local.image.width,
                                 c.local.image.height,
                                 framerate as u8,
@@ -112,10 +112,10 @@ impl TrackedWindow for Window {
                             ui.add(te);
                         });
                         if ui.button("Connect").clicked() {
-                            network.try_connect(&self.server);
+                            let _e = network.try_connect(&self.server);
                         }
                     } else if ui.button("Stop server").clicked() {
-                        network.stop_server();
+                        let _e = network.stop_server().is_ok();
                     }
                 }
             }

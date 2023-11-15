@@ -92,7 +92,6 @@ impl MainNesWindow {
     /// Create a new request for a main window of the emulator.
     #[cfg(feature = "egui-multiwin")]
     pub fn new_request(
-        rate: u32,
         producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
     ) -> NewWindowRequest {
@@ -311,7 +310,11 @@ impl TrackedWindow for MainNesWindow {
 
     fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
         self.sound_stream.take();
-        self.recording.stop();
+        loop {
+            if self.recording.stop().is_ok() {
+                break;
+            }
+        }
         true
     }
 
@@ -458,7 +461,7 @@ impl TrackedWindow for MainNesWindow {
                         NodeRole::Player => {
                             let controller = c.mb.get_controller_ref(0);
                             for i in 0..4 {
-                                network.send_controller_data(i, controller.button_data());
+                                let _e = network.send_controller_data(i, controller.button_data());
                             }
                         }
                         NodeRole::PlayerHost => {
@@ -506,8 +509,7 @@ impl TrackedWindow for MainNesWindow {
                 let e = self.audio_streaming.pop().unwrap();
                 if let Some(_a) = e.upgrade() {
                     tvec.push(e);
-                }
-                else {
+                } else {
                     println!("Dropping a weak audio producer");
                 }
             }
@@ -556,7 +558,7 @@ impl TrackedWindow for MainNesWindow {
                         if let Some(olocal) = &mut c.olocal {
                             if let Some(network) = &mut olocal.network {
                                 if network.role() == NodeRole::PlayerHost {
-                                    network.video_data(&c.local.image);
+                                    let _e = network.video_data(&c.local.image);
                                 }
                             }
                         }
@@ -782,7 +784,11 @@ impl TrackedWindow for MainNesWindow {
                 );
             } else {
                 c.local.resolution_locked = false;
-                self.recording.stop();
+                loop {
+                    if self.recording.stop().is_ok() {
+                        break;
+                    }
+                }
             }
         }
 
@@ -843,7 +849,7 @@ impl TrackedWindow for MainNesWindow {
                                             ))
                                             .clicked()
                                         {
-                                            network.request_controller(i);
+                                            let _e = network.request_controller(i);
                                         }
                                     }
                                     if ui
@@ -853,7 +859,7 @@ impl TrackedWindow for MainNesWindow {
                                         ))
                                         .clicked()
                                     {
-                                        network.release_controller();
+                                        let _e = network.release_controller();
                                     }
                                 });
                             }

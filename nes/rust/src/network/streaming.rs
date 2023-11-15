@@ -125,8 +125,13 @@ impl StreamingOut {
                 ])
                 .unwrap();
             gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder]).unwrap();
-            gstreamer::Element::link_many([audio_source.upcast_ref(), &aqueue, &aresample, &aencoder])
-                .unwrap();
+            gstreamer::Element::link_many([
+                audio_source.upcast_ref(),
+                &aqueue,
+                &aresample,
+                &aencoder,
+            ])
+            .unwrap();
 
             aencoder.link(&mux).unwrap();
             vencoder.link(&mux).unwrap();
@@ -174,21 +179,21 @@ impl StreamingOut {
     }
 
     /// Send a chunk of audio data to the pipeline
-    pub fn send_audio_buffer(&mut self, buffer: Vec<u8>) {
+    pub fn send_audio_buffer(&mut self, _buffer: Vec<u8>) {
         if let Some(_pipeline) = &mut self.record_pipeline {
             todo!();
         }
     }
 
-    /// Stop recording
-    pub fn stop(&mut self) {
+    /// Stop streaming
+    pub fn stop(&mut self) -> Result<(), gstreamer::FlowError> {
         if let Some(pipeline) = &mut self.record_pipeline {
             let _dot =
                 gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
             //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
 
             if let Some(source) = &mut self.record_source {
-                source.end_of_stream();
+                source.end_of_stream()?;
             }
             pipeline
                 .set_state(gstreamer::State::Null)
@@ -197,6 +202,7 @@ impl StreamingOut {
         self.record_pipeline = None;
         self.record_source = None;
         self.audio = None;
+        Ok(())
     }
 }
 
@@ -369,17 +375,8 @@ impl StreamingIn {
                 .expect("could not get sink pad from adecoder");
             demux.connect_pad_added(move |_src, src_pad| {
                 println!("connect pad added");
-                let is_video = if src_pad.name().starts_with("video") {
-                    true
-                } else {
-                    false
-                };
-
-                let is_audio = if src_pad.name().starts_with("audio") {
-                    true
-                } else {
-                    false
-                };
+                let is_video = src_pad.name().starts_with("video");
+                let is_audio = src_pad.name().starts_with("audio");
 
                 let connect_demux = || -> Result<(), u8> {
                     src_pad
@@ -446,20 +443,21 @@ impl StreamingIn {
         }
     }
 
-    /// Stop recording
-    pub fn stop(&mut self) {
+    /// Stop streaming
+    pub fn stop(&mut self) -> Result<(), gstreamer::FlowError> {
         if let Some(pipeline) = &mut self.pipeline {
             let _dot =
                 gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
             //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
 
             if let Some(source) = &mut self.stream_source {
-                source.end_of_stream();
+                source.end_of_stream()?;
             }
             pipeline
                 .set_state(gstreamer::State::Null)
                 .expect("Unable to set the recording pipeline to the `Null` state");
         }
         self.pipeline = None;
+        Ok(())
     }
 }

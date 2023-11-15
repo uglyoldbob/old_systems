@@ -2,9 +2,7 @@
 
 use std::path::PathBuf;
 
-use gstreamer::prelude::{
-    Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
-};
+use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual};
 
 use crate::apu::AudioProducerWithRate;
 
@@ -182,14 +180,14 @@ impl Recording {
     }
 
     /// Stop recording
-    pub fn stop(&mut self) {
+    pub fn stop(&mut self) -> Result<(), gstreamer::FlowError> {
         if let Some(pipeline) = &mut self.record_pipeline {
             let _dot =
                 gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
             //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
 
             if let Some(source) = &mut self.record_source {
-                source.end_of_stream();
+                source.end_of_stream()?;
             }
             pipeline
                 .set_state(gstreamer::State::Null)
@@ -198,5 +196,6 @@ impl Recording {
         self.record_pipeline = None;
         self.record_source = None;
         self.audio = None;
+        Ok(())
     }
 }

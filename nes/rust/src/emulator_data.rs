@@ -236,7 +236,7 @@ impl LocalEmulatorDataClone {
         let mut pb = dirs.data_dir().to_path_buf();
         pb.push("saves");
         if !pb.exists() {
-            std::fs::create_dir_all(&pb);
+            let _ = std::fs::create_dir_all(&pb);
         }
         pb
     }
@@ -246,7 +246,7 @@ impl LocalEmulatorDataClone {
         let mut pb = self.dirs.data_dir().to_path_buf();
         pb.push("recordings");
         if !pb.exists() {
-            std::fs::create_dir_all(&pb);
+            let _ = std::fs::create_dir_all(&pb);
         }
         pb
     }

@@ -131,7 +131,7 @@ impl asynchronous_codec::Decoder for Codec {
         src: &mut asynchronous_codec::BytesMut,
     ) -> Result<Option<Self::Item>, Self::Error> {
         match self.codec.decode(src)? {
-            Some(bytes) => match bincode::deserialize::<MessageToFromNetwork>(&bytes.to_vec()) {
+            Some(bytes) => match bincode::deserialize::<MessageToFromNetwork>(&bytes) {
                 Ok(m) => Ok(Some(m)),
                 Err(e) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
             },
@@ -200,7 +200,7 @@ impl Handler {
     /// Construct a new struct.
     fn new(protocol: Protocol, role: NodeRole, host: Option<ServerDetails>) -> Self {
         let mut s = StreamingOut::new();
-        let mut s2 = StreamingIn::new();
+        let _s2 = StreamingIn::new();
         if let Some(h) = host {
             println!("Starting a gstreamer pipeline for a user");
             s.start(h.width, h.height, h.framerate, h.cpu_frequency);
@@ -314,7 +314,9 @@ impl ConnectionHandler for Handler {
             if let Some(a) = &self.asource {
                 self.asource_sent = true;
                 return std::task::Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                    MessageToFromBehavior::AudioProducer(Arc::<std::sync::Mutex<AudioProducerWithRate>>::downgrade(a)),
+                    MessageToFromBehavior::AudioProducer(Arc::<
+                        std::sync::Mutex<AudioProducerWithRate>,
+                    >::downgrade(a)),
                 ));
             }
         }
@@ -330,7 +332,7 @@ impl ConnectionHandler for Handler {
                 std::task::Poll::Ready(Ok(())) => {
                     if let Some(m) = self.pending_out.pop_front() {
                         let m2 = match m {
-                            MessageToFromBehavior::AudioProducer(a) => {
+                            MessageToFromBehavior::AudioProducer(_a) => {
                                 panic!("Cannot send audio producer to network device");
                             }
                             MessageToFromBehavior::RequestController(i, c) => {
@@ -374,30 +376,27 @@ impl ConnectionHandler for Handler {
                         }
                     }
                     if let Some(source) = &mut self.avsink {
-                        match source.try_pull_sample(gstreamer::ClockTime::from_mseconds(1)) {
-                            Some(a) => {
-                                let c = a.buffer();
-                                if let Some(buf) = c {
-                                    let mut v: Vec<u8> = vec![0; buf.size()];
-                                    if let Ok(()) = buf.copy_to_slice(0, &mut v) {
-                                        match out.start_send_unpin(
-                                            MessageToFromNetwork::EmulatorVideoStream(v),
-                                        ) {
-                                            Ok(()) => match out.poll_flush_unpin(cx) {
-                                                std::task::Poll::Ready(Ok(())) => {}
-                                                std::task::Poll::Ready(Err(e)) => {
-                                                    println!("Error flushing message {:?}", e);
-                                                }
-                                                std::task::Poll::Pending => {}
-                                            },
-                                            Err(e) => {
-                                                println!("Failed to send message {:?}", e);
+                        if let Some(a) = source.try_pull_sample(gstreamer::ClockTime::from_mseconds(1)) {
+                            let c = a.buffer();
+                            if let Some(buf) = c {
+                                let mut v: Vec<u8> = vec![0; buf.size()];
+                                if let Ok(()) = buf.copy_to_slice(0, &mut v) {
+                                    match out.start_send_unpin(
+                                        MessageToFromNetwork::EmulatorVideoStream(v),
+                                    ) {
+                                        Ok(()) => match out.poll_flush_unpin(cx) {
+                                            std::task::Poll::Ready(Ok(())) => {}
+                                            std::task::Poll::Ready(Err(e)) => {
+                                                println!("Error flushing message {:?}", e);
                                             }
+                                            std::task::Poll::Pending => {}
+                                        },
+                                        Err(e) => {
+                                            println!("Failed to send message {:?}", e);
                                         }
                                     }
                                 }
                             }
-                            None => {}
                         }
                     }
                 }
@@ -621,7 +620,10 @@ impl Behavior {
                 println!("Server {:?} left us, oh no", peer);
                 self.server = None;
                 self.role = NodeRole::Unknown;
-                self.messages.push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetRole(NodeRole::Unknown)));
+                self.messages
+                    .push_back(ToSwarm::GenerateEvent(MessageToSwarm::SetRole(
+                        NodeRole::Unknown,
+                    )));
             }
             NodeRole::Unknown => {
                 panic!("Not really how there can be a disconnect when my role is unknown");

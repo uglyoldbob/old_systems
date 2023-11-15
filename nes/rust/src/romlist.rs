@@ -39,7 +39,7 @@ impl RomList {
     /// Returns the quantity of roms that are unknown.
     pub fn get_unknown_quantity(&self) -> u32 {
         let mut quant = 0;
-        for (_s, rs) in &self.elements {
+        for rs in self.elements.values() {
             if rs.result.is_none() {
                 quant += 1;
             }
@@ -50,7 +50,7 @@ impl RomList {
     /// Returns the quantity of roms that are broken
     pub fn get_broken_quantity(&self) -> u32 {
         let mut quant = 0;
-        for (_s, rs) in &self.elements {
+        for rs in self.elements.values() {
             if let Some(rs) = &rs.result {
                 match rs {
                     Ok(_rom) => {}
@@ -70,7 +70,7 @@ impl RomList {
     /// Retrieves the number of roms that are not usable
     pub fn get_bad_quantity(&self) -> u32 {
         let mut quant = 0;
-        for (_s, rs) in &self.elements {
+        for rs in self.elements.values() {
             if let Some(rs) = &rs.result {
                 match rs {
                     Ok(_rom) => {}
@@ -91,18 +91,17 @@ impl RomList {
     /// Get a mapper count tree. Maps mappernumber to quantity
     pub fn get_mapper_quantity(&self) -> std::collections::BTreeMap<u32, u32> {
         let mut mq = std::collections::BTreeMap::new();
-        for (_s, rs) in &self.elements {
+        for rs in self.elements.values() {
             if let Some(rs) = &rs.result {
                 match rs {
                     Ok(rom) => {
                         mq.insert(rom.mapper, mq.get(&rom.mapper).unwrap_or(&0) + 1);
                     }
-                    Err(romerr) => match romerr {
-                        CartridgeError::IncompatibleMapper(m) => {
+                    Err(romerr) => {
+                        if let CartridgeError::IncompatibleMapper(m) = romerr {
                             mq.insert(*m, mq.get(m).unwrap_or(&0) + 1);
                         }
-                        _ => {}
-                    },
+                    }
                 }
             }
         }

@@ -269,23 +269,20 @@ impl ButtonCombination {
             if index == BUTTON_COMBO_TURBOB {
                 self.try_set_rate(index, config.rates[1]);
             }
-            match b {
-                UserInput::GilrsAxisButton(id, a, dir) => {
-                    if *id == gid && *a == code {
-                        if *dir {
-                            if axis.value() > 0.5 {
-                                self.set_button(index, 0);
-                            } else {
-                                self.clear_button(index);
-                            }
-                        } else if axis.value() < -0.5 {
+            if let UserInput::GilrsAxisButton(id, a, dir) = b {
+                if *id == gid && *a == code {
+                    if *dir {
+                        if axis.value() > 0.5 {
                             self.set_button(index, 0);
                         } else {
                             self.clear_button(index);
                         }
+                    } else if axis.value() < -0.5 {
+                        self.set_button(index, 0);
+                    } else {
+                        self.clear_button(index);
                     }
                 }
-                _ => {}
             }
         }
     }

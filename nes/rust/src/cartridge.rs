@@ -5,7 +5,7 @@ mod mapper01;
 mod mapper03;
 mod mapper04;
 
-use std::{collections::BTreeMap, path::PathBuf, slice::ChunksExact};
+use std::{collections::BTreeMap, path::{PathBuf, Path}, slice::ChunksExact};
 
 use mapper00::Mapper00;
 use mapper01::Mapper01;
@@ -213,7 +213,7 @@ impl std::ops::IndexMut<usize> for PersistentStorage {
 impl Drop for PersistentStorage {
     fn drop(&mut self) {
         if let PersistentStorage::Persistent(_p, v) = self {
-            v.flush();
+            let _ = v.flush();
         }
     }
 }
@@ -229,7 +229,7 @@ impl PersistentStorage {
                 .open(&p);
             if let Ok(mut file) = file {
                 if overwrite {
-                    std::io::Write::write_all(&mut file, &v[..]);
+                    std::io::Write::write_all(&mut file, &v[..]).ok()?;
                 }
                 Some(file)
             } else {
@@ -242,7 +242,7 @@ impl PersistentStorage {
                 .create(true)
                 .open(&p);
             if let Ok(mut file) = file {
-                std::io::Write::write_all(&mut file, &v[..]);
+                std::io::Write::write_all(&mut file, &v[..]).ok()?;
                 Some(file)
             } else {
                 None
@@ -742,7 +742,7 @@ impl NesCartridge {
     }
 
     /// Load a cartridge, returning an error or the new cartridge
-    pub fn load_cartridge(name: String, sp: &PathBuf) -> Result<Self, CartridgeError> {
+    pub fn load_cartridge(name: String, sp: &Path) -> Result<Self, CartridgeError> {
         let rom_contents = std::fs::read(name.clone());
         if let Err(e) = rom_contents {
             return Err(CartridgeError::FsError(e.kind().to_string()));
@@ -775,7 +775,7 @@ impl NesCartridge {
         };
 
         if let Ok(c) = &mut cart {
-            let mut pb: PathBuf = sp.clone();
+            let mut pb: PathBuf = sp.to_path_buf();
             pb.push(format!("{}.prgram", c.save));
             if c.data.volatile.battery_backup {
                 c.data.volatile.prg_ram.convert_to_nonvolatile(pb);
