@@ -88,6 +88,10 @@ impl StreamingOut {
                 .name("vconvert")
                 .build()
                 .expect("Could not create source element.");
+            let aqueue = gstreamer::ElementFactory::make("queue")
+                .name("aqueue")
+                .build()
+                .expect("Could not create element.");
             let aencoder = gstreamer::ElementFactory::make("avenc_ac3")
                 .name("aencode")
                 .build()
@@ -111,6 +115,7 @@ impl StreamingOut {
                 .add_many([
                     app_source.upcast_ref(),
                     audio_source.upcast_ref(),
+                    &aqueue,
                     &aencoder,
                     &vconv,
                     &aresample,
@@ -120,7 +125,7 @@ impl StreamingOut {
                 ])
                 .unwrap();
             gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder]).unwrap();
-            gstreamer::Element::link_many([audio_source.upcast_ref(), &aresample, &aencoder])
+            gstreamer::Element::link_many([audio_source.upcast_ref(), &aqueue, &aresample, &aencoder])
                 .unwrap();
 
             aencoder.link(&mux).unwrap();
@@ -136,7 +141,7 @@ impl StreamingOut {
             self.sink = Some(sink);
 
             self.audio = Some(AudioProducerWithRate::new_gstreamer(
-                88200,
+                44100,
                 cpu_frequency / 44100.0,
                 audio_source,
             ));
