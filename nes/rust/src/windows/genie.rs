@@ -6,7 +6,7 @@ use crate::NesEmulatorData;
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
+use egui_multiwin::{arboard, egui_glow::EguiGlow};
 
 #[cfg(feature = "egui-multiwin")]
 use crate::egui_multiwin_dynamic::{

@@ -34,6 +34,8 @@ pub struct NesMotherboard {
     #[serde(skip)]
     /// The controllers for the system
     controllers: [NesController; 2],
+    /// The speed ratio applied to the emulator
+    pub speed_ratio: f32,
 }
 
 impl NesMotherboard {
@@ -64,6 +66,7 @@ impl NesMotherboard {
             last_cpu_data: 0,
             last_ppu_coordinates: (0, 0),
             controllers: [NesController::default(), NesController::default()],
+            speed_ratio: 1.0,
         }
     }
 

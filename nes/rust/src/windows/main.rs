@@ -365,7 +365,8 @@ impl TrackedWindow for MainNesWindow {
         c.mb.get_controller_mut(2).rapid_fire(frame_time);
         c.mb.get_controller_mut(3).rapid_fire(frame_time);
 
-        let emulator_frame = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
+        let nanos = 1_000_000_000.0 / (60.0 * c.mb.speed_ratio);
+        let emulator_frame = std::time::Duration::from_nanos(nanos as u64);
         let mut render = false;
         self.emulator_time += frame_time;
         while self.emulator_time > emulator_frame {
@@ -772,6 +773,17 @@ impl TrackedWindow for MainNesWindow {
             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F7))
         {
             rewind_state = true;
+        }
+
+        if egui
+            .egui_ctx
+            .input(|i| i.key_pressed(egui_multiwin::egui::Key::F11))
+        {
+            if c.mb.speed_ratio < 1.0 {
+                c.mb.speed_ratio = 1.0;
+            } else {
+                c.mb.speed_ratio = 0.5;
+            }
         }
 
         if egui
