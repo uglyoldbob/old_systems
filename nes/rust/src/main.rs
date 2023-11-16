@@ -19,6 +19,7 @@ mod controller;
 mod cpu;
 mod emulator_data;
 mod event;
+mod genie;
 mod motherboard;
 mod network;
 mod ppu;
@@ -657,6 +658,9 @@ fn main() {
             &event_loop,
         );
     }
+
+    genie::GameGenieCode::from_str("GOSSIP");
+    genie::GameGenieCode::from_str("AENTTTZA");
 
     multi_window.run(event_loop, nes_data);
 }

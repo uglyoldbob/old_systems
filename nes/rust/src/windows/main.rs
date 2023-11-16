@@ -849,7 +849,7 @@ impl TrackedWindow for MainNesWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.vertical_centered(|ui| {
                 let size = ui.available_size();
-                ui.horizontal(|ui| {
+                ui.horizontal_centered(|ui| {
                     if let Some(olocal) = &mut c.olocal {
                         if let Some(network) = &mut olocal.network {
                             let myc = network.get_controller_id();
@@ -927,7 +927,10 @@ impl TrackedWindow for MainNesWindow {
                     }
                 });
             });
-            window.set_title(&format!("UglyOldBob NES Emulator - {:.0}/{:.0} FPS", self.emulator_fps, self.fps));
+            window.set_title(&format!(
+                "UglyOldBob NES Emulator - {:.0}/{:.0} FPS",
+                self.emulator_fps, self.fps
+            ));
             if c.mb
                 .get_controller_ref(0)
                 .button_data()
