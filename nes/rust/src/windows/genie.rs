@@ -77,6 +77,10 @@ impl TrackedWindow for Window {
                 if let Some(code) = delete {
                     cart.cartridge_volatile_mut().remove_code(&code);
                 }
+                if cart.cartridge().volatile.genie.len() > 0 {
+                    ui.separator();
+                }
+                ui.label("Enter game genie code");
                 ui.text_edit_singleline(&mut self.code);
                 if let Ok(v) = crate::genie::GameGenieCode::from_str(&self.code) {
                     if ui.button("Add game genie code").clicked() {

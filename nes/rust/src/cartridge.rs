@@ -56,11 +56,23 @@ trait NesMapperTrait {
                 for code in &cart.volatile.genie {
                     if code.address() == addr {
                         if let Some(check) = code.check() {
-                            if a == Some(check) {
-                                a = Some(code.value());
+                            let lv = self.memory_cycle_dump(cart, addr ^ 0x8000);
+                            if let Some(lv) = lv {
+                                if a == Some(check) {
+                                    a = Some(lv & code.value());
+                                }
+                            } else {
+                                if a == Some(check) {
+                                    a = Some(code.value());
+                                }
                             }
                         } else {
-                            a = Some(code.value());
+                            let lv = self.memory_cycle_dump(cart, addr ^ 0x8000);
+                            if let Some(lv) = lv {
+                                a = Some(lv & code.value());
+                            } else {
+                                a = Some(code.value());
+                            }
                         }
                     }
                 }

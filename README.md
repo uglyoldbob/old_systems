@@ -18,5 +18,5 @@ Repository for emulation of old game systems and other old computing systems
 - [x] Create link to recordings folder
 - [ ] Slow motion
 - [x] Rom ranking system
-- [ ] Game genie code support
+- [x] Game genie code support
 - [x] Full screen support
