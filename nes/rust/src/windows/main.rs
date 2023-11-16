@@ -365,7 +365,7 @@ impl TrackedWindow for MainNesWindow {
         c.mb.get_controller_mut(2).rapid_fire(frame_time);
         c.mb.get_controller_mut(3).rapid_fire(frame_time);
 
-        let nanos = 1_000_000_000.0 / (60.0 * c.mb.speed_ratio);
+        let nanos = 1_000_000_000.0 / (c.ppu_frame_rate() * c.mb.speed_ratio);
         let emulator_frame = std::time::Duration::from_nanos(nanos as u64);
         let mut render = false;
         self.emulator_time += frame_time;
@@ -811,7 +811,7 @@ impl TrackedWindow for MainNesWindow {
                 self.recording.start(
                     &self.have_gstreamer,
                     &c.local.image,
-                    60,
+                    c.ppu_frame_rate() as u8,
                     recpath,
                     sampling_frequency,
                 );
