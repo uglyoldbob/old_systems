@@ -927,7 +927,7 @@ impl TrackedWindow for MainNesWindow {
                     }
                 });
             });
-            ui.label(format!("{:.0}/{:.0} FPS", self.emulator_fps, self.fps));
+            window.set_title(&format!("UglyOldBob NES Emulator - {:.0}/{:.0} FPS", self.emulator_fps, self.fps));
             if c.mb
                 .get_controller_ref(0)
                 .button_data()
