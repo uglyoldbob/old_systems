@@ -11,6 +11,7 @@ pub mod configuration;
 pub mod controllers;
 pub mod cpu_memory_dump_window;
 pub mod debug_window;
+pub mod genie;
 pub mod main;
 pub mod name_table_dump_window;
 pub mod network;
@@ -32,6 +33,7 @@ pub enum Windows {
     Controllers(crate::windows::controllers::Window),
     CpuMemoryDumpWindow(crate::windows::cpu_memory_dump_window::CpuMemoryDumpWindow),
     Debug(crate::windows::debug_window::DebugNesWindow),
+    Genie(crate::windows::genie::Window),
     NametableDump(crate::windows::name_table_dump_window::DumpWindow),
     Network(crate::windows::network::Window),
     PatternTableDump(crate::windows::pattern_table_dump_window::DumpWindow),

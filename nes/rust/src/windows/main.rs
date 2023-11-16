@@ -695,6 +695,11 @@ impl TrackedWindow for MainNesWindow {
                         windows_to_create.push(super::controllers::Window::new_request());
                         ui.close_menu();
                     }
+                    let button = egui_multiwin::egui::Button::new("Game genie");
+                    if ui.add_enabled(true, button).clicked() {
+                        windows_to_create.push(super::genie::Window::new_request());
+                        ui.close_menu();
+                    }
                 });
                 #[cfg(feature = "debugger")]
                 {

@@ -9,7 +9,7 @@ pub enum GameGenieError {
 }
 
 /// Represents a valid game genie code
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone)]
 pub struct GameGenieCode {
     /// The code for an actual game genie
     code: String,
@@ -22,6 +22,11 @@ pub struct GameGenieCode {
 }
 
 impl GameGenieCode {
+    /// Get the actual user displayed code
+    pub fn code(&self) -> &String {
+        &self.code
+    }
+
     /// Get the check value
     pub fn check(&self) -> Option<u8> {
         self.check_value

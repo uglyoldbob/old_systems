@@ -659,8 +659,5 @@ fn main() {
         );
     }
 
-    genie::GameGenieCode::from_str("GOSSIP");
-    genie::GameGenieCode::from_str("AENTTTZA");
-
     multi_window.run(event_loop, nes_data);
 }

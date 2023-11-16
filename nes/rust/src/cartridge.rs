@@ -18,6 +18,8 @@ use mapper04::Mapper04;
 
 use serde::{Deserialize, Serialize};
 
+use crate::genie::GameGenieCode;
+
 /// All mappers must implement this.
 #[enum_dispatch::enum_dispatch]
 trait NesMapperTrait {
@@ -50,16 +52,30 @@ trait NesMapperTrait {
     fn genie(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
         if cart.volatile.genie.len() > 0 {
             let a = if (0xe000..=0xffff).contains(&addr) {
-                self.memory_cycle_read(cart, addr ^ 0x8000)
+                let mut a = self.memory_cycle_read(cart, addr);
+                for code in &cart.volatile.genie {
+                    if code.address() == addr {
+                        if let Some(check) = code.check() {
+                            if a == Some(check) {
+                                a = Some(code.value());
+                            }
+                        } else {
+                            a = Some(code.value());
+                        }
+                    }
+                }
+                a
             } else {
                 let mut a = self.memory_cycle_read(cart, addr);
                 for code in &cart.volatile.genie {
-                    if let Some(check) = code.check() {
-                        if a == Some(check) {
+                    if code.address() == addr {
+                        if let Some(check) = code.check() {
+                            if a == Some(check) {
+                                a = Some(code.value());
+                            }
+                        } else {
                             a = Some(code.value());
                         }
-                    } else {
-                        a = Some(code.value());
                     }
                 }
                 a
@@ -394,6 +410,21 @@ pub struct VolatileCartridgeData {
     pub chr_ram: Vec<u8>,
     /// A list of game genie codes
     pub genie: Vec<crate::genie::GameGenieCode>,
+}
+
+impl VolatileCartridgeData {
+    /// Remove a game genie code
+    pub fn remove_code(&mut self, code: &GameGenieCode) {
+        let mut codes = Vec::new();
+        let len = self.genie.len();
+        for i in 0..len {
+            let c = self.genie.pop().unwrap();
+            if c != *code {
+                codes.push(c);
+            }
+        }
+        self.genie = codes;
+    }
 }
 
 #[non_exhaustive]
@@ -821,6 +852,11 @@ impl NesCartridge {
     ///Retrieve a reference to the cartridge data
     pub fn cartridge(&self) -> &NesCartridgeData {
         &self.data
+    }
+
+    /// Retrieve a mutable reference to the cartridge volatile data
+    pub fn cartridge_volatile_mut(&mut self) -> &mut VolatileCartridgeData {
+        &mut self.data.volatile
     }
 
     /// Retrieve a list of cartridge registers
