@@ -368,13 +368,15 @@ impl TrackedWindow for MainNesWindow {
         let emulator_frame = std::time::Duration::from_nanos(1_000_000_000u64 / 60);
         let mut render = false;
         self.emulator_time += frame_time;
-        if self.emulator_time > emulator_frame {
+        while self.emulator_time > emulator_frame {
             let new_time = std::time::Instant::now();
             let new_emulated_fps = 1_000_000_000.0
                 / new_time.duration_since(self.last_emulated_frame).as_nanos() as f64;
-            self.emulator_fps = new_emulated_fps;
-            self.last_emulated_frame = new_time;
+            self.emulator_fps = (self.emulator_fps * 0.95) + (0.05 * new_emulated_fps);
             self.emulator_time -= emulator_frame;
+            if self.emulator_time < emulator_frame {
+                self.last_emulated_frame = new_time;
+            }
             render = true;
         }
 
