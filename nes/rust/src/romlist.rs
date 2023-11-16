@@ -5,11 +5,94 @@ use crate::cartridge::{CartridgeError, NesCartridge};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, str::FromStr};
 
+#[derive(Clone, Serialize, Deserialize, PartialEq, strum::EnumIter)]
+/// The ranking system for roms, consists of 5 hate, 5 love, and one neutral ranking
+pub enum RomRanking {
+    /// 5 positive stars
+    Love5,
+    /// 4 positive stars
+    Love4,
+    /// 3 positive stars
+    Love3,
+    /// 2 positive stars
+    Love2,
+    /// 1 positive star
+    Love1,
+    /// 0 stars, (default)
+    Neutral,
+    /// 1 negative star
+    Hate1,
+    /// 2 negative stars
+    Hate2,
+    /// 3 negative stars
+    Hate3,
+    /// 4 negative stars
+    Hate4,
+    /// 5 negative stars
+    Hate5,
+}
+
+impl std::fmt::Display for RomRanking {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            RomRanking::Love5 => "5 Stars Love",
+            RomRanking::Love4 => "4 Stars Love",
+            RomRanking::Love3 => "3 Stars Love",
+            RomRanking::Love2 => "2 Stars Love",
+            RomRanking::Love1 => "1 Star Love",
+            RomRanking::Neutral => "Unranked",
+            RomRanking::Hate1 => "1 star Hate",
+            RomRanking::Hate2 => "2 stars Hate",
+            RomRanking::Hate3 => "3 stars Hate",
+            RomRanking::Hate4 => "4 stars Hate",
+            RomRanking::Hate5 => "5 stars Hate",
+        })
+    }
+}
+
+impl RomRanking {
+    /// Increase ranking by one star
+    pub fn increase(&mut self) {
+        *self = match self {
+            RomRanking::Love5 => RomRanking::Love5,
+            RomRanking::Love4 => RomRanking::Love5,
+            RomRanking::Love3 => RomRanking::Love4,
+            RomRanking::Love2 => RomRanking::Love3,
+            RomRanking::Love1 => RomRanking::Love2,
+            RomRanking::Neutral => RomRanking::Love1,
+            RomRanking::Hate1 => RomRanking::Neutral,
+            RomRanking::Hate2 => RomRanking::Hate1,
+            RomRanking::Hate3 => RomRanking::Hate2,
+            RomRanking::Hate4 => RomRanking::Hate3,
+            RomRanking::Hate5 => RomRanking::Hate4,
+        }
+    }
+
+    /// Decrease ranking by one star
+    pub fn decrease(&mut self) {
+        *self = match self {
+            RomRanking::Love5 => RomRanking::Love4,
+            RomRanking::Love4 => RomRanking::Love3,
+            RomRanking::Love3 => RomRanking::Love2,
+            RomRanking::Love2 => RomRanking::Love1,
+            RomRanking::Love1 => RomRanking::Neutral,
+            RomRanking::Neutral => RomRanking::Hate1,
+            RomRanking::Hate1 => RomRanking::Hate2,
+            RomRanking::Hate2 => RomRanking::Hate3,
+            RomRanking::Hate3 => RomRanking::Hate4,
+            RomRanking::Hate4 => RomRanking::Hate5,
+            RomRanking::Hate5 => RomRanking::Hate5,
+        }
+    }
+}
+
 /// Data gathered from a successful rom load
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RomListResult {
     /// The mapper number of the rom
     pub mapper: u32,
+    /// The ranking for the rom, higher is better. Negative is worse.
+    pub ranking: RomRanking,
 }
 
 /// A single entry for a potentially valid rom for the emulator
@@ -111,18 +194,30 @@ impl RomList {
     /// Load the rom list from disk
     pub fn load_list(mut pb: PathBuf) -> Self {
         pb.push("roms.bin");
+        println!("Load actual rom list from {}", pb.display());
         let contents = std::fs::read(pb);
-        if let Err(_e) = contents {
+        if let Err(e) = contents {
+            println!("Error loading list {:?}, getting new list", e);
             return RomList::new();
         }
         let contents = contents.unwrap();
-        let config = bincode::deserialize(&contents[..]);
-        config.ok().unwrap_or(RomList::new())
+        let config: Result<RomList, Box<bincode::ErrorKind>> = bincode::deserialize(&contents[..]);
+        match config {
+            Ok(list) => {
+                println!("There are {} entries in the rom list", list.elements.len());
+                list
+            }
+            Err(e) => {
+                println!("Error deserializing list: {:?}", e);
+                RomList::new()
+            }
+        }
     }
 
     /// Save the rom list to disk
     pub fn save_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
         pb.push("roms.bin");
+        println!("Save list to {}", pb.display());
         let encoded = bincode::serialize(&self).unwrap();
         std::fs::write(pb, encoded)
     }
@@ -148,6 +243,7 @@ impl Default for RomListParser {
 impl RomListParser {
     /// Create a new rom list parser object. It loads the file that lists previously parsed roms.
     pub fn new(pb: PathBuf) -> Self {
+        println!("Load romlist from {}", pb.display());
         Self {
             list: RomList::load_list(pb),
             scan_complete: false,
@@ -160,9 +256,18 @@ impl RomListParser {
         &self.list
     }
 
+    /// Returns a mutable reference to the list of roms.
+    pub fn list_mut(&mut self) -> &mut RomList {
+        &mut self.list
+    }
+
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
     pub fn find_roms(&mut self, dir: &str, sp: PathBuf, bin: PathBuf) {
         if !self.scan_complete {
+            println!(
+                "There are {} roms currently in the list",
+                self.list.elements.len()
+            );
             for entry in walkdir::WalkDir::new(dir)
                 .into_iter()
                 .filter_map(Result::ok)
@@ -175,9 +280,13 @@ impl RomListParser {
                     let cart = NesCartridge::load_cartridge(name.clone(), &sp);
                     match cart {
                         Ok(_cart) => {
-                            self.list.elements.entry(m).or_insert_with(|| RomListEntry {
-                                result: None,
-                                modified: None,
+                            let e = self.list.elements.entry(m.clone());
+                            e.or_insert_with(|| {
+                                println!("inserting new success entry {}", m.display());
+                                RomListEntry {
+                                    result: None,
+                                    modified: None,
+                                }
                             });
                         }
                         Err(e) => {
@@ -209,6 +318,7 @@ impl RomListParser {
                         );
                         entry.result = Some(romcheck.map(|i| RomListResult {
                             mapper: i.mappernum(),
+                            ranking: RomRanking::Neutral,
                         }));
                         entry.modified = Some(modified);
                     }

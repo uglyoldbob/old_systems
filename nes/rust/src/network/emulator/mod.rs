@@ -376,7 +376,9 @@ impl ConnectionHandler for Handler {
                         }
                     }
                     if let Some(source) = &mut self.avsink {
-                        if let Some(a) = source.try_pull_sample(gstreamer::ClockTime::from_mseconds(1)) {
+                        if let Some(a) =
+                            source.try_pull_sample(gstreamer::ClockTime::from_mseconds(1))
+                        {
                             let c = a.buffer();
                             if let Some(buf) = c {
                                 let mut v: Vec<u8> = vec![0; buf.size()];

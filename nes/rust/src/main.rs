@@ -409,6 +409,10 @@ fn main() {
         event_loop.create_proxy();
 
     let mut nes_data = NesEmulatorData::new(Some(proxy));
+    println!(
+        "There are {} roms in the romlist",
+        nes_data.local.parser.list().elements.len()
+    );
     nes_data.local.parser.find_roms(
         nes_data.local.configuration.get_rom_path(),
         nes_data.local.save_path(),

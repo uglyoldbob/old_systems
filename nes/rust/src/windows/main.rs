@@ -772,11 +772,11 @@ impl TrackedWindow for MainNesWindow {
             .input(|i| i.key_pressed(egui_multiwin::egui::Key::F12))
         {
             match window.fullscreen() {
-                Some(_a) => {
-                    window.set_fullscreen(None)
-                }
+                Some(_a) => window.set_fullscreen(None),
                 None => {
-                    window.set_fullscreen(Some(egui_multiwin::winit::window::Fullscreen::Borderless(None)));
+                    window.set_fullscreen(Some(
+                        egui_multiwin::winit::window::Fullscreen::Borderless(None),
+                    ));
                 }
             }
         }

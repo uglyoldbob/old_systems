@@ -36,7 +36,7 @@ impl Window {
     pub fn new_request(data: &NesEmulatorData) -> NewWindowRequest {
         let mut index = 0;
         let mut max_i = 0;
-        for (i, (path, _entry)) in data.local.roms.elements.iter().enumerate() {
+        for (i, (path, _entry)) in data.local.parser.list().elements.iter().enumerate() {
             if let Some(a) = data.mb.cartridge().map(|p| p.rom_name()) {
                 if a == path.display().to_string() {
                     index = i + 1;
@@ -148,7 +148,9 @@ impl TrackedWindow for Window {
                 }
 
                 if self.next_rom.is_none() {
-                    if let Some((path, _romentry)) = c.local.roms.elements.iter().nth(self.index) {
+                    if let Some((path, _romentry)) =
+                        c.local.parser.list().elements.iter().nth(self.index)
+                    {
                         if let Ok(cart) = crate::NesCartridge::load_cartridge(
                             path.to_str().unwrap().into(),
                             &c.local.save_path(),
@@ -188,7 +190,9 @@ impl TrackedWindow for Window {
                     }
                 }
 
-                if let Some((path, _romentry)) = c.local.roms.elements.iter().nth(self.index) {
+                if let Some((path, _romentry)) =
+                    c.local.parser.list().elements.iter().nth(self.index)
+                {
                     ui.label(format!("The next rom is {}", path.display()));
 
                     let mut new_rom = None;
@@ -226,7 +230,8 @@ impl TrackedWindow for Window {
                         let mut num_bug = 0;
                         let mut num_working = 0;
                         let mut num_unknown = 0;
-                        for (i, (path, _entry)) in c.local.roms.elements.iter().enumerate() {
+                        for (i, (path, _entry)) in c.local.parser.list().elements.iter().enumerate()
+                        {
                             let mut rom_found = false;
                             let mut rom_valid = false;
                             if let Ok(cart) = crate::NesCartridge::load_cartridge(
@@ -289,25 +294,25 @@ impl TrackedWindow for Window {
                     }
                 }
                 ui.label("Rom count by mapper:");
-                let unknown = c.local.roms.get_unknown_quantity();
+                let unknown = c.local.parser.list().get_unknown_quantity();
                 ui.label(format!("UNKNOWN: {}", unknown));
-                let broken = c.local.roms.get_broken_quantity();
+                let broken = c.local.parser.list().get_broken_quantity();
                 ui.label(format!("BROKEN: {}", broken));
-                let bad = c.local.roms.get_bad_quantity();
+                let bad = c.local.parser.list().get_bad_quantity();
                 ui.label(format!("INVALID: {}", bad));
                 let mut sum = bad;
-                for (mapper, quantity) in c.local.roms.get_mapper_quantity() {
+                for (mapper, quantity) in c.local.parser.list().get_mapper_quantity() {
                     sum += quantity;
                     ui.label(format!("Mapper {}: {}", mapper, quantity));
                 }
                 ui.label(format!(
                     "Total good+bad is {}/{}",
                     sum,
-                    c.local.roms.elements.len()
+                    c.local.parser.list().elements.len()
                 ));
             })
         });
-        if self.index >= c.local.roms.elements.len() {
+        if self.index >= c.local.parser.list().elements.len() {
             self.index = 0;
             self.want_status = None;
         }

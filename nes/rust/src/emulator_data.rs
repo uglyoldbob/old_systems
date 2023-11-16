@@ -181,8 +181,6 @@ pub struct LocalEmulatorDataClone {
     pub configuration: EmulatorConfiguration,
     /// The parser for known roms
     pub parser: crate::romlist::RomListParser,
-    /// The list of roms for the emulator
-    pub roms: RomList,
     /// This variable is for keeping track of which roms have been manually tested
     #[cfg(feature = "rom_status")]
     pub rom_test: crate::rom_status::RomListTestParser,
@@ -293,8 +291,7 @@ impl LocalEmulatorDataClone {
         let config = user_config;
         Self {
             configuration: config,
-            parser: crate::romlist::RomListParser::default(),
-            roms: RomList::load_list(Self::get_save_path(&dirs)),
+            parser: crate::romlist::RomListParser::new(Self::get_save_path(&dirs)),
             #[cfg(feature = "rom_status")]
             rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
             resolution_locked: false,

@@ -192,10 +192,7 @@ impl AudioBuffer {
             AudioBuffer::U8(d) => d.to_vec(),
             AudioBuffer::U16(d) => d.iter().flat_map(|a| a.to_le_bytes()).collect(),
             AudioBuffer::U32(d) => d.iter().flat_map(|a| a.to_le_bytes()).collect(),
-            AudioBuffer::F32(d) => d
-                .iter()
-                .flat_map(|a| a.to_bits().to_le_bytes())
-                .collect(),
+            AudioBuffer::F32(d) => d.iter().flat_map(|a| a.to_bits().to_le_bytes()).collect(),
         }
     }
 

@@ -5,7 +5,11 @@ mod mapper01;
 mod mapper03;
 mod mapper04;
 
-use std::{collections::BTreeMap, path::{PathBuf, Path}, slice::ChunksExact};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    slice::ChunksExact,
+};
 
 use mapper00::Mapper00;
 use mapper01::Mapper01;

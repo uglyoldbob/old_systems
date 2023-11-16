@@ -1,12 +1,13 @@
 //! The module for finding nes roms
 
-use crate::{cartridge::NesCartridge, NesEmulatorData};
+use crate::{cartridge::NesCartridge, romlist::RomRanking, NesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{arboard, egui::Sense, egui_glow::EguiGlow};
+use strum::IntoEnumIterator;
 
 use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
@@ -65,36 +66,64 @@ impl TrackedWindow for RomFinder {
         //process to see if any new roms need to be checked
         c.process_roms();
 
+        let mut save_list = false;
+        let sp = c.local.save_path();
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
                 let mut new_rom = None;
-                for (p, entry) in c.local.parser.list().elements.iter() {
-                    if let Some(Ok(r)) = &entry.result {
-                        let resp = ui.add(
-                            egui_multiwin::egui::Label::new(format!(
-                                "{:x}: {}",
-                                r.mapper,
-                                p.display()
-                            ))
-                            .sense(Sense::click()),
-                        );
-                        if let Some(cart) = c.mb.cartridge() {
-                            if p.display().to_string() == cart.rom_name() && !self.scrolled {
-                                resp.scroll_to_me(Some(egui_multiwin::egui::Align::TOP));
-                                self.scrolled = true;
+                for ranking in RomRanking::iter() {
+                    let mut have_entry = false;
+                    for (p, entry) in c.local.parser.list_mut().elements.iter_mut() {
+                        if let Some(Ok(r)) = &mut entry.result {
+                            if r.ranking == ranking {
+                                have_entry = true;
+                                ui.horizontal(|ui| {
+                                    if ui.button("-").clicked() {
+                                        r.ranking.decrease();
+                                        save_list = true;
+                                    }
+                                    if ui.button("+").clicked() {
+                                        r.ranking.increase();
+                                        save_list = true;
+                                    }
+
+                                    ui.label(r.ranking.to_string());
+
+                                    let resp = ui.add(
+                                        egui_multiwin::egui::Label::new(format!(
+                                            "{:x}: {}",
+                                            r.mapper,
+                                            p.display()
+                                        ))
+                                        .sense(Sense::click()),
+                                    );
+                                    if let Some(cart) = c.mb.cartridge() {
+                                        if p.display().to_string() == cart.rom_name()
+                                            && !self.scrolled
+                                        {
+                                            resp.scroll_to_me(Some(
+                                                egui_multiwin::egui::Align::TOP,
+                                            ));
+                                            self.scrolled = true;
+                                        }
+                                    }
+
+                                    if resp.double_clicked() {
+                                        new_rom = Some(
+                                            NesCartridge::load_cartridge(
+                                                p.to_str().unwrap().into(),
+                                                &sp,
+                                            )
+                                            .unwrap(),
+                                        );
+                                        quit = true;
+                                    }
+                                });
                             }
                         }
-
-                        if resp.double_clicked() {
-                            new_rom = Some(
-                                NesCartridge::load_cartridge(
-                                    p.to_str().unwrap().into(),
-                                    &c.local.save_path(),
-                                )
-                                .unwrap(),
-                            );
-                            quit = true;
-                        }
+                    }
+                    if have_entry {
+                        ui.separator();
                     }
                 }
                 ui.label("Unsupported roms below here");
@@ -110,6 +139,13 @@ impl TrackedWindow for RomFinder {
                 }
             });
         });
+
+        if save_list {
+            let p = c.local.save_path();
+            if c.local.parser.list().save_list(p).is_ok() {
+                println!("Saved rom list");
+            }
+        }
 
         self.scrolled = true;
 

@@ -17,6 +17,6 @@ Repository for emulation of old game systems and other old computing systems
 - [ ] Add a list of instructions to the debugger
 - [x] Create link to recordings folder
 - [ ] Slow motion
-- [ ] Rom ranking system
+- [x] Rom ranking system
 - [ ] Game genie code support
 - [x] Full screen support
