@@ -658,6 +658,8 @@ pub struct NesPpu {
     pub bg_debug: Option<(u8, u8)>,
     /// Indicates the mode the ppu access is in
     mode: Option<PpuMode>,
+    /// The type of ppu to emulate
+    t: crate::emulator_data::EmulatorType,
 }
 
 /// The flags that set the nametable base
@@ -771,7 +773,7 @@ const fn palette_generator() -> [[u8; 3]; 64] {
 
 impl NesPpu {
     /// Return a new ppu.
-    pub fn new() -> Self {
+    pub fn new(mode: crate::emulator_data::EmulatorType) -> Self {
         let reg2: u8 = rand::random::<u8>() & !0x40;
         let mut oam = [0; 256];
         for i in &mut oam {
@@ -782,6 +784,11 @@ impl NesPpu {
         for i in &mut oam2 {
             *i = rand::random();
         }
+
+        let fd = match mode {
+            crate::emulator_data::EmulatorType::Ntsc => Box::new(RgbImage::new(256, 240)),
+            crate::emulator_data::EmulatorType::Pal => Box::new(RgbImage::new(256, 239)),
+        };
         Self {
             scanline_number: 0,
             scanline_cycle: 0,
@@ -800,7 +807,7 @@ impl NesPpu {
             attributetable_shift: [0, 0],
             patterntable_tile: 0,
             patterntable_shift: [0, 0],
-            frame_data: Box::new(RgbImage::new(256, 240)),
+            frame_data: fd,
             pend_vram_write: None,
             pend_vram_read: None,
             vram_address: 0,
@@ -824,6 +831,7 @@ impl NesPpu {
             #[cfg(feature = "debugger")]
             bg_debug: None,
             mode: None,
+            t: mode,
         }
     }
 

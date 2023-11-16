@@ -122,7 +122,7 @@ pub fn cpu_bench(c: &mut Criterion) {
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
 
-    let mut nes_data = NesEmulatorData::new(None);
+    let mut nes_data = NesEmulatorData::new(None, emulator_data::EmulatorType::Ntsc);
     group.bench_function("basic 2", |b| {
         b.iter(|| 'emulator_loop: loop {
             nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);
@@ -137,8 +137,8 @@ pub fn cpu_bench(c: &mut Criterion) {
         b.iter_batched(
             || {
                 let cpu: NesCpu = NesCpu::new();
-                let ppu: NesPpu = NesPpu::new();
-                let apu: NesApu = NesApu::new();
+                let ppu: NesPpu = NesPpu::new(crate::emulator_data::EmulatorType::Ntsc);
+                let apu: NesApu = NesApu::new(crate::emulator_data::EmulatorType::Ntsc);
                 let cpu_peripherals: NesCpuPeripherals = NesCpuPeripherals::new(ppu, apu);
                 let mut mb: NesMotherboard = NesMotherboard::new();
                 let nc = NesCartridge::load_cartridge(
@@ -221,7 +221,7 @@ pub fn bench1(c: &mut Criterion) {
     println!("Current dir is {}", wdir.display());
 
     let mut group = c.benchmark_group("basic ppu rendering");
-    let mut nes_data = NesEmulatorData::new(None);
+    let mut nes_data = NesEmulatorData::new(None, emulator_data::EmulatorType::Ntsc);
     group.bench_function("basic 1", |b| {
         b.iter(|| 'emulator_loop: loop {
             nes_data.cycle_step(&mut Vec::new(), &mut Vec::new(), &mut None);

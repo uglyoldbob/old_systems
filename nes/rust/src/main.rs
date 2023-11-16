@@ -409,7 +409,7 @@ fn main() {
     let proxy: egui_multiwin::winit::event_loop::EventLoopProxy<event::Event> =
         event_loop.create_proxy();
 
-    let mut nes_data = NesEmulatorData::new(Some(proxy));
+    let mut nes_data = NesEmulatorData::new(Some(proxy), emulator_data::EmulatorType::Ntsc);
     println!(
         "There are {} roms in the romlist",
         nes_data.local.parser.list().elements.len()

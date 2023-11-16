@@ -546,11 +546,13 @@ pub struct NesApu {
     always_clock: usize,
     /// Halt holders for the 4 channels
     pend_halt: [Option<bool>; 4],
+    /// The mode of emulation for the apu
+    mode: crate::emulator_data::EmulatorType,
 }
 
 impl NesApu {
     /// Build a new apu
-    pub fn new() -> Self {
+    pub fn new(mode: crate::emulator_data::EmulatorType) -> Self {
         Self {
             clock: false,
             status: 0,
@@ -571,6 +573,7 @@ impl NesApu {
             inhibit_length_clock: false,
             always_clock: 0,
             pend_halt: [None; 4],
+            mode,
         }
     }
 

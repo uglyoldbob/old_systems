@@ -19,6 +19,16 @@ use egui_multiwin::egui;
 #[cfg(feature = "egui-multiwin")]
 use crate::egui_multiwin_dynamic::multi_window::NewWindowRequest;
 
+/// The types of systems that can be emulated
+#[non_exhaustive]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Copy, Clone)]
+pub enum EmulatorType {
+    /// The NTSC based nes platform
+    Ntsc,
+    /// The PAL based nes platform
+    Pal,
+}
+
 /// Persistent configuration for the emulator
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -342,6 +352,8 @@ pub struct NesEmulatorData {
     /// Local emulator data that cannot be cloned
     #[serde(skip)]
     pub olocal: Option<LocalEmulatorData>,
+    /// The mode for this emulator
+    mode: EmulatorType,
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -365,10 +377,11 @@ impl NesEmulatorData {
     /// Create a new nes emulator
     pub fn new(
         proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+        mode: EmulatorType,
     ) -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
-        let ppu = NesPpu::new();
-        let apu = NesApu::new();
+        let ppu = NesPpu::new(mode);
+        let apu = NesApu::new(mode);
 
         Self {
             cpu: NesCpu::new(),
@@ -392,17 +405,24 @@ impl NesEmulatorData {
             vblank_just_set: 0,
             local: LocalEmulatorDataClone::new(proxy),
             olocal: Some(LocalEmulatorData::default()),
+            mode,
         }
     }
 
     /// Return the framerate of the ppu
     pub fn ppu_frame_rate(&self) -> f32 {
-        60.0
+        match self.mode {
+            EmulatorType::Ntsc => 60.0,
+            EmulatorType::Pal => 50.0,
+        }
     }
 
     /// Return the cpu frequency.
     pub fn cpu_frequency(&self) -> f32 {
-        21.47727e6 / 12.0
+        match self.mode {
+            EmulatorType::Ntsc => 236.25e6 / (11.0 * 12.0),
+            EmulatorType::Pal => 26.601712e6,
+        }
     }
 
     /// Finds roms for the system
@@ -466,8 +486,8 @@ impl NesEmulatorData {
         let controller3 = self.mb.get_controller(2);
         let controller4 = self.mb.get_controller(3);
         let mb: NesMotherboard = NesMotherboard::new();
-        let ppu = NesPpu::new();
-        let apu = NesApu::new();
+        let ppu = NesPpu::new(self.mode);
+        let apu = NesApu::new(self.mode);
 
         let breakpoints = self.cpu.breakpoints.clone();
         self.cpu = NesCpu::new();
