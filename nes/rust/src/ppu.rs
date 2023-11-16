@@ -1126,7 +1126,7 @@ impl NesPpu {
                 self.scanline_number = 0;
             }
         } else if self.scanline_cycle == 339
-            && self.scanline_number == 261
+            && self.scanline_number == self.last_line()
             && self.frame_odd
             && ((self.registers[1] & (PPU_REGISTER1_DRAW_BACKGROUND)) != 0)
             && self.t == crate::emulator_data::EmulatorType::Ntsc
@@ -1471,6 +1471,22 @@ impl NesPpu {
         }
     }
 
+    /// Returns the last line of vblank
+    fn vblank_line(&self) -> u16 {
+        match self.t {
+            crate::emulator_data::EmulatorType::Ntsc => 260,
+            crate::emulator_data::EmulatorType::Pal => 310,
+        }
+    }
+
+    /// Returns the last line number of a frame
+    fn last_line(&self) -> u16 {
+        match self.t {
+            crate::emulator_data::EmulatorType::Ntsc => 261,
+            crate::emulator_data::EmulatorType::Pal => 311,
+        }
+    }
+
     /// Run a single clock cycle of the ppu
     pub fn cycle(&mut self, bus: &mut NesMotherboard) {
         self.vblank_just_set = false;
@@ -1777,7 +1793,7 @@ impl NesPpu {
                 self.idle_operation(bus, self.scanline_cycle - 1);
             }
             self.increment_scanline_cycle();
-        } else if self.scanline_number <= 260 {
+        } else if self.scanline_number <= self.vblank_line() {
             //vblank lines
             if self.scanline_cycle == 1 && self.scanline_number == 241 {
                 self.registers[2] |= 0x80;
@@ -1793,7 +1809,7 @@ impl NesPpu {
             }
             self.increment_scanline_cycle();
         } else {
-            if self.scanline_number == 261 && self.scanline_cycle == 1 {
+            if self.scanline_number == (self.vblank_line() + 1) && self.scanline_cycle == 1 {
                 self.suppress_nmi = false;
                 self.registers[2] &= !0xE0; //vblank, sprite 0, sprite overflow
             }
