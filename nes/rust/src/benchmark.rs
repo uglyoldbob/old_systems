@@ -6,6 +6,7 @@ mod controller;
 mod cpu;
 mod emulator_data;
 mod event;
+mod genie;
 mod motherboard;
 mod network;
 mod ppu;

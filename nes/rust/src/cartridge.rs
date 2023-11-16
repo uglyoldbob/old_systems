@@ -46,6 +46,29 @@ trait NesMapperTrait {
     fn cartridge_registers(&self) -> BTreeMap<String, u8>;
     /// Retrieve the irq signal
     fn irq(&self) -> bool;
+    /// Checks for active game genie codes and acts appropriately
+    fn genie(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
+        if cart.volatile.genie.len() > 0 {
+            let a = if (0xe000..=0xffff).contains(&addr) {
+                self.memory_cycle_read(cart, addr ^ 0x8000)
+            } else {
+                let mut a = self.memory_cycle_read(cart, addr);
+                for code in &cart.volatile.genie {
+                    if let Some(check) = code.check() {
+                        if a == Some(check) {
+                            a = Some(code.value());
+                        }
+                    } else {
+                        a = Some(code.value());
+                    }
+                }
+                a
+            };
+            a
+        } else {
+            self.memory_cycle_read(cart, addr)
+        }
+    }
 }
 
 /// The mapper for an nes cartridge
@@ -369,6 +392,8 @@ pub struct VolatileCartridgeData {
     pub mapper: u32,
     /// Where chr-ram is stored
     pub chr_ram: Vec<u8>,
+    /// A list of game genie codes
+    pub genie: Vec<crate::genie::GameGenieCode>,
 }
 
 #[non_exhaustive]
@@ -587,6 +612,7 @@ impl NesCartridge {
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mappernum as u32,
             chr_ram,
+            genie: Vec::new(),
         };
 
         let nonvol = NonvolatileCartridgeData {
@@ -708,6 +734,7 @@ impl NesCartridge {
             mirroring: (rom_contents[6] & 1) != 0,
             mapper: mappernum as u32,
             chr_ram: Vec::new(),
+            genie: Vec::new(),
         };
 
         let nonvol = NonvolatileCartridgeData {
@@ -808,7 +835,7 @@ impl NesCartridge {
 
     /// Drive a cpu memory read cycle
     pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
-        self.mapper.memory_cycle_read(&mut self.data, addr)
+        self.mapper.genie(&mut self.data, addr)
     }
 
     /// Drive a cpu memory write cycle

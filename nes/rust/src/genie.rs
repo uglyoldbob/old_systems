@@ -9,6 +9,7 @@ pub enum GameGenieError {
 }
 
 /// Represents a valid game genie code
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct GameGenieCode {
     /// The code for an actual game genie
     code: String,
@@ -21,6 +22,21 @@ pub struct GameGenieCode {
 }
 
 impl GameGenieCode {
+    /// Get the check value
+    pub fn check(&self) -> Option<u8> {
+        self.check_value
+    }
+
+    /// Return the target address of the code
+    pub fn address(&self) -> u16 {
+        self.target
+    }
+
+    /// Return the replacement value of the code
+    pub fn value(&self) -> u8 {
+        self.new_value
+    }
+
     /// Convert a string reference to a game genie code, if possible.
     pub fn from_str(i: &str) -> Result<Self, GameGenieError> {
         if i.len() != 6 && i.len() != 8 {
@@ -64,13 +80,13 @@ impl GameGenieCode {
             transposed[4] = (digits[0] & 8) | (digits[1] & 7);
             transposed[5] = (digits[5] & 8) | (digits[0] & 7);
 
-            let address = 0x8000 | ((transposed[0] as u16) << 12)
+            let address = 0x8000
+                | ((transposed[0] as u16) << 12)
                 | ((transposed[1] as u16) << 8)
                 | ((transposed[2] as u16) << 4)
                 | (transposed[3] as u16);
-            
-            let data = ((transposed[4]) << 4)
-            | transposed[5];
+
+            let data = ((transposed[4]) << 4) | transposed[5];
             return Ok(GameGenieCode {
                 code: i.to_string(),
                 target: address,
@@ -88,14 +104,13 @@ impl GameGenieCode {
             transposed[6] = (digits[6] & 8) | (digits[7] & 7);
             transposed[7] = (digits[5] & 8) | (digits[6] & 7);
 
-            let address = 0x8000 | ((transposed[0] as u16) << 12)
+            let address = 0x8000
+                | ((transposed[0] as u16) << 12)
                 | ((transposed[1] as u16) << 8)
                 | ((transposed[2] as u16) << 4)
                 | (transposed[3] as u16);
-            let data = ((transposed[4]) << 4)
-                | transposed[5];
-            let check = ((transposed[6]) << 4)
-            | transposed[7];
+            let data = ((transposed[4]) << 4) | transposed[5];
+            let check = ((transposed[6]) << 4) | transposed[7];
             return Ok(GameGenieCode {
                 code: i.to_string(),
                 target: address,
