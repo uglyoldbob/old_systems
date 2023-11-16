@@ -787,7 +787,7 @@ impl NesPpu {
 
         let fd = match mode {
             crate::emulator_data::EmulatorType::Ntsc => Box::new(RgbImage::new(256, 240)),
-            crate::emulator_data::EmulatorType::Pal => Box::new(RgbImage::new(256, 239)),
+            crate::emulator_data::EmulatorType::Pal => Box::new(RgbImage::new(256, 240)),
         };
         Self {
             scanline_number: 0,
@@ -1129,6 +1129,7 @@ impl NesPpu {
             && self.scanline_number == 261
             && self.frame_odd
             && ((self.registers[1] & (PPU_REGISTER1_DRAW_BACKGROUND)) != 0)
+            && self.t == crate::emulator_data::EmulatorType::Ntsc
         {
             self.scanline_cycle += 1;
         }

@@ -8,7 +8,6 @@ use crate::{
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
-    romlist::RomList,
 };
 
 #[cfg(feature = "eframe")]
@@ -21,7 +20,7 @@ use crate::egui_multiwin_dynamic::multi_window::NewWindowRequest;
 
 /// The types of systems that can be emulated
 #[non_exhaustive]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Copy, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Copy, Clone, PartialEq)]
 pub enum EmulatorType {
     /// The NTSC based nes platform
     Ntsc,
@@ -383,6 +382,15 @@ impl NesEmulatorData {
         let ppu = NesPpu::new(mode);
         let apu = NesApu::new(mode);
 
+        let cpu_divisor = match mode {
+            EmulatorType::Ntsc => 12,
+            EmulatorType::Pal => 16,
+        };
+        let ppu_divisor = match mode {
+            EmulatorType::Ntsc => 4,
+            EmulatorType::Pal => 5,
+        };
+
         Self {
             cpu: NesCpu::new(),
             cpu_peripherals: NesCpuPeripherals::new(ppu, apu),
@@ -393,8 +401,8 @@ impl NesEmulatorData {
             single_step: false,
             #[cfg(feature = "debugger")]
             wait_for_frame_end: false,
-            cpu_clock_counter: rand::random::<u8>() % 16,
-            ppu_clock_counter: rand::random::<u8>() % 4,
+            cpu_clock_counter: rand::random::<u8>() % cpu_divisor,
+            ppu_clock_counter: rand::random::<u8>() % ppu_divisor,
             last_frame_time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -406,6 +414,22 @@ impl NesEmulatorData {
             local: LocalEmulatorDataClone::new(proxy),
             olocal: Some(LocalEmulatorData::default()),
             mode,
+        }
+    }
+
+    /// Returns the cpu divisor for the main clock
+    fn cpu_divisor(&self) -> u8 {
+        match self.mode {
+            EmulatorType::Ntsc => 12,
+            EmulatorType::Pal => 16,
+        }
+    }
+
+    /// Returns the ppu divisor for the main clock
+    fn ppu_divisor(&self) -> u8 {
+        match self.mode {
+            EmulatorType::Ntsc => 4,
+            EmulatorType::Pal => 5,
         }
     }
 
@@ -546,7 +570,7 @@ impl NesEmulatorData {
 
         self.ppu_clock_counter += 1;
 
-        if self.ppu_clock_counter >= 4 {
+        if self.ppu_clock_counter >= self.ppu_divisor() {
             self.ppu_clock_counter = 0;
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
             if self.cpu_peripherals.ppu.vblank_just_set {
@@ -560,7 +584,7 @@ impl NesEmulatorData {
         }
 
         self.cpu_clock_counter += 1;
-        if self.cpu_clock_counter >= 12 {
+        if self.cpu_clock_counter >= self.cpu_divisor() {
             self.cpu_clock_counter = 0;
             let nmi = self.nmi[2];
 
