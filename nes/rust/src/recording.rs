@@ -81,7 +81,7 @@ impl Recording {
 
             let vbitrate = &format!(
                 "{}",
-                image.width as u32 * image.height as u32 * framerate as u32 / 64
+                image.width as u32 * image.height as u32 * framerate as u32 / 8
             );
             println!("Video birate is calculated as {}", vbitrate);
 
