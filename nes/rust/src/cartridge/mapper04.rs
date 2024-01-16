@@ -1,11 +1,11 @@
-//! Implements mapper 03
+//! Implements mapper 04
 
 use std::collections::BTreeMap;
 
 use crate::cartridge::NesCartridgeData;
 use crate::cartridge::{NesMapper, NesMapperTrait};
 
-/// Mapper 03
+/// Mapper 04
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Mapper04 {

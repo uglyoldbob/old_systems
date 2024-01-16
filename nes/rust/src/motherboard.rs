@@ -411,6 +411,7 @@ impl NesMotherboard {
                 self.ram[addr as usize] = data;
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_write(addr, data);
                 }
             }
             0x2000..=0x3fff => {
@@ -419,6 +420,7 @@ impl NesMotherboard {
                 per.ppu_write(addr, data, &mut self.ppu_palette_ram);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_write(addr, data);
                 }
             }
             0x4000..=0x4017 => {
@@ -431,6 +433,7 @@ impl NesMotherboard {
                 }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_write(addr, data);
                 }
             }
             0x4018..=0x401f => {
@@ -439,6 +442,7 @@ impl NesMotherboard {
                 //println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_write(addr, data);
                 }
             }
             _ => {

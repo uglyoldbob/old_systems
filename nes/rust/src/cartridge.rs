@@ -4,6 +4,7 @@ mod mapper00;
 mod mapper01;
 mod mapper03;
 mod mapper04;
+mod mapper05;
 
 use std::{
     collections::BTreeMap,
@@ -15,6 +16,7 @@ use mapper00::Mapper00;
 use mapper01::Mapper01;
 use mapper03::Mapper03;
 use mapper04::Mapper04;
+use mapper05::Mapper05;
 
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +31,8 @@ trait NesMapperTrait {
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     /// Run a cpu memory write cycle
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
+    /// A write cycle that does not target cartridge memory. Used for mappers that monitor writes like mmc5.
+    fn other_memory_write(&mut self, _addr: u16, _data: u8) {}
     /// Runs a memory cycle that does nothing, for mappers that need to do special things.
     fn memory_cycle_nop(&mut self);
     #[must_use]
@@ -108,6 +112,7 @@ pub enum NesMapper {
     Mapper01,
     Mapper03,
     Mapper04,
+    Mapper05,
 }
 
 /// The trait for cpu memory reads and writes, implemented by devices on the bus
@@ -557,6 +562,7 @@ impl NesCartridge {
             1 => mapper01::Mapper01::new(rom_data),
             3 => mapper03::Mapper03::new(rom_data),
             4 => mapper04::Mapper04::new(rom_data),
+            5 => mapper05::Mapper05::new(rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper));
             }
@@ -889,6 +895,11 @@ impl NesCartridge {
     /// Drive a cpu memory write cycle
     pub fn memory_write(&mut self, addr: u16, data: u8) {
         self.mapper.memory_cycle_write(&mut self.data, addr, data);
+    }
+
+    /// Drive the other memory write cycle
+    pub fn other_memory_write(&mut self, addr: u16, data: u8) {
+        self.mapper.other_memory_write(addr, data);
     }
 
     /// A nop for the cpu bus, for driving mapper logic that needs it.
