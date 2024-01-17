@@ -31,6 +31,14 @@ pub struct Mapper05 {
     ppumask: u8,
     /// The irq register
     irq: u8,
+    /// Used for the irq code
+    last_ppu_address: Option<u16>,
+    /// The number of times the ppu address has matched
+    address_match: u8,
+    /// The current detected scanline
+    scanline: u8,
+    /// Number of idle commands detected on ppu
+    idle: u8,
 }
 
 impl Mapper05 {
@@ -46,6 +54,10 @@ impl Mapper05 {
             ppuctrl: 0,
             ppumask: 0,
             irq: 0,
+            last_ppu_address: None,
+            address_match: 0,
+            scanline: 0,
+            idle: 0,
         })
     }
     /// Check the mirroring bit for the ppu addressing.
@@ -61,11 +73,31 @@ impl Mapper05 {
     fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
         None
     }
+
+    /// Get the inframe flag
+    fn get_inframe(&self) -> bool {
+        (self.irq & 0x40) != 0
+    }
+
+    /// Set the inframe flag
+    fn set_inframe(&mut self, b: bool) {
+        if b {
+            self.irq |= 0x40;
+        }
+        else {
+            self.irq &= !0x40;
+        }
+    }
+
+    /// Set the irq pending flag
+    fn set_irq(&mut self) {
+        self.irq |= 0x80;
+    }
 }
 
 impl NesMapperTrait for Mapper05 {
     fn irq(&self) -> bool {
-        false
+        (self.irq & 0x80) != 0
     }
 
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
@@ -186,7 +218,24 @@ impl NesMapperTrait for Mapper05 {
     }
 
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8> {
-        self.memory_cycle_dump(cart, addr)
+        match addr {
+            0xfffa | 0xfffb => {
+                self.set_inframe(false);
+                self.last_ppu_address = None;
+            }
+            _ => {
+
+            }
+        }
+        let r = self.memory_cycle_dump(cart, addr);
+
+        match addr {
+            0x5203 => {
+                self.irq &= !0x80;
+            }
+            _ => {}
+        }
+        r
     }
 
     fn memory_cycle_nop(&mut self) {}
@@ -262,6 +311,10 @@ impl NesMapperTrait for Mapper05 {
                 self.ppuctrl = data;
             }
             0x2001 => {
+                if (data & 0x18) == 0 {
+                    self.set_inframe(false);
+                    self.last_ppu_address = None;
+                }
                 self.ppumask = data;
             }
             _ => {}
@@ -280,10 +333,34 @@ impl NesMapperTrait for Mapper05 {
     }
 
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8> {
+        if (0x2000..=0x2fff).contains(&self.ppu_address) && Some(self.ppu_address) == self.last_ppu_address {
+            self.address_match += 1;
+            if self.address_match == 2 {
+                if !self.get_inframe() {
+                    self.set_inframe(true);
+                    self.scanline = 0;
+                }
+                else {
+                    self.scanline += 1;
+                    if self.scanline == self.registers4[3] {
+                        self.set_irq();
+                    }
+                }
+            }
+        }
+        else {
+            self.address_match = 0;
+        }
+        self.idle = 0;
         self.ppu_read(self.ppu_address, cart)
     }
 
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
+        self.idle += 1;
+        if self.idle == 3 {
+            self.set_inframe(false);
+            self.last_ppu_address = None;
+        }
         let addr = self.ppu_address;
     }
 
