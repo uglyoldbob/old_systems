@@ -71,7 +71,14 @@ impl Mapper05 {
     }
     /// Perform a ppu read operation
     fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
-        None
+        match addr {
+            0..=0x3ff => {
+                Some(42)
+            }
+            _ => {
+                None
+            }
+        }
     }
 
     /// Get the inframe flag
@@ -265,7 +272,7 @@ impl NesMapperTrait for Mapper05 {
                     // writes work normally when rendering is enabled
                     _ => {
                         let data = if (self.ppumask & 0x18) != 0 { data } else { 0 };
-                        let i = addr & 0x3fff;
+                        let i = addr & 0x3ff;
                         self.int_ram[i as usize] = data;
                     }
                 }
