@@ -83,22 +83,105 @@ impl NesMapperTrait for Mapper05 {
                 let i = addr & 7;
                 Some(self.registers4[i as usize])
             }
-            0x5204 => {
-                Some(self.irq)
-            }
+            0x5204 => Some(self.irq),
             0x5205 => {
-                let mul : u16 = (self.registers4[5] as u16) * (self.registers4[6] as u16);
+                let mul: u16 = (self.registers4[5] as u16) * (self.registers4[6] as u16);
                 let mul = (mul & 0xFF) as u8;
                 Some(mul)
             }
             0x5206 => {
-                let mul : u16 = (self.registers4[5] as u16) * (self.registers4[6] as u16);
+                let mul: u16 = (self.registers4[5] as u16) * (self.registers4[6] as u16);
                 let mul = (mul >> 8) as u8;
                 Some(mul)
             }
-            _ => {
-                None
+            0x6000..=0x7fff => {
+                let a = (self.registers2[0] & 0x7f) as u32;
+                let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                let addr = addr & (cart.volatile.prg_ram.len() as u32 - 1);
+                Some(cart.volatile.prg_ram[addr as usize])
+            },
+            0x8000..=0x9fff => match self.registers[0] & 3 {
+                0 => {
+                    let a = (self.registers2[4] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr as usize])
+                }
+                1 | 2 => {
+                    let a = (self.registers2[2] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let rom = (self.registers2[2] & 0x80) != 0;
+                    if rom {
+                        let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                        Some(cart.nonvolatile.prg_rom[addr as usize])
+                    } else {
+                        let addr = addr & (cart.volatile.prg_ram.len() as u32 - 1);
+                        Some(cart.volatile.prg_ram[addr as usize])
+                    }
+                }
+                3 => {
+                    let a = (self.registers2[1] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let rom = (self.registers2[1] & 0x80) != 0;
+                    if rom {
+                        let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                        Some(cart.nonvolatile.prg_rom[addr as usize])
+                    } else {
+                        let addr = addr & (cart.volatile.prg_ram.len() as u32 - 1);
+                        Some(cart.volatile.prg_ram[addr as usize])
+                    }
+                }
+                _ => unreachable!(),
+            },
+            0xa000..=0xbfff => match self.registers[0] & 3 {
+                0 => {
+                    let a = (self.registers2[4] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr as usize])
+                }
+                1 | 2 | 3 => {
+                    let a = (self.registers2[2] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let rom = (self.registers2[2] & 0x80) != 0;
+                    if rom {
+                        let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                        Some(cart.nonvolatile.prg_rom[addr as usize])
+                    } else {
+                        let addr = addr & (cart.volatile.prg_ram.len() as u32 - 1);
+                        Some(cart.volatile.prg_ram[addr as usize])
+                    }
+                }
+                _ => unreachable!(),
+            },
+            0xc000..=0xdfff => match self.registers[0] & 3 {
+                0 | 1 => {
+                    let a = (self.registers2[4] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                    Some(cart.nonvolatile.prg_rom[addr as usize])
+                }
+                2 | 3 => {
+                    let a = (self.registers2[3] & 0x7f) as u32;
+                    let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                    let rom = (self.registers2[3] & 0x80) != 0;
+                    if rom {
+                        let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                        Some(cart.nonvolatile.prg_rom[addr as usize])
+                    } else {
+                        let addr = addr & (cart.volatile.prg_ram.len() as u32 - 1);
+                        Some(cart.volatile.prg_ram[addr as usize])
+                    }
+                }
+                _ => unreachable!(),
+            },
+            0xe000..=0xffff => {
+                let a = (self.registers2[4] & 0x7f) as u32;
+                let addr = (addr as u32 & 0x1FFF) | (a << 13);
+                let addr = addr & (cart.nonvolatile.prg_rom.len() as u32 - 1);
+                Some(cart.nonvolatile.prg_rom[addr as usize])
             }
+            _ => None,
         }
     }
 
@@ -130,12 +213,44 @@ impl NesMapperTrait for Mapper05 {
                 match self.registers[4] & 3 {
                     // internal ram is read only
                     3 => {}
-                    // writes work normally
+                    // writes work normally when rendering is enabled
                     _ => {
+                        let data = if (self.ppumask & 0x18) != 0 { data } else { 0 };
                         let i = addr & 0x3fff;
                         self.int_ram[i as usize] = data;
                     }
                 }
+            }
+            0x6000..=0x7fff => match self.registers[0] & 3 {
+                0 => {}
+                1 => {}
+                2 => {}
+                3 => {}
+                _ => unreachable!(),
+            },
+            0x8000..=0x9fff => match self.registers[0] & 3 {
+                0 => {}
+                1 => {}
+                2 => {}
+                3 => {}
+                _ => unreachable!(),
+            },
+            0xa000..=0xbfff => match self.registers[0] & 3 {
+                0 => {}
+                1 => {}
+                2 => {}
+                3 => {}
+                _ => unreachable!(),
+            },
+            0xc000..=0xdfff => match self.registers[0] & 3 {
+                0 => {}
+                1 => {}
+                2 => {}
+                3 => {}
+                _ => unreachable!(),
+            },
+            0xe000..=0xffff => {
+                //always rom so do nothing here
             }
             _ => {}
         }
