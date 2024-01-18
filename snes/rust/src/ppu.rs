@@ -523,4 +523,9 @@ impl SnesPpu {
     pub fn set_frame(&mut self, f: &RgbImage) {
         self.frame_data = Box::new(f.clone());
     }
+
+    /// Run a single clock cycle of the ppu
+    pub fn cycle(&mut self, bus: &mut SnesMotherboard) {
+        self.frame_end = true;
+    }
 }

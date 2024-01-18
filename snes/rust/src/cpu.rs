@@ -30,7 +30,7 @@ impl SnesCpuPeripherals {
 
     /// Run a ppu cycle
     pub fn ppu_cycle(&mut self, mb: &mut SnesMotherboard) {
-
+        self.ppu.cycle(mb);
     }
 
     /// Return the ppu frame number
