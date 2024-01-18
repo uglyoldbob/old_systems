@@ -612,7 +612,7 @@ fn main() {
         None
     };
 
-    let root_window = windows::main::MainNesWindow::new_request(sound_producer, sound_stream);
+    let root_window = windows::main::MainSnesWindow::new_request(sound_producer, sound_stream);
 
     let wdir = std::env::current_dir().unwrap();
     println!("Current dir is {}", wdir.display());
@@ -645,7 +645,7 @@ fn main() {
     #[cfg(feature = "debugger")]
     {
         if nes_data.paused {
-            let debug_win = windows::debug_window::DebugNesWindow::new_request();
+            let debug_win = windows::debug_window::DebugSnesWindow::new_request();
             let _e = multi_window.add(debug_win, &mut nes_data, &event_loop);
         }
     }

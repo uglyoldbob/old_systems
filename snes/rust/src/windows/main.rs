@@ -408,15 +408,11 @@ impl TrackedWindow for MainSnesWindow {
             egui.egui_ctx.input(|i| {
                 for index in 0..4 {
                     let controller = c.mb.get_controller_mut(index);
-                    if let crate::controller::SnesController::Zapper(z) = controller {
-                        z.provide_zapper_data(self.mouse, self.mouse_vision);
-                    } else {
-                        for contr in controller.get_buttons_iter_mut() {
-                            let cnum = index;
-                            let button_config =
-                                &c.local.configuration.controller_config[cnum as usize];
-                            contr.update_egui_buttons(i, button_config);
-                        }
+                    for contr in controller.get_buttons_iter_mut() {
+                        let cnum = index;
+                        let button_config =
+                            &c.local.configuration.controller_config[cnum as usize];
+                        contr.update_egui_buttons(i, button_config);
                     }
                 }
             });
@@ -430,28 +426,22 @@ impl TrackedWindow for MainSnesWindow {
                     for (code, button) in gs.buttons() {
                         for index in 0..4 {
                             let controller = c.mb.get_controller_mut(index);
-                            if let crate::controller::SnesController::Zapper(_z) = controller {
-                            } else {
-                                for contr in controller.get_buttons_iter_mut() {
-                                    let cnum = index;
-                                    let button_config =
-                                        &c.local.configuration.controller_config[cnum as usize];
-                                    contr.update_gilrs_buttons(id, code, button, button_config);
-                                }
+                            for contr in controller.get_buttons_iter_mut() {
+                                let cnum = index;
+                                let button_config =
+                                    &c.local.configuration.controller_config[cnum as usize];
+                                contr.update_gilrs_buttons(id, code, button, button_config);
                             }
                         }
                     }
                     for (code, axis) in gs.axes() {
                         for index in 0..4 {
                             let controller = c.mb.get_controller_mut(index);
-                            if let crate::controller::SnesController::Zapper(_z) = controller {
-                            } else {
-                                for contr in controller.get_buttons_iter_mut() {
-                                    let cnum = index;
-                                    let button_config =
-                                        &c.local.configuration.controller_config[cnum as usize];
-                                    contr.update_gilrs_axes(id, code, axis, button_config);
-                                }
+                            for contr in controller.get_buttons_iter_mut() {
+                                let cnum = index;
+                                let button_config =
+                                    &c.local.configuration.controller_config[cnum as usize];
+                                contr.update_gilrs_axes(id, code, axis, button_config);
                             }
                         }
                     }
@@ -713,10 +703,6 @@ impl TrackedWindow for MainSnesWindow {
                             ui.close_menu();
                             windows_to_create.push(super::cpu_memory_dump_window::CpuMemoryDumpWindow::new_request());
                         }
-                        if ui.button("Dump PPU Data").clicked() {
-                            ui.close_menu();
-                            windows_to_create.push(super::ppu_memory_dump_window::PpuMemoryDumpWindow::new_request());
-                        }
                         if ui.button("Dump Cartridge Data").clicked() {
                             ui.close_menu();
                             windows_to_create.push(super::cartridge_dump::CartridgeMemoryDumpWindow::new_request());
@@ -726,20 +712,6 @@ impl TrackedWindow for MainSnesWindow {
                             windows_to_create.push(
                                 super::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new_request(),
                             );
-                        }
-                        if ui.button("Dump ppu pattern table").clicked() {
-                            ui.close_menu();
-                            windows_to_create
-                                .push(super::pattern_table_dump_window::DumpWindow::new_request());
-                        }
-                        if ui.button("Dump ppu name tables").clicked() {
-                            ui.close_menu();
-                            windows_to_create
-                                .push(super::name_table_dump_window::DumpWindow::new_request());
-                        }
-                        if ui.button("Dump ppu sprites").clicked() {
-                            ui.close_menu();
-                            windows_to_create.push(super::sprite_dump_window::DumpWindow::new_request());
                         }
                         if ui.button("Reset").clicked() {
                             ui.close_menu();

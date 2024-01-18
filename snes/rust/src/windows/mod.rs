@@ -13,12 +13,8 @@ pub mod cpu_memory_dump_window;
 pub mod debug_window;
 pub mod genie;
 pub mod main;
-pub mod name_table_dump_window;
 pub mod network;
-pub mod pattern_table_dump_window;
-pub mod ppu_memory_dump_window;
 pub mod rom_finder;
-pub mod sprite_dump_window;
 
 #[cfg(feature = "rom_status")]
 pub mod rom_checker;
@@ -34,11 +30,7 @@ pub enum Windows {
     CpuMemoryDumpWindow(crate::windows::cpu_memory_dump_window::CpuMemoryDumpWindow),
     Debug(crate::windows::debug_window::DebugSnesWindow),
     Genie(crate::windows::genie::Window),
-    NametableDump(crate::windows::name_table_dump_window::DumpWindow),
     Network(crate::windows::network::Window),
-    PatternTableDump(crate::windows::pattern_table_dump_window::DumpWindow),
-    PpuMemoryDump(crate::windows::ppu_memory_dump_window::PpuMemoryDumpWindow),
     RomChecker(crate::windows::rom_checker::Window),
     RomFinder(crate::windows::rom_finder::RomFinder),
-    SpriteDump(crate::windows::sprite_dump_window::DumpWindow),
 }

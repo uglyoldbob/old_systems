@@ -473,6 +473,12 @@ impl RgbImage {
 pub struct SnesPpu {
     /// The frame data stored in the ppu for being displayed onto the screen later.
     frame_data: Box<RgbImage>,
+    /// The frame number of the ppu, used for testing and debugging purposes.
+    #[cfg(any(test, feature = "debugger"))]
+    frame_number: u64,
+    #[cfg(feature = "debugger")]
+    /// For debugging pixel generation of the background
+    pub bg_debug: Option<(u8, u8)>,
 }
 
 impl SnesPpu {
@@ -480,7 +486,22 @@ impl SnesPpu {
     pub fn new() -> Self {
         Self {
             frame_data: Box::new(RgbImage::new(todo!(), todo!())),
+            #[cfg(any(test, feature = "debugger"))]
+            frame_number: 0,
+            #[cfg(any(test, feature = "debugger"))]
+            bg_debug: None,
         }
+    }
+
+    /// Return the frame number of the ppu, mostly used for testing and debugging the ppu
+    #[cfg(any(test, feature = "debugger"))]
+    pub fn frame_number(&self) -> u64 {
+        self.frame_number
+    }
+
+    /// Returns a reference to the frame data stored in the ppu.
+    pub fn get_frame(&mut self) -> &RgbImage {
+        &self.frame_data
     }
 
     /// Get a backup of the ppu frame
