@@ -29,6 +29,8 @@ trait NesMapperTrait {
     fn memory_cycle_dump(&self, cart: &NesCartridgeData, addr: u16) -> Option<u8>;
     /// Run a cpu memory read cycle
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
+    /// A read cycle that does not target cartridge memory. Used for mappers that monitor reads like mmc5.
+    fn other_memory_read(&mut self, cart: &mut NesCartridgeData, addr: u16) {}
     /// Run a cpu memory write cycle
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
     /// A write cycle that does not target cartridge memory. Used for mappers that monitor writes like mmc5.
@@ -895,6 +897,11 @@ impl NesCartridge {
     /// Drive a cpu memory write cycle
     pub fn memory_write(&mut self, addr: u16, data: u8) {
         self.mapper.memory_cycle_write(&mut self.data, addr, data);
+    }
+
+    /// Drive the other memory read cycle, this cycle does not perform a read, but drives logic that depends on the read
+    pub fn other_memory_read(&mut self, addr: u16) {
+        self.mapper.other_memory_read(&mut self.data, addr);
     }
 
     /// Drive the other memory write cycle

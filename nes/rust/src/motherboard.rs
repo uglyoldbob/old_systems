@@ -339,6 +339,7 @@ impl NesMotherboard {
                 self.last_cpu_data = response;
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_read(addr);
                 }
             }
             0x2000..=0x3fff => {
@@ -350,6 +351,7 @@ impl NesMotherboard {
                 }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_read(addr);
                 }
             }
             0x4000..=0x4017 => {
@@ -374,6 +376,7 @@ impl NesMotherboard {
                 }
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_read(addr);
                 }
             }
             0x4018..=0x401f => {
@@ -381,6 +384,7 @@ impl NesMotherboard {
                 //test mode
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
+                    cart.other_memory_read(addr);
                 }
             }
             _ => {

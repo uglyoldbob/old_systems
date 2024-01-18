@@ -72,8 +72,13 @@ impl Mapper05 {
     /// Perform a ppu read operation
     fn ppu_read(&self, addr: u16, cart: &NesCartridgeData) -> Option<u8> {
         match addr {
-            0..=0x3ff => {
+            0..=0x1fff => {
+                //pattern tables
                 Some(42)
+            }
+            0x2000..=0x3eff => {
+                //nametables
+                Some(43)
             }
             _ => {
                 None
@@ -221,6 +226,23 @@ impl NesMapperTrait for Mapper05 {
                 Some(cart.nonvolatile.prg_rom[addr as usize])
             }
             _ => None,
+        }
+    }
+    
+    fn other_memory_read(&mut self, cart: &mut NesCartridgeData, addr:u16) {
+        match addr {
+            //pattern table
+            0..=0x1fff => {
+                //increment tile fetch count
+                if (self.ppuctrl & 0x20) != 0 {
+                    //if count is START, chr banks = sprite
+                    //if count is END, chr banks = background
+                }
+            }
+            0x2000..=0x3eff => {
+                todo!();
+            }
+            _ => {}
         }
     }
 
