@@ -1,4 +1,4 @@
-//! Implements mapper02
+//! Implements mapper34
 
 use std::collections::BTreeMap;
 
@@ -8,22 +8,25 @@ use crate::cartridge::{NesMapper, NesMapperTrait};
 /// Mapper00
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct Mapper02 {
+pub struct Mapper34 {
     /// True when mirroring is vertical
     mirror_vertical: bool,
     /// The address for ppu memory cycles
     ppu_address: u16,
     /// The bank select register
     bank: u8,
+    /// Extra registers
+    regs: [u8; 2],
 }
 
-impl Mapper02 {
-    /// Create a new mapper02
+impl Mapper34 {
+    /// Create a new mapper
     pub fn new(d: &NesCartridgeData) -> NesMapper {
         NesMapper::from(Self {
             mirror_vertical: d.volatile.mirroring,
             ppu_address: 0,
             bank: 0xff,
+            regs: [0; 2],
         })
     }
     /// Check the mirroring bit for the ppu addressing.
@@ -37,7 +40,7 @@ impl Mapper02 {
     }
 }
 
-impl NesMapperTrait for Mapper02 {
+impl NesMapperTrait for Mapper34 {
     fn irq(&self) -> bool {
         false
     }
@@ -101,20 +104,10 @@ impl NesMapperTrait for Mapper02 {
                     None
                 }
             }
-            0x8000..=0xbfff => {
-                let addr2 = addr & 0x3fff;
+            0x8000..=0xffff => {
+                let addr2 = addr & 0x7fff;
                 let mut addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
-                addr3 |= (self.bank as u32 & 0xF) << 14;
-                let addr4 = addr3;
-                Some(
-                    cart.nonvolatile.prg_rom
-                        [addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
-                )
-            }
-            0xc000..=0xffff => {
-                let addr2 = addr & 0x3fff;
-                let mut addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
-                addr3 |= 0xFFFF << 14;
+                addr3 |= (self.bank as u32 & 0xF) << 15;
                 let addr4 = addr3;
                 Some(
                     cart.nonvolatile.prg_rom
@@ -128,21 +121,33 @@ impl NesMapperTrait for Mapper02 {
     fn memory_cycle_nop(&mut self) {}
 
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
-        if (0x6000..=0x7fff).contains(&addr) {
-            if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                let c = cart.nonvolatile.trainer.as_mut().unwrap();
-                let addr = addr & 0x1ff;
-                c[addr as usize] = data;
-            } else {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.volatile.prg_ram.is_empty() {
-                    addr2 %= cart.volatile.prg_ram.len() as u16;
-                    cart.volatile.prg_ram[addr2 as usize] = data;
+        match addr {
+            0x6000..=0x7ffc => {
+                if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
+                    let c = cart.nonvolatile.trainer.as_mut().unwrap();
+                    let addr = addr & 0x1ff;
+                    c[addr as usize] = data;
+                } else {
+                    let mut addr2 = addr & 0x1fff;
+                    if !cart.volatile.prg_ram.is_empty() {
+                        addr2 %= cart.volatile.prg_ram.len() as u16;
+                        cart.volatile.prg_ram[addr2 as usize] = data;
+                    }
                 }
             }
-        }
-        if addr >= 0x8000 {
-            self.bank = data;
+            0x7ffd => {
+                self.bank = data;
+            }
+            0x7ffe => {
+                self.regs[1] = data;
+            }
+            0x7fff => {
+                self.regs[2] = data;
+            }
+            0x8000..=0xffff => {
+                self.bank = data;
+            }
+            _ => {}
         }
     }
 

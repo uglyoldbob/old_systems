@@ -6,6 +6,7 @@ mod mapper02;
 mod mapper03;
 mod mapper04;
 mod mapper05;
+mod mapper34;
 mod mapper71;
 
 use std::{
@@ -20,6 +21,7 @@ use mapper02::Mapper02;
 use mapper03::Mapper03;
 use mapper04::Mapper04;
 use mapper05::Mapper05;
+use mapper34::Mapper34;
 use mapper71::Mapper71;
 
 use serde::{Deserialize, Serialize};
@@ -120,6 +122,7 @@ pub enum NesMapper {
     Mapper03,
     Mapper04,
     Mapper05,
+    Mapper34,
     Mapper71,
 }
 
@@ -572,6 +575,7 @@ impl NesCartridge {
             3 => mapper03::Mapper03::new(rom_data),
             4 => mapper04::Mapper04::new(rom_data),
             5 => mapper05::Mapper05::new(rom_data),
+            34 => mapper34::Mapper34::new(rom_data),
             71 => mapper71::Mapper71::new(rom_data),
             _ => {
                 return Err(CartridgeError::IncompatibleMapper(mapper));
