@@ -2,6 +2,7 @@
 
 mod mapper00;
 mod mapper01;
+mod mapper02;
 mod mapper03;
 mod mapper04;
 mod mapper05;
@@ -14,6 +15,7 @@ use std::{
 
 use mapper00::Mapper00;
 use mapper01::Mapper01;
+use mapper02::Mapper02;
 use mapper03::Mapper03;
 use mapper04::Mapper04;
 use mapper05::Mapper05;
@@ -112,6 +114,7 @@ trait NesMapperTrait {
 pub enum NesMapper {
     Mapper00,
     Mapper01,
+    Mapper02,
     Mapper03,
     Mapper04,
     Mapper05,
@@ -562,6 +565,7 @@ impl NesCartridge {
         let mapper = match mapper {
             0 => mapper00::Mapper00::new(rom_data),
             1 => mapper01::Mapper01::new(rom_data),
+            2 => mapper02::Mapper02::new(rom_data),
             3 => mapper03::Mapper03::new(rom_data),
             4 => mapper04::Mapper04::new(rom_data),
             5 => mapper05::Mapper05::new(rom_data),
