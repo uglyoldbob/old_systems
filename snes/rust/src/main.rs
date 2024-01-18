@@ -409,7 +409,7 @@ fn main() {
     let proxy: egui_multiwin::winit::event_loop::EventLoopProxy<event::Event> =
         event_loop.create_proxy();
 
-    let mut nes_data = NesEmulatorData::new(Some(proxy));
+    let mut nes_data = SnesEmulatorData::new(Some(proxy));
     println!(
         "There are {} roms in the romlist",
         nes_data.local.parser.list().elements.len()
@@ -636,7 +636,7 @@ fn main() {
     if nes_data.local.configuration.sticky_rom {
         if let Some(c) = nes_data.local.configuration.start_rom() {
             let nc =
-                NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
+                SnesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
             nes_data.insert_cartridge(nc);
         }
     }
