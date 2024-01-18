@@ -362,8 +362,6 @@ impl TrackedWindow for MainSnesWindow {
 
         c.mb.get_controller_mut(0).rapid_fire(frame_time);
         c.mb.get_controller_mut(1).rapid_fire(frame_time);
-        c.mb.get_controller_mut(2).rapid_fire(frame_time);
-        c.mb.get_controller_mut(3).rapid_fire(frame_time);
 
         let nanos = 1_000_000_000.0 / (c.ppu_frame_rate() * c.mb.speed_ratio);
         let emulator_frame = std::time::Duration::from_nanos(nanos as u64);
@@ -406,7 +404,7 @@ impl TrackedWindow for MainSnesWindow {
 
         {
             egui.egui_ctx.input(|i| {
-                for index in 0..4 {
+                for index in 0..2 {
                     let controller = c.mb.get_controller_mut(index);
                     for contr in controller.get_buttons_iter_mut() {
                         let cnum = index;
@@ -453,7 +451,7 @@ impl TrackedWindow for MainSnesWindow {
                     match network.role() {
                         NodeRole::Player => {
                             let controller = c.mb.get_controller_ref(0);
-                            for i in 0..4 {
+                            for i in 0..2 {
                                 let _e = network.send_controller_data(i, controller.button_data());
                             }
                         }

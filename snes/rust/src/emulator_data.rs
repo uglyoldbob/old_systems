@@ -282,7 +282,7 @@ impl LocalEmulatorDataClone {
     fn new(
         proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
     ) -> Self {
-        let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
+        let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "snes_emulator").unwrap();
 
         let mut user_path = dirs.config_dir().to_path_buf();
         user_path.push("config.toml");

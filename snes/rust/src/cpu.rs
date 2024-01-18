@@ -39,8 +39,8 @@ impl SnesCpuPeripherals {
     }
 
     /// Has the current ppu frame ended?
-    pub fn ppu_frame_end(&self) -> bool {
-        todo!();
+    pub fn ppu_frame_end(&mut self) -> bool {
+        self.ppu.get_frame_end()
     }
 
     /// Returns a reference to the frame data for the ppu

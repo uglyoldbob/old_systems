@@ -7,12 +7,12 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'nes'",
+            "name": "Debug executable 'snes'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=nes",
-                    "--package=nes"
+                    "--bin=snes",
+                    "--package=snes"
                 ]
             },
             "args": [],

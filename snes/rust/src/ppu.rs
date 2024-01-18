@@ -479,18 +479,28 @@ pub struct SnesPpu {
     #[cfg(feature = "debugger")]
     /// For debugging pixel generation of the background
     pub bg_debug: Option<(u8, u8)>,
+    /// The flag that indicates the end of a frame has occurred. Used for synchronizing frame rate of the emulator.
+    frame_end: bool,
 }
 
 impl SnesPpu {
     /// Construct a new ppu
     pub fn new() -> Self {
         Self {
-            frame_data: Box::new(RgbImage::new(todo!(), todo!())),
+            frame_data: Box::new(RgbImage::new(256, 224)),
             #[cfg(any(test, feature = "debugger"))]
             frame_number: 0,
             #[cfg(any(test, feature = "debugger"))]
             bg_debug: None,
+            frame_end: false,
         }
+    }
+
+    /// Returns true if the frame has ended. Used for frame rate synchronizing.
+    pub fn get_frame_end(&mut self) -> bool {
+        let flag = self.frame_end;
+        self.frame_end = false;
+        flag
     }
 
     /// Return the frame number of the ppu, mostly used for testing and debugging the ppu
