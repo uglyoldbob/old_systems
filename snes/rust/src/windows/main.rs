@@ -3,8 +3,8 @@
 use std::io::Write;
 
 use crate::{
-    apu::AudioProducerWithRate, controller::NesControllerTrait, network::NodeRole,
-    recording::Recording, NesEmulatorData,
+    apu::AudioProducerWithRate, controller::SnesControllerTrait, network::NodeRole,
+    recording::Recording, SnesEmulatorData,
 };
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
@@ -23,7 +23,7 @@ use crate::egui_multiwin_dynamic::{
 };
 
 /// The struct for the main window of the emulator.
-pub struct MainNesWindow {
+pub struct MainSnesWindow {
     /// The last time a rewind point was saved.
     rewind_point: Option<std::time::Instant>,
     /// The rewind points
@@ -35,7 +35,7 @@ pub struct MainNesWindow {
     /// Used to synchronize the emulator to the right frame rate
     emulator_time: std::time::Duration,
     #[cfg(feature = "eframe")]
-    c: NesEmulatorData,
+    c: SnesEmulatorData,
     /// The calculated frames per second performance of the program. Will be higher than the fps of the emulator.
     fps: f64,
     /// The calculated frames per second performance of the emulator.
@@ -68,10 +68,10 @@ pub struct MainNesWindow {
     audio_streaming: Vec<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
 }
 
-impl MainNesWindow {
+impl MainSnesWindow {
     #[cfg(feature = "eframe")]
     pub fn new_request(
-        c: NesEmulatorData,
+        c: SnesEmulatorData,
         rate: u32,
         producer: Option<crate::AudioProducer>,
         stream: Option<cpal::Stream>,
@@ -107,7 +107,7 @@ impl MainNesWindow {
         }
 
         NewWindowRequest {
-            window_state: super::Windows::Main(MainNesWindow {
+            window_state: super::Windows::Main(MainSnesWindow {
                 have_gstreamer,
                 rewind_point: None,
                 rewinds: [Vec::new(), Vec::new(), Vec::new()],
@@ -145,7 +145,7 @@ impl MainNesWindow {
 }
 
 #[cfg(feature = "eframe")]
-impl eframe::App for MainNesWindow {
+impl eframe::App for MainSnesWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         #[cfg(feature = "puffin")]
         {
@@ -205,7 +205,7 @@ impl eframe::App for MainNesWindow {
         {
             #[cfg(feature = "puffin")]
             puffin::profile_scope!("nes frame convert");
-            let image = NesPpu::convert_to_egui(self.c.cpu_peripherals.ppu_get_frame());
+            let image = SnesPpu::convert_to_egui(self.c.cpu_peripherals.ppu_get_frame());
 
             if let None = self.texture {
                 self.texture =
@@ -303,12 +303,12 @@ impl eframe::App for MainNesWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for MainNesWindow {
+impl TrackedWindow for MainSnesWindow {
     fn is_root(&self) -> bool {
         true
     }
 
-    fn can_quit(&mut self, _c: &mut NesEmulatorData) -> bool {
+    fn can_quit(&mut self, _c: &mut SnesEmulatorData) -> bool {
         self.sound_stream.take();
         loop {
             if self.recording.stop().is_ok() {
@@ -322,7 +322,7 @@ impl TrackedWindow for MainNesWindow {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,
@@ -408,7 +408,7 @@ impl TrackedWindow for MainNesWindow {
             egui.egui_ctx.input(|i| {
                 for index in 0..4 {
                     let controller = c.mb.get_controller_mut(index);
-                    if let crate::controller::NesController::Zapper(z) = controller {
+                    if let crate::controller::SnesController::Zapper(z) = controller {
                         z.provide_zapper_data(self.mouse, self.mouse_vision);
                     } else {
                         for contr in controller.get_buttons_iter_mut() {
@@ -430,7 +430,7 @@ impl TrackedWindow for MainNesWindow {
                     for (code, button) in gs.buttons() {
                         for index in 0..4 {
                             let controller = c.mb.get_controller_mut(index);
-                            if let crate::controller::NesController::Zapper(_z) = controller {
+                            if let crate::controller::SnesController::Zapper(_z) = controller {
                             } else {
                                 for contr in controller.get_buttons_iter_mut() {
                                     let cnum = index;
@@ -444,7 +444,7 @@ impl TrackedWindow for MainNesWindow {
                     for (code, axis) in gs.axes() {
                         for index in 0..4 {
                             let controller = c.mb.get_controller_mut(index);
-                            if let crate::controller::NesController::Zapper(_z) = controller {
+                            if let crate::controller::SnesController::Zapper(_z) = controller {
                             } else {
                                 for contr in controller.get_buttons_iter_mut() {
                                     let cnum = index;
@@ -707,7 +707,7 @@ impl TrackedWindow for MainNesWindow {
                     ui.menu_button("Debug", |ui| {
                         if ui.button("Debugger").clicked() {
                             ui.close_menu();
-                            windows_to_create.push(super::debug_window::DebugNesWindow::new_request());
+                            windows_to_create.push(super::debug_window::DebugSnesWindow::new_request());
                         }
                         if ui.button("Dump CPU Data").clicked() {
                             ui.close_menu();

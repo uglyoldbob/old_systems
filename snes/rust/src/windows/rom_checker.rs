@@ -2,7 +2,7 @@
 
 use std::io::Write;
 
-use crate::{cartridge::NesCartridge, rom_status::RomStatus, NesEmulatorData};
+use crate::{cartridge::SnesCartridge, rom_status::RomStatus, SnesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -23,7 +23,7 @@ pub struct Window {
     /// The index into the large rom list
     index: usize,
     /// The next rom in the list
-    next_rom: Option<NesCartridge>,
+    next_rom: Option<SnesCartridge>,
     /// The input field for entering bug status
     bug: String,
     /// Set to some when it is desired to scan for a rom with a status
@@ -33,7 +33,7 @@ pub struct Window {
 #[cfg(feature = "egui-multiwin")]
 impl Window {
     /// Create a new request for a Debug window.
-    pub fn new_request(data: &NesEmulatorData) -> NewWindowRequest {
+    pub fn new_request(data: &SnesEmulatorData) -> NewWindowRequest {
         let mut index = 0;
         let mut max_i = 0;
         for (i, (path, _entry)) in data.local.parser.list().elements.iter().enumerate() {
@@ -82,7 +82,7 @@ impl TrackedWindow for Window {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,
@@ -151,7 +151,7 @@ impl TrackedWindow for Window {
                     if let Some((path, _romentry)) =
                         c.local.parser.list().elements.iter().nth(self.index)
                     {
-                        if let Ok(cart) = crate::NesCartridge::load_cartridge(
+                        if let Ok(cart) = crate::SnesCartridge::load_cartridge(
                             path.to_str().unwrap().into(),
                             &c.local.save_path(),
                         ) {
@@ -234,7 +234,7 @@ impl TrackedWindow for Window {
                         {
                             let mut rom_found = false;
                             let mut rom_valid = false;
-                            if let Ok(cart) = crate::NesCartridge::load_cartridge(
+                            if let Ok(cart) = crate::SnesCartridge::load_cartridge(
                                 path.to_str().unwrap().into(),
                                 &c.local.save_path(),
                             ) {

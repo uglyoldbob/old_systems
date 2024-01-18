@@ -3,10 +3,10 @@
 use std::{io::Write, path::PathBuf};
 
 use crate::{
-    apu::AudioProducerWithRate,
+    apu::{AudioProducerWithRate, SnesApu},
     cartridge::SnesCartridge,
     cpu::{SnesCpu, SnesCpuPeripherals},
-    motherboard::NesMotherboard,
+    motherboard::SnesMotherboard,
     ppu::SnesPpu,
     romlist::RomList,
 };
@@ -312,7 +312,7 @@ pub struct SnesEmulatorData {
     /// The peripherals of the cpu for the emulator
     pub cpu_peripherals: SnesCpuPeripherals,
     /// The motherboard for the emualtor
-    pub mb: NesMotherboard,
+    pub mb: SnesMotherboard,
     /// Used for operating the cpu clock divider
     pub cpu_clock_counter: u8,
     /// Used for operating the ppu clock divider
@@ -366,7 +366,7 @@ impl SnesEmulatorData {
     pub fn new(
         proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
     ) -> Self {
-        let mb: NesMotherboard = NesMotherboard::new();
+        let mb: SnesMotherboard = SnesMotherboard::new();
         let ppu = SnesPpu::new();
         let apu = SnesApu::new();
 
@@ -444,7 +444,7 @@ impl SnesEmulatorData {
                 self.mb.set_controller(3, controller4);
                 self.local = lcl;
                 self.olocal = olcl;
-                self.cpu_peripherals.ppu.set_frame(screen);
+                self.cpu_peripherals.ppu.set_frame(&screen);
                 Ok(())
             }
             Err(e) => Err(e),
@@ -465,7 +465,7 @@ impl SnesEmulatorData {
         let controller2 = self.mb.get_controller(1);
         let controller3 = self.mb.get_controller(2);
         let controller4 = self.mb.get_controller(3);
-        let mb: NesMotherboard = NesMotherboard::new();
+        let mb: SnesMotherboard = SnesMotherboard::new();
         let ppu = SnesPpu::new();
         let apu = SnesApu::new();
 
@@ -529,14 +529,6 @@ impl SnesEmulatorData {
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
-            if self.cpu_peripherals.ppu.vblank_just_set {
-                self.vblank_just_set = 1;
-            }
-            self.nmi[0] = self.nmi[1];
-            self.nmi[1] = self.nmi[2];
-            self.nmi[2] = self.nmi[3];
-            self.nmi[3] = self.nmi[4];
-            self.nmi[4] = self.cpu_peripherals.ppu_irq();
         }
 
         self.cpu_clock_counter += 1;
@@ -546,7 +538,6 @@ impl SnesEmulatorData {
 
             self.cpu_peripherals.apu.clock_slow(sound, streams, filter);
             let irq = self.cpu_peripherals.apu.irq();
-            self.cpu.set_dma_input(self.cpu_peripherals.apu.dma());
             let cart_irq = self.mb.cartridge().map(|cart| cart.irq()).unwrap_or(false);
             self.cpu.cycle(
                 &mut self.mb,
@@ -554,14 +545,6 @@ impl SnesEmulatorData {
                 nmi,
                 self.prev_irq | cart_irq,
             );
-            if self.cpu_peripherals.ppu.vblank_clear && self.vblank_just_set > 0 {
-                self.cpu_peripherals.ppu.suppress_nmi();
-                self.nmi[0] = false;
-                self.nmi[1] = false;
-                self.nmi[2] = false;
-                self.nmi[3] = false;
-                self.nmi[4] = false;
-            }
             self.prev_irq = irq;
         }
 

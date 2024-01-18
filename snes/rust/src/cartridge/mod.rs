@@ -97,7 +97,7 @@ trait SnesMapperTrait {
     }
 }
 
-/// The mapper for an nes cartridge
+/// The mapper for an Snes cartridge
 #[non_exhaustive]
 #[enum_dispatch::enum_dispatch(SnesMapperTrait)]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -106,7 +106,7 @@ pub enum SnesMapper {
 }
 
 /// The trait for cpu memory reads and writes, implemented by devices on the bus
-pub trait NesMemoryBusDevice {
+pub trait SnesMemoryBusDevice {
     /// Run a cpu memory read cycle on the cartridge
     fn memory_cycle_read(
         &mut self,
@@ -438,10 +438,10 @@ impl VolatileCartridgeData {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// The format that a rom file is loaded from
 pub enum RomFormat {
-    /// The ines1 rom format
-    Ines1,
-    /// The ines2 rom format
-    Ines2,
+    /// The iSnes1 rom format
+    ISnes1,
+    /// The iSnes2 rom format
+    ISnes2,
 }
 
 /// A cartridge, including the mapper structure
@@ -451,7 +451,7 @@ pub struct SnesCartridge {
     /// The data in the cartridge, including ram and everything else
     data: SnesCartridgeData,
     /// The mapper
-    mapper: NesMapper,
+    mapper: SnesMapper,
     /// The mapper number
     mappernum: u32,
     /// Rom format loaded from
@@ -504,8 +504,8 @@ impl SnesCartridge {
         self.mapper.irq()
     }
 
-    /// "Parses" an obsolete ines rom
-    fn load_obsolete_ines(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    /// "Parses" an obsolete iSnes rom
+    fn load_obsolete_iSnes(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
     }
 
@@ -556,8 +556,8 @@ impl SnesCartridge {
         Ok(mapper)
     }
 
-    /// Parses an ines1 format rom
-    fn load_ines1(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    /// Parses an iSnes1 format rom
+    fn load_iSnes1(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         if rom_contents[0] != b'N'
             || rom_contents[1] != b'E'
             || rom_contents[2] != b'S'
@@ -658,7 +658,7 @@ impl SnesCartridge {
             prom: None,
         };
 
-        let rom_data = NesCartridgeData {
+        let rom_data = SnesCartridgeData {
             volatile: vol,
             nonvolatile: nonvol,
         };
@@ -680,7 +680,7 @@ impl SnesCartridge {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
-            rom_format: RomFormat::Ines1,
+            rom_format: RomFormat::ISnes1,
             hash: hash.to_owned(),
             save: pb
                 .file_name()
@@ -693,8 +693,8 @@ impl SnesCartridge {
         })
     }
 
-    /// Parses an ines2 format rom
-    fn load_ines2(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    /// Parses an iSnes2 format rom
+    fn load_iSnes2(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         if rom_contents[0] != b'N'
             || rom_contents[1] != b'E'
             || rom_contents[2] != b'S'
@@ -780,12 +780,12 @@ impl SnesCartridge {
             prom: None,
         };
 
-        let rom_data = NesCartridgeData {
+        let rom_data = SnesCartridgeData {
             nonvolatile: nonvol,
             volatile: vol,
         };
 
-        let mapper = NesCartridge::get_mapper(mappernum as u32, &rom_data)?;
+        let mapper = SnesCartridge::get_mapper(mappernum as u32, &rom_data)?;
 
         let pb = <PathBuf as std::str::FromStr>::from_str(&name).unwrap();
 
@@ -794,7 +794,7 @@ impl SnesCartridge {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
-            rom_format: RomFormat::Ines2,
+            rom_format: RomFormat::ISnes2,
             hash: hash.to_owned(),
             save: pb
                 .file_name()
@@ -825,19 +825,19 @@ impl SnesCartridge {
             return Err(CartridgeError::InvalidRom);
         }
         let mut cart = if (rom_contents[7] & 0xC) == 8 {
-            Self::load_ines2(name, &rom_contents)
+            Self::load_iSnes2(name, &rom_contents)
         } else if (rom_contents[7] & 0xC) == 4 {
-            Self::load_obsolete_ines(name, &rom_contents)
+            Self::load_obsolete_iSnes(name, &rom_contents)
         } else if (rom_contents[7] & 0xC) == 0
             && rom_contents[12] == 0
             && rom_contents[13] == 0
             && rom_contents[14] == 0
             && rom_contents[15] == 0
         {
-            Self::load_ines1(name, &rom_contents)
+            Self::load_iSnes1(name, &rom_contents)
         } else {
-            //or ines 0.7
-            Self::load_obsolete_ines(name, &rom_contents)
+            //or iSnes 0.7
+            Self::load_obsolete_iSnes(name, &rom_contents)
         };
 
         if let Ok(c) = &mut cart {
@@ -852,9 +852,9 @@ impl SnesCartridge {
     }
 }
 
-impl NesCartridge {
+impl SnesCartridge {
     ///Retrieve a reference to the cartridge data
-    pub fn cartridge(&self) -> &NesCartridgeData {
+    pub fn cartridge(&self) -> &SnesCartridgeData {
         &self.data
     }
 

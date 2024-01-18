@@ -1,6 +1,6 @@
 //! This modules contains the window for editing controller properties
 
-use crate::NesEmulatorData;
+use crate::SnesEmulatorData;
 use strum::IntoEnumIterator;
 
 #[cfg(feature = "eframe")]
@@ -64,7 +64,7 @@ impl TrackedWindow for Window {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,

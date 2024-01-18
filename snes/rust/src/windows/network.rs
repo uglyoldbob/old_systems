@@ -12,7 +12,7 @@ use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},
 };
-use crate::emulator_data::NesEmulatorData;
+use crate::emulator_data::SnesEmulatorData;
 
 /// The network configuration window.
 pub struct Window {
@@ -54,7 +54,7 @@ impl TrackedWindow for Window {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,

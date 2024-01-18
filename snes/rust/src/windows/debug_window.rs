@@ -1,6 +1,6 @@
 //! The module for the main debug window
 
-use crate::NesEmulatorData;
+use crate::SnesEmulatorData;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -15,17 +15,17 @@ use crate::egui_multiwin_dynamic::{
 };
 
 /// The structure for a debug window of the emulator.
-pub struct DebugNesWindow {
+pub struct DebugSnesWindow {
     /// The string for a new breakpoint, in hexadecimal characters.
     breakpoint: String,
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl DebugNesWindow {
+impl DebugSnesWindow {
     /// Create a new request for a Debug window.
     pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: super::Windows::Debug(DebugNesWindow {
+            window_state: super::Windows::Debug(DebugSnesWindow {
                 breakpoint: "".to_string(),
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
@@ -45,7 +45,7 @@ impl DebugNesWindow {
 }
 
 #[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for DebugNesWindow {
+impl TrackedWindow for DebugSnesWindow {
     fn is_root(&self) -> bool {
         false
     }
@@ -54,7 +54,7 @@ impl TrackedWindow for DebugNesWindow {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,

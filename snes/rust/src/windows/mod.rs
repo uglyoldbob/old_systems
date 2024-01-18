@@ -26,13 +26,13 @@ pub mod rom_checker;
 /// The list of windows that can exist in the emulator.
 #[enum_dispatch(TrackedWindow)]
 pub enum Windows {
-    Main(crate::windows::main::MainNesWindow),
+    Main(crate::windows::main::MainSnesWindow),
     CartridgeDump(crate::windows::cartridge_dump::CartridgeMemoryDumpWindow),
     CartridgePrgRamDump(crate::windows::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow),
     Configuration(crate::windows::configuration::Window),
     Controllers(crate::windows::controllers::Window),
     CpuMemoryDumpWindow(crate::windows::cpu_memory_dump_window::CpuMemoryDumpWindow),
-    Debug(crate::windows::debug_window::DebugNesWindow),
+    Debug(crate::windows::debug_window::DebugSnesWindow),
     Genie(crate::windows::genie::Window),
     NametableDump(crate::windows::name_table_dump_window::DumpWindow),
     Network(crate::windows::network::Window),

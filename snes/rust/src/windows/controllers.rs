@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::{controller::NesController, NesEmulatorData};
+use crate::{controller::SnesController, SnesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -70,7 +70,7 @@ impl TrackedWindow for Window {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,
@@ -145,7 +145,7 @@ impl TrackedWindow for Window {
                     .selected_text(controller.to_string())
                     .show_ui(ui, |ui| {
                         let mut changed = false;
-                        for opt in NesController::iter() {
+                        for opt in SnesController::iter() {
                             if ui
                                 .selectable_value(&mut controller, opt.clone(), opt.to_string())
                                 .changed()
@@ -192,10 +192,7 @@ impl TrackedWindow for Window {
 
                 let controller = c.mb.get_controller_mut(i);
                 match controller {
-                    crate::controller::NesController::FourScore(_fs) => {
-                        ui.label("A problem occurred");
-                    }
-                    crate::controller::NesController::StandardController(_) => {
+                    crate::controller::SnesController::StandardController(_) => {
                         ui.horizontal(|ui| {
                             ui.label("Button A:");
                             if ui
@@ -414,10 +411,7 @@ impl TrackedWindow for Window {
                             }
                         });
                     }
-                    crate::controller::NesController::Zapper(_) => {
-                        ui.label("Zapper controlled by mouse");
-                    }
-                    crate::controller::NesController::DummyController(_) => {}
+                    crate::controller::SnesController::DummyController(_) => {}
                 }
 
                 if let Some(r) = set_turboa {

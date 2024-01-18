@@ -1,6 +1,6 @@
 //! The module for finding nes roms
 
-use crate::{cartridge::NesCartridge, romlist::RomRanking, NesEmulatorData};
+use crate::{cartridge::SnesCartridge, romlist::RomRanking, SnesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -52,7 +52,7 @@ impl TrackedWindow for RomFinder {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,
@@ -110,7 +110,7 @@ impl TrackedWindow for RomFinder {
 
                                     if resp.double_clicked() {
                                         new_rom = Some(
-                                            NesCartridge::load_cartridge(
+                                            SnesCartridge::load_cartridge(
                                                 p.to_str().unwrap().into(),
                                                 &sp,
                                             )

@@ -1,6 +1,6 @@
 //! The module for the cartridge program data dump window
 
-use crate::NesEmulatorData;
+use crate::SnesEmulatorData;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -50,7 +50,7 @@ impl TrackedWindow for CartridgeMemoryDumpWindow {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,

@@ -1,5 +1,5 @@
 //! This module is for the window that dumps ppu name table information.
-use crate::{ppu::RgbImage, NesEmulatorData};
+use crate::{ppu::RgbImage, SnesEmulatorData};
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -63,7 +63,7 @@ impl TrackedWindow for DumpWindow {
 
     fn redraw(
         &mut self,
-        c: &mut NesEmulatorData,
+        c: &mut SnesEmulatorData,
         egui: &mut EguiGlow,
         _window: &egui_multiwin::winit::window::Window,
         _clipboard: &mut arboard::Clipboard,
