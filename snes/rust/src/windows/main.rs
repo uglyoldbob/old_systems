@@ -408,8 +408,7 @@ impl TrackedWindow for MainSnesWindow {
                     let controller = c.mb.get_controller_mut(index);
                     for contr in controller.get_buttons_iter_mut() {
                         let cnum = index;
-                        let button_config =
-                            &c.local.configuration.controller_config[cnum as usize];
+                        let button_config = &c.local.configuration.controller_config[cnum as usize];
                         contr.update_egui_buttons(i, button_config);
                     }
                 }

@@ -75,8 +75,7 @@ impl NesMapperTrait for Mapper34 {
                 addr3 |= (self.bank as u32 & 0xF) << 14;
                 let addr4 = addr3;
                 Some(
-                    cart.nonvolatile.prg_rom
-                        [addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
+                    cart.nonvolatile.prg_rom[addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
                 )
             }
             0xc000..=0xffff => {
@@ -85,8 +84,7 @@ impl NesMapperTrait for Mapper34 {
                 addr3 |= 0xFFFF << 14;
                 let addr4 = addr3;
                 Some(
-                    cart.nonvolatile.prg_rom
-                        [addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
+                    cart.nonvolatile.prg_rom[addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
                 )
             }
             _ => None,
@@ -110,8 +108,7 @@ impl NesMapperTrait for Mapper34 {
                 addr3 |= (self.bank as u32 & 0xF) << 15;
                 let addr4 = addr3;
                 Some(
-                    cart.nonvolatile.prg_rom
-                        [addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
+                    cart.nonvolatile.prg_rom[addr4 as usize & (cart.nonvolatile.prg_rom.len() - 1)],
                 )
             }
             _ => None,

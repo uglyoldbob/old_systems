@@ -465,7 +465,6 @@ impl RgbImage {
     }
 }
 
-
 /// The structure for the snes PPU (picture processing unit)
 #[non_exhaustive]
 #[serde_with::serde_as]

@@ -17,16 +17,11 @@ pub struct SnesCpuPeripherals {
 impl SnesCpuPeripherals {
     /// Build a set of cpu peripherals
     pub fn new(ppu: SnesPpu, apu: SnesApu) -> Self {
-        Self {
-            ppu,
-            apu,
-        }
+        Self { ppu, apu }
     }
 
     /// reset the ppu
-    pub fn ppu_reset(&mut self) {
-
-    }
+    pub fn ppu_reset(&mut self) {}
 
     /// Run a ppu cycle
     pub fn ppu_cycle(&mut self, mb: &mut SnesMotherboard) {
@@ -118,9 +113,7 @@ impl SnesCpu {
     }
 
     /// Reset the cpu
-    pub fn reset(&mut self) {
-        
-    }
+    pub fn reset(&mut self) {}
 
     /// Returns true when done fetching all bytes for an instruction.
     #[cfg(feature = "debugger")]

@@ -488,6 +488,10 @@ pub enum CartridgeError {
     RomTooShort,
     /// The rom has bytes that were not parsed
     RomTooLong,
+    /// The cartridge length is not a multiple of 512
+    BadLength,
+    /// The rom header was not found
+    HeaderNotFound,
 }
 
 /// Calculate the sha256 of a chunk of data, and return it in a hex encoded string.
@@ -498,15 +502,86 @@ fn calc_sha256(data: &[u8]) -> String {
     data_encoding::HEXLOWER.encode(digest.as_ref())
 }
 
+struct RomHeaderOption {
+    start: u32,
+    mode: u8,
+    method: MapperMethod,
+}
+
+enum MapperMethod {
+    LoRom,
+    HiRom,
+    ExHirom,
+}
+
+/// An iterator over the contents of a rom for getting the checksum
+struct MapperIter<'a> {
+    /// The address
+    addr: u32,
+    /// The size of the main chunk of memory for the rom. This is the largest power of two equal to or less than the entire length of the rom.
+    main_size: u32,
+    /// The size of the repeat block for the minor portion of rom memory
+    step: u32,
+    /// The maximum address to read to for all of the rom
+    max_size: u32,
+    /// The map method
+    map: &'a MapperMethod,
+    /// The contents of the rom
+    contents: &'a [u8],
+}
+
+impl<'a> Iterator for MapperIter<'a> {
+    type Item = u8;
+    fn next(&mut self) -> Option<Self::Item> {
+        let d = if self.addr < self.main_size {
+            Some(self.contents[self.addr as usize])
+        } else if self.addr < self.max_size {
+            let index = self.addr % self.step;
+            let small = self.contents.len() - self.main_size as usize;
+            if index as usize >= small {
+                Some(0)
+            } else {
+                Some(self.contents[(self.main_size + index) as usize])
+            }
+        } else {
+            None
+        };
+        self.addr += 1;
+        d
+    }
+}
+
+impl<'a> MapperMethod {
+    fn get_iter(&'a self, contents: &'a [u8]) -> MapperIter {
+        let mut size = contents.len().next_power_of_two();
+        if size > contents.len() {
+            size /= 2;
+        }
+
+        let mut msize = contents.len() - size;
+
+        let (max_size, step) = if msize > 0 {
+            msize = msize.next_power_of_two();
+            (size * 2, msize)
+        } else {
+            (size, 0)
+        };
+        println!("Size {:x}, {:x}, {:X} {:x}", contents.len(), size, step, max_size);
+        MapperIter {
+            addr: 0,
+            main_size: size as u32,
+            step: step as u32,
+            max_size: max_size as u32,
+            map: self,
+            contents,
+        }
+    }
+}
+
 impl SnesCartridge {
     /// Helper function to get the irq signal from the cartridge
     pub fn irq(&self) -> bool {
         self.mapper.irq()
-    }
-
-    /// "Parses" an obsolete iSnes rom
-    fn load_obsolete_iSnes(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        Err(CartridgeError::IncompatibleRom)
     }
 
     /// Saves the contents of the cartridge data so that it can be restored after loading a save state.
@@ -556,145 +631,8 @@ impl SnesCartridge {
         Ok(mapper)
     }
 
-    /// Parses an iSnes1 format rom
-    fn load_iSnes1(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        if rom_contents[0] != b'N'
-            || rom_contents[1] != b'E'
-            || rom_contents[2] != b'S'
-            || rom_contents[3] != 0x1a
-        {
-            return Err(CartridgeError::InvalidRom);
-        }
-        let prg_rom_size = rom_contents[4] as usize * 16384;
-
-        let chr_rom_size = rom_contents[5] as usize * 8192;
-        let mut file_offset: usize = 16;
-        let trainer = if (rom_contents[6] & 4) != 0 {
-            let mut trainer = Vec::with_capacity(512);
-            for i in 0..512 {
-                if rom_contents.len() <= (file_offset + i) {
-                    return Err(CartridgeError::RomTooShort);
-                }
-                trainer.push(rom_contents[file_offset + i]);
-            }
-            file_offset += 512;
-            Some(trainer)
-        } else {
-            None
-        };
-
-        let mut prg_rom = Vec::with_capacity(prg_rom_size);
-        for i in 0..prg_rom_size {
-            if rom_contents.len() <= (file_offset + i) {
-                return Err(CartridgeError::RomTooShort);
-            }
-            prg_rom.push(rom_contents[file_offset + i]);
-        }
-        file_offset += prg_rom_size;
-
-        let mut chr_rom = Vec::with_capacity(chr_rom_size);
-        let mut chr_ram = Vec::with_capacity(8192);
-        if chr_rom_size != 0 {
-            for i in 0..chr_rom_size {
-                let data = {
-                    if rom_contents.len() <= (file_offset + i) {
-                        return Err(CartridgeError::RomTooShort);
-                    }
-                    rom_contents[file_offset + i]
-                };
-                chr_rom.push(data);
-            }
-            file_offset += chr_rom_size;
-        } else {
-            let chr_ram_size = 8192;
-            for _i in 0..chr_ram_size {
-                let data = rand::random();
-                chr_ram.push(data);
-            }
-        }
-        let inst_rom = if (rom_contents[7] & 2) != 0 {
-            let mut irom = Vec::with_capacity(8192);
-            for i in 0..8192 {
-                if rom_contents.len() <= (file_offset + i) {
-                    return Err(CartridgeError::RomTooShort);
-                }
-                irom.push(rom_contents[file_offset + i]);
-            }
-            //file_offset += 8192;
-            Some(irom)
-        } else {
-            None
-        };
-
-        let ram_size = if (rom_contents[6] & 2) != 0 {
-            0x2000
-        } else if rom_contents[8] != 0 {
-            rom_contents[8] as usize * 8192
-        } else {
-            8192
-        };
-        let mut prg_ram = Vec::with_capacity(ram_size);
-        for _i in 0..ram_size {
-            let v = rand::random();
-            prg_ram.push(v);
-        }
-
-        let mappernum = (rom_contents[6] >> 4) | (rom_contents[7] & 0xf0);
-
-        let vol = VolatileCartridgeData {
-            prg_ram: PersistentStorage::Volatile(prg_ram),
-            battery_backup: (rom_contents[6] & 2) != 0,
-            mirroring: (rom_contents[6] & 1) != 0,
-            mapper: mappernum as u32,
-            chr_ram,
-            genie: Vec::new(),
-        };
-
-        let nonvol = NonvolatileCartridgeData {
-            trainer,
-            prg_rom,
-            chr_rom,
-            inst_rom,
-            prom: None,
-        };
-
-        let rom_data = SnesCartridgeData {
-            volatile: vol,
-            nonvolatile: nonvol,
-        };
-        let mapper = Self::get_mapper(mappernum as u32, &rom_data)?;
-
-        if file_offset != rom_contents.len() {
-            return Err(CartridgeError::RomTooLong);
-            /*println!(
-                "Expected to read {:x} bytes, read {:x}",
-                rom_contents.len(),
-                file_offset
-            );*/
-        }
-        let hash = calc_sha256(rom_contents);
-
-        let pb = <PathBuf as std::str::FromStr>::from_str(&name).unwrap();
-
-        Ok(Self {
-            data: rom_data,
-            mapper,
-            mappernum: mappernum as u32,
-            rom_format: RomFormat::ISnes1,
-            hash: hash.to_owned(),
-            save: pb
-                .file_name()
-                .unwrap()
-                .to_os_string()
-                .into_string()
-                .unwrap()
-                .to_string(),
-            rom_name: name.to_owned(),
-        })
-    }
-
     /// Parses an iSnes2 format rom
-    fn load_iSnes2(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_snes_rom(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         if rom_contents[0] != b'N'
             || rom_contents[1] != b'E'
             || rom_contents[2] != b'S'
@@ -807,6 +745,79 @@ impl SnesCartridge {
         })
     }
 
+    /// Finds the rom header and calls load_snes_rom
+    fn find_rom_header(
+        name: String,
+        preheader: bool,
+        contents: &[u8],
+    ) -> Result<Self, CartridgeError> {
+        let header_locations: [RomHeaderOption; 3] = [
+            RomHeaderOption {
+                start: 0x7fc0,
+                mode: 0,
+                method: MapperMethod::LoRom,
+            },
+            RomHeaderOption {
+                start: 0xffc0,
+                mode: 1,
+                method: MapperMethod::HiRom,
+            },
+            RomHeaderOption {
+                start: 0x40ffc0,
+                mode: 5,
+                method: MapperMethod::ExHirom,
+            },
+        ];
+
+        let rom_contents: Vec<u8> = if preheader {
+            contents[512..].iter().map(|f| *f).collect()
+        } else {
+            contents.iter().map(|f| *f).collect()
+        };
+
+        for o in header_locations {
+            if rom_contents.len() < (o.start as usize + 32) {
+                continue;
+            }
+            let maybe_header_contents = &rom_contents[o.start as usize..o.start as usize + 32];
+            if (maybe_header_contents[0x15] & 0xF) != o.mode {
+                continue;
+            }
+
+            let checksum: u16 =
+                (maybe_header_contents[0x1c] as u16) | (maybe_header_contents[0x1d] as u16) << 8;
+            let nchecksum: u16 =
+                (maybe_header_contents[0x1e] as u16) | (maybe_header_contents[0x1f] as u16) << 8;
+            if (checksum ^ nchecksum) != 0xffff {
+                continue;
+            }
+
+            let dataiter = o.method.get_iter(&rom_contents);
+            let mut calc_checksum: u64 = 0;
+            let mut calcd = 0;
+            for (i, d) in dataiter.enumerate() {
+                if (i & 1) == 0 {
+                    calcd = d as u16;
+                } else {
+                    calcd = (calcd << 8) | d as u16;
+                    calc_checksum = calc_checksum.wrapping_add(calcd as u64);
+                }
+            }
+            println!("Name : {} Checksums: {:X} {:X}", name, calc_checksum, checksum);
+
+            let dataiter: Vec<u8> = o.method.get_iter(&rom_contents).collect();
+            let mut f = std::fs::OpenOptions::new().create(true).write(true).open("./romcheck.bin").unwrap();
+            std::io::Write::write_all(&mut f, &dataiter);
+
+            println!(
+                "Mode matched and checksum pair could be real at {:X}",
+                o.start
+            );
+        }
+
+        Err(CartridgeError::HeaderNotFound)
+    }
+
     /// Load a cartridge, returning an error or the new cartridge
     pub fn load_cartridge(name: String, sp: &Path) -> Result<Self, CartridgeError> {
         let rom_contents = std::fs::read(name.clone());
@@ -814,31 +825,13 @@ impl SnesCartridge {
             return Err(CartridgeError::FsError(e.kind().to_string()));
         }
         let rom_contents = rom_contents.unwrap();
-        if rom_contents.len() < 16 {
-            return Err(CartridgeError::InvalidRom);
+
+        let preheader = rom_contents.len() % 1024 == 512;
+        if rom_contents.len() % 512 != 0 {
+            return Err(CartridgeError::BadLength);
         }
-        if rom_contents[0] != b'N'
-            || rom_contents[1] != b'E'
-            || rom_contents[2] != b'S'
-            || rom_contents[3] != 0x1a
-        {
-            return Err(CartridgeError::InvalidRom);
-        }
-        let mut cart = if (rom_contents[7] & 0xC) == 8 {
-            Self::load_iSnes2(name, &rom_contents)
-        } else if (rom_contents[7] & 0xC) == 4 {
-            Self::load_obsolete_iSnes(name, &rom_contents)
-        } else if (rom_contents[7] & 0xC) == 0
-            && rom_contents[12] == 0
-            && rom_contents[13] == 0
-            && rom_contents[14] == 0
-            && rom_contents[15] == 0
-        {
-            Self::load_iSnes1(name, &rom_contents)
-        } else {
-            //or iSnes 0.7
-            Self::load_obsolete_iSnes(name, &rom_contents)
-        };
+
+        let mut cart = Self::find_rom_header(name, preheader, &rom_contents);
 
         if let Ok(c) = &mut cart {
             let mut pb: PathBuf = sp.to_path_buf();

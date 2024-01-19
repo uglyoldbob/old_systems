@@ -78,7 +78,7 @@ impl Mapper05 {
             0..=0x03ff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -91,17 +91,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[0] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x400..=0x7ff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -114,17 +114,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[1] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x800..=0xbff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -137,17 +137,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[2] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0xc00..=0xfff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -160,17 +160,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[3] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x1000..=0x13ff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -183,17 +183,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[4] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x1400..=0x17ff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -206,17 +206,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[5] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x1800..=0x1bff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -229,17 +229,17 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[6] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x1c00..=0x1fff => match self.registers[1] & 3 {
                 0 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<13;
+                    let big_addr: u32 = a << 13;
                     let addr: u32 = addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
@@ -252,20 +252,18 @@ impl Mapper05 {
                 }
                 3 => {
                     let a = self.registers3[7] as u32;
-                    let big_addr: u32 = a<<10;
+                    let big_addr: u32 = a << 10;
                     let addr: u32 = 0x3ff & addr as u32 | big_addr;
                     let addr = addr & (cart.nonvolatile.chr_rom.len() as u32 - 1);
                     Some(cart.nonvolatile.chr_rom[addr as usize])
                 }
                 _ => unreachable!(),
-            }
+            },
             0x2000..=0x3eff => {
                 //nametables
                 todo!();
             }
-            _ => {
-                None
-            }
+            _ => None,
         }
     }
 
@@ -278,8 +276,7 @@ impl Mapper05 {
     fn set_inframe(&mut self, b: bool) {
         if b {
             self.irq |= 0x40;
-        }
-        else {
+        } else {
             self.irq &= !0x40;
         }
     }
@@ -340,7 +337,7 @@ impl NesMapperTrait for Mapper05 {
                 let addr = (addr as u32 & 0x1FFF) | (a << 13);
                 let addr = addr & (cart.volatile.prg_ram.len() as u32 - 1);
                 Some(cart.volatile.prg_ram[addr as usize])
-            },
+            }
             0x8000..=0x9fff => match self.registers[0] & 3 {
                 0 => {
                     let a = (self.registers2[4] & 0x7f) as u32;
@@ -443,8 +440,8 @@ impl NesMapperTrait for Mapper05 {
             _ => None,
         }
     }
-    
-    fn other_memory_read(&mut self, cart: &mut NesCartridgeData, addr:u16) {
+
+    fn other_memory_read(&mut self, cart: &mut NesCartridgeData, addr: u16) {
         match addr {
             //pattern table
             0..=0x1fff => {
@@ -467,9 +464,7 @@ impl NesMapperTrait for Mapper05 {
                 self.set_inframe(false);
                 self.last_ppu_address = None;
             }
-            _ => {
-
-            }
+            _ => {}
         }
         let r = self.memory_cycle_dump(cart, addr);
 
@@ -591,8 +586,7 @@ impl NesMapperTrait for Mapper05 {
                 if !self.get_inframe() {
                     self.set_inframe(true);
                     self.scanline = 0;
-                }
-                else {
+                } else {
                     self.scanline += 1;
                     if self.scanline == self.registers4[3] {
                         self.set_irq();
@@ -600,8 +594,7 @@ impl NesMapperTrait for Mapper05 {
                 }
                 self.tile_count = 0;
             }
-        }
-        else {
+        } else {
             self.address_match = 0;
         }
         self.idle = 0;
