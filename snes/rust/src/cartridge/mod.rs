@@ -784,26 +784,24 @@ impl SnesCartridge {
                 continue;
             }
 
-            let checksum: u16 =
-                (maybe_header_contents[0x1c] as u16) | (maybe_header_contents[0x1d] as u16) << 8;
             let nchecksum: u16 =
+                (maybe_header_contents[0x1c] as u16) | (maybe_header_contents[0x1d] as u16) << 8;
+            let checksum: u16 =
                 (maybe_header_contents[0x1e] as u16) | (maybe_header_contents[0x1f] as u16) << 8;
             if (checksum ^ nchecksum) != 0xffff {
                 continue;
             }
 
-            let dataiter = o.method.get_iter(&rom_contents);
-            let mut calc_checksum: u64 = 0;
-            let mut calcd = 0;
-            for (i, d) in dataiter.enumerate() {
-                if (i & 1) == 0 {
-                    calcd = d as u16;
-                } else {
-                    calcd = (calcd << 8) | d as u16;
-                    calc_checksum = calc_checksum.wrapping_add(calcd as u64);
-                }
+            let mut cs1: u16 = 0;
+            for (i, d) in o.method.get_iter(&rom_contents).enumerate() {
+                cs1 = cs1.wrapping_add(d as u16);
             }
-            println!("Name : {} Checksums: {:X} {:X}", name, calc_checksum, checksum);
+
+            println!("Name : {} Checksums: {:X} {:X}", name, cs1, checksum);
+
+            let checksum_good = (cs1 == checksum);
+
+            println!("CHECKSUM MATCH: {}", checksum_good);
 
             let dataiter: Vec<u8> = o.method.get_iter(&rom_contents).collect();
             let mut f = std::fs::OpenOptions::new().create(true).write(true).open("./romcheck.bin").unwrap();
