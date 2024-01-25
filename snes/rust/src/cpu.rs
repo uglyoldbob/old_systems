@@ -4,6 +4,27 @@ use crate::apu::SnesApu;
 use crate::motherboard::SnesMotherboard;
 use crate::ppu::SnesPpu;
 
+/// The carry flag for the cpu flags register
+const CPU_FLAG_CARRY: u8 = 1;
+/// The zero flag for the cpu flags register
+const CPU_FLAG_ZERO: u8 = 2;
+/// The interrupt disable flag for the cpu flags register
+const CPU_FLAG_INT_DISABLE: u8 = 4;
+/// The decimal flag for the cpu flags register
+const CPU_FLAG_DECIMAL: u8 = 8;
+/// The b1 flag for the cpu flags register
+const CPU_FLAG_B1: u8 = 0x10;
+/// The index register width flag
+const CPU_FLAG_INDEX_WIDTH: u8 = 0x10;
+/// The b2 flag for the cpu flags register
+const CPU_FLAG_B2: u8 = 0x20;
+/// The memory width flag for native mode
+const CPU_FLAG_MEMORY: u8 = 0x20;
+/// The overflow flag for the cpu flags register
+const CPU_FLAG_OVERFLOW: u8 = 0x40;
+/// The negative flag for the cpu flags register
+const CPU_FLAG_NEGATIVE: u8 = 0x80;
+
 /// The peripherals for the cpu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -78,13 +99,13 @@ pub struct CpuRegisters {
     /// Stack pointer
     sp: u16,
     /// Data bank register 1
-    dbr: u16,
-    /// Data bank register 2
-    db: u8,
+    dbr: u8,
+    /// Direct register
+    db: u16,
     /// Program bank
     pb: u8,
     /// Program bank register
-    pbr: u16,
+    pbr: u8,
     /// Status register
     p: u8,
     /// program counter
@@ -126,6 +147,8 @@ pub struct SnesCpu {
     done_fetching: bool,
     /// The portion of an instruction currently being executed
     subcycle: u8,
+    /// The reset indicator for the cpu
+    reset: bool,
 }
 
 impl SnesCpu {
@@ -140,11 +163,14 @@ impl SnesCpu {
             #[cfg(feature = "debugger")]
             done_fetching: false,
             subcycle: 0,
+            reset: true,
         }
     }
 
     /// Reset the cpu
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        self.reset = true;
+    }
 
     /// Returns true when done fetching all bytes for an instruction.
     #[cfg(feature = "debugger")]
@@ -180,5 +206,8 @@ impl SnesCpu {
         nmi: bool,
         irq: bool,
     ) {
+        if self.reset {
+
+        }
     }
 }
