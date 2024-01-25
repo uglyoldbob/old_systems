@@ -230,6 +230,15 @@ impl LocalEmulatorDataClone {
     }
 
     /// Convenience function for the new function
+    fn get_other_path(dirs: &directories::ProjectDirs) -> std::path::PathBuf {
+        let pb = dirs.data_dir().to_path_buf();
+        if !pb.exists() {
+            let _ = std::fs::create_dir_all(&pb);
+        }
+        pb
+    }
+
+    /// Convenience function for the new function
     fn get_save_path(dirs: &directories::ProjectDirs) -> std::path::PathBuf {
         let mut pb = dirs.data_dir().to_path_buf();
         pb.push("saves");
@@ -291,7 +300,7 @@ impl LocalEmulatorDataClone {
         let config = user_config;
         Self {
             configuration: config,
-            parser: crate::romlist::RomListParser::new(Self::get_save_path(&dirs)),
+            parser: crate::romlist::RomListParser::new(Self::get_other_path(&dirs)),
             #[cfg(feature = "rom_status")]
             rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
             resolution_locked: false,
