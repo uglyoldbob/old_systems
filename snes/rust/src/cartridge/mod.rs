@@ -566,7 +566,13 @@ impl<'a> MapperMethod {
         } else {
             (size, 0)
         };
-        println!("Size {:x}, {:x}, {:X} {:x}", contents.len(), size, step, max_size);
+        println!(
+            "Size {:x}, {:x}, {:X} {:x}",
+            contents.len(),
+            size,
+            step,
+            max_size
+        );
         MapperIter {
             addr: 0,
             main_size: size as u32,
@@ -631,15 +637,8 @@ impl SnesCartridge {
         Ok(mapper)
     }
 
-    /// Parses an iSnes2 format rom
+    /// Parses an snes rom
     fn load_snes_rom(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        if rom_contents[0] != b'N'
-            || rom_contents[1] != b'E'
-            || rom_contents[2] != b'S'
-            || rom_contents[3] != 0x1a
-        {
-            return Err(CartridgeError::InvalidRom);
-        }
         let prg_rom_size = if (rom_contents[9] & 0xF) < 0xF {
             (rom_contents[4] as usize | ((rom_contents[9] & 0xF) as usize) << 8) * 16384
         } else {
@@ -804,7 +803,11 @@ impl SnesCartridge {
             println!("CHECKSUM MATCH: {}", checksum_good);
 
             let dataiter: Vec<u8> = o.method.get_iter(&rom_contents).collect();
-            let mut f = std::fs::OpenOptions::new().create(true).write(true).open("./romcheck.bin").unwrap();
+            let mut f = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open("./romcheck.bin")
+                .unwrap();
             std::io::Write::write_all(&mut f, &dataiter);
 
             println!(

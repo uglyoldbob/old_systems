@@ -313,8 +313,6 @@ pub struct SnesEmulatorData {
     pub cpu_peripherals: SnesCpuPeripherals,
     /// The motherboard for the emualtor
     pub mb: SnesMotherboard,
-    /// Used for operating the cpu clock divider
-    pub cpu_clock_counter: u8,
     /// Used for operating the ppu clock divider
     ppu_clock_counter: u8,
     /// Indicates that the emulator is paused.
@@ -380,7 +378,6 @@ impl SnesEmulatorData {
             single_step: false,
             #[cfg(feature = "debugger")]
             wait_for_frame_end: false,
-            cpu_clock_counter: rand::random::<u8>() % 16,
             ppu_clock_counter: rand::random::<u8>() % 4,
             last_frame_time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -402,7 +399,7 @@ impl SnesEmulatorData {
 
     /// Return the cpu frequency.
     pub fn cpu_frequency(&self) -> f32 {
-        21.47727e6 / 12.0
+        1.89e9 / 88.0
     }
 
     /// Finds roms for the system
@@ -481,7 +478,6 @@ impl SnesEmulatorData {
         self.mb.set_controller(2, controller3);
         self.mb.set_controller(3, controller4);
 
-        self.cpu_clock_counter = rand::random::<u8>() % 16;
         self.ppu_clock_counter = rand::random::<u8>() % 4;
         self.last_frame_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -531,23 +527,17 @@ impl SnesEmulatorData {
             self.cpu_peripherals.ppu_cycle(&mut self.mb);
         }
 
-        self.cpu_clock_counter += 1;
-        if self.cpu_clock_counter >= 12 {
-            self.cpu_clock_counter = 0;
-            let nmi = self.nmi[2];
+        let nmi = self.nmi[2];
 
-            self.cpu_peripherals.apu.clock_slow(sound, streams, filter);
-            let irq = self.cpu_peripherals.apu.irq();
-            let cart_irq = self.mb.cartridge().map(|cart| cart.irq()).unwrap_or(false);
-            self.cpu.cycle(
-                &mut self.mb,
-                &mut self.cpu_peripherals,
-                nmi,
-                self.prev_irq | cart_irq,
-            );
-            self.prev_irq = irq;
-        }
-
-        if self.ppu_clock_counter == 0 {}
+        self.cpu_peripherals.apu.clock_slow(sound, streams, filter);
+        let irq = self.cpu_peripherals.apu.irq();
+        let cart_irq = self.mb.cartridge().map(|cart| cart.irq()).unwrap_or(false);
+        self.cpu.cycle(
+            &mut self.mb,
+            &mut self.cpu_peripherals,
+            nmi,
+            self.prev_irq | cart_irq,
+        );
+        self.prev_irq = irq;
     }
 }

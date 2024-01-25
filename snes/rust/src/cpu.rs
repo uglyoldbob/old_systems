@@ -45,23 +45,13 @@ impl SnesCpuPeripherals {
 }
 
 #[cfg(feature = "debugger")]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 /// Stores the state of the cpu at the debugger point.
 /// Single byte instructions make debugging without this weird, because the instruction has already taken effect
 /// by the time the debugger is presenting the information
 pub struct SnesCpuDebuggerPoint {
-    /// The a register
-    pub a: u8,
-    /// The x register
-    pub x: u8,
-    /// The y register
-    pub y: u8,
-    /// The stack register
-    pub s: u8,
-    /// The flags register
-    pub p: u8,
-    /// The program counter
-    pub pc: u16,
+    /// The registers
+    pub registers: CpuRegisters,
     /// The string that corresponds to the disassembly for the most recently fetched instruction
     pub disassembly: String,
 }
@@ -70,13 +60,51 @@ impl SnesCpuDebuggerPoint {
     /// Build a new point
     pub fn new() -> Self {
         Self {
+            registers: CpuRegisters::new(),
+            disassembly: "RESET".to_string(),
+        }
+    }
+}
+
+/// The registers for the cpu
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct CpuRegisters {
+    /// The accumulator
+    a: u16,
+    /// index register x
+    x: u16,
+    /// index register y
+    y: u16,
+    /// Stack pointer
+    sp: u16,
+    /// Data bank register 1
+    dbr: u16,
+    /// Data bank register 2
+    db: u8,
+    /// Program bank
+    pb: u8,
+    /// Program bank register
+    pbr: u16,
+    /// Status register
+    p: u8,
+    /// program counter
+    pub pc: u16,
+}
+
+impl CpuRegisters {
+    /// Construct a new set of registers
+    pub fn new() -> Self {
+        Self {
             a: 0,
             x: 0,
             y: 0,
-            s: 0xfd,
+            sp: 0,
+            dbr: 0,
+            db: 0,
+            pb: 0,
+            pbr: 0,
             p: 0,
             pc: 0xfffc,
-            disassembly: "RESET".to_string(),
         }
     }
 }
@@ -85,6 +113,8 @@ impl SnesCpuDebuggerPoint {
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct SnesCpu {
+    /// The registers for the cpu
+    registers: CpuRegisters,
     /// A list of breakpoints for the cpu
     #[cfg(feature = "debugger")]
     pub breakpoints: Vec<u16>,
@@ -102,6 +132,7 @@ impl SnesCpu {
     /// Build a new cpu
     pub fn new() -> Self {
         Self {
+            registers: CpuRegisters::new(),
             #[cfg(feature = "debugger")]
             breakpoints: Vec::new(),
             #[cfg(feature = "debugger")]
@@ -126,7 +157,7 @@ impl SnesCpu {
         let mut b = false;
         if self.done_fetching {
             for v in &self.breakpoints {
-                if self.debugger.pc == *v {
+                if self.debugger.registers.pc == *v {
                     println!("subcycle for breakpoint is {}", self.subcycle);
                     b = true;
                 }

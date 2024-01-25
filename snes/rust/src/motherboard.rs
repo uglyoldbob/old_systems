@@ -148,10 +148,10 @@ impl SnesMotherboard {
         response
     }
 
-    /// Perform a read operation on the cpu memory bus
-    pub fn memory_cycle_read(
+    /// Perform a read operation on the cpu memory bus a
+    pub fn memory_cycle_read_a(
         &mut self,
-        addr: u16,
+        addr: u32,
         _controllers: [bool; 2],
         per: &mut SnesCpuPeripherals,
     ) -> u8 {
@@ -159,10 +159,10 @@ impl SnesMotherboard {
         response
     }
 
-    /// Perform a write operation on the cpu memory bus
-    pub fn memory_cycle_write(
+    /// Perform a write operation on the cpu memory bus a
+    pub fn memory_cycle_write_a(
         &mut self,
-        addr: u16,
+        addr: u32,
         data: u8,
         _controllers: [bool; 2],
         per: &mut SnesCpuPeripherals,

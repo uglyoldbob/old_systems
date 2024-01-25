@@ -95,19 +95,14 @@ impl TrackedWindow for DebugSnesWindow {
                         ui.label(format!("ROM format: {:?}", cart.rom_format));
                     }
                     ui.horizontal(|ui| {
-                        ui.label(format!("Address: 0x{:x}", c.cpu.debugger.pc));
+                        ui.label(format!("Address: 0x{:x}", c.cpu.debugger.registers.pc));
                         if let Some(t) = c.cpu.disassemble() {
                             ui.label(t);
                         }
                     });
                     ui.label(format!(
-                        "A: {:x}, X: {:x}, Y: {:x}, P: {:x}, SP: {:x}",
-                        c.cpu.debugger.a,
-                        c.cpu.debugger.x,
-                        c.cpu.debugger.y,
-                        c.cpu.debugger.p,
-                        c.cpu.debugger.s,
-                    ));
+                        "{:X?}",
+                        c.cpu.debugger));
                     ui.label(format!(
                         "Frame number {}",
                         c.cpu_peripherals.ppu_frame_number()
