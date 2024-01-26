@@ -25,6 +25,27 @@ const CPU_FLAG_OVERFLOW: u8 = 0x40;
 /// The negative flag for the cpu flags register
 const CPU_FLAG_NEGATIVE: u8 = 0x80;
 
+/// Describes how many cycles it takes per step of the cpu
+#[derive(serde::Serialize, serde::Deserialize)]
+enum CpuCycleLength {
+    /// The step takes six cycles
+    ShortCycle,
+    /// The step takes eight cycles
+    MediumCycle,
+    /// The step takes twelve cycles
+    LongCycle,
+}
+
+impl CpuCycleLength {
+    fn count(&self) -> u8 {
+        match self {
+            Self::ShortCycle => 6,
+            Self::MediumCycle => 8,
+            Self::LongCycle => 12,
+        }
+    }
+}
+
 /// The peripherals for the cpu
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -104,7 +125,7 @@ pub struct CpuRegisters {
     db: u16,
     /// Program bank
     pb: u8,
-    /// Program bank register
+    /// Program bank register (the k register)
     pbr: u8,
     /// Status register
     p: u8,
@@ -149,6 +170,14 @@ pub struct SnesCpu {
     subcycle: u8,
     /// The reset indicator for the cpu
     reset: bool,
+    /// The length of the current tick
+    length: CpuCycleLength,
+    /// The counter for the length of the current tick
+    length_ctr: u8,
+    /// The emulation mode flag
+    emulation: bool,
+    /// The current opcode being executed
+    opcode: Option<u8>,
 }
 
 impl SnesCpu {
@@ -164,6 +193,10 @@ impl SnesCpu {
             done_fetching: false,
             subcycle: 0,
             reset: true,
+            length: CpuCycleLength::ShortCycle,
+            length_ctr: 0,
+            emulation: false,
+            opcode: None,
         }
     }
 
@@ -198,6 +231,34 @@ impl SnesCpu {
         Some(self.debugger.disassembly.to_owned())
     }
 
+    /// Return the cycle length for the given address
+    fn eval_address(addr: u32) -> CpuCycleLength {
+        let bank = (addr>>16) as u8;
+        let low_addr = (addr & 0xFFFF) as u16;
+        match (bank, low_addr) {
+            ((0..=0x3f), (0..=0x1fff)) => CpuCycleLength::MediumCycle,
+            ((0..=0x3f), (0x2000..=0x3fff)) => CpuCycleLength::ShortCycle,
+            ((0..=0x3f), (0x4000..=0x41ff)) => CpuCycleLength::LongCycle,
+            ((0..=0x3f), (0x4200..=0x5fff)) => CpuCycleLength::ShortCycle,
+            ((0..=0x3f), (0x6000..=0xffff)) => CpuCycleLength::MediumCycle,
+            ((0x40..=0x7f), _) => CpuCycleLength::MediumCycle,
+            ((0x80..=0xbf), (0..=0x1fff)) => CpuCycleLength::MediumCycle,
+            ((0x80..=0xbf), (0x2000..=0x3fff)) => CpuCycleLength::ShortCycle,
+            ((0x80..=0xbf), (0x4000..=0x41ff)) => CpuCycleLength::LongCycle,
+            ((0x80..=0xbf), (0x4200..=0x5fff)) => CpuCycleLength::ShortCycle,
+            ((0x80..=0xbf), (0x6000..=0x7fff)) => CpuCycleLength::MediumCycle,
+            ((0x80..=0xbf), (0x8000..=0xffff)) => CpuCycleLength::ShortCycle, //todo variable
+            ((0xc0..=0xff), _) => CpuCycleLength::ShortCycle, //todo variable
+        }
+    }
+
+    /// Retrieve the full 24 bits of address for pc
+    fn get_full_pc(&self) -> u32 {
+        let pcl = self.registers.pc as u32;
+        let pch = (self.registers.p as u32) << 16;
+        pcl | pch
+    }
+
     /// Run a single cycle of the cpu
     pub fn cycle(
         &mut self,
@@ -206,7 +267,30 @@ impl SnesCpu {
         nmi: bool,
         irq: bool,
     ) {
+        self.length_ctr += 1;
+        if self.length_ctr < self.length.count() {
+            return;
+        }
+        self.length_ctr = 0;
+        
         if self.reset {
+            match self.subcycle {
+                0 => {
+                    self.emulation = true;
+                    self.subcycle += 1;
+                }
+                _ => {
+                    self.reset = false;
+                    self.subcycle = 0;
+                }
+            }
+        }
+        else if self.opcode.is_none() {
+            if self.length_ctr == 0 {
+                self.length = Self::eval_address(self.get_full_pc());
+            }
+        }
+        else {
 
         }
     }

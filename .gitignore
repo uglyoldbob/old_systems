@@ -74,3 +74,5 @@ target/*
 coverage/*
 roms/*
 saves/*
+snes/roms/*
+config.toml
