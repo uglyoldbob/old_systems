@@ -372,9 +372,9 @@ impl SnesCpu {
                         _ => {
                             if self.length_ctr == 1 {
                                 self.length = CpuCycleLength::ShortCycle;
-                            }
-                            else {
+                            } else {
                                 self.registers.p &= !(self.temp as u8);
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
                                 self.end_instruction();
                             }
                         }
@@ -395,10 +395,15 @@ impl SnesCpu {
                         }
                         2 => {
                             if self.length_ctr == 1 {
-                                self.length =
-                                    self.eval_address(0, self.registers.sp);
+                                self.length = self.eval_address(0, self.registers.sp);
                             } else {
-                                bus.memory_cycle_write_a(0, self.registers.sp, (self.registers.a & 0xff) as u8, [false, false], cpu_peripherals);
+                                bus.memory_cycle_write_a(
+                                    0,
+                                    self.registers.sp,
+                                    (self.registers.a & 0xff) as u8,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
                                 self.registers.sp = self.registers.sp.wrapping_add(1);
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
                                 if (self.registers.p & CPU_FLAG_MEMORY) != 0 {
@@ -410,10 +415,15 @@ impl SnesCpu {
                         }
                         _ => {
                             if self.length_ctr == 1 {
-                                self.length =
-                                    self.eval_address(0, self.registers.sp);
+                                self.length = self.eval_address(0, self.registers.sp);
                             } else {
-                                bus.memory_cycle_write_a(0, self.registers.sp, (self.registers.a & 0xff) as u8, [false, false], cpu_peripherals);
+                                bus.memory_cycle_write_a(
+                                    0,
+                                    self.registers.sp,
+                                    (self.registers.a & 0xff) as u8,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
                                 self.registers.sp = self.registers.sp.wrapping_add(1);
                                 self.end_instruction();
                             }
@@ -436,10 +446,14 @@ impl SnesCpu {
                         2 => {
                             if self.length_ctr == 1 {
                                 self.registers.sp = self.registers.sp.wrapping_sub(1);
-                                self.length =
-                                    self.eval_address(0, self.registers.sp);
+                                self.length = self.eval_address(0, self.registers.sp);
                             } else {
-                                let t = bus.memory_cycle_read_a(0, self.registers.sp, [false, false], cpu_peripherals);
+                                let t = bus.memory_cycle_read_a(
+                                    0,
+                                    self.registers.sp,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
                                 self.registers.dbr = t;
                                 self.subcycle += 1;
                             }
@@ -588,24 +602,22 @@ impl SnesCpu {
                                     [false, false],
                                     cpu_peripherals,
                                 ) as u16;
-                                println!("temp is {:X}", self.temp);
                                 if (self.registers.p & CPU_FLAG_MEMORY) != 0 {
                                     #[cfg(feature = "debugger")]
                                     {
                                         self.debugger.disassembly = format!("LDA #{:X}", self.temp);
                                         self.done_fetching = true;
                                     }
-                                    self.registers.a = (self.registers.a & 0xFF00) | (self.temp & 0xFF);
+                                    self.registers.a =
+                                        (self.registers.a & 0xFF00) | (self.temp & 0xFF);
                                     if self.temp == 0 {
                                         self.registers.p |= CPU_FLAG_ZERO;
-                                    }
-                                    else {
+                                    } else {
                                         self.registers.p &= !CPU_FLAG_ZERO;
                                     }
                                     if (self.temp & 0x80) != 0 {
                                         self.registers.p |= CPU_FLAG_NEGATIVE;
-                                    }
-                                    else {
+                                    } else {
                                         self.registers.p &= !CPU_FLAG_NEGATIVE;
                                     }
                                     self.registers.pc = self.registers.pc.wrapping_add(1);
@@ -629,13 +641,86 @@ impl SnesCpu {
                                         cpu_peripherals,
                                     ) as u16)
                                         << 8;
-                                println!("temp is {:X}", self.temp);
                                 #[cfg(feature = "debugger")]
                                 {
                                     self.debugger.disassembly = format!("LDA #{:X}", self.temp);
                                     self.done_fetching = true;
                                 }
                                 self.registers.a = self.temp;
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.end_instruction();
+                            }
+                        }
+                    },
+                    // ldx immediate
+                    0xa2 => match self.subcycle {
+                        1 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
+                                if (self.registers.p & CPU_FLAG_INDEX_WIDTH) != 0 {
+                                    #[cfg(feature = "debugger")]
+                                    {
+                                        self.debugger.disassembly = format!("LDX #{:X}", self.temp);
+                                        self.done_fetching = true;
+                                    }
+                                    self.registers.x =
+                                        (self.registers.x & 0xFF00) | (self.temp & 0xFF);
+                                    if self.temp == 0 {
+                                        self.registers.p |= CPU_FLAG_ZERO;
+                                    } else {
+                                        self.registers.p &= !CPU_FLAG_ZERO;
+                                    }
+                                    if (self.temp & 0x80) != 0 {
+                                        self.registers.p |= CPU_FLAG_NEGATIVE;
+                                    } else {
+                                        self.registers.p &= !CPU_FLAG_NEGATIVE;
+                                    }
+                                    self.registers.pc = self.registers.pc.wrapping_add(1);
+                                    self.end_instruction();
+                                } else {
+                                    self.subcycle += 1;
+                                }
+                            }
+                        }
+                        _ => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = self.temp
+                                    | (bus.memory_cycle_read_a(
+                                        self.registers.pbr,
+                                        self.registers.pc,
+                                        [false, false],
+                                        cpu_peripherals,
+                                    ) as u16)
+                                        << 8;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!("LDX #{:X}", self.temp);
+                                    self.done_fetching = true;
+                                }
+                                self.registers.x = self.temp;
+                                if self.temp == 0 {
+                                    self.registers.p |= CPU_FLAG_ZERO;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_ZERO;
+                                }
+                                if (self.temp & 0x8000) != 0 {
+                                    self.registers.p |= CPU_FLAG_NEGATIVE;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_NEGATIVE;
+                                }
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
                                 self.end_instruction();
                             }
@@ -799,7 +884,7 @@ impl SnesCpu {
                                 bus.memory_cycle_write_a(
                                     self.temp2 as u8,
                                     self.temp,
-                                    (self.registers.a>>8) as u8,
+                                    (self.registers.a >> 8) as u8,
                                     [false, false],
                                     cpu_peripherals,
                                 );
@@ -891,7 +976,7 @@ impl SnesCpu {
                             }
                             self.subcycle += 1;
                         }
-                        _ => {}                        
+                        _ => {}
                     },
                 }
             }
