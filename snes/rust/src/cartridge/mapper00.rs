@@ -51,35 +51,36 @@ impl SnesMapperTrait for Mapper00 {
             let big_addr = ((bank as u32) << 15) | ((addr & 0x7fff) as u32);
             if big_addr < cart.nonvolatile.rom_first {
                 Some(cart.nonvolatile.prg_rom[big_addr as usize])
-            }
-            else {
+            } else {
                 Some(42)
             }
-        }
-        else {
+        } else {
             None
         }
     }
 
-    fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
+    fn memory_cycle_read(
+        &mut self,
+        cart: &mut SnesCartridgeData,
+        bank: u8,
+        addr: u16,
+    ) -> Option<u8> {
         if (0x8000..=0xffff).contains(&addr) {
             let big_addr = ((bank as u32) << 15) | ((addr & 0x7fff) as u32);
+            let big_addr = big_addr & (cart.nonvolatile.rom_largest - 1);
             if big_addr < cart.nonvolatile.rom_first {
                 Some(cart.nonvolatile.prg_rom[big_addr as usize])
+            } else {
+                todo!("Map the second half of rom");
             }
-            else {
-                Some(42)
-            }
-        }
-        else {
+        } else {
             None
         }
     }
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16, data: u8) {
-    }
+    fn memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16, data: u8) {}
 
     fn ppu_peek_address(&self, addr: u16, cart: &SnesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);

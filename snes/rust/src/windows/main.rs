@@ -519,9 +519,7 @@ impl TrackedWindow for MainSnesWindow {
                 {
                     if !c.paused {
                         c.cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
-                        if c.cpu.breakpoint_option()
-                            && (c.cpu.breakpoint() || c.single_step)
-                        {
+                        if c.cpu.breakpoint_option() && (c.cpu.breakpoint() || c.single_step) {
                             c.paused = true;
                             c.single_step = false;
                             break 'emulator_loop;

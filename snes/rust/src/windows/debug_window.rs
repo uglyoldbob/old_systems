@@ -91,18 +91,13 @@ impl TrackedWindow for DebugSnesWindow {
                     if ui.button("Power cycle").clicked() {
                         c.power_cycle();
                     }
-                    if let Some(cart) = c.mb.cartridge() {
-                        ui.label(format!("ROM format: {:?}", cart.rom_format));
-                    }
                     ui.horizontal(|ui| {
                         ui.label(format!("Address: 0x{:x}", c.cpu.debugger.registers.pc));
                         if let Some(t) = c.cpu.disassemble() {
                             ui.label(t);
                         }
                     });
-                    ui.label(format!(
-                        "{:X?}",
-                        c.cpu.debugger));
+                    ui.label(format!("{:X?}", c.cpu.debugger));
                     ui.label(format!(
                         "Frame number {}",
                         c.cpu_peripherals.ppu_frame_number()

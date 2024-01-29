@@ -20,7 +20,12 @@ trait SnesMapperTrait {
     /// Dump some data from the cart
     fn memory_cycle_dump(&self, cart: &SnesCartridgeData, bank: u8, addr: u16) -> Option<u8>;
     /// Run a cpu memory read cycle
-    fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) -> Option<u8>;
+    fn memory_cycle_read(
+        &mut self,
+        cart: &mut SnesCartridgeData,
+        bank: u8,
+        addr: u16,
+    ) -> Option<u8>;
     /// A read cycle that does not target cartridge memory. Used for mappers that monitor reads like mmc5.
     fn other_memory_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) {}
     /// Run a cpu memory write cycle
@@ -394,6 +399,8 @@ pub struct NonvolatileCartridgeData {
     pub prg_rom: Vec<u8>,
     /// The largest chunk of memory size for the rom
     pub rom_first: u32,
+    /// The largest size mapped to the rom
+    pub rom_largest: u32,
 }
 
 /// Volatile storage for cartridge data
@@ -428,16 +435,6 @@ impl VolatileCartridgeData {
     }
 }
 
-#[non_exhaustive]
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-/// The format that a rom file is loaded from
-pub enum RomFormat {
-    /// The iSnes1 rom format
-    ISnes1,
-    /// The iSnes2 rom format
-    ISnes2,
-}
-
 /// A cartridge, including the mapper structure
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -448,8 +445,6 @@ pub struct SnesCartridge {
     mapper: SnesMapper,
     /// The mapper number
     mappernum: u32,
-    /// Rom format loaded from
-    pub rom_format: RomFormat,
     /// The hash of the rom contents
     hash: String,
     /// The name to use for save games
@@ -625,7 +620,11 @@ impl SnesCartridge {
     }
 
     /// Parses an snes rom
-    fn load_snes_rom(name: String, mapper: u8, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+    fn load_snes_rom(
+        name: String,
+        mapper: u8,
+        rom_contents: &[u8],
+    ) -> Result<Self, CartridgeError> {
         let mut prg_rom = Vec::with_capacity(rom_contents.len());
         for i in 0..rom_contents.len() {
             prg_rom.push(rom_contents[i]);
@@ -659,6 +658,7 @@ impl SnesCartridge {
         let nonvol = NonvolatileCartridgeData {
             prg_rom,
             rom_first: size as u32,
+            rom_largest: max_size as u32,
         };
 
         let rom_data = SnesCartridgeData {
@@ -675,7 +675,6 @@ impl SnesCartridge {
             data: rom_data,
             mapper,
             mappernum: mappernum as u32,
-            rom_format: RomFormat::ISnes2,
             hash: hash.to_owned(),
             save: pb
                 .file_name()
@@ -803,7 +802,8 @@ impl SnesCartridge {
 
     /// Drive a cpu memory write cycle
     pub fn memory_write(&mut self, bank: u8, addr: u16, data: u8) {
-        self.mapper.memory_cycle_write(&mut self.data, bank, addr, data);
+        self.mapper
+            .memory_cycle_write(&mut self.data, bank, addr, data);
     }
 
     /// Drive the other memory read cycle, this cycle does not perform a read, but drives logic that depends on the read

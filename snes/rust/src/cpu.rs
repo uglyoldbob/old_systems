@@ -252,7 +252,7 @@ impl SnesCpu {
             ((0x80..=0xbf), (0x4200..=0x5fff)) => CpuCycleLength::ShortCycle,
             ((0x80..=0xbf), (0x6000..=0x7fff)) => CpuCycleLength::MediumCycle,
             ((0x80..=0xbf), (0x8000..=0xffff)) => CpuCycleLength::ShortCycle, //todo variable
-            ((0xc0..=0xff), _) => CpuCycleLength::ShortCycle, //todo variable
+            ((0xc0..=0xff), _) => CpuCycleLength::ShortCycle,                 //todo variable
         }
     }
 
@@ -277,7 +277,7 @@ impl SnesCpu {
         if self.length_ctr == self.length.count() {
             self.length_ctr = 0;
         }
-        
+
         if self.reset {
             match self.subcycle {
                 0 | 1 | 2 | 3 | 4 | 5 | 6 => {
@@ -287,9 +287,13 @@ impl SnesCpu {
                         self.registers.pb = 0;
                         self.registers.db = 0;
                         self.length = self.eval_address(0, self.registers.sp);
-                    }
-                    else {
-                        let _a = bus.memory_cycle_read_a(0, self.registers.sp, [false, false], cpu_peripherals);
+                    } else {
+                        let _a = bus.memory_cycle_read_a(
+                            0,
+                            self.registers.sp,
+                            [false, false],
+                            cpu_peripherals,
+                        );
                         self.registers.sp += 1;
                         self.subcycle += 1;
                     }
@@ -297,50 +301,53 @@ impl SnesCpu {
                 7 => {
                     if self.length_ctr == 1 {
                         self.length = self.eval_address(0, 0xfffc);
-                    }
-                    else {
-                        self.temp = bus.memory_cycle_read_a(0, 0xfffc, [false, false], cpu_peripherals) as u16;
+                    } else {
+                        self.temp =
+                            bus.memory_cycle_read_a(0, 0xfffc, [false, false], cpu_peripherals)
+                                as u16;
                         self.subcycle += 1;
                     }
                 }
                 _ => {
                     if self.length_ctr == 1 {
                         self.length = self.eval_address(0, 0xfffd);
-                    }
-                    else {
+                    } else {
                         self.reset = false;
                         self.subcycle = 0;
-                        self.temp = self.temp | (bus.memory_cycle_read_a(0, 0xfffd, [false, false], cpu_peripherals) as u16) << 8;
+                        self.temp = self.temp
+                            | (bus.memory_cycle_read_a(0, 0xfffd, [false, false], cpu_peripherals)
+                                as u16)
+                                << 8;
                         self.registers.pc = self.temp;
                         self.subcycle += 1;
                     }
                 }
             }
-        }
-        else if self.opcode.is_none() {
+        } else if self.opcode.is_none() {
             if self.length_ctr == 1 {
                 self.length = self.eval_address(self.registers.p, self.registers.pc);
-            }
-            else {
-                self.opcode = Some(bus.memory_cycle_read_a(self.registers.pbr, self.registers.pc, [false,false], cpu_peripherals));
+            } else {
+                self.opcode = Some(bus.memory_cycle_read_a(
+                    self.registers.pbr,
+                    self.registers.pc,
+                    [false, false],
+                    cpu_peripherals,
+                ));
                 self.subcycle += 1;
             }
-        }
-        else {
+        } else {
             if let Some(opcode) = self.opcode {
                 match opcode {
                     //xce (exchange carry and emulation flag)
                     0xfb => {
                         if self.length_ctr == 1 {
                             self.length = CpuCycleLength::ShortCycle;
-                        }
-                        else {
+                        } else {
                             let carry = (self.registers.p & CPU_FLAG_CARRY) != 0;
                             let emulation = self.emulation;
                             if emulation {
                                 self.registers.p |= CPU_FLAG_CARRY;
-                            }
-                            else {
+                            } else {
                                 self.registers.p &= !CPU_FLAG_CARRY;
                             }
                             self.emulation = carry;
@@ -352,8 +359,7 @@ impl SnesCpu {
                     0x78 => {
                         if self.length_ctr == 1 {
                             self.length = CpuCycleLength::ShortCycle;
-                        }
-                        else {
+                        } else {
                             self.registers.p |= CPU_FLAG_INT_DISABLE;
                             self.registers.pc = self.registers.pc.wrapping_add(1);
                             self.end_instruction();
@@ -363,8 +369,7 @@ impl SnesCpu {
                     0x18 => {
                         if self.length_ctr == 1 {
                             self.length = CpuCycleLength::ShortCycle;
-                        }
-                        else {
+                        } else {
                             self.registers.p &= !CPU_FLAG_CARRY;
                             self.registers.pc = self.registers.pc.wrapping_add(1);
                             self.end_instruction();
@@ -375,45 +380,62 @@ impl SnesCpu {
                         1 => {
                             if self.length_ctr == 1 {
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
-                                self.length = self.eval_address(self.registers.p, self.registers.pc);
-                            }
-                            else {
-                                self.temp = bus.memory_cycle_read_a(self.registers.pbr, self.registers.pc, [false,false], cpu_peripherals) as u16;
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
                                 self.subcycle += 1;
                             }
                         }
                         2 => {
                             if self.length_ctr == 1 {
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
-                                self.length = self.eval_address(self.registers.p, self.registers.pc);
-                            }
-                            else {
-                                self.temp = self.temp | (bus.memory_cycle_read_a(self.registers.pbr, self.registers.pc, [false,false], cpu_peripherals) as u16)<<8;
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = self.temp
+                                    | (bus.memory_cycle_read_a(
+                                        self.registers.pbr,
+                                        self.registers.pc,
+                                        [false, false],
+                                        cpu_peripherals,
+                                    ) as u16)
+                                        << 8;
                                 self.subcycle += 1;
                             }
                         }
                         3 => {
                             if self.length_ctr == 1 {
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
-                                self.length = self.eval_address(self.registers.p, self.registers.pc);
-                            }
-                            else {
-                                self.temp2 = bus.memory_cycle_read_a(self.registers.pbr, self.registers.pc, [false,false], cpu_peripherals) as u16;
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp2 = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
                                 self.subcycle += 1;
                             }
                         }
                         _ => {
                             if self.length_ctr == 1 {
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
-                                self.length = self.eval_address(self.registers.p, self.registers.pc);
-                            }
-                            else {
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
                                 self.registers.pbr = self.temp2 as u8;
                                 self.registers.pc = self.temp;
                                 self.end_instruction();
                             }
                         }
-                    }
+                    },
                     _ => {
                         todo!("Opcode {:X} unimplemented", opcode);
                     }

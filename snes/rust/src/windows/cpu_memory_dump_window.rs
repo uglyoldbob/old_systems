@@ -77,37 +77,44 @@ impl TrackedWindow for CpuMemoryDumpWindow {
                             } else {
                                 "**".to_string()
                             };
-                            let a2 = if let Some(a) = c.mb.memory_dump(v, i + 1, &c.cpu_peripherals) {
+                            let a2 = if let Some(a) = c.mb.memory_dump(v, i + 1, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()
                             };
-                            let a3 = if let Some(a) = c.mb.memory_dump(v, i + 2, &c.cpu_peripherals) {
+                            let a3 = if let Some(a) = c.mb.memory_dump(v, i + 2, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()
                             };
-                            let a4 = if let Some(a) = c.mb.memory_dump(v, i + 3, &c.cpu_peripherals) {
+                            let a4 = if let Some(a) = c.mb.memory_dump(v, i + 3, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()
                             };
-                            let a5 = if let Some(a) = c.mb.memory_dump(v, i + 4, &c.cpu_peripherals) {
+                            let a5 = if let Some(a) = c.mb.memory_dump(v, i + 4, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()
                             };
-                            let a6 = if let Some(a) = c.mb.memory_dump(v, i + 5, &c.cpu_peripherals) {
+                            let a6 = if let Some(a) = c.mb.memory_dump(v, i + 5, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()
                             };
-                            let a7 = if let Some(a) = c.mb.memory_dump(v, i + 6, &c.cpu_peripherals) {
+                            let a7 = if let Some(a) = c.mb.memory_dump(v, i + 6, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()
                             };
-                            let a8 = if let Some(a) = c.mb.memory_dump(v, i + 7, &c.cpu_peripherals) {
+                            let a8 = if let Some(a) = c.mb.memory_dump(v, i + 7, &c.cpu_peripherals)
+                            {
                                 format!("{:02X}", a)
                             } else {
                                 "**".to_string()

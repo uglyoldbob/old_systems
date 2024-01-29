@@ -218,9 +218,7 @@ impl SnesMotherboard {
                 let combined = ((bank as u32 & 1) << 16) | a as u32;
                 self.ram[combined as usize] = data;
             }
-            _ => {
-
-            }
+            _ => {}
         }
     }
 }

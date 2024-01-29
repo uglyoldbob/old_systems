@@ -1,7 +1,10 @@
 //! This is responsible for parsing roms from the filesystem, determining which ones are valid for the emulator to load.
 //! Emulator inaccuracies may prevent a rom that this module determines to be valid fromm operating correctly.
 
-use crate::{cartridge::{CartridgeError, SnesCartridge}, COMPILE_TIME};
+use crate::{
+    cartridge::{CartridgeError, SnesCartridge},
+    COMPILE_TIME,
+};
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, str::FromStr};
@@ -221,7 +224,11 @@ impl RomList {
     /// Save the rom list to disk
     pub fn save_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
         pb.push("roms.bin");
-        println!("Save list to {}, compile at {}", pb.display(), self.compile_time);
+        println!(
+            "Save list to {}, compile at {}",
+            pb.display(),
+            self.compile_time
+        );
         let encoded = bincode::serialize(&self).unwrap();
         std::fs::write(pb, encoded)
     }
@@ -299,15 +306,17 @@ impl RomListParser {
                             self.list.elements.entry(m).or_insert_with(|| {
                                 changes = true;
                                 RomListEntry {
-                                result: Some(Err(e)),
-                                modified: None,
-                            }});
+                                    result: Some(Err(e)),
+                                    modified: None,
+                                }
+                            });
                         }
                     }
                 }
             }
             if changes {
-                self.list.compile_time = chrono::DateTime::from_timestamp(0, 0).unwrap().to_string();
+                self.list.compile_time =
+                    chrono::DateTime::from_timestamp(0, 0).unwrap().to_string();
             }
             let _e = self.list.save_list(bin);
             self.scan_complete = true;
