@@ -193,6 +193,7 @@ impl SnesMotherboard {
                 }
             }
         }
+        println!("Read address {:X} {:X} = {:X}", bank, addr, response);
         response
     }
 
