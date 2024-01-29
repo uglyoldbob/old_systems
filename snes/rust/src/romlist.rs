@@ -1,7 +1,8 @@
 //! This is responsible for parsing roms from the filesystem, determining which ones are valid for the emulator to load.
 //! Emulator inaccuracies may prevent a rom that this module determines to be valid fromm operating correctly.
 
-use crate::cartridge::{CartridgeError, SnesCartridge};
+use crate::{cartridge::{CartridgeError, SnesCartridge}, COMPILE_TIME};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, str::FromStr};
 
@@ -109,6 +110,8 @@ pub struct RomListEntry {
 pub struct RomList {
     /// The tree of roms.
     pub elements: std::collections::BTreeMap<PathBuf, RomListEntry>,
+    /// When software that built the list was compiled
+    compile_time: String,
 }
 
 impl RomList {
@@ -116,6 +119,7 @@ impl RomList {
     fn new() -> Self {
         Self {
             elements: std::collections::BTreeMap::new(),
+            compile_time: "".to_string(),
         }
     }
 
@@ -217,7 +221,7 @@ impl RomList {
     /// Save the rom list to disk
     pub fn save_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
         pb.push("roms.bin");
-        println!("Save list to {}", pb.display());
+        println!("Save list to {}, compile at {}", pb.display(), self.compile_time);
         let encoded = bincode::serialize(&self).unwrap();
         std::fs::write(pb, encoded)
     }
@@ -264,6 +268,7 @@ impl RomListParser {
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
     pub fn find_roms(&mut self, dir: &str, sp: PathBuf, bin: PathBuf) {
         if !self.scan_complete {
+            let mut changes = false;
             println!(
                 "There are {} roms currently in the list",
                 self.list.elements.len()
@@ -283,6 +288,7 @@ impl RomListParser {
                             let e = self.list.elements.entry(m.clone());
                             e.or_insert_with(|| {
                                 println!("inserting new success entry {}", m.display());
+                                changes = true;
                                 RomListEntry {
                                     result: None,
                                     modified: None,
@@ -290,13 +296,18 @@ impl RomListParser {
                             });
                         }
                         Err(e) => {
-                            self.list.elements.entry(m).or_insert_with(|| RomListEntry {
+                            self.list.elements.entry(m).or_insert_with(|| {
+                                changes = true;
+                                RomListEntry {
                                 result: Some(Err(e)),
                                 modified: None,
-                            });
+                            }});
                         }
                     }
                 }
+            }
+            if changes {
+                self.list.compile_time = chrono::DateTime::from_timestamp(0, 0).unwrap().to_string();
             }
             let _e = self.list.save_list(bin);
             self.scan_complete = true;
@@ -305,13 +316,19 @@ impl RomListParser {
 
     /// Responsbile for checking to see if an update has been performed. An update consists of checking to see if any roms have changed since the last scan through the filesystem.
     pub fn process_roms(&mut self, sp: PathBuf) {
+        let compile_time = crate::get_compile_time();
+        let data_time = chrono::DateTime::parse_from_str(&self.list.compile_time, "%+").unwrap();
+        let force_refetch = compile_time > data_time;
+        if force_refetch {
+            println!("Forcing rom refresh {} {}", compile_time, data_time);
+        }
         if !self.update_complete {
             for (p, entry) in self.list.elements.iter_mut() {
                 let metadata = p.metadata();
                 if let Ok(metadata) = metadata {
                     let modified = metadata.modified().unwrap_or(std::time::SystemTime::now());
                     let last_modified = entry.modified.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                    if modified > last_modified {
+                    if modified > last_modified || force_refetch {
                         let romcheck = SnesCartridge::load_cartridge(
                             p.as_os_str().to_str().unwrap().to_string(),
                             &sp,
@@ -324,6 +341,8 @@ impl RomListParser {
                     }
                 }
             }
+
+            self.list.compile_time = COMPILE_TIME.to_string();
             let _e = self.list.save_list(sp);
             self.update_complete = true;
         }

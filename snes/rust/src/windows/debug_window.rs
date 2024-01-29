@@ -139,10 +139,6 @@ impl TrackedWindow for DebugSnesWindow {
                             ui.label(format!("{}: {:x}", n, v));
                         }
                         ui.label(format!(
-                            "Chr memory size: {:X}",
-                            c.cartridge().nonvolatile.chr_rom.len()
-                        ));
-                        ui.label(format!(
                             "Prg rom size: {:X}",
                             c.cartridge().nonvolatile.prg_rom.len()
                         ));

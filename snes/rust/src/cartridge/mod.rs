@@ -18,15 +18,15 @@ use crate::genie::GameGenieCode;
 #[enum_dispatch::enum_dispatch]
 trait SnesMapperTrait {
     /// Dump some data from the cart
-    fn memory_cycle_dump(&self, cart: &SnesCartridgeData, addr: u16) -> Option<u8>;
+    fn memory_cycle_dump(&self, cart: &SnesCartridgeData, bank: u8, addr: u16) -> Option<u8>;
     /// Run a cpu memory read cycle
-    fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, addr: u16) -> Option<u8>;
+    fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) -> Option<u8>;
     /// A read cycle that does not target cartridge memory. Used for mappers that monitor reads like mmc5.
-    fn other_memory_read(&mut self, cart: &mut SnesCartridgeData, addr: u16) {}
+    fn other_memory_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) {}
     /// Run a cpu memory write cycle
-    fn memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, addr: u16, data: u8);
+    fn memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16, data: u8);
     /// A write cycle that does not target cartridge memory. Used for mappers that monitor writes like mmc5.
-    fn other_memory_write(&mut self, _addr: u16, _data: u8) {}
+    fn other_memory_write(&mut self, bank: u8, _addr: u16, _data: u8) {}
     /// Runs a memory cycle that does nothing, for mappers that need to do special things.
     fn memory_cycle_nop(&mut self);
     #[must_use]
@@ -47,14 +47,14 @@ trait SnesMapperTrait {
     /// Retrieve the irq signal
     fn irq(&self) -> bool;
     /// Checks for active game genie codes and acts appropriately
-    fn genie(&mut self, cart: &mut SnesCartridgeData, addr: u16) -> Option<u8> {
+    fn genie(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
         if cart.volatile.genie.len() > 0 {
             let a = if (0xe000..=0xffff).contains(&addr) {
-                let mut a = self.memory_cycle_read(cart, addr);
+                let mut a = self.memory_cycle_read(cart, bank, addr);
                 for code in &cart.volatile.genie {
                     if code.address() == addr {
                         if let Some(check) = code.check() {
-                            let lv = self.memory_cycle_dump(cart, addr ^ 0x8000);
+                            let lv = self.memory_cycle_dump(cart, bank, addr ^ 0x8000);
                             if let Some(lv) = lv {
                                 if a == Some(check) {
                                     a = Some(lv & code.value());
@@ -65,7 +65,7 @@ trait SnesMapperTrait {
                                 }
                             }
                         } else {
-                            let lv = self.memory_cycle_dump(cart, addr ^ 0x8000);
+                            let lv = self.memory_cycle_dump(cart, bank, addr ^ 0x8000);
                             if let Some(lv) = lv {
                                 a = Some(lv & code.value());
                             } else {
@@ -76,7 +76,7 @@ trait SnesMapperTrait {
                 }
                 a
             } else {
-                let mut a = self.memory_cycle_read(cart, addr);
+                let mut a = self.memory_cycle_read(cart, bank, addr);
                 for code in &cart.volatile.genie {
                     if code.address() == addr {
                         if let Some(check) = code.check() {
@@ -92,7 +92,7 @@ trait SnesMapperTrait {
             };
             a
         } else {
-            self.memory_cycle_read(cart, addr)
+            self.memory_cycle_read(cart, bank, addr)
         }
     }
 }
@@ -390,16 +390,8 @@ pub struct SnesCartridgeData {
 /// Nonvolatile storage for cartridge data
 #[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
 pub struct NonvolatileCartridgeData {
-    /// An optional trainer for the cartridge
-    pub trainer: Option<Vec<u8>>,
-    /// The prg rom, where code typically goes.
+    /// The prg rom
     pub prg_rom: Vec<u8>,
-    /// The chr rom, where graphics are generally stored
-    pub chr_rom: Vec<u8>,
-    /// inst_rom ?
-    pub inst_rom: Option<Vec<u8>>,
-    /// prom?
-    pub prom: Option<(Vec<u8>, Vec<u8>)>,
 }
 
 /// Volatile storage for cartridge data
@@ -566,13 +558,6 @@ impl<'a> MapperMethod {
         } else {
             (size, 0)
         };
-        println!(
-            "Size {:x}, {:x}, {:X} {:x}",
-            contents.len(),
-            size,
-            step,
-            max_size
-        );
         MapperIter {
             addr: 0,
             main_size: size as u32,
@@ -638,83 +623,25 @@ impl SnesCartridge {
     }
 
     /// Parses an snes rom
-    fn load_snes_rom(name: String, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
-        let prg_rom_size = if (rom_contents[9] & 0xF) < 0xF {
-            (rom_contents[4] as usize | ((rom_contents[9] & 0xF) as usize) << 8) * 16384
-        } else {
-            let mult = (rom_contents[4] & 3) as usize * 2 + 1;
-            let exp = 2 << ((rom_contents[4] >> 2) as usize);
-            exp * mult
-        };
-
-        let mut file_offset: usize = 16;
-        let trainer = if (rom_contents[6] & (1 << 2)) != 0 {
-            let mut trainer = Vec::with_capacity(512);
-            for i in 0..512 {
-                if rom_contents.len() <= (file_offset + i) {
-                    return Err(CartridgeError::RomTooShort);
-                }
-                trainer.push(rom_contents[file_offset + i]);
-            }
-            file_offset += 512;
-            Some(trainer)
-        } else {
-            None
-        };
-
-        let mut prg_rom = Vec::with_capacity(prg_rom_size);
-        for i in 0..prg_rom_size {
-            if rom_contents.len() <= (file_offset + i) {
-                return Err(CartridgeError::RomTooShort);
-            }
-            prg_rom.push(rom_contents[file_offset + i]);
-        }
-        file_offset += prg_rom_size;
-
-        let chr_rom_size = if (rom_contents[9] & 0xF) < 0xF {
-            (rom_contents[4] as usize | ((rom_contents[9] & 0xF0) as usize) << 4) * 8192
-        } else {
-            let mult = (rom_contents[4] & 3) as usize * 2 + 1;
-            let exp = 2 << ((rom_contents[4] >> 2) as usize);
-            exp * mult
-        };
-
-        let mut chr_rom = Vec::with_capacity(chr_rom_size);
-
-        if chr_rom_size != 0 {
-            for i in 0..chr_rom_size {
-                if rom_contents.len() <= (file_offset + i) {
-                    return Err(CartridgeError::RomTooShort);
-                }
-                chr_rom.push(rom_contents[file_offset + i]);
-            }
-            file_offset += chr_rom_size;
+    fn load_snes_rom(name: String, mapper: u8, rom_contents: &[u8]) -> Result<Self, CartridgeError> {
+        let mut prg_rom = Vec::with_capacity(rom_contents.len());
+        for i in 0..rom_contents.len() {
+            prg_rom.push(rom_contents[i]);
         }
 
-        if file_offset < rom_contents.len() {
-            return Err(CartridgeError::RomTooLong);
-            //println!("Didn't use the entire rom file, I should report this as a failure");
-        }
-
-        let mappernum = (rom_contents[6] >> 4) as u16
-            | (rom_contents[7] & 0xf0) as u16
-            | (rom_contents[8] as u16) << 8;
+        let mappernum = mapper;
 
         let vol = VolatileCartridgeData {
             prg_ram: PersistentStorage::Volatile(Vec::new()),
-            battery_backup: (rom_contents[6] & 2) != 0,
-            mirroring: (rom_contents[6] & 1) != 0,
+            battery_backup: false,
+            mirroring: false,
             mapper: mappernum as u32,
             chr_ram: Vec::new(),
             genie: Vec::new(),
         };
 
         let nonvol = NonvolatileCartridgeData {
-            trainer,
             prg_rom,
-            chr_rom,
-            inst_rom: None,
-            prom: None,
         };
 
         let rom_data = SnesCartridgeData {
@@ -796,24 +723,9 @@ impl SnesCartridge {
                 cs1 = cs1.wrapping_add(d as u16);
             }
 
-            println!("Name : {} Checksums: {:X} {:X}", name, cs1, checksum);
-
             let checksum_good = (cs1 == checksum);
 
-            println!("CHECKSUM MATCH: {}", checksum_good);
-
-            let dataiter: Vec<u8> = o.method.get_iter(&rom_contents).collect();
-            let mut f = std::fs::OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open("./romcheck.bin")
-                .unwrap();
-            std::io::Write::write_all(&mut f, &dataiter);
-
-            println!(
-                "Mode matched and checksum pair could be real at {:X}",
-                o.start
-            );
+            return Self::load_snes_rom(name, o.mode, &rom_contents);
         }
 
         Err(CartridgeError::HeaderNotFound)
@@ -863,28 +775,28 @@ impl SnesCartridge {
     }
 
     /// Perform a dump of a cartridge
-    pub fn memory_dump(&self, addr: u16) -> Option<u8> {
-        self.mapper.memory_cycle_dump(&self.data, addr)
+    pub fn memory_dump(&self, bank: u8, addr: u16) -> Option<u8> {
+        self.mapper.memory_cycle_dump(&self.data, bank, addr)
     }
 
     /// Drive a cpu memory read cycle
-    pub fn memory_read(&mut self, addr: u16) -> Option<u8> {
-        self.mapper.genie(&mut self.data, addr)
+    pub fn memory_read(&mut self, bank: u8, addr: u16) -> Option<u8> {
+        self.mapper.genie(&mut self.data, bank, addr)
     }
 
     /// Drive a cpu memory write cycle
-    pub fn memory_write(&mut self, addr: u16, data: u8) {
-        self.mapper.memory_cycle_write(&mut self.data, addr, data);
+    pub fn memory_write(&mut self, bank: u8, addr: u16, data: u8) {
+        self.mapper.memory_cycle_write(&mut self.data, bank, addr, data);
     }
 
     /// Drive the other memory read cycle, this cycle does not perform a read, but drives logic that depends on the read
-    pub fn other_memory_read(&mut self, addr: u16) {
-        self.mapper.other_memory_read(&mut self.data, addr);
+    pub fn other_memory_read(&mut self, bank: u8, addr: u16) {
+        self.mapper.other_memory_read(&mut self.data, bank, addr);
     }
 
     /// Drive the other memory write cycle
-    pub fn other_memory_write(&mut self, addr: u16, data: u8) {
-        self.mapper.other_memory_write(addr, data);
+    pub fn other_memory_write(&mut self, bank: u8, addr: u16, data: u8) {
+        self.mapper.other_memory_write(bank, addr, data);
     }
 
     /// A nop for the cpu bus, for driving mapper logic that needs it.

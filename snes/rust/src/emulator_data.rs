@@ -266,7 +266,7 @@ impl LocalEmulatorDataClone {
 
     /// Process the list of roms
     pub fn process_roms(&mut self) {
-        self.parser.process_roms(self.save_path())
+        self.parser.process_roms(self.get_save_other())
     }
 }
 
@@ -469,8 +469,6 @@ impl SnesEmulatorData {
         let cart = self.remove_cartridge();
         let controller1 = self.mb.get_controller(0);
         let controller2 = self.mb.get_controller(1);
-        let controller3 = self.mb.get_controller(2);
-        let controller4 = self.mb.get_controller(3);
         let mb: SnesMotherboard = SnesMotherboard::new();
         let ppu = SnesPpu::new();
         let apu = SnesApu::new();
@@ -484,8 +482,6 @@ impl SnesEmulatorData {
 
         self.mb.set_controller(0, controller1);
         self.mb.set_controller(1, controller2);
-        self.mb.set_controller(2, controller3);
-        self.mb.set_controller(3, controller4);
 
         self.ppu_clock_counter = rand::random::<u8>() % 4;
         self.last_frame_time = std::time::SystemTime::now()

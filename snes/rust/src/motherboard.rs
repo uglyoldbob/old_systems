@@ -16,7 +16,7 @@ pub struct SnesMotherboard {
     cart: Option<SnesCartridge>,
     /// The cpu ram
     #[serde_as(as = "Bytes")]
-    ram: [u8; 2048],
+    ram: [u8; 128 * 1024],
     /// The ppu vram, physically outside the ppu, so this makes perfect sense.
     #[serde_as(as = "Bytes")]
     vram: [u8; 2048],
@@ -41,7 +41,7 @@ impl SnesMotherboard {
     /// Create a new Snes motherboard
     pub fn new() -> Self {
         //board ram is random on startup
-        let mut main_ram: [u8; 2048] = [0; 2048];
+        let mut main_ram: [u8; 128 * 1024] = [0; 128 * 1024];
         for i in main_ram.iter_mut() {
             *i = rand::random();
         }
@@ -143,30 +143,81 @@ impl SnesMotherboard {
     }
 
     /// Perform a read operation on the cpu memory bus, but doesn;t have any side effects like a normal read might
-    pub fn memory_dump(&self, addr: u16, per: &SnesCpuPeripherals) -> Option<u8> {
+    pub fn memory_dump(&self, bank: u8, addr: u16, per: &SnesCpuPeripherals) -> Option<u8> {
         let mut response: Option<u8> = None;
+        match (bank, addr) {
+            ((0..=0x3f), (0..=0x1fff)) => {
+                response = Some(self.ram[addr as usize]);
+            }
+            ((0x80..=0xbf), (0..=0x1fff)) => {
+                response = Some(self.ram[addr as usize]);
+            }
+            ((0x7e..=0x7f), a) => {
+                let combined = ((bank as u32 & 1) << 16) | a as u32;
+                response = Some(self.ram[combined as usize]);
+            }
+            _ => {
+
+            }
+        }
         response
     }
 
     /// Perform a read operation on the cpu memory bus a
     pub fn memory_cycle_read_a(
         &mut self,
-        addr: u32,
+        bank: u8,
+        addr: u16,
         _controllers: [bool; 2],
         per: &mut SnesCpuPeripherals,
     ) -> u8 {
         let mut response: u8 = self.last_cpu_data;
+        match (bank, addr) {
+            ((0..=0x3f), (0..=0x1fff)) => {
+                response = self.ram[addr as usize];
+            }
+            ((0x80..=0xbf), (0..=0x1fff)) => {
+                response = self.ram[addr as usize];
+            }
+            ((0x7e..=0x7f), a) => {
+                let combined = ((bank as u32 & 1) << 16) | a as u32;
+                response = self.ram[combined as usize];
+            }
+            _ => {
+                if let Some(cart) = &mut self.cart {
+                    if let Some(r) = cart.memory_read(bank, addr) {
+                        response = r;
+                    }
+                }
+            }
+        }
         response
     }
 
     /// Perform a write operation on the cpu memory bus a
     pub fn memory_cycle_write_a(
         &mut self,
-        addr: u32,
+        bank: u8,
+        addr: u16,
         data: u8,
         _controllers: [bool; 2],
         per: &mut SnesCpuPeripherals,
     ) {
         self.last_cpu_data = data;
+        match (bank, addr) {
+            ((0..=0x3f), (0..=0x1fff)) => {
+                self.ram[addr as usize] = data;
+            }
+            ((0x80..=0xbf), (0..=0x1fff)) => {
+                self.ram[addr as usize] = data;
+            }
+            ((0x7e..=0x7f), a) => {
+                let combined = ((bank as u32 & 1) << 16) | a as u32;
+                self.ram[combined as usize] = data;
+            }
+            _ => {
+
+            }
+        }
     }
 }

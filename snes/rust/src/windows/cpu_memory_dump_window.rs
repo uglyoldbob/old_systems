@@ -15,14 +15,19 @@ use crate::egui_multiwin_dynamic::{
 };
 
 /// The window for dumping cpu data
-pub struct CpuMemoryDumpWindow {}
+pub struct CpuMemoryDumpWindow {
+    /// The user text for the bank to dump
+    bank: String,
+}
 
 #[cfg(feature = "egui-multiwin")]
 impl CpuMemoryDumpWindow {
     /// Create a request to create a new window of self.
     pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: super::Windows::CpuMemoryDumpWindow(CpuMemoryDumpWindow {}),
+            window_state: super::Windows::CpuMemoryDumpWindow(CpuMemoryDumpWindow {
+                bank: "0".to_string(),
+            }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
@@ -61,53 +66,57 @@ impl TrackedWindow for CpuMemoryDumpWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("CPU Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
-                #[cfg(feature = "debugger")]
-                {
-                    for i in (0..=0xFFFF).step_by(8) {
-                        let a1 = if let Some(a) = c.mb.memory_dump(i, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a2 = if let Some(a) = c.mb.memory_dump(i + 1, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a3 = if let Some(a) = c.mb.memory_dump(i + 2, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a4 = if let Some(a) = c.mb.memory_dump(i + 3, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a5 = if let Some(a) = c.mb.memory_dump(i + 4, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a6 = if let Some(a) = c.mb.memory_dump(i + 5, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a7 = if let Some(a) = c.mb.memory_dump(i + 6, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        let a8 = if let Some(a) = c.mb.memory_dump(i + 7, &c.cpu_peripherals) {
-                            format!("{:02X}", a)
-                        } else {
-                            "**".to_string()
-                        };
-                        ui.label(format!(
-                            "{:04X}: {} {} {} {}\t{} {} {} {}",
-                            i, a1, a2, a3, a4, a5, a6, a7, a8,
-                        ));
+                ui.label("Enter bank number in hexadecimal");
+                ui.text_edit_singleline(&mut self.bank);
+                if let Ok(v) = u8::from_str_radix(&self.bank, 16) {
+                    #[cfg(feature = "debugger")]
+                    {
+                        for i in (0..=0xFFFF).step_by(8) {
+                            let a1 = if let Some(a) = c.mb.memory_dump(v, i, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a2 = if let Some(a) = c.mb.memory_dump(v, i + 1, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a3 = if let Some(a) = c.mb.memory_dump(v, i + 2, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a4 = if let Some(a) = c.mb.memory_dump(v, i + 3, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a5 = if let Some(a) = c.mb.memory_dump(v, i + 4, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a6 = if let Some(a) = c.mb.memory_dump(v, i + 5, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a7 = if let Some(a) = c.mb.memory_dump(v, i + 6, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            let a8 = if let Some(a) = c.mb.memory_dump(v, i + 7, &c.cpu_peripherals) {
+                                format!("{:02X}", a)
+                            } else {
+                                "**".to_string()
+                            };
+                            ui.label(format!(
+                                "{:04X}: {} {} {} {}\t{} {} {} {}",
+                                i, a1, a2, a3, a4, a5, a6, a7, a8,
+                            ));
+                        }
                     }
                 }
             });

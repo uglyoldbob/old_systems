@@ -46,23 +46,8 @@ impl SnesMapperTrait for Mapper00 {
         hm
     }
 
-    fn memory_cycle_dump(&self, cart: &SnesCartridgeData, addr: u16) -> Option<u8> {
+    fn memory_cycle_dump(&self, cart: &SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
         match addr {
-            0x6000..=0x7fff => {
-                if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                    let c = cart.nonvolatile.trainer.as_ref().unwrap();
-                    let addr = addr & 0x1ff;
-                    Some(c[addr as usize])
-                } else {
-                    let mut addr2 = addr & 0x1fff;
-                    if !cart.volatile.prg_ram.is_empty() {
-                        addr2 %= cart.volatile.prg_ram.len() as u16;
-                        Some(cart.volatile.prg_ram[addr2 as usize])
-                    } else {
-                        None
-                    }
-                }
-            }
             0x8000..=0xffff => {
                 let addr2 = addr & 0x7fff;
                 let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
@@ -72,7 +57,7 @@ impl SnesMapperTrait for Mapper00 {
         }
     }
 
-    fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, addr: u16) -> Option<u8> {
+    fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
         match addr {
             0x6000..=0x7fff => {
                 let mut addr2 = addr & 0x1fff;
@@ -94,25 +79,12 @@ impl SnesMapperTrait for Mapper00 {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, addr: u16, data: u8) {
-        if (0x6000..=0x7fff).contains(&addr) {
-            if cart.nonvolatile.trainer.is_some() && (0x7000..=0x71ff).contains(&addr) {
-                let c = cart.nonvolatile.trainer.as_mut().unwrap();
-                let addr = addr & 0x1ff;
-                c[addr as usize] = data;
-            } else {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.volatile.prg_ram.is_empty() {
-                    addr2 %= cart.volatile.prg_ram.len() as u16;
-                    cart.volatile.prg_ram[addr2 as usize] = data;
-                }
-            }
-        }
+    fn memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16, data: u8) {
     }
 
     fn ppu_peek_address(&self, addr: u16, cart: &SnesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);
-        let data = cart.nonvolatile.chr_rom[(addr as usize) % cart.nonvolatile.chr_rom.len()];
+        let data = 42;
         (mirror, thing, Some(data))
     }
 
@@ -122,18 +94,7 @@ impl SnesMapperTrait for Mapper00 {
     }
 
     fn ppu_memory_cycle_read(&mut self, cart: &mut SnesCartridgeData) -> Option<u8> {
-        let mut v = Vec::new();
-        let chr = if !cart.volatile.chr_ram.is_empty() {
-            &mut cart.volatile.chr_ram
-        } else if !cart.nonvolatile.chr_rom.is_empty() {
-            &mut cart.nonvolatile.chr_rom
-        } else {
-            &mut v
-        };
-        if chr.is_empty() {
-            return None;
-        }
-        Some(chr[(self.ppu_address as usize) % chr.len()])
+        None
     }
 
     fn ppu_memory_cycle_write(&mut self, cart: &mut SnesCartridgeData, data: u8) {

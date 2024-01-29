@@ -13,6 +13,14 @@ compile_error!("feature \"eframe\" and feature \"sdl2\" cannot be enabled at the
 #[cfg(all(feature = "sdl2", feature = "egui-multiwin"))]
 compile_error!("feature \"sdl2\" and feature \"egui-multiwin\" cannot be enabled at the same time");
 
+/// A constant that defines when the code was compiled
+pub const COMPILE_TIME: &'static str = compile_time::datetime_str!();
+
+/// Returns when the code was compiled
+pub fn get_compile_time() -> chrono::DateTime<chrono::FixedOffset> {
+    chrono::DateTime::parse_from_str(COMPILE_TIME, "%+").unwrap()
+}
+
 mod apu;
 mod cartridge;
 mod controller;
