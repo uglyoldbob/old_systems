@@ -47,33 +47,32 @@ impl SnesMapperTrait for Mapper00 {
     }
 
     fn memory_cycle_dump(&self, cart: &SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
-        match addr {
-            0x8000..=0xffff => {
-                let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
-                Some(cart.nonvolatile.prg_rom[addr3 as usize])
+        if (0x8000..=0xffff).contains(&addr) {
+            let big_addr = ((bank as u32) << 15) | ((addr & 0x7fff) as u32);
+            if big_addr < cart.nonvolatile.rom_first {
+                Some(cart.nonvolatile.prg_rom[big_addr as usize])
             }
-            _ => None,
+            else {
+                Some(42)
+            }
+        }
+        else {
+            None
         }
     }
 
     fn memory_cycle_read(&mut self, cart: &mut SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
-        match addr {
-            0x6000..=0x7fff => {
-                let mut addr2 = addr & 0x1fff;
-                if !cart.volatile.prg_ram.is_empty() {
-                    addr2 %= cart.volatile.prg_ram.len() as u16;
-                    Some(cart.volatile.prg_ram[addr2 as usize])
-                } else {
-                    None
-                }
+        if (0x8000..=0xffff).contains(&addr) {
+            let big_addr = ((bank as u32) << 15) | ((addr & 0x7fff) as u32);
+            if big_addr < cart.nonvolatile.rom_first {
+                Some(cart.nonvolatile.prg_rom[big_addr as usize])
             }
-            0x8000..=0xffff => {
-                let addr2 = addr & 0x7fff;
-                let addr3 = addr2 as u32 % cart.nonvolatile.prg_rom.len() as u32;
-                Some(cart.nonvolatile.prg_rom[addr3 as usize])
+            else {
+                Some(42)
             }
-            _ => None,
+        }
+        else {
+            None
         }
     }
 

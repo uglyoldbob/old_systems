@@ -392,6 +392,8 @@ pub struct SnesCartridgeData {
 pub struct NonvolatileCartridgeData {
     /// The prg rom
     pub prg_rom: Vec<u8>,
+    /// The largest chunk of memory size for the rom
+    pub rom_first: u32,
 }
 
 /// Volatile storage for cartridge data
@@ -629,6 +631,20 @@ impl SnesCartridge {
             prg_rom.push(rom_contents[i]);
         }
 
+        let mut size = rom_contents.len().next_power_of_two();
+        if size > rom_contents.len() {
+            size /= 2;
+        }
+
+        let mut msize = rom_contents.len() - size;
+
+        let (max_size, step) = if msize > 0 {
+            msize = msize.next_power_of_two();
+            (size * 2, msize)
+        } else {
+            (size, 0)
+        };
+
         let mappernum = mapper;
 
         let vol = VolatileCartridgeData {
@@ -642,6 +658,7 @@ impl SnesCartridge {
 
         let nonvol = NonvolatileCartridgeData {
             prg_rom,
+            rom_first: size as u32,
         };
 
         let rom_data = SnesCartridgeData {
@@ -719,7 +736,7 @@ impl SnesCartridge {
             }
 
             let mut cs1: u16 = 0;
-            for (i, d) in o.method.get_iter(&rom_contents).enumerate() {
+            for d in o.method.get_iter(&rom_contents) {
                 cs1 = cs1.wrapping_add(d as u16);
             }
 

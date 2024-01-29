@@ -16,7 +16,7 @@ pub struct SnesMotherboard {
     cart: Option<SnesCartridge>,
     /// The cpu ram
     #[serde_as(as = "Bytes")]
-    ram: [u8; 128 * 1024],
+    ram: Box<[u8; 128 * 1024]>,
     /// The ppu vram, physically outside the ppu, so this makes perfect sense.
     #[serde_as(as = "Bytes")]
     vram: [u8; 2048],
@@ -41,7 +41,7 @@ impl SnesMotherboard {
     /// Create a new Snes motherboard
     pub fn new() -> Self {
         //board ram is random on startup
-        let mut main_ram: [u8; 128 * 1024] = [0; 128 * 1024];
+        let mut main_ram: Box<[u8; 128 * 1024]> = Box::new([0; 128 * 1024]);
         for i in main_ram.iter_mut() {
             *i = rand::random();
         }
@@ -157,7 +157,9 @@ impl SnesMotherboard {
                 response = Some(self.ram[combined as usize]);
             }
             _ => {
-
+                if let Some(cart) = &self.cart {
+                    response = cart.memory_dump(bank, addr);
+                }
             }
         }
         response
