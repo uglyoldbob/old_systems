@@ -131,6 +131,8 @@ pub struct CpuRegisters {
     p: u8,
     /// program counter
     pub pc: u16,
+    /// The emulation mode flag
+    emulation: bool,
 }
 
 impl CpuRegisters {
@@ -147,6 +149,7 @@ impl CpuRegisters {
             pbr: 0,
             p: 0x34,
             pc: 0xfffc,
+            emulation: true,
         }
     }
 }
@@ -174,8 +177,6 @@ pub struct SnesCpu {
     length: CpuCycleLength,
     /// The counter for the length of the current tick
     length_ctr: u8,
-    /// The emulation mode flag
-    emulation: bool,
     /// The current opcode being executed
     opcode: Option<u8>,
     /// A temporary processing register
@@ -199,7 +200,6 @@ impl SnesCpu {
             reset: true,
             length: CpuCycleLength::ShortCycle,
             length_ctr: 0,
-            emulation: false,
             opcode: None,
             temp: 0,
             temp2: 0,
@@ -287,7 +287,7 @@ impl SnesCpu {
             match self.subcycle {
                 0 | 1 | 2 | 3 | 4 | 5 | 6 => {
                     if self.length_ctr == 1 {
-                        self.emulation = true;
+                        self.registers.emulation = true;
                         self.registers.dbr = 0;
                         self.registers.pb = 0;
                         self.registers.db = 0;
@@ -464,13 +464,13 @@ impl SnesCpu {
                                 self.done_fetching = true;
                             }
                             let carry = (self.registers.p & CPU_FLAG_CARRY) != 0;
-                            let emulation = self.emulation;
+                            let emulation = self.registers.emulation;
                             if emulation {
                                 self.registers.p |= CPU_FLAG_CARRY;
                             } else {
                                 self.registers.p &= !CPU_FLAG_CARRY;
                             }
-                            self.emulation = carry;
+                            self.registers.emulation = carry;
                             self.registers.pc = self.registers.pc.wrapping_add(1);
                             self.end_instruction();
                         }
@@ -596,6 +596,18 @@ impl SnesCpu {
                                         self.done_fetching = true;
                                     }
                                     self.registers.a = (self.registers.a & 0xFF00) | (self.temp & 0xFF);
+                                    if self.temp == 0 {
+                                        self.registers.p |= CPU_FLAG_ZERO;
+                                    }
+                                    else {
+                                        self.registers.p &= !CPU_FLAG_ZERO;
+                                    }
+                                    if (self.temp & 0x80) != 0 {
+                                        self.registers.p |= CPU_FLAG_NEGATIVE;
+                                    }
+                                    else {
+                                        self.registers.p &= !CPU_FLAG_NEGATIVE;
+                                    }
                                     self.registers.pc = self.registers.pc.wrapping_add(1);
                                     self.end_instruction();
                                 } else {
