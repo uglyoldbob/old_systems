@@ -92,7 +92,10 @@ impl TrackedWindow for DebugSnesWindow {
                         c.power_cycle();
                     }
                     ui.horizontal(|ui| {
-                        ui.label(format!("Address: 0x{:x}", c.cpu.debugger.registers.pc));
+                        ui.label(format!(
+                            "Address: 0x{:x} 0x{:x}",
+                            c.cpu.debugger.registers.pbr, c.cpu.debugger.registers.pc
+                        ));
                         if let Some(t) = c.cpu.disassemble() {
                             ui.label(t);
                         }

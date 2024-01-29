@@ -126,7 +126,7 @@ pub struct CpuRegisters {
     /// Program bank
     pb: u8,
     /// Program bank register (the k register)
-    pbr: u8,
+    pub pbr: u8,
     /// Status register
     p: u8,
     /// program counter
@@ -270,6 +270,11 @@ impl SnesCpu {
         nmi: bool,
         irq: bool,
     ) {
+        #[cfg(feature = "debugger")]
+        {
+            self.done_fetching = false;
+        }
+
         self.length_ctr += 1;
         if self.length_ctr > 1 && self.length_ctr < self.length.count() {
             return;
@@ -333,6 +338,10 @@ impl SnesCpu {
                     [false, false],
                     cpu_peripherals,
                 ));
+                #[cfg(feature = "debugger")]
+                {
+                    self.debugger.registers = self.registers.clone();
+                }
                 self.subcycle += 1;
             }
         } else {
@@ -343,6 +352,11 @@ impl SnesCpu {
                         if self.length_ctr == 1 {
                             self.length = CpuCycleLength::ShortCycle;
                         } else {
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("XCE");
+                                self.done_fetching = true;
+                            }
                             let carry = (self.registers.p & CPU_FLAG_CARRY) != 0;
                             let emulation = self.emulation;
                             if emulation {
@@ -360,6 +374,11 @@ impl SnesCpu {
                         if self.length_ctr == 1 {
                             self.length = CpuCycleLength::ShortCycle;
                         } else {
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("SEI");
+                                self.done_fetching = true;
+                            }
                             self.registers.p |= CPU_FLAG_INT_DISABLE;
                             self.registers.pc = self.registers.pc.wrapping_add(1);
                             self.end_instruction();
@@ -370,6 +389,11 @@ impl SnesCpu {
                         if self.length_ctr == 1 {
                             self.length = CpuCycleLength::ShortCycle;
                         } else {
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("CLC");
+                                self.done_fetching = true;
+                            }
                             self.registers.p &= !CPU_FLAG_CARRY;
                             self.registers.pc = self.registers.pc.wrapping_add(1);
                             self.end_instruction();
@@ -430,8 +454,144 @@ impl SnesCpu {
                                 self.length =
                                     self.eval_address(self.registers.p, self.registers.pc);
                             } else {
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!(
+                                        "JMP ${:X}",
+                                        (self.temp2 as u32) << 16 | (self.temp as u32)
+                                    );
+                                    self.done_fetching = true;
+                                }
                                 self.registers.pbr = self.temp2 as u8;
                                 self.registers.pc = self.temp;
+                                self.end_instruction();
+                            }
+                        }
+                    },
+                    // lda immediate
+                    0xa9 => match self.subcycle {
+                        1 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
+                                self.subcycle += 1;
+                            }
+                            if (self.registers.p & CPU_FLAG_MEMORY) == 1 {
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!("LDA #{:X}", self.temp);
+                                    self.done_fetching = true;
+                                }
+                                self.registers.a = self.temp;
+                                self.end_instruction();
+                            } else {
+                                self.subcycle += 1;
+                            }
+                        }
+                        _ => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = self.temp
+                                    | (bus.memory_cycle_read_a(
+                                        self.registers.pbr,
+                                        self.registers.pc,
+                                        [false, false],
+                                        cpu_peripherals,
+                                    ) as u16)
+                                        << 8;
+                                self.subcycle += 1;
+                            }
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("LDA #{:X}", self.temp);
+                                self.done_fetching = true;
+                            }
+                            self.registers.a = self.temp;
+                            self.registers.pc = self.registers.pc.wrapping_add(1);
+                            self.end_instruction();
+                        }
+                    },
+                    // stz absolute
+                    0x9c => match self.subcycle {
+                        1 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
+                                self.subcycle += 1;
+                            }
+                        }
+                        2 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = self.temp
+                                    | (bus.memory_cycle_read_a(
+                                        self.registers.pbr,
+                                        self.registers.pc,
+                                        [false, false],
+                                        cpu_peripherals,
+                                    ) as u16)
+                                        << 8;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!("STZ ${:X}", self.temp);
+                                    self.done_fetching = true;
+                                }
+                                self.subcycle += 1;
+                            }
+                        }
+                        3 => {
+                            if self.length_ctr == 1 {
+                                self.length = self.eval_address(0, self.temp);
+                            } else {
+                                bus.memory_cycle_write_a(
+                                    0,
+                                    self.temp,
+                                    0,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                if (self.registers.p & CPU_FLAG_MEMORY) == 1 {
+                                    self.end_instruction();
+                                } else {
+                                    self.subcycle += 1;
+                                }
+                            }
+                        }
+                        _ => {
+                            if self.length_ctr == 1 {
+                                self.temp = self.temp.wrapping_add(1);
+                                self.length = self.eval_address(0, self.temp);
+                            } else {
+                                bus.memory_cycle_write_a(
+                                    0,
+                                    self.temp,
+                                    0,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
                                 self.end_instruction();
                             }
                         }

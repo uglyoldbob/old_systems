@@ -644,6 +644,7 @@ fn main() {
     let _e = multi_window.add(root_window, &mut nes_data, &event_loop);
     #[cfg(feature = "debugger")]
     {
+        nes_data.paused = true;
         if nes_data.paused {
             let debug_win = windows::debug_window::DebugSnesWindow::new_request();
             let _e = multi_window.add(debug_win, &mut nes_data, &event_loop);

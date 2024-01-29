@@ -220,5 +220,6 @@ impl SnesMotherboard {
             }
             _ => {}
         }
+        println!("Write address {:X} {:X} = {:X}", bank, addr, data);
     }
 }

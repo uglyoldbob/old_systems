@@ -49,6 +49,7 @@ impl SnesMapperTrait for Mapper00 {
     fn memory_cycle_dump(&self, cart: &SnesCartridgeData, bank: u8, addr: u16) -> Option<u8> {
         if (0x8000..=0xffff).contains(&addr) {
             let big_addr = ((bank as u32) << 15) | ((addr & 0x7fff) as u32);
+            let big_addr = big_addr & (cart.nonvolatile.rom_largest - 1);
             if big_addr < cart.nonvolatile.rom_first {
                 Some(cart.nonvolatile.prg_rom[big_addr as usize])
             } else {
