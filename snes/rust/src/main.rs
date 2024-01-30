@@ -651,13 +651,15 @@ fn main() {
         }
     }
 
-    #[cfg(feature = "rom_status")]
-    {
-        let _e = multi_window.add(
-            windows::rom_checker::Window::new_request(&nes_data),
-            &mut nes_data,
-            &event_loop,
-        );
+    if false {
+        #[cfg(feature = "rom_status")]
+        {
+            let _e = multi_window.add(
+                windows::rom_checker::Window::new_request(&nes_data),
+                &mut nes_data,
+                &event_loop,
+            );
+        }
     }
 
     multi_window.run(event_loop, nes_data);
