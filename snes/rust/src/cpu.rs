@@ -350,6 +350,48 @@ impl SnesCpu {
         } else {
             if let Some(opcode) = self.opcode {
                 match opcode {
+                    //dex
+                    0xca => {
+                        if self.length_ctr == 1 {
+                            self.length = CpuCycleLength::ShortCycle;
+                        } else {
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("DEX");
+                                self.done_fetching = true;
+                            }
+                            if (self.registers.p & CPU_FLAG_INDEX_WIDTH) != 0 {
+                                //8 bit operation
+                                let mut x = self.registers.x.to_le_bytes();
+                                x[0] = x[0].wrapping_sub(1);
+                                self.registers.x = u16::from_le_bytes(x);
+                                if x[0] == 0 {
+                                    self.registers.p |= CPU_FLAG_ZERO;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_ZERO;
+                                }
+                                if (x[0] & 0x80) != 0 {
+                                    self.registers.p |= CPU_FLAG_NEGATIVE;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_NEGATIVE;
+                                }
+                            } else {
+                                self.registers.x = self.registers.x.wrapping_sub(1);
+                                if self.registers.x == 0 {
+                                    self.registers.p |= CPU_FLAG_ZERO;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_ZERO;
+                                }
+                                if (self.registers.x & 0x8000) != 0 {
+                                    self.registers.p |= CPU_FLAG_NEGATIVE;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_NEGATIVE;
+                                }
+                            }
+                            self.registers.pc = self.registers.pc.wrapping_add(1);
+                            self.end_instruction();
+                        }
+                    }
                     // REP
                     0xC2 => match self.subcycle {
                         1 => {

@@ -526,7 +526,6 @@ impl SnesEmulatorData {
         }
 
         self.ppu_clock_counter += 1;
-
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
             self.cpu_peripherals.ppu_cycle(&mut self.mb);

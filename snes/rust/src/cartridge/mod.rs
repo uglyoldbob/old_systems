@@ -712,9 +712,9 @@ impl SnesCartridge {
         ];
 
         let rom_contents: Vec<u8> = if preheader {
-            contents[512..].iter().map(|f| *f).collect()
+            contents[512..].to_vec()
         } else {
-            contents.iter().map(|f| *f).collect()
+            contents.to_vec()
         };
 
         for o in header_locations {
