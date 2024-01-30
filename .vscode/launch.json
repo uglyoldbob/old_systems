@@ -8,6 +8,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug executable 'snes'",
+            "preLaunchTask": "format",
             "cargo": {
                 "args": [
                     "build",

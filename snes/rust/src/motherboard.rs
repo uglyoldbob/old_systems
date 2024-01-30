@@ -152,6 +152,16 @@ impl SnesMotherboard {
             ((0x80..=0xbf), (0..=0x1fff)) => {
                 response = Some(self.ram[addr as usize]);
             }
+            ((0..=0x3f), (0x2100..=0x213f)) => {
+                if let Some(r) = per.ppu.memory_cycle_read_a((addr & 0x3f) as u8) {
+                    response = Some(r);
+                }
+            }
+            ((0x80..=0xbf), (0x2100..=0x213f)) => {
+                if let Some(r) = per.ppu.memory_cycle_read_a((addr & 0x3f) as u8) {
+                    response = Some(r);
+                }
+            }
             ((0x7e..=0x7f), a) => {
                 let combined = ((bank as u32 & 1) << 16) | a as u32;
                 response = Some(self.ram[combined as usize]);
@@ -180,6 +190,16 @@ impl SnesMotherboard {
             }
             ((0x80..=0xbf), (0..=0x1fff)) => {
                 response = self.ram[addr as usize];
+            }
+            ((0..=0x3f), (0x2100..=0x213f)) => {
+                if let Some(r) = per.ppu.memory_cycle_read_a((addr & 0x3f) as u8) {
+                    response = r;
+                }
+            }
+            ((0x80..=0xbf), (0x2100..=0x213f)) => {
+                if let Some(r) = per.ppu.memory_cycle_read_a((addr & 0x3f) as u8) {
+                    response = r;
+                }
             }
             ((0x7e..=0x7f), a) => {
                 let combined = ((bank as u32 & 1) << 16) | a as u32;
@@ -213,6 +233,12 @@ impl SnesMotherboard {
             }
             ((0x80..=0xbf), (0..=0x1fff)) => {
                 self.ram[addr as usize] = data;
+            }
+            ((0..=0x3f), (0x2100..=0x213f)) => {
+                per.ppu.memory_cycle_write_a((addr & 0x3f) as u8, data);
+            }
+            ((0x80..=0xbf), (0x2100..=0x213f)) => {
+                per.ppu.memory_cycle_write_a((addr & 0x3f) as u8, data);
             }
             ((0x7e..=0x7f), a) => {
                 let combined = ((bank as u32 & 1) << 16) | a as u32;

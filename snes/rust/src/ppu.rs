@@ -480,6 +480,9 @@ pub struct SnesPpu {
     pub bg_debug: Option<(u8, u8)>,
     /// The flag that indicates the end of a frame has occurred. Used for synchronizing frame rate of the emulator.
     frame_end: bool,
+    /// The ppu registers
+    #[serde_as(as = "Bytes")]
+    pub registers: [u8; 64],
 }
 
 impl SnesPpu {
@@ -492,6 +495,7 @@ impl SnesPpu {
             #[cfg(any(test, feature = "debugger"))]
             bg_debug: None,
             frame_end: false,
+            registers: [0; 64],
         }
     }
 
@@ -521,6 +525,20 @@ impl SnesPpu {
     /// Restore the frame from a backup
     pub fn set_frame(&mut self, f: &RgbImage) {
         self.frame_data = Box::new(f.clone());
+    }
+
+    /// Read a register on the ppu
+    pub fn memory_cycle_read_a(&self, addr: u8) -> Option<u8> {
+        if addr < 0x40 {
+            Some(self.registers[addr as usize])
+        } else {
+            None
+        }
+    }
+
+    /// Write a register on the ppu
+    pub fn memory_cycle_write_a(&mut self, addr: u8, data: u8) {
+        self.registers[(addr & 0x3f) as usize] = data;
     }
 
     /// Run a single clock cycle of the ppu
