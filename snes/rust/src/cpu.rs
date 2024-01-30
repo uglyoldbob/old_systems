@@ -183,6 +183,8 @@ pub struct SnesCpu {
     temp: u16,
     /// A secondary temporary processing register
     temp2: u16,
+    /// A full width address calculation register
+    temp3: u32,
 }
 
 impl SnesCpu {
@@ -203,6 +205,7 @@ impl SnesCpu {
             opcode: None,
             temp: 0,
             temp2: 0,
+            temp3: 0,
         }
     }
 
@@ -379,6 +382,38 @@ impl SnesCpu {
                             }
                         }
                     },
+                    // SEP
+                    0xE2 => match self.subcycle {
+                        1 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!("SEP #{:X}", self.temp);
+                                    self.done_fetching = true;
+                                }
+                                self.subcycle += 1;
+                            }
+                        }
+                        _ => {
+                            if self.length_ctr == 1 {
+                                self.length = CpuCycleLength::ShortCycle;
+                            } else {
+                                self.registers.p |= (self.temp as u8);
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.end_instruction();
+                            }
+                        }
+                    },
                     // PHA
                     0x48 => match self.subcycle {
                         1 => {
@@ -429,6 +464,37 @@ impl SnesCpu {
                             }
                         }
                     },
+                    // PHK
+                    0x4b => match self.subcycle {
+                        1 => {
+                            if self.length_ctr == 1 {
+                                self.length = CpuCycleLength::ShortCycle;
+                            } else {
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!("PHK");
+                                    self.done_fetching = true;
+                                }
+                                self.subcycle += 1;
+                            }
+                        }
+                        _ => {
+                            if self.length_ctr == 1 {
+                                self.length = self.eval_address(0, self.registers.sp);
+                            } else {
+                                bus.memory_cycle_write_a(
+                                    0,
+                                    self.registers.sp,
+                                    (self.registers.pbr & 0xff) as u8,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
+                                self.registers.sp = self.registers.sp.wrapping_sub(1);
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.end_instruction();
+                            }
+                        }
+                    },
                     // PLB
                     0xAB => match self.subcycle {
                         1 => {
@@ -445,7 +511,7 @@ impl SnesCpu {
                         }
                         2 => {
                             if self.length_ctr == 1 {
-                                self.registers.sp = self.registers.sp.wrapping_sub(1);
+                                self.registers.sp = self.registers.sp.wrapping_add(1);
                                 self.length = self.eval_address(0, self.registers.sp);
                             } else {
                                 let t = bus.memory_cycle_read_a(
@@ -455,6 +521,16 @@ impl SnesCpu {
                                     cpu_peripherals,
                                 );
                                 self.registers.dbr = t;
+                                if t == 0 {
+                                    self.registers.p |= CPU_FLAG_ZERO;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_ZERO;
+                                }
+                                if (t & 0x80) != 0 {
+                                    self.registers.p |= CPU_FLAG_NEGATIVE;
+                                } else {
+                                    self.registers.p &= !CPU_FLAG_NEGATIVE;
+                                }
                                 self.subcycle += 1;
                             }
                         }
@@ -649,6 +725,76 @@ impl SnesCpu {
                                 self.registers.a = self.temp;
                                 self.registers.pc = self.registers.pc.wrapping_add(1);
                                 self.end_instruction();
+                            }
+                        }
+                    },
+                    //lda abs, x
+                    0xbd => match self.subcycle {
+                        1 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = bus.memory_cycle_read_a(
+                                    self.registers.pbr,
+                                    self.registers.pc,
+                                    [false, false],
+                                    cpu_peripherals,
+                                ) as u16;
+                                self.subcycle += 1;
+                            }
+                        }
+                        2 => {
+                            if self.length_ctr == 1 {
+                                self.registers.pc = self.registers.pc.wrapping_add(1);
+                                self.length =
+                                    self.eval_address(self.registers.p, self.registers.pc);
+                            } else {
+                                self.temp = self.temp
+                                    | (bus.memory_cycle_read_a(
+                                        self.registers.pbr,
+                                        self.registers.pc,
+                                        [false, false],
+                                        cpu_peripherals,
+                                    ) as u16)
+                                        << 8;
+                                #[cfg(feature = "debugger")]
+                                {
+                                    self.debugger.disassembly = format!("LDA #{:X}, X", self.temp);
+                                    self.done_fetching = true;
+                                }
+                                self.subcycle += 1;
+                            }
+                        }
+                        3 => {
+                            if self.length_ctr == 1 {
+                                self.temp3 = ((self.registers.dbr as u32) << 16
+                                    | (self.temp as u32))
+                                    + self.registers.x as u32;
+                                self.length = self.eval_address(self.registers.dbr, self.temp);
+                            } else {
+                                let t = bus.memory_cycle_read_a(
+                                    self.registers.dbr,
+                                    self.temp,
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
+                                self.subcycle += 1;
+                            }
+                        }
+                        _ => {
+                            if self.length_ctr == 1 {
+                                self.length = self
+                                    .eval_address(self.registers.dbr, self.temp.wrapping_add(1));
+                            } else {
+                                let t = bus.memory_cycle_read_a(
+                                    self.registers.dbr,
+                                    self.temp.wrapping_add(1),
+                                    [false, false],
+                                    cpu_peripherals,
+                                );
+                                self.subcycle += 1;
                             }
                         }
                     },
@@ -966,6 +1112,46 @@ impl SnesCpu {
                             }
                         }
                     },
+                    // txs
+                    0x9A => {
+                        if self.length_ctr == 1 {
+                            self.length = CpuCycleLength::ShortCycle;
+                        } else {
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("TXS");
+                                self.done_fetching = true;
+                            }
+                            self.registers.sp = self.registers.x;
+                            self.registers.pc = self.registers.pc.wrapping_add(1);
+                            self.end_instruction();
+                        }
+                    }
+                    // tcd
+                    0x5B => {
+                        if self.length_ctr == 1 {
+                            self.length = CpuCycleLength::ShortCycle;
+                        } else {
+                            #[cfg(feature = "debugger")]
+                            {
+                                self.debugger.disassembly = format!("TCD");
+                                self.done_fetching = true;
+                            }
+                            self.registers.db = self.registers.a;
+                            if self.registers.db == 0 {
+                                self.registers.p |= CPU_FLAG_ZERO;
+                            } else {
+                                self.registers.p &= !CPU_FLAG_ZERO;
+                            }
+                            if (self.registers.db & 0x8000) != 0 {
+                                self.registers.p |= CPU_FLAG_NEGATIVE;
+                            } else {
+                                self.registers.p &= !CPU_FLAG_NEGATIVE;
+                            }
+                            self.registers.pc = self.registers.pc.wrapping_add(1);
+                            self.end_instruction();
+                        }
+                    }
                     _ => match self.subcycle {
                         1 => {
                             println!("Opcode {:X} unimplemented", opcode);

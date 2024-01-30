@@ -731,7 +731,10 @@ impl SnesCartridge {
             let checksum: u16 =
                 (maybe_header_contents[0x1e] as u16) | (maybe_header_contents[0x1f] as u16) << 8;
             if (checksum ^ nchecksum) != 0xffff {
-                continue;
+                println!(
+                    "{}: Check and NCHECKSUM aren't complementary: {:X} {:X}",
+                    name, checksum, nchecksum
+                );
             }
 
             let mut cs1: u16 = 0;
