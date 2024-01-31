@@ -2,7 +2,7 @@
 
 use crate::apu::SnesApu;
 use crate::motherboard::SnesMotherboard;
-use crate::ppu::SnesPpu;
+use crate::ppu::{SnesPpu, SnesPpu2};
 
 /// The carry flag for the cpu flags register
 const CPU_FLAG_CARRY: u8 = 1;
@@ -50,16 +50,18 @@ impl CpuCycleLength {
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct SnesCpuPeripherals {
-    /// The ppu for the nes system
+    /// The ppu for the snes system
     pub ppu: SnesPpu,
-    /// The apu for the nes system
+    /// The second ppu for the snes
+    pub ppu2: SnesPpu2,
+    /// The apu for the snes system
     pub apu: SnesApu,
 }
 
 impl SnesCpuPeripherals {
     /// Build a set of cpu peripherals
-    pub fn new(ppu: SnesPpu, apu: SnesApu) -> Self {
-        Self { ppu, apu }
+    pub fn new(ppu: SnesPpu, ppu2: SnesPpu2, apu: SnesApu) -> Self {
+        Self { ppu, ppu2, apu }
     }
 
     /// reset the ppu
@@ -81,7 +83,7 @@ impl SnesCpuPeripherals {
     }
 
     /// Returns a reference to the frame data for the ppu
-    pub fn ppu_get_frame(&mut self) -> &crate::ppu::RgbImage {
+    pub fn ppu_get_frame(&mut self) -> &common_emulator::video::RgbImage {
         self.ppu.get_frame()
     }
 }

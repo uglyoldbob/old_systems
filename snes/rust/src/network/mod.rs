@@ -9,8 +9,8 @@ use futures::FutureExt;
 use libp2p::core::transport::ListenerId;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
-use crate::apu::AudioProducerWithRate;
 use crate::controller::ButtonCombination;
+use common_emulator::audio::AudioProducerWithRate;
 
 use self::streaming::StreamingIn;
 
@@ -582,7 +582,7 @@ impl Network {
     }
 
     /// Push some audio to the local sound producer specified by `sound`
-    pub fn push_audio(&mut self, sound: &mut crate::apu::AudioProducerWithRate) {
+    pub fn push_audio(&mut self, sound: &mut common_emulator::audio::AudioProducerWithRate) {
         let a = self.streamin.audio_source();
         if let Some(a) = a {
             let sample = a.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
@@ -591,8 +591,10 @@ impl Network {
                     self.audio_buffer.resize(sb.size(), 0);
                     sb.copy_to_slice(0, &mut self.audio_buffer)
                         .expect("Failed to copy audio data from pipeline");
-                    let abuf =
-                        sound.make_buffer(crate::apu::AudioSample::F32(0.0), &self.audio_buffer);
+                    let abuf = sound.make_buffer(
+                        common_emulator::audio::AudioSample::F32(0.0),
+                        &self.audio_buffer,
+                    );
                     sound.fill_with_buffer(&abuf);
                 }
             }
@@ -600,7 +602,10 @@ impl Network {
     }
 
     /// Retrieve a frame of data and decode it into the specified image.
-    pub fn get_video_data(&mut self, i: &mut crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
+    pub fn get_video_data(
+        &mut self,
+        i: &mut common_emulator::video::PixelImage<egui_multiwin::egui::Color32>,
+    ) {
         let vs = self.streamin.video_source();
         if let Some(vs) = vs {
             let s = vs.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
@@ -618,7 +623,7 @@ impl Network {
     /// Provide video data as a server to all clients.
     pub fn video_data(
         &mut self,
-        i: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>,
+        i: &common_emulator::video::PixelImage<egui_multiwin::egui::Color32>,
     ) -> Result<(), async_channel::SendError<MessageToNetworkThread>> {
         if self.sender.is_full() {
             println!("Gonna have a bad time since the sender is full");

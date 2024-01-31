@@ -17,7 +17,8 @@ use libp2p::{
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
-use crate::{apu::AudioProducerWithRate, controller::ButtonCombination};
+use crate::controller::ButtonCombination;
+use common_emulator::audio::AudioProducerWithRate;
 
 use super::{
     streaming::{StreamingIn, StreamingOut},

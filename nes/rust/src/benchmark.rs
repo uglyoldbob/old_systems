@@ -10,10 +10,6 @@ mod genie;
 mod motherboard;
 mod network;
 mod ppu;
-mod recording;
-mod rom_status;
-mod romlist;
-mod utility;
 pub mod windows;
 
 #[cfg(feature = "egui-multiwin")]
@@ -47,7 +43,7 @@ use crate::cartridge::NesCartridge;
 use crate::cpu::{NesCpu, NesCpuPeripherals};
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
-use crate::utility::convert_hex_to_decimal;
+use common_emulator::convert_hex_to_decimal;
 use emulator_data::NesEmulatorData;
 
 use criterion::Criterion;
@@ -241,35 +237,41 @@ pub fn romlist_bench(c: &mut Criterion) {
     group.bench_function("first run", |b| {
         b.iter(|| {
             let _e = std::fs::remove_file("./roms.bin");
-            let mut list = romlist::RomListParser::new(std::path::PathBuf::new());
+            let mut list = common_emulator::romlist::RomListParser::new(std::path::PathBuf::new());
             list.find_roms(
                 "../test_roms",
                 std::path::PathBuf::new(),
                 std::path::PathBuf::new(),
+                |n, p| NesCartridge::load_cartridge(n, p),
             );
-            list.process_roms(std::path::PathBuf::new());
+            list.process_roms(std::path::PathBuf::new(), |n, p| {
+                NesCartridge::load_cartridge(n, p)
+            });
         });
     });
 
     group.bench_function("second run", |b| {
         b.iter(|| {
-            let mut list = romlist::RomListParser::new(std::path::PathBuf::new());
+            let mut list = common_emulator::romlist::RomListParser::new(std::path::PathBuf::new());
             list.find_roms(
                 "../test_roms",
                 std::path::PathBuf::new(),
                 std::path::PathBuf::new(),
+                |n, p| NesCartridge::load_cartridge(n, p),
             );
-            list.process_roms(std::path::PathBuf::new());
+            list.process_roms(std::path::PathBuf::new(), |n, p| {
+                NesCartridge::load_cartridge(n, p)
+            });
         });
     });
 }
 
 pub fn image_scaling_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("Image scaling");
-    let base_image = crate::ppu::RgbImage::new(256, 240);
+    let base_image = common_emulator::video::RgbImage::new(256, 240);
     group.bench_function("to_pixels conversion", |b| {
         b.iter_batched(
-            || Box::new(crate::ppu::RgbImage::new(256, 240)),
+            || Box::new(common_emulator::video::RgbImage::new(256, 240)),
             |data| {
                 let _e = data.to_pixels();
             },
@@ -279,7 +281,7 @@ pub fn image_scaling_bench(c: &mut Criterion) {
 
     group.bench_function("to_pixels nul resizing conversion", |b| {
         b.iter_batched(
-            || Box::new(crate::ppu::RgbImage::new(256, 240)),
+            || Box::new(common_emulator::video::RgbImage::new(256, 240)),
             |data| {
                 let _e = data.to_pixels().resize(None);
             },
@@ -289,7 +291,7 @@ pub fn image_scaling_bench(c: &mut Criterion) {
 
     group.bench_function("to_egui_pixels nul resizing conversion", |b| {
         b.iter_batched(
-            || Box::new(crate::ppu::RgbImage::new(256, 240)),
+            || Box::new(common_emulator::video::RgbImage::new(256, 240)),
             |data| {
                 let _e = data.to_pixels_egui().resize(None).to_egui();
             },
@@ -297,11 +299,11 @@ pub fn image_scaling_bench(c: &mut Criterion) {
         );
     });
 
-    for alg in <ppu::ScalingAlgorithm as strum::IntoEnumIterator>::iter() {
+    for alg in <common_emulator::video::ScalingAlgorithm as strum::IntoEnumIterator>::iter() {
         let text = format!("to_pixels {} resizing conversion", alg.to_string());
         group.bench_function(text, |b| {
             b.iter_batched(
-                || Box::new(crate::ppu::RgbImage::new(256, 240)),
+                || Box::new(common_emulator::video::RgbImage::new(256, 240)),
                 |data| {
                     let _e = data.to_pixels().resize(Some(alg));
                 },
@@ -311,7 +313,7 @@ pub fn image_scaling_bench(c: &mut Criterion) {
         let text = format!("to_egui_pixels {} resizing conversion", alg.to_string());
         group.bench_function(text, |b| {
             b.iter_batched(
-                || Box::new(crate::ppu::RgbImage::new(256, 240)),
+                || Box::new(common_emulator::video::RgbImage::new(256, 240)),
                 |data| {
                     let _e = data.to_pixels_egui().resize(Some(alg)).to_egui();
                 },

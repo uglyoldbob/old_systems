@@ -1,5 +1,7 @@
 //! This module is for the window that dumps ppu name table information.
-use crate::{ppu::RgbImage, NesEmulatorData};
+use crate::NesEmulatorData;
+
+use common_emulator::video::RgbImage;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;

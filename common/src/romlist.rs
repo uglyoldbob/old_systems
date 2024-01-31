@@ -1,9 +1,19 @@
 //! This is responsible for parsing roms from the filesystem, determining which ones are valid for the emulator to load.
 //! Emulator inaccuracies may prevent a rom that this module determines to be valid fromm operating correctly.
 
-use crate::cartridge::{CartridgeError, NesCartridge};
+use super::CartridgeError;
+use crate::COMPILE_TIME;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
+/// A trait that the generic cartridge type must implement
+pub trait GetMapperNumber {
+    /// Retrieve the mapper number of the cartridge
+    fn mappernum(&self) -> u32;
+}
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, strum::EnumIter)]
 /// The ranking system for roms, consists of 5 hate, 5 love, and one neutral ranking
@@ -109,6 +119,8 @@ pub struct RomListEntry {
 pub struct RomList {
     /// The tree of roms.
     pub elements: std::collections::BTreeMap<PathBuf, RomListEntry>,
+    /// When software that built the list was compiled
+    compile_time: String,
 }
 
 impl RomList {
@@ -116,6 +128,7 @@ impl RomList {
     fn new() -> Self {
         Self {
             elements: std::collections::BTreeMap::new(),
+            compile_time: "".to_string(),
         }
     }
 
@@ -217,7 +230,11 @@ impl RomList {
     /// Save the rom list to disk
     pub fn save_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
         pb.push("roms.bin");
-        println!("Save list to {}", pb.display());
+        println!(
+            "Save list to {}, compile at {}",
+            pb.display(),
+            self.compile_time
+        );
         let encoded = bincode::serialize(&self).unwrap();
         std::fs::write(pb, encoded)
     }
@@ -262,8 +279,12 @@ impl RomListParser {
     }
 
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).
-    pub fn find_roms(&mut self, dir: &str, sp: PathBuf, bin: PathBuf) {
+    pub fn find_roms<F, T>(&mut self, dir: &str, sp: PathBuf, bin: PathBuf, mut loader: F)
+    where
+        F: FnMut(String, &Path) -> Result<T, CartridgeError>,
+    {
         if !self.scan_complete {
+            let mut changes = false;
             println!(
                 "There are {} roms currently in the list",
                 self.list.elements.len()
@@ -277,12 +298,13 @@ impl RomListParser {
                 if meta.is_ok() {
                     let m = entry.clone().into_path();
                     let name = m.clone().into_os_string().into_string().unwrap();
-                    let cart = NesCartridge::load_cartridge(name.clone(), &sp);
+                    let cart = loader(name.clone(), &sp);
                     match cart {
                         Ok(_cart) => {
                             let e = self.list.elements.entry(m.clone());
                             e.or_insert_with(|| {
                                 println!("inserting new success entry {}", m.display());
+                                changes = true;
                                 RomListEntry {
                                     result: None,
                                     modified: None,
@@ -290,13 +312,20 @@ impl RomListParser {
                             });
                         }
                         Err(e) => {
-                            self.list.elements.entry(m).or_insert_with(|| RomListEntry {
-                                result: Some(Err(e)),
-                                modified: None,
+                            self.list.elements.entry(m).or_insert_with(|| {
+                                changes = true;
+                                RomListEntry {
+                                    result: Some(Err(e)),
+                                    modified: None,
+                                }
                             });
                         }
                     }
                 }
+            }
+            if changes {
+                self.list.compile_time =
+                    chrono::DateTime::from_timestamp(0, 0).unwrap().to_string();
             }
             let _e = self.list.save_list(bin);
             self.scan_complete = true;
@@ -304,18 +333,25 @@ impl RomListParser {
     }
 
     /// Responsbile for checking to see if an update has been performed. An update consists of checking to see if any roms have changed since the last scan through the filesystem.
-    pub fn process_roms(&mut self, sp: PathBuf) {
+    pub fn process_roms<F, T>(&mut self, sp: PathBuf, mut loader: F)
+    where
+        F: FnMut(String, &Path) -> Result<T, CartridgeError>,
+        T: GetMapperNumber,
+    {
+        let compile_time = super::get_compile_time();
+        let data_time = chrono::DateTime::parse_from_str(&self.list.compile_time, "%+").unwrap();
+        let force_refetch = compile_time > data_time;
+        if force_refetch {
+            println!("Forcing rom refresh {} {}", compile_time, data_time);
+        }
         if !self.update_complete {
             for (p, entry) in self.list.elements.iter_mut() {
                 let metadata = p.metadata();
                 if let Ok(metadata) = metadata {
                     let modified = metadata.modified().unwrap_or(std::time::SystemTime::now());
                     let last_modified = entry.modified.unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                    if modified > last_modified {
-                        let romcheck = NesCartridge::load_cartridge(
-                            p.as_os_str().to_str().unwrap().to_string(),
-                            &sp,
-                        );
+                    if modified > last_modified || force_refetch {
+                        let romcheck = loader(p.as_os_str().to_str().unwrap().to_string(), &sp);
                         entry.result = Some(romcheck.map(|i| RomListResult {
                             mapper: i.mappernum(),
                             ranking: RomRanking::Neutral,
@@ -324,6 +360,8 @@ impl RomListParser {
                     }
                 }
             }
+
+            self.list.compile_time = COMPILE_TIME.to_string();
             let _e = self.list.save_list(sp);
             self.update_complete = true;
         }

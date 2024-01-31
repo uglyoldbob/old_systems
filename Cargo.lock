@@ -983,6 +983,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-emulator"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "compile-time",
+ "egui-multiwin",
+ "gstreamer",
+ "gstreamer-app",
+ "gstreamer-audio",
+ "gstreamer-video",
+ "ringbuf",
+ "serde",
+ "serde_with",
+ "strum",
+ "walkdir",
+]
+
+[[package]]
 name = "compile-time"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3722,6 +3741,7 @@ dependencies = [
  "bincode",
  "biquad",
  "chrono",
+ "common-emulator",
  "cpal",
  "criterion",
  "data-encoding",
@@ -5196,6 +5216,7 @@ dependencies = [
  "bincode",
  "biquad",
  "chrono",
+ "common-emulator",
  "compile-time",
  "cpal",
  "criterion",

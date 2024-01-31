@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual};
 
-use crate::apu::AudioProducerWithRate;
+use crate::audio::AudioProducerWithRate;
 
 /// The main struct for recording related activities
 pub struct Recording {
@@ -13,7 +13,7 @@ pub struct Recording {
     /// The source for video data from the emulator
     record_source: Option<gstreamer_app::AppSrc>,
     /// The audio source for the recording
-    audio: Option<crate::apu::AudioProducerWithRate>,
+    audio: Option<crate::audio::AudioProducerWithRate>,
 }
 
 impl Recording {
@@ -27,7 +27,7 @@ impl Recording {
     }
 
     /// Returns an optional sound source
-    pub fn get_sound(&mut self) -> &mut Option<crate::apu::AudioProducerWithRate> {
+    pub fn get_sound(&mut self) -> &mut Option<crate::audio::AudioProducerWithRate> {
         &mut self.audio
     }
 
@@ -40,7 +40,7 @@ impl Recording {
     pub fn start(
         &mut self,
         have_gstreamer: &Result<(), gstreamer::glib::Error>,
-        image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>,
+        image: &crate::video::PixelImage<egui_multiwin::egui::Color32>,
         framerate: u8,
         name: PathBuf,
         cpu_frequency: f32,
@@ -83,7 +83,7 @@ impl Recording {
                 "{}",
                 image.width as u32 * image.height as u32 * framerate as u32 / 8
             );
-            println!("Video birate is calculated as {}", vbitrate);
+            println!("Video bitrate is calculated as {}", vbitrate);
 
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
@@ -161,7 +161,7 @@ impl Recording {
     }
 
     /// Send a frame of data to the recording
-    pub fn send_frame(&mut self, image: &crate::ppu::PixelImage<egui_multiwin::egui::Color32>) {
+    pub fn send_frame(&mut self, image: &crate::video::PixelImage<egui_multiwin::egui::Color32>) {
         if let Some(_pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
                 let mut buf =

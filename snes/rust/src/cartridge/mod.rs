@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::genie::GameGenieCode;
 
+use common_emulator::CartridgeError;
+
 /// All mappers must implement this.
 #[enum_dispatch::enum_dispatch]
 trait SnesMapperTrait {
@@ -462,27 +464,6 @@ pub struct SnesCartridgeBackup {
     rom_name: String,
 }
 
-/// The types of errors that can occur when loading a rom
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum CartridgeError {
-    /// There can be a filesystem error opening the file
-    FsError(String),
-    /// It might not be any known type of rom
-    InvalidRom,
-    /// The rom might be incompatible (unparsed format)
-    IncompatibleRom,
-    /// The rom might use a mapper that is not yet implemented
-    IncompatibleMapper(u32),
-    /// The rom might be too short, indicating some bytes got cut off of the end, or that it has been corrupted/modified
-    RomTooShort,
-    /// The rom has bytes that were not parsed
-    RomTooLong,
-    /// The cartridge length is not a multiple of 512
-    BadLength,
-    /// The rom header was not found
-    HeaderNotFound,
-}
-
 /// Calculate the sha256 of a chunk of data, and return it in a hex encoded string.
 fn calc_sha256(data: &[u8]) -> String {
     let mut context = ring::digest::Context::new(&ring::digest::SHA256);
@@ -566,6 +547,12 @@ impl<'a> MapperMethod {
     }
 }
 
+impl common_emulator::romlist::GetMapperNumber for SnesCartridge {
+    fn mappernum(&self) -> u32 {
+        self.mappernum
+    }
+}
+
 impl SnesCartridge {
     /// Helper function to get the irq signal from the cartridge
     pub fn irq(&self) -> bool {
@@ -601,11 +588,6 @@ impl SnesCartridge {
     /// Retrieve the save name for the cartridge
     pub fn save_name(&self) -> String {
         format!("{}.save", self.save)
-    }
-
-    /// Retrieve the mapper number for the cartridge
-    pub fn mappernum(&self) -> u32 {
-        self.mappernum
     }
 
     /// Builds a mapper for the rom

@@ -3,13 +3,14 @@
 use std::{io::Write, path::PathBuf};
 
 use crate::{
-    apu::{AudioProducerWithRate, SnesApu},
+    apu::SnesApu,
     cartridge::SnesCartridge,
     cpu::{SnesCpu, SnesCpuPeripherals},
     motherboard::SnesMotherboard,
-    ppu::SnesPpu,
-    romlist::RomList,
+    ppu::{SnesPpu, SnesPpu2},
 };
+
+use common_emulator::audio::AudioProducerWithRate;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -39,7 +40,7 @@ pub struct EmulatorConfiguration {
     /// The controller configuration for all 4 possible controllers.
     pub controller_config: [crate::controller::ControllerConfig; 4],
     /// The scaler to use for the emulator
-    pub scaler: Option<crate::ppu::ScalingAlgorithm>,
+    pub scaler: Option<common_emulator::video::ScalingAlgorithm>,
 }
 
 impl Default for EmulatorConfiguration {
@@ -180,10 +181,10 @@ pub struct LocalEmulatorDataClone {
     /// This contains the non-volatile configuration of the emulator
     pub configuration: EmulatorConfiguration,
     /// The parser for known roms
-    pub parser: crate::romlist::RomListParser,
+    pub parser: common_emulator::romlist::RomListParser,
     /// This variable is for keeping track of which roms have been manually tested
     #[cfg(feature = "rom_status")]
-    pub rom_test: crate::rom_status::RomListTestParser,
+    pub rom_test: common_emulator::rom_status::RomListTestParser,
     /// Indicates that the screen resolution is locked
     pub resolution_locked: bool,
     /// The way to get system specific paths
@@ -191,7 +192,7 @@ pub struct LocalEmulatorDataClone {
     /// The proxy for sending internal messages
     proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
     /// The stored resized image for the emulator
-    pub image: crate::ppu::PixelImage<egui::Color32>,
+    pub image: common_emulator::video::PixelImage<egui::Color32>,
     /// The number of samples per second of the audio output.
     sound_rate: u32,
 }
@@ -261,12 +262,16 @@ impl LocalEmulatorDataClone {
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
         self.parser
-            .find_roms(dir, self.save_path(), self.get_save_other())
+            .find_roms(dir, self.save_path(), self.get_save_other(), |n, p| {
+                SnesCartridge::load_cartridge(n, p)
+            })
     }
 
     /// Process the list of roms
     pub fn process_roms(&mut self) {
-        self.parser.process_roms(self.get_save_other())
+        self.parser.process_roms(self.get_save_other(), |n, p| {
+            SnesCartridge::load_cartridge(n, p)
+        })
     }
 }
 
@@ -300,13 +305,15 @@ impl LocalEmulatorDataClone {
         let config = user_config;
         Self {
             configuration: config,
-            parser: crate::romlist::RomListParser::new(Self::get_other_path(&dirs)),
+            parser: common_emulator::romlist::RomListParser::new(Self::get_other_path(&dirs)),
             #[cfg(feature = "rom_status")]
-            rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
+            rom_test: common_emulator::rom_status::RomListTestParser::new(
+                dirs.data_dir().to_path_buf(),
+            ),
             resolution_locked: false,
             dirs,
             proxy,
-            image: crate::ppu::PixelImage::<egui::Color32>::default(),
+            image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
         }
     }
@@ -375,11 +382,12 @@ impl SnesEmulatorData {
     ) -> Self {
         let mb: SnesMotherboard = SnesMotherboard::new();
         let ppu = SnesPpu::new();
+        let ppu2 = SnesPpu2::new();
         let apu = SnesApu::new();
 
         Self {
             cpu: SnesCpu::new(),
-            cpu_peripherals: SnesCpuPeripherals::new(ppu, apu),
+            cpu_peripherals: SnesCpuPeripherals::new(ppu, ppu2, apu),
             mb,
             #[cfg(feature = "debugger")]
             paused: false,
@@ -471,13 +479,14 @@ impl SnesEmulatorData {
         let controller2 = self.mb.get_controller(1);
         let mb: SnesMotherboard = SnesMotherboard::new();
         let ppu = SnesPpu::new();
+        let ppu2 = SnesPpu2::new();
         let apu = SnesApu::new();
 
         let breakpoints = self.cpu.breakpoints.clone();
         self.cpu = SnesCpu::new();
         self.cpu.breakpoints = breakpoints;
 
-        self.cpu_peripherals = SnesCpuPeripherals::new(ppu, apu);
+        self.cpu_peripherals = SnesCpuPeripherals::new(ppu, ppu2, apu);
         self.mb = mb;
 
         self.mb.set_controller(0, controller1);
@@ -528,7 +537,8 @@ impl SnesEmulatorData {
         self.ppu_clock_counter += 1;
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
-            self.cpu_peripherals.ppu_cycle(&mut self.mb);
+            self.cpu_peripherals.ppu.cycle(&mut self.mb);
+            self.cpu_peripherals.ppu2.cycle(&mut self.mb);
         }
 
         let nmi = self.nmi[2];

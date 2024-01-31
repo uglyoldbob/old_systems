@@ -8,8 +8,8 @@ use crate::cpu::NesCpu;
 use crate::cpu::NesCpuPeripherals;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
-use crate::utility::convert_hex_to_decimal;
 use crate::NesEmulatorData;
+use common_emulator::convert_hex_to_decimal;
 
 #[test]
 fn basic_cpu_test() {

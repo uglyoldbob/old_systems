@@ -1,6 +1,7 @@
 //! This module is for the window that dumps the ppu pattern tables.
 
-use crate::{ppu::RgbImage, NesEmulatorData};
+use crate::NesEmulatorData;
+use common_emulator::video::RgbImage;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;

@@ -3,13 +3,14 @@
 use std::{io::Write, path::PathBuf};
 
 use crate::{
-    apu::{AudioProducerWithRate, NesApu},
+    apu::NesApu,
     cartridge::NesCartridge,
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
-    romlist::RomList,
 };
+
+use common_emulator::audio::AudioProducerWithRate;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
@@ -39,7 +40,7 @@ pub struct EmulatorConfiguration {
     /// The controller configuration for all 4 possible controllers.
     pub controller_config: [crate::controller::ControllerConfig; 4],
     /// The scaler to use for the emulator
-    pub scaler: Option<crate::ppu::ScalingAlgorithm>,
+    pub scaler: Option<common_emulator::video::ScalingAlgorithm>,
 }
 
 impl Default for EmulatorConfiguration {
@@ -180,10 +181,10 @@ pub struct LocalEmulatorDataClone {
     /// This contains the non-volatile configuration of the emulator
     pub configuration: EmulatorConfiguration,
     /// The parser for known roms
-    pub parser: crate::romlist::RomListParser,
+    pub parser: common_emulator::romlist::RomListParser,
     /// This variable is for keeping track of which roms have been manually tested
     #[cfg(feature = "rom_status")]
-    pub rom_test: crate::rom_status::RomListTestParser,
+    pub rom_test: common_emulator::rom_status::RomListTestParser,
     /// Indicates that the screen resolution is locked
     pub resolution_locked: bool,
     /// The way to get system specific paths
@@ -191,7 +192,7 @@ pub struct LocalEmulatorDataClone {
     /// The proxy for sending internal messages
     proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
     /// The stored resized image for the emulator
-    pub image: crate::ppu::PixelImage<egui::Color32>,
+    pub image: common_emulator::video::PixelImage<egui::Color32>,
     /// The number of samples per second of the audio output.
     sound_rate: u32,
 }
@@ -261,12 +262,15 @@ impl LocalEmulatorDataClone {
     /// Finds roms for the system
     pub fn find_roms(&mut self, dir: &str) {
         self.parser
-            .find_roms(dir, self.save_path(), self.get_save_other())
+            .find_roms(dir, self.save_path(), self.get_save_other(), |n, p| {
+                NesCartridge::load_cartridge(n, p)
+            })
     }
 
     /// Process the list of roms
     pub fn process_roms(&mut self) {
-        self.parser.process_roms(self.save_path())
+        self.parser
+            .process_roms(self.save_path(), |n, p| NesCartridge::load_cartridge(n, p))
     }
 }
 
@@ -300,13 +304,15 @@ impl LocalEmulatorDataClone {
         let config = user_config;
         Self {
             configuration: config,
-            parser: crate::romlist::RomListParser::new(Self::get_other_path(&dirs)),
+            parser: common_emulator::romlist::RomListParser::new(Self::get_other_path(&dirs)),
             #[cfg(feature = "rom_status")]
-            rom_test: crate::rom_status::RomListTestParser::new(dirs.data_dir().to_path_buf()),
+            rom_test: common_emulator::rom_status::RomListTestParser::new(
+                dirs.data_dir().to_path_buf(),
+            ),
             resolution_locked: false,
             dirs,
             proxy,
-            image: crate::ppu::PixelImage::<egui::Color32>::default(),
+            image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
         }
     }

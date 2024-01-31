@@ -4,7 +4,7 @@ use gstreamer::prelude::{
     Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
 };
 
-use crate::apu::AudioProducerWithRate;
+use common_emulator::audio::AudioProducerWithRate;
 
 /// The main struct for sending a video stream over an arbitrary stream
 pub struct StreamingOut {
@@ -15,7 +15,7 @@ pub struct StreamingOut {
     /// The sink that goes out to a network device
     sink: Option<gstreamer_app::AppSink>,
     /// The audio source for the recording
-    audio: Option<crate::apu::AudioProducerWithRate>,
+    audio: Option<AudioProducerWithRate>,
 }
 
 impl StreamingOut {
@@ -35,7 +35,7 @@ impl StreamingOut {
     }
 
     /// Takes the optional sound source
-    pub fn get_sound(&mut self) -> Option<crate::apu::AudioProducerWithRate> {
+    pub fn get_sound(&mut self) -> Option<AudioProducerWithRate> {
         self.audio.take()
     }
 

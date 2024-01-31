@@ -21,6 +21,7 @@ async-channel = "2.0.0"
 asynchronous-codec = "0.7.0"
 biquad = "0.4.2"
 chrono = "0.4.31"
+common-emulator = { path = "../../common" }
 cpal = {version = "0.15.2", optional=true}
 data-encoding = "2.4.0"
 directories = "5.0.1"

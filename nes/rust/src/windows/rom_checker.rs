@@ -2,7 +2,9 @@
 
 use std::io::Write;
 
-use crate::{cartridge::NesCartridge, rom_status::RomStatus, NesEmulatorData};
+use crate::{cartridge::NesCartridge, NesEmulatorData};
+
+use common_emulator::rom_status::RomStatus;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;

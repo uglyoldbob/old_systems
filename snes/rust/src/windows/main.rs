@@ -2,10 +2,10 @@
 //!
 use std::io::Write;
 
-use crate::{
-    apu::AudioProducerWithRate, controller::SnesControllerTrait, network::NodeRole,
-    recording::Recording, SnesEmulatorData,
-};
+use crate::{controller::SnesControllerTrait, network::NodeRole, SnesEmulatorData};
+
+use common_emulator::audio::AudioProducerWithRate;
+use common_emulator::recording::Recording;
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
 use cpal::traits::StreamTrait;

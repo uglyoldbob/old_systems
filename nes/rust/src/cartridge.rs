@@ -15,6 +15,7 @@ use std::{
     slice::ChunksExact,
 };
 
+use common_emulator::CartridgeError;
 use mapper00::Mapper00;
 use mapper01::Mapper01;
 use mapper02::Mapper02;
@@ -494,29 +495,18 @@ pub struct NesCartridgeBackup {
     rom_name: String,
 }
 
-/// The types of errors that can occur when loading a rom
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum CartridgeError {
-    /// There can be a filesystem error opening the file
-    FsError(String),
-    /// It might not be any known type of rom
-    InvalidRom,
-    /// The rom might be incompatible (unparsed format)
-    IncompatibleRom,
-    /// The rom might use a mapper that is not yet implemented
-    IncompatibleMapper(u32),
-    /// The rom might be too short, indicating some bytes got cut off of the end, or that it has been corrupted/modified
-    RomTooShort,
-    /// The rom has bytes that were not parsed
-    RomTooLong,
-}
-
 /// Calculate the sha256 of a chunk of data, and return it in a hex encoded string.
 fn calc_sha256(data: &[u8]) -> String {
     let mut context = ring::digest::Context::new(&ring::digest::SHA256);
     context.update(data);
     let digest = context.finish();
     data_encoding::HEXLOWER.encode(digest.as_ref())
+}
+
+impl common_emulator::romlist::GetMapperNumber for NesCartridge {
+    fn mappernum(&self) -> u32 {
+        self.mappernum
+    }
 }
 
 impl NesCartridge {
@@ -559,11 +549,6 @@ impl NesCartridge {
     /// Retrieve the save name for the cartridge
     pub fn save_name(&self) -> String {
         format!("{}.save", self.save)
-    }
-
-    /// Retrieve the mapper number for the cartridge
-    pub fn mappernum(&self) -> u32 {
-        self.mappernum
     }
 
     /// Builds a mapper for the rom

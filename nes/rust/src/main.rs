@@ -23,10 +23,6 @@ mod genie;
 mod motherboard;
 mod network;
 mod ppu;
-mod recording;
-mod romlist;
-#[cfg(test)]
-mod utility;
 
 use emulator_data::NesEmulatorData;
 
@@ -45,9 +41,6 @@ pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
 mod tests;
 
 use crate::cartridge::NesCartridge;
-
-#[cfg(feature = "rom_status")]
-pub mod rom_status;
 
 #[cfg(any(feature = "egui-multiwin", feature = "eframe"))]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -397,7 +390,7 @@ use crate::egui_multiwin_dynamic::multi_window::MultiWindow;
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
-    use crate::apu::{AudioProducer, AudioProducerWithRate};
+    use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
 
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
@@ -418,6 +411,7 @@ fn main() {
         nes_data.local.configuration.get_rom_path(),
         nes_data.local.save_path(),
         nes_data.local.get_save_other(),
+        |n, p| NesCartridge::load_cartridge(n, p),
     );
     let mut multi_window = MultiWindow::new();
 
@@ -635,9 +629,10 @@ fn main() {
 
     if nes_data.local.configuration.sticky_rom {
         if let Some(c) = nes_data.local.configuration.start_rom() {
-            let nc =
-                NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path()).unwrap();
-            nes_data.insert_cartridge(nc);
+            if let Ok(nc) = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path())
+            {
+                nes_data.insert_cartridge(nc);
+            }
         }
     }
 

@@ -105,7 +105,7 @@ impl TrackedWindow for Window {
                     )
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut scaler, None, "None");
-                        for opt in crate::ppu::ScalingAlgorithm::iter() {
+                        for opt in common_emulator::video::ScalingAlgorithm::iter() {
                             ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
                         }
                     });

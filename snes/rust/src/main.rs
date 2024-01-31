@@ -13,14 +13,6 @@ compile_error!("feature \"eframe\" and feature \"sdl2\" cannot be enabled at the
 #[cfg(all(feature = "sdl2", feature = "egui-multiwin"))]
 compile_error!("feature \"sdl2\" and feature \"egui-multiwin\" cannot be enabled at the same time");
 
-/// A constant that defines when the code was compiled
-pub const COMPILE_TIME: &'static str = compile_time::datetime_str!();
-
-/// Returns when the code was compiled
-pub fn get_compile_time() -> chrono::DateTime<chrono::FixedOffset> {
-    chrono::DateTime::parse_from_str(COMPILE_TIME, "%+").unwrap()
-}
-
 mod apu;
 mod cartridge;
 mod controller;
@@ -31,10 +23,6 @@ mod genie;
 mod motherboard;
 mod network;
 mod ppu;
-mod recording;
-mod romlist;
-#[cfg(test)]
-mod utility;
 
 use emulator_data::SnesEmulatorData;
 
@@ -53,9 +41,6 @@ pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
 mod tests;
 
 use crate::cartridge::SnesCartridge;
-
-#[cfg(feature = "rom_status")]
-pub mod rom_status;
 
 #[cfg(any(feature = "egui-multiwin", feature = "eframe"))]
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -405,7 +390,7 @@ use crate::egui_multiwin_dynamic::multi_window::MultiWindow;
 
 #[cfg(feature = "egui-multiwin")]
 fn main() {
-    use crate::apu::{AudioProducer, AudioProducerWithRate};
+    use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
 
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
@@ -426,6 +411,7 @@ fn main() {
         nes_data.local.configuration.get_rom_path(),
         nes_data.local.save_path(),
         nes_data.local.get_save_other(),
+        |n, p| SnesCartridge::load_cartridge(n, p),
     );
     let mut multi_window = MultiWindow::new();
 

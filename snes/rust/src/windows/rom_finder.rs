@@ -1,6 +1,7 @@
 //! The module for finding nes roms
 
-use crate::{cartridge::SnesCartridge, romlist::RomRanking, SnesEmulatorData};
+use crate::{cartridge::SnesCartridge, SnesEmulatorData};
+use common_emulator::romlist::RomRanking;
 
 #[cfg(feature = "eframe")]
 use eframe::egui;
