@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 
 pub mod audio;
 pub mod event;
+pub mod input;
 pub mod recording;
 pub mod rom_status;
 pub mod romlist;
+pub mod storage;
 pub mod video;
 
 /// The types of errors that can occur when loading a rom
