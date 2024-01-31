@@ -1,7 +1,6 @@
 //! This is the module for network play related code.
 
 mod emulator;
-mod streaming;
 
 use std::collections::HashSet;
 
@@ -12,7 +11,7 @@ use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 use crate::controller::ButtonCombination;
 use common_emulator::audio::AudioProducerWithRate;
 
-use self::streaming::StreamingIn;
+use common_emulator::streaming::StreamingIn;
 
 #[derive(PartialEq, Copy, Clone, Debug, serde::Deserialize, serde::Serialize)]
 /// The roles that a node on the network can have

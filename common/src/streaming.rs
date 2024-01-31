@@ -4,7 +4,7 @@ use gstreamer::prelude::{
     Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
 };
 
-use common_emulator::audio::AudioProducerWithRate;
+use crate::audio::AudioProducerWithRate;
 
 /// The main struct for sending a video stream over an arbitrary stream
 pub struct StreamingOut {

@@ -20,10 +20,9 @@ use libp2p::{
 use crate::controller::ButtonCombination;
 use common_emulator::audio::AudioProducerWithRate;
 
-use super::{
-    streaming::{StreamingIn, StreamingOut},
-    NodeRole,
-};
+use super::NodeRole;
+
+use common_emulator::streaming::{StreamingIn, StreamingOut};
 
 /// Represents a message that can be sent to and from other nodes in the network.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]

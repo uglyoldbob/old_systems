@@ -7,6 +7,7 @@ pub mod recording;
 pub mod rom_status;
 pub mod romlist;
 pub mod storage;
+pub mod streaming;
 pub mod video;
 
 /// The types of errors that can occur when loading a rom
