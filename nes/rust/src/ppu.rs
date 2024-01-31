@@ -1064,14 +1064,16 @@ impl NesPpu {
                         self.attributetable_shift[1]
                     };
                     let extra_palette_bits = (attribute >> (2 * combined)) & 3;
-
-                    if let Some((x, y)) = self.bg_debug {
-                        if cycle == x && self.scanline_number == y as u16 {
-                            //println!("PIXEL {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
+                    #[cfg(feature = "debugger")]
+                    {
+                        if let Some((x, y)) = self.bg_debug {
+                            if cycle == x && self.scanline_number == y as u16 {
+                                //println!("PIXEL {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
+                            }
                         }
-                    }
-                    if cycle == 8 {
-                        //println!("PIXEL2 {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
+                        if cycle == 8 {
+                            //println!("PIXEL2 {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
+                        }
                     }
                     let lower_bits = (upper_bit << 1) | lower_bit;
 
@@ -1483,6 +1485,7 @@ impl NesPpu {
     }
 
     /// Renders all sprites
+    #[cfg(feature = "debugger")]
     pub fn render_sprites(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         let allsprites = self.get_64_sprites();
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {

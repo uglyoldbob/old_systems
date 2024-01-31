@@ -122,7 +122,10 @@ impl TrackedWindow for DumpWindow {
                                     if pos.x >= 0.0 && pos.y >= 0.0 {
                                         let pixelx = (pos.x / zoom).floor() as u8;
                                         let pixely = (pos.y / zoom).floor() as u8;
-                                        c.cpu_peripherals.ppu.bg_debug = Some((pixelx, pixely));
+                                        #[cfg(feature = "debugger")]
+                                        {
+                                            c.cpu_peripherals.ppu.bg_debug = Some((pixelx, pixely));
+                                        }
                                         let x = (pos.x / (8.0 * zoom)).floor() as usize;
                                         let y = (pos.y / (8.0 * zoom)).floor() as usize;
                                         let left = x < 32;

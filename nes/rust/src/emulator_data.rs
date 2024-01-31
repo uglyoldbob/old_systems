@@ -489,9 +489,16 @@ impl NesEmulatorData {
         let ppu = NesPpu::new();
         let apu = NesApu::new();
 
-        let breakpoints = self.cpu.breakpoints.clone();
-        self.cpu = NesCpu::new();
-        self.cpu.breakpoints = breakpoints;
+        #[cfg(feature = "debugger")]
+        {
+            let breakpoints = self.cpu.breakpoints.clone();
+            self.cpu = NesCpu::new();
+            self.cpu.breakpoints = breakpoints;
+        }
+        #[cfg(not(feature = "debugger"))]
+        {
+            self.cpu = NesCpu::new();
+        }
 
         self.cpu_peripherals = NesCpuPeripherals::new(ppu, apu);
         self.mb = mb;

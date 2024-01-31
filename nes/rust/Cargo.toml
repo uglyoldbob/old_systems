@@ -8,7 +8,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["egui-multiwin", "debugger", "rom_status"]
+default = ["egui-multiwin", "rom_status"]
 debugger = []
 rom_status = []
 puffin = ["dep:puffin", "dep:puffin_egui"]

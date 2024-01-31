@@ -76,7 +76,10 @@ impl TrackedWindow for DumpWindow {
         egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
             ui.label("PPU Sprite Dump Window");
             egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
-                c.cpu_peripherals.ppu.render_sprites(&mut self.buf, &c.mb);
+                #[cfg(feature = "debugger")]
+                {
+                    c.cpu_peripherals.ppu.render_sprites(&mut self.buf, &c.mb);
+                }
                 c.cpu_peripherals
                     .ppu
                     .render_palette(&mut self.palette, &c.mb);
@@ -137,18 +140,21 @@ impl TrackedWindow for DumpWindow {
                                 let num = col + row * 16;
 
                                 ui.label(format!("Sprite number is {:x}", num));
-                                let sprites = c.cpu_peripherals.ppu.get_64_sprites();
-                                ui.label(format!(
-                                    "Sprite tile is {:x} {:x}, attribute is {:x}",
-                                    sprites[num].tile_num(sprites[num].y(), 16),
-                                    sprites[num].tile_num(sprites[num].y() + 8, 16),
-                                    sprites[num].attribute(),
-                                ));
-                                ui.label(format!(
-                                    "Location is {},{}",
-                                    sprites[num].x(),
-                                    sprites[num].y()
-                                ));
+                                #[cfg(feature = "debugger")]
+                                {
+                                    let sprites = c.cpu_peripherals.ppu.get_64_sprites();
+                                    ui.label(format!(
+                                        "Sprite tile is {:x} {:x}, attribute is {:x}",
+                                        sprites[num].tile_num(sprites[num].y(), 16),
+                                        sprites[num].tile_num(sprites[num].y() + 8, 16),
+                                        sprites[num].attribute(),
+                                    ));
+                                    ui.label(format!(
+                                        "Location is {},{}",
+                                        sprites[num].x(),
+                                        sprites[num].y()
+                                    ));
+                                }
                             }
                         }
                     }

@@ -578,8 +578,34 @@ impl TrackedWindow for MainNesWindow {
                 }
                 #[cfg(not(feature = "debugger"))]
                 {
-                    c.cycle_step(&mut self.sound, &mut self.filter);
+                    {
+                        c.cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
+                    }
                     if c.cpu_peripherals.ppu_frame_end() {
+                        if !self.paused {
+                            let image = c
+                                .cpu_peripherals
+                                .ppu_get_frame()
+                                .to_pixels_egui()
+                                .resize(c.local.configuration.scaler);
+                            c.local.image = image;
+                        }
+                        self.recording.send_frame(&c.local.image);
+                        if let Some(olocal) = &mut c.olocal {
+                            if let Some(network) = &mut olocal.network {
+                                if network.role() == NodeRole::PlayerHost {
+                                    let _e = network.video_data(&c.local.image);
+                                }
+                            }
+                        }
+
+                        if self.mouse_delay > 0 {
+                            self.mouse_delay -= 1;
+                            if self.mouse_delay == 0 {
+                                self.mouse = false;
+                                self.mouse_miss = false;
+                            }
+                        }
                         break 'emulator_loop;
                     }
                 }
@@ -925,8 +951,11 @@ impl TrackedWindow for MainNesWindow {
                         if r.hovered() {
                             if let Some(pos) = r.hover_pos() {
                                 let coord = pos - r.rect.left_top();
-                                c.cpu_peripherals.ppu.bg_debug =
-                                    Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
+                                #[cfg(feature = "debugger")]
+                                {
+                                    c.cpu_peripherals.ppu.bg_debug =
+                                        Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
+                                }
 
                                 let pixel = c.local.image.get_pixel(coord / zoom);
                                 self.mouse_vision = !self.mouse_miss
@@ -957,12 +986,15 @@ impl TrackedWindow for MainNesWindow {
             }
         });
 
-        if let Some(s) = &mut self.sound_stream {
-            if c.paused && !self.paused {
-                self.paused = s.pause().is_ok();
-            }
-            if !c.paused && self.paused {
-                self.paused = s.play().is_err();
+        #[cfg(feature = "debugger")]
+        {
+            if let Some(s) = &mut self.sound_stream {
+                if c.paused && !self.paused {
+                    self.paused = s.pause().is_ok();
+                }
+                if !c.paused && self.paused {
+                    self.paused = s.play().is_err();
+                }
             }
         }
 

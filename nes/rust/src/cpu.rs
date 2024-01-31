@@ -562,6 +562,7 @@ impl NesCpu {
     }
 
     /// Returns true when a breakpoint is active
+    #[cfg(feature = "debugger")]
     pub fn breakpoint(&self) -> bool {
         let mut b = false;
         if self.done_fetching {
@@ -12549,7 +12550,10 @@ impl NesCpu {
                 },
                 _ => {
                     if s.subcycle == 1 {
-                        s.copy_debugger(format!("*JAM ${:02x}", o));
+                        #[cfg(feature = "debugger")]
+                        {
+                            s.copy_debugger(format!("*JAM ${:02x}", o));
+                        }
                         s.subcycle = 2;
                     }
                 }
