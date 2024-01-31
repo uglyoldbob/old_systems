@@ -190,7 +190,7 @@ pub struct LocalEmulatorDataClone {
     /// The way to get system specific paths
     dirs: directories::ProjectDirs,
     /// The proxy for sending internal messages
-    proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+    proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>>,
     /// The stored resized image for the emulator
     pub image: common_emulator::video::PixelImage<egui::Color32>,
     /// The number of samples per second of the audio output.
@@ -201,7 +201,8 @@ impl LocalEmulatorDataClone {
     /// Returns a clone of the proxy
     pub fn get_proxy(
         &self,
-    ) -> Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>> {
+    ) -> Option<egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>>
+    {
         self.proxy.clone()
     }
 
@@ -294,7 +295,9 @@ impl LocalEmulatorDataClone {
 
     /// Create a new Self object with the given event loop proxy
     fn new(
-        proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+        proxy: Option<
+            egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
+        >,
     ) -> Self {
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "snes_emulator").unwrap();
 
@@ -361,9 +364,9 @@ pub struct SnesEmulatorData {
 #[cfg(feature = "egui-multiwin")]
 impl SnesEmulatorData {
     /// Process any events received from the main event loop
-    pub fn process_event(&mut self, event: crate::event::Event) -> Vec<NewWindowRequest> {
+    pub fn process_event(&mut self, event: common_emulator::event::Event) -> Vec<NewWindowRequest> {
         match event.message {
-            crate::event::EventType::CheckNetwork => {
+            common_emulator::event::EventType::CheckNetwork => {
                 if let Some(olocal) = &mut self.olocal {
                     if let Some(network) = &mut olocal.network {
                         network.process_messages();
@@ -378,7 +381,9 @@ impl SnesEmulatorData {
 impl SnesEmulatorData {
     /// Create a new nes emulator
     pub fn new(
-        proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>>,
+        proxy: Option<
+            egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
+        >,
     ) -> Self {
         let mb: SnesMotherboard = SnesMotherboard::new();
         let ppu = SnesPpu::new();

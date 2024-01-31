@@ -18,7 +18,6 @@ mod cartridge;
 mod controller;
 mod cpu;
 mod emulator_data;
-mod event;
 mod genie;
 mod motherboard;
 mod network;
@@ -52,12 +51,12 @@ use eframe::egui;
 pub mod egui_multiwin_dynamic {
     egui_multiwin::tracked_window!(
         crate::emulator_data::SnesEmulatorData,
-        crate::event::Event,
+        common_emulator::event::Event,
         crate::windows::Windows
     );
     egui_multiwin::multi_window!(
         crate::emulator_data::SnesEmulatorData,
-        crate::event::Event,
+        common_emulator::event::Event,
         crate::windows::Windows
     );
 }
@@ -399,7 +398,7 @@ fn main() {
     egui_multiwin::winit::platform::x11::EventLoopBuilderExtX11::with_x11(&mut event_loop);
     let event_loop = event_loop.build();
 
-    let proxy: egui_multiwin::winit::event_loop::EventLoopProxy<event::Event> =
+    let proxy: egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event> =
         event_loop.create_proxy();
 
     let mut nes_data = SnesEmulatorData::new(Some(proxy));

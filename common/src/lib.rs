@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod audio;
+pub mod event;
 pub mod recording;
 pub mod rom_status;
 pub mod romlist;
