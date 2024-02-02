@@ -28,7 +28,7 @@ use common_emulator::streaming::{StreamingIn, StreamingOut};
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum MessageToFromNetwork {
     /// Controller data for a specific controller.
-    ControllerData(u8, Box<crate::controller::ButtonCombination>),
+    ControllerData(u8, Vec<u8>),
     /// Part of the emulator audio video stream.
     EmulatorVideoStream(Vec<u8>),
     /// A request for a specific role in the network.
@@ -61,11 +61,11 @@ pub struct Protocol {
     protocols: Vec<ProtocolId>,
 }
 
-impl Default for Protocol {
-    fn default() -> Self {
+impl Protocol {
+    fn new(s: &'static str) -> Self {
         Self {
             protocols: vec![ProtocolId {
-                protocol: StreamProtocol::new("/nes/0.0.1"),
+                protocol: StreamProtocol::new(s),
             }],
         }
     }
@@ -226,7 +226,7 @@ impl Handler {
 /// Represents messages that can be send between the networkbehaviour and the connectionhandler.
 pub enum MessageToFromBehavior {
     /// Controller data for a specific controller.
-    ControllerData(u8, Box<ButtonCombination>),
+    ControllerData(u8, Vec<u8>),
     /// A request for a specific role on the network.
     RequestRole(PeerId, NodeRole),
     /// A request for a specific controller on the emulator.
@@ -527,10 +527,18 @@ impl std::fmt::Debug for Message {
 }
 
 /// Represents a protocol configuration for the behavior.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Config {
     /// The supported protocol
     protocol: Protocol,
+}
+
+impl Config {
+    fn new(s: &'static str) -> Self {
+        Self {
+            protocol: Protocol::new(s),
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -572,7 +580,7 @@ impl Behavior {
     /// Construct a new Self
     pub fn new() -> Self {
         Self {
-            config: Config::default(),
+            config: Config::new("/nes/0.0.1"),
             messages: VecDeque::new(),
             waker: Arc::new(Mutex::new(None)),
             clients: HashSet::new(),
@@ -641,7 +649,7 @@ impl Behavior {
     }
 
     /// Send the given controller data to the host.
-    pub fn send_controller_data(&mut self, index: u8, data: Box<ButtonCombination>) {
+    pub fn send_controller_data(&mut self, index: u8, data: Vec<u8>) {
         if let Some(pid) = &self.server {
             self.messages.push_back(ToSwarm::NotifyHandler {
                 peer_id: *pid,
@@ -741,7 +749,7 @@ impl Behavior {
 /// Represents the types of messages that can be sent to the swarm from the network behaviour.
 pub enum MessageToSwarm {
     /// Controller data from a user
-    ControllerData(u8, Box<ButtonCombination>),
+    ControllerData(u8, Vec<u8>),
     /// A role request from a user.
     RequestRole(PeerId, NodeRole),
     /// A command from a host to set the role of a user.

@@ -32,7 +32,7 @@ pub enum NodeRole {
 #[derive(Debug)]
 pub enum MessageToNetworkThread {
     /// Controller data from the player, with which controller index and the button data.
-    ControllerData(u8, Box<ButtonCombination>),
+    ControllerData(u8, Vec<u8>),
     /// Signal to start PlayerHost mode
     StartServer {
         /// The width of the image
@@ -69,7 +69,7 @@ pub enum MessageFromNetworkThread {
     /// Emulator video and audio data.
     AvStream(Vec<u8>),
     /// Controller data from one of the players.
-    ControllerData(u8, Box<ButtonCombination>),
+    ControllerData(u8, Vec<u8>),
     /// Indicates that the host has a new address
     NewAddress(Multiaddr),
     /// Indicates that the host no longer has the specified address
@@ -395,7 +395,9 @@ pub struct Network {
     /// The role for this node in the network.
     role: NodeRole,
     /// The cached button inputs for all possible players in the game.
-    buttons: [Option<ButtonCombination>; 4],
+    buttons: [Option<Vec<u8>>; 4],
+    /// Holds data for a disconnected player
+    buttons_disconnect: Vec<u8>,
     /// The controller that this node is holding. None indicates that no controller is held.
     my_controller: Option<u8>,
     /// Indicates who is holding each controller, if there is somebody holding that controller.
@@ -417,6 +419,7 @@ impl Network {
     pub fn new(
         proxy: egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
         audio_rate: u32,
+        blank_controller: Vec<u8>,
     ) -> Self {
         let (s1, r1) = async_channel::bounded(1000);
         let (s2, r2) = async_channel::bounded(1000);
@@ -433,7 +436,8 @@ impl Network {
             addresses: HashSet::new(),
             server_running: false,
             role: NodeRole::Unknown,
-            buttons: [None; 4],
+            buttons: [None, None, None, None],
+            buttons_disconnect: blank_controller,
             my_controller: None,
             controller_holder: [None; 4],
             connected: false,
@@ -449,9 +453,9 @@ impl Network {
         &self.addresses
     }
 
-    /// Retrieve the specified index of button data, cloned.
-    pub fn get_button_data(&mut self, i: u8) -> Option<ButtonCombination> {
-        self.buttons[i as usize]
+    /// Retrieve the specified index of button data.
+    pub fn get_button_data(&mut self, i: u8) -> &Option<Vec<u8>> {
+        &self.buttons[i as usize]
     }
 
     /// Process all messages received from the network thread.
@@ -464,7 +468,7 @@ impl Network {
                         if let Some(p) = self.controller_holder[i] {
                             if peer == p {
                                 if let Some(b) = &mut self.buttons[i] {
-                                    b.clear_buttons();
+                                    *b = self.buttons_disconnect.clone();
                                 }
                                 self.controller_holder[i] = None;
                                 break;
@@ -493,7 +497,7 @@ impl Network {
                                 if peer == p {
                                     println!("Clear controller {}", i);
                                     if let Some(b) = &mut self.buttons[i] {
-                                        b.clear_buttons();
+                                        *b = self.buttons_disconnect.clone();
                                     }
                                     self.controller_holder[i] = None;
                                     break;
@@ -511,7 +515,7 @@ impl Network {
                             if let Some(peer) = self.controller_holder[i] {
                                 if peer == p {
                                     if let Some(b) = &mut self.buttons[i] {
-                                        b.clear_buttons();
+                                        *b = self.buttons_disconnect.clone();
                                     }
                                     self.controller_holder[i] = None;
                                     let _ = self.sender.send_blocking(
@@ -549,7 +553,7 @@ impl Network {
                 }
                 MessageFromNetworkThread::ControllerData(i, d) => {
                     if self.controller_holder[i as usize].is_some() {
-                        self.buttons[i as usize] = Some(*d);
+                        self.buttons[i as usize] = Some(d);
                     }
                 }
                 MessageFromNetworkThread::NewAddress(a) => {
@@ -716,12 +720,12 @@ impl Network {
     pub fn send_controller_data(
         &mut self,
         i: u8,
-        data: crate::controller::ButtonCombination,
+        data: Vec<u8>,
     ) -> Result<(), async_channel::SendError<MessageToNetworkThread>> {
         if let Some(id) = &self.my_controller {
             if *id == i {
                 self.sender
-                    .send_blocking(MessageToNetworkThread::ControllerData(i, Box::new(data)))?;
+                    .send_blocking(MessageToNetworkThread::ControllerData(i, data))?;
             }
         }
         Ok(())
