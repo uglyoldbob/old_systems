@@ -20,7 +20,6 @@ mod cpu;
 mod emulator_data;
 mod genie;
 mod motherboard;
-mod network;
 mod ppu;
 
 use emulator_data::SnesEmulatorData;

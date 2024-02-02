@@ -8,10 +8,9 @@ use futures::FutureExt;
 use libp2p::core::transport::ListenerId;
 use libp2p::{futures::StreamExt, Multiaddr, Swarm};
 
-use crate::controller::ButtonCombination;
-use common_emulator::audio::AudioProducerWithRate;
+use crate::audio::AudioProducerWithRate;
 
-use common_emulator::streaming::StreamingIn;
+use crate::streaming::StreamingIn;
 
 #[derive(PartialEq, Copy, Clone, Debug, serde::Deserialize, serde::Serialize)]
 /// The roles that a node on the network can have
@@ -112,7 +111,7 @@ struct InternalNetwork {
     /// The list of addresses that a server is listening on.
     addresses: HashSet<Multiaddr>,
     /// The proxy object used to indicate that there are new messages on the `sender` channel.
-    proxy: egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
+    proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
     /// The id of the listener for a server.
     listener: Option<ListenerId>,
 }
@@ -176,8 +175,8 @@ impl InternalNetwork {
                                             self.listener = None;
                                             self.addresses.clear();
                                             let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(false)).await;
-                                            let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                common_emulator::event::EventType::CheckNetwork,
+                                            let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                crate::event::EventType::CheckNetwork,
                                             ));
                                         }
                                         MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency, role } => {
@@ -192,8 +191,8 @@ impl InternalNetwork {
                                                 let behavior = self.swarm.behaviour_mut();
                                                 behavior.emulator.send_server_details(width, height, framerate, cpu_frequency, role);
                                                 let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                         }
@@ -208,8 +207,8 @@ impl InternalNetwork {
                                         let _ = self.sender
                                             .send(MessageFromNetworkThread::PlayerObserverDisconnect(peer_id))
                                             .await;
-                                        let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                            common_emulator::event::EventType::CheckNetwork,
+                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                            crate::event::EventType::CheckNetwork,
                                         ));
                                     }
                                     libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
@@ -217,8 +216,8 @@ impl InternalNetwork {
                                         let _ = self.sender
                                             .send(MessageFromNetworkThread::NewAddress(address.clone()))
                                             .await;
-                                        let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                            common_emulator::event::EventType::CheckNetwork,
+                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                            crate::event::EventType::CheckNetwork,
                                         ));
                                         self.addresses.insert(address);
                                     }
@@ -229,8 +228,8 @@ impl InternalNetwork {
                                         let _ = self.sender
                                             .send(MessageFromNetworkThread::NewAddress(addr.clone()))
                                             .await;
-                                        let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                            common_emulator::event::EventType::CheckNetwork,
+                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                            crate::event::EventType::CheckNetwork,
                                         ));
                                         self.addresses.insert(addr);
                                     }
@@ -251,8 +250,8 @@ impl InternalNetwork {
                                         let _ = self.sender
                                             .send(MessageFromNetworkThread::ExpiredAddress(addr.clone()))
                                             .await;
-                                        let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                            common_emulator::event::EventType::CheckNetwork,
+                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                            crate::event::EventType::CheckNetwork,
                                         ));
                                         self.addresses.remove(&addr);
                                     }
@@ -262,64 +261,64 @@ impl InternalNetwork {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::AudioProducer(a))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::AvStream(d) => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::AvStream(d))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::ConnectedToHost => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::ConnectedToHost)
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::RequestController(i, c) => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::RequestController(i, c))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::SetController(c) => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::SetController(c))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::SetRole(r) => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::NewRole(r))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::RequestRole(p, r) => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::RequestRole(p, r))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                             emulator::MessageToSwarm::ControllerData(i, d) => {
                                                 let _ = self.sender
                                                     .send(MessageFromNetworkThread::ControllerData(i, d))
                                                     .await;
-                                                let _ = self.proxy.send_event(common_emulator::event::Event::new_general(
-                                                    common_emulator::event::EventType::CheckNetwork,
+                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
+                                                    crate::event::EventType::CheckNetwork,
                                                 ));
                                             }
                                         }
@@ -337,11 +336,12 @@ impl InternalNetwork {
         runtime: &mut tokio::runtime::Runtime,
         s: async_channel::Sender<MessageFromNetworkThread>,
         r: async_channel::Receiver<MessageToNetworkThread>,
-        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
+        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
+        version: &'static str,
     ) -> tokio::task::JoinHandle<()> {
-        runtime.spawn(async {
+        runtime.spawn(async move {
             println!("Started async code");
-            if let Some(mut i) = Self::try_new(s, r, proxy) {
+            if let Some(mut i) = Self::try_new(s, r, proxy, version) {
                 i.do_the_thing().await;
             }
         })
@@ -351,7 +351,8 @@ impl InternalNetwork {
     fn try_new(
         s: async_channel::Sender<MessageFromNetworkThread>,
         r: async_channel::Receiver<MessageToNetworkThread>,
-        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
+        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
+        version: &'static str,
     ) -> Option<Self> {
         let swarm = libp2p::SwarmBuilder::with_new_identity()
             .with_tokio()
@@ -363,7 +364,7 @@ impl InternalNetwork {
             .ok()?
             .with_behaviour(|_key| SwarmBehavior {
                 upnp: libp2p::upnp::tokio::Behaviour::default(),
-                emulator: emulator::Behavior::new(),
+                emulator: emulator::Behavior::new(version),
             })
             .ok()?
             .build();
@@ -417,9 +418,10 @@ pub struct Network {
 impl Network {
     ///Create a new instance of network with the given role
     pub fn new(
-        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
+        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
         audio_rate: u32,
         blank_controller: Vec<u8>,
+        version: &'static str,
     ) -> Self {
         let (s1, r1) = async_channel::bounded(1000);
         let (s2, r2) = async_channel::bounded(1000);
@@ -427,7 +429,7 @@ impl Network {
             .enable_all()
             .build()
             .unwrap();
-        let t2 = InternalNetwork::start(&mut t, s2, r1, proxy);
+        let t2 = InternalNetwork::start(&mut t, s2, r1, proxy, version);
         Self {
             tokio: t,
             thread: t2,
@@ -585,7 +587,7 @@ impl Network {
     }
 
     /// Push some audio to the local sound producer specified by `sound`
-    pub fn push_audio(&mut self, sound: &mut common_emulator::audio::AudioProducerWithRate) {
+    pub fn push_audio(&mut self, sound: &mut crate::audio::AudioProducerWithRate) {
         let a = self.streamin.audio_source();
         if let Some(a) = a {
             let sample = a.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
@@ -594,10 +596,8 @@ impl Network {
                     self.audio_buffer.resize(sb.size(), 0);
                     sb.copy_to_slice(0, &mut self.audio_buffer)
                         .expect("Failed to copy audio data from pipeline");
-                    let abuf = sound.make_buffer(
-                        common_emulator::audio::AudioSample::F32(0.0),
-                        &self.audio_buffer,
-                    );
+                    let abuf =
+                        sound.make_buffer(crate::audio::AudioSample::F32(0.0), &self.audio_buffer);
                     sound.fill_with_buffer(&abuf);
                 }
             }
@@ -607,7 +607,7 @@ impl Network {
     /// Retrieve a frame of data and decode it into the specified image.
     pub fn get_video_data(
         &mut self,
-        i: &mut common_emulator::video::PixelImage<egui_multiwin::egui::Color32>,
+        i: &mut crate::video::PixelImage<egui_multiwin::egui::Color32>,
     ) {
         let vs = self.streamin.video_source();
         if let Some(vs) = vs {
@@ -626,7 +626,7 @@ impl Network {
     /// Provide video data as a server to all clients.
     pub fn video_data(
         &mut self,
-        i: &common_emulator::video::PixelImage<egui_multiwin::egui::Color32>,
+        i: &crate::video::PixelImage<egui_multiwin::egui::Color32>,
     ) -> Result<(), async_channel::SendError<MessageToNetworkThread>> {
         if self.sender.is_full() {
             println!("Gonna have a bad time since the sender is full");

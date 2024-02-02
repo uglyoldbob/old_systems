@@ -17,12 +17,11 @@ use libp2p::{
     InboundUpgrade, OutboundUpgrade, PeerId, StreamProtocol,
 };
 
-use crate::controller::ButtonCombination;
-use common_emulator::audio::AudioProducerWithRate;
+use crate::audio::AudioProducerWithRate;
 
 use super::NodeRole;
 
-use common_emulator::streaming::{StreamingIn, StreamingOut};
+use crate::streaming::{StreamingIn, StreamingOut};
 
 /// Represents a message that can be sent to and from other nodes in the network.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -578,9 +577,9 @@ pub struct Behavior {
 
 impl Behavior {
     /// Construct a new Self
-    pub fn new() -> Self {
+    pub fn new(s: &'static str) -> Self {
         Self {
-            config: Config::new("/nes/0.0.1"),
+            config: Config::new(s),
             messages: VecDeque::new(),
             waker: Arc::new(Mutex::new(None)),
             clients: HashSet::new(),

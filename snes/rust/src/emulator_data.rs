@@ -163,7 +163,7 @@ pub struct LocalEmulatorData {
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
     /// The network object for interacting with other emulators
-    pub network: Option<crate::network::Network>,
+    pub network: Option<common_emulator::network::Network>,
 }
 
 impl Default for LocalEmulatorData {
@@ -542,8 +542,8 @@ impl SnesEmulatorData {
         self.ppu_clock_counter += 1;
         if self.ppu_clock_counter >= 4 {
             self.ppu_clock_counter = 0;
-            self.cpu_peripherals.ppu.cycle(&mut self.mb);
             self.cpu_peripherals.ppu2.cycle(&mut self.mb);
+            self.cpu_peripherals.ppu.cycle(&mut self.mb);
         }
 
         let nmi = self.nmi[2];

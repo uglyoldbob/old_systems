@@ -2,9 +2,10 @@
 //!
 use std::io::Write;
 
-use crate::{controller::SnesControllerTrait, network::NodeRole, SnesEmulatorData};
+use crate::{controller::SnesControllerTrait, SnesEmulatorData};
 
 use common_emulator::audio::AudioProducerWithRate;
+use common_emulator::network::NodeRole;
 use common_emulator::recording::Recording;
 
 #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
@@ -451,15 +452,24 @@ impl TrackedWindow for MainSnesWindow {
                         NodeRole::Player => {
                             let controller = c.mb.get_controller_ref(0);
                             for i in 0..2 {
-                                let _e = network.send_controller_data(i, controller.button_data());
+                                let _e = network.send_controller_data(
+                                    i,
+                                    bincode::serialize(&controller.button_data()).unwrap(),
+                                );
                             }
                         }
                         NodeRole::PlayerHost => {
                             for i in 0..4 {
                                 if let Some(bc) = network.get_button_data(i) {
-                                    let controller = c.mb.get_controller_mut(i);
-                                    if let Some(con) = controller.get_buttons_iter_mut().next() {
-                                        *con = bc;
+                                    if let Ok(bc) = bincode::deserialize::<
+                                        crate::controller::ButtonCombination,
+                                    >(bc)
+                                    {
+                                        let controller = c.mb.get_controller_mut(i);
+                                        if let Some(con) = controller.get_buttons_iter_mut().next()
+                                        {
+                                            *con = bc;
+                                        }
                                     }
                                 }
                             }

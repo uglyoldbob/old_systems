@@ -4,9 +4,10 @@ use std::io::Write;
 
 use crate::{
     controller::{ButtonCombination, NesControllerTrait},
-    network::NodeRole,
     NesEmulatorData,
 };
+
+use common_emulator::network::NodeRole;
 
 use common_emulator::audio::AudioProducerWithRate;
 use common_emulator::recording::Recording;

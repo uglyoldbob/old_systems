@@ -163,7 +163,7 @@ pub struct LocalEmulatorData {
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
     /// The network object for interacting with other emulators
-    pub network: Option<crate::network::Network>,
+    pub network: Option<common_emulator::network::Network>,
 }
 
 impl Default for LocalEmulatorData {

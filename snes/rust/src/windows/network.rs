@@ -72,9 +72,14 @@ impl TrackedWindow for Window {
                     ui.label("Network is not active");
                     if ui.button("Enable networking").clicked() {
                         if let Some(proxy) = c.local.get_proxy() {
-                            olocal.network = Some(crate::network::Network::new(
+                            let mut button = crate::controller::ButtonCombination::new();
+                            button.clear_buttons();
+                            let button = bincode::serialize(&button).unwrap();
+                            olocal.network = Some(common_emulator::network::Network::new(
                                 proxy,
                                 c.local.get_sound_rate(),
+                                button,
+                                "/snes/0.0.1",
                             ));
                         }
                     }

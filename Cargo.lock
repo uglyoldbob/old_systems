@@ -986,20 +986,25 @@ dependencies = [
 name = "common-emulator"
 version = "0.1.0"
 dependencies = [
+ "async-channel 2.1.1",
+ "asynchronous-codec",
  "bincode",
  "chrono",
  "compile-time",
  "egui-multiwin",
+ "futures",
  "gilrs",
  "gstreamer",
  "gstreamer-app",
  "gstreamer-audio",
  "gstreamer-video",
+ "libp2p",
  "memmap2 0.9.3",
  "ringbuf",
  "serde",
  "serde_with",
  "strum",
+ "tokio",
  "walkdir",
 ]
 

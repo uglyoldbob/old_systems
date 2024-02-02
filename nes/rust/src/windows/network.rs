@@ -75,10 +75,11 @@ impl TrackedWindow for Window {
                             let mut button = crate::controller::ButtonCombination::new();
                             button.clear_buttons();
                             let button = bincode::serialize(&button).unwrap();
-                            olocal.network = Some(crate::network::Network::new(
+                            olocal.network = Some(common_emulator::network::Network::new(
                                 proxy,
                                 c.local.get_sound_rate(),
                                 button,
+                                "/nes/0.0.1",
                             ));
                         }
                     }

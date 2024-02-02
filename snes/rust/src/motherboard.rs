@@ -19,7 +19,10 @@ pub struct SnesMotherboard {
     ram: Box<[u8; 128 * 1024]>,
     /// The ppu vram, physically outside the ppu, so this makes perfect sense.
     #[serde_as(as = "Bytes")]
-    vram: [u8; 2048],
+    vram1: [u8; 32768],
+    /// The ppu vram, physically outside the ppu, so this makes perfect sense.
+    #[serde_as(as = "Bytes")]
+    vram2: [u8; 32768],
     /// The palette ram for the ppu, technically belongs in the ppu.
     ppu_palette_ram: [u8; 32],
     /// The vram address fromm the last ppu address cycle
@@ -46,8 +49,13 @@ impl SnesMotherboard {
             *i = rand::random();
         }
 
-        let mut vram: [u8; 2048] = [0; 2048];
-        for i in vram.iter_mut() {
+        let mut vram1: [u8; 32768] = [0; 32768];
+        for i in vram1.iter_mut() {
+            *i = rand::random();
+        }
+
+        let mut vram2: [u8; 32768] = [0; 32768];
+        for i in vram2.iter_mut() {
             *i = rand::random();
         }
 
@@ -58,7 +66,8 @@ impl SnesMotherboard {
         Self {
             cart: None,
             ram: main_ram,
-            vram,
+            vram1,
+            vram2,
             ppu_palette_ram: pram,
             vram_address: None,
             last_ppu_cycle: 2,
