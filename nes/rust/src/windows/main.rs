@@ -738,6 +738,14 @@ impl TrackedWindow for MainNesWindow {
                         windows_to_create.push(super::genie::Window::new_request());
                         ui.close_menu();
                     }
+                    if ui.button("Reset").clicked() {
+                        ui.close_menu();
+                        c.reset();
+                    }
+                    if ui.button("Power cycle").clicked() {
+                        ui.close_menu();
+                        c.power_cycle();
+                    }
                 });
                 #[cfg(feature = "debugger")]
                 {
@@ -777,14 +785,6 @@ impl TrackedWindow for MainNesWindow {
                         if ui.button("Dump ppu sprites").clicked() {
                             ui.close_menu();
                             windows_to_create.push(super::sprite_dump_window::DumpWindow::new_request());
-                        }
-                        if ui.button("Reset").clicked() {
-                            ui.close_menu();
-                            c.reset();
-                        }
-                        if ui.button("Power cycle").clicked() {
-                            ui.close_menu();
-                            c.power_cycle();
                         }
                     });
                 }
