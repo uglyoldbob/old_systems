@@ -71,6 +71,8 @@ pub struct MainNesWindow {
     recording: Recording,
     /// The audio objects for a streaming server
     audio_streaming: Vec<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>>,
+    /// The percentage of time taken for rendering
+    render_percent: f32,
 }
 
 impl MainNesWindow {
@@ -132,6 +134,7 @@ impl MainNesWindow {
                 mouse_miss: false,
                 recording: Recording::new(),
                 audio_streaming: Vec::new(),
+                render_percent: 0.0,
             }),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
@@ -621,6 +624,10 @@ impl TrackedWindow for MainNesWindow {
                     }
                 }
             }
+            let time_after_render = std::time::Instant::now();
+            let render_time = time_after_render.duration_since(time_now).as_nanos();
+            let render_percent = render_time as f32 / nanos;
+            self.render_percent = (self.render_percent * 0.95) + (0.05 * render_percent);
         }
 
         if self.paused {
@@ -985,8 +992,9 @@ impl TrackedWindow for MainNesWindow {
                 });
             });
             window.set_title(&format!(
-                "UglyOldBob NES Emulator - {:.0}/{:.0} FPS",
-                self.emulator_fps, self.fps
+                "UglyOldBob NES Emulator - {:.0} FPS {:.1} percent",
+                self.emulator_fps,
+                self.render_percent * 100.0
             ));
             if c.mb
                 .get_controller_ref(0)
