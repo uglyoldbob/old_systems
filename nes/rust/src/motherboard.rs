@@ -36,6 +36,10 @@ pub struct NesMotherboard {
     controllers: [NesController; 2],
     /// The speed ratio applied to the emulator
     pub speed_ratio: f32,
+    ///zapper x coord
+    x: u16,
+    ///zapper y coord
+    y: u16,
 }
 
 impl NesMotherboard {
@@ -67,6 +71,8 @@ impl NesMotherboard {
             last_ppu_coordinates: (0, 0),
             controllers: [NesController::default(), NesController::default()],
             speed_ratio: 1.0,
+            x: 65535,
+            y: 65535,
         }
     }
 
@@ -209,6 +215,12 @@ impl NesMotherboard {
                 self.controllers[index as usize] = nc;
             }
         }
+    }
+
+    /// Set the zapper coordinates
+    pub fn set_zapper_coords(&mut self, x: u16, y: u16) {
+        self.x = x;
+        self.y = y;
     }
 
     /// Return a reference to the cartridge if it exists
@@ -363,12 +375,24 @@ impl NesMotherboard {
                         self.last_cpu_data = response;
                     }
                     0x4016 => {
-                        let d = self.controllers[0].read_data() & 0x1f;
+                        let d = self.controllers[0].read_data(
+                            per.ppu.get_frame(),
+                            per.ppu.column(),
+                            per.ppu.row(),
+                            self.x,
+                            self.y,
+                        ) & 0x1f;
                         response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         self.last_cpu_data = response;
                     }
                     0x4017 => {
-                        let d = self.controllers[1].read_data() & 0x1f;
+                        let d = self.controllers[1].read_data(
+                            per.ppu.get_frame(),
+                            per.ppu.column(),
+                            per.ppu.row(),
+                            self.x,
+                            self.y,
+                        ) & 0x1f;
                         response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         self.last_cpu_data = response;
                     }

@@ -729,7 +729,7 @@ impl NesPpu {
 
     /// Returns true when sprites should be fetched.
     fn should_fetch_sprites(&self) -> bool {
-        (self.registers[1] & PPU_REGISTER1_DRAW_BACKGROUND) != 0
+        (self.registers[1] & (PPU_REGISTER1_DRAW_BACKGROUND | PPU_REGISTER1_DRAW_SPRITES)) != 0
     }
 
     /// Returns true when sprites should be evaulated.
@@ -1470,7 +1470,7 @@ impl NesPpu {
     }
 
     /// Returns a reference to the frame data stored in the ppu.
-    pub fn get_frame(&mut self) -> &RgbImage {
+    pub fn get_frame(&self) -> &RgbImage {
         &self.frame_data
     }
 

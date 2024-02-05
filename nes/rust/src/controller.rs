@@ -397,7 +397,14 @@ pub trait NesControllerTrait {
     /// Dump data from the controller. No side effects.
     fn dump_data(&self) -> u8;
     /// Read data from the controller.
-    fn read_data(&mut self) -> u8;
+    fn read_data(
+        &mut self,
+        screen: &common_emulator::video::RgbImage,
+        ppux: u16,
+        ppuy: u16,
+        x: u16,
+        y: u16,
+    ) -> u8;
     /// Return the data for all button states
     fn button_data(&self) -> ButtonCombination;
 }
@@ -569,10 +576,17 @@ impl NesControllerTrait for FourScore {
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(&mut self) -> u8 {
+    fn read_data(
+        &mut self,
+        screen: &common_emulator::video::RgbImage,
+        ppux: u16,
+        ppuy: u16,
+        x: u16,
+        y: u16,
+    ) -> u8 {
         match self.clock_counter {
-            0..=7 => self.controllers[0].read_data(),
-            8..=15 => self.controllers[1].read_data(),
+            0..=7 => self.controllers[0].read_data(screen, ppux, ppuy, x, y),
+            8..=15 => self.controllers[1].read_data(screen, ppux, ppuy, x, y),
             16..=17 => 0,
             18 => 0xFF,
             19..=23 => 0,
@@ -621,7 +635,14 @@ impl NesControllerTrait for DummyController {
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(&mut self) -> u8 {
+    fn read_data(
+        &mut self,
+        screen: &common_emulator::video::RgbImage,
+        ppux: u16,
+        ppuy: u16,
+        x: u16,
+        y: u16,
+    ) -> u8 {
         0xff
     }
 }
@@ -677,12 +698,30 @@ impl NesControllerTrait for Zapper {
     fn dump_data(&self) -> u8 {
         let d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
         let d4 = self.combo[0].buttons[BUTTON_COMBO_FIRE].is_some();
-        0xE7 | if d3 { 1 << 3 } else { 0 } | if !d4 { 1 << 4 } else { 0 }
+        0xE7 | if !d4 { 1 << 4 } else { 0 }
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(&mut self) -> u8 {
-        self.dump_data()
+    fn read_data(
+        &mut self,
+        screen: &common_emulator::video::RgbImage,
+        ppux: u16,
+        ppuy: u16,
+        x: u16,
+        y: u16,
+    ) -> u8 {
+        let mut d = self.dump_data();
+        if x < 256 && y < 240 {
+            let color = screen.get_pixel(egui::Vec2 {
+                x: x as f32,
+                y: y as f32,
+            });
+            if color[0] > 200 && color[1] > 200 && color[2] > 200 {
+                println!("Detect color at {},{} {},{}", ppux, ppuy, x, y);
+                d |= 1 << 3;
+            }
+        }
+        d
     }
 }
 
@@ -854,7 +893,14 @@ impl NesControllerTrait for StandardController {
         data | 0x1e
     }
 
-    fn read_data(&mut self) -> u8 {
+    fn read_data(
+        &mut self,
+        screen: &common_emulator::video::RgbImage,
+        ppux: u16,
+        ppuy: u16,
+        x: u16,
+        y: u16,
+    ) -> u8 {
         self.dump_data()
     }
 }

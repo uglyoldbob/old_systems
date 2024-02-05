@@ -955,16 +955,17 @@ impl TrackedWindow for MainNesWindow {
                             })
                             .sense(egui::Sense::click_and_drag()),
                         );
-                        if r.clicked() || r.dragged() {
+                        if (r.clicked() || r.dragged()) && !self.mouse {
                             self.mouse = true;
                             self.mouse_miss = false;
-                            self.mouse_delay = 10;
-                        } else if r.clicked_by(egui::PointerButton::Secondary)
-                            || r.dragged_by(egui::PointerButton::Secondary)
+                            self.mouse_delay = 15;
+                        } else if (r.clicked_by(egui::PointerButton::Secondary)
+                            || r.dragged_by(egui::PointerButton::Secondary))
+                            && !self.mouse
                         {
                             self.mouse = true;
                             self.mouse_miss = true;
-                            self.mouse_delay = 10;
+                            self.mouse_delay = 15;
                         }
                         if r.hovered() {
                             if let Some(pos) = r.hover_pos() {
@@ -974,12 +975,21 @@ impl TrackedWindow for MainNesWindow {
                                     c.cpu_peripherals.ppu.bg_debug =
                                         Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
                                 }
+                                let scale_factor = c
+                                    .local
+                                    .configuration
+                                    .scaler
+                                    .map(|s| s.scale_factor())
+                                    .or(Some(1.0))
+                                    .unwrap();
+                                let zcoord = coord / (zoom * scale_factor);
+                                c.mb.set_zapper_coords(zcoord.x as u16, zcoord.y as u16);
 
                                 let pixel = c.local.image.get_pixel(coord / zoom);
                                 self.mouse_vision = !self.mouse_miss
-                                    && pixel.r() > 10
-                                    && pixel.g() > 10
-                                    && pixel.b() > 10;
+                                    && pixel.r() > 100
+                                    && pixel.g() > 100
+                                    && pixel.b() > 100;
 
                                 //println!("Hover at {:?}", pos - r.rect.left_top());
                             } else {

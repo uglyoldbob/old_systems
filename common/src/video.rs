@@ -4,7 +4,14 @@ use egui_multiwin::egui;
 
 /// The types of algorithms for scaling up the image
 #[derive(
-    PartialEq, strum::Display, strum::EnumIter, serde::Serialize, serde::Deserialize, Clone, Copy,
+    PartialEq,
+    strum::Display,
+    strum::EnumIter,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    Copy,
+    Debug,
 )]
 pub enum ScalingAlgorithm {
     ///The Scale2x algorithm, based on EPX (Eric's pixel expansion)
@@ -13,6 +20,17 @@ pub enum ScalingAlgorithm {
     Scale3x,
     ///The eagle scaling algorithm
     Eagle,
+}
+
+impl ScalingAlgorithm {
+    /// Get the scaling factor
+    pub fn scale_factor(&self) -> f32 {
+        match self {
+            ScalingAlgorithm::Scale2x => 2.0,
+            ScalingAlgorithm::Scale3x => 3.0,
+            ScalingAlgorithm::Eagle => 2.0,
+        }
+    }
 }
 
 /// A 24bpp pixel.
