@@ -105,12 +105,16 @@ impl SnesPpu {
 #[non_exhaustive]
 #[serde_with::serde_as]
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct SnesPpu2 {}
+pub struct SnesPpu2 {
+    /// Where palette data is stored
+    #[serde_as(as = "Bytes")]
+    cgram: [u8; 512],
+}
 
 impl SnesPpu2 {
     /// Construct the struct
     pub fn new() -> Self {
-        Self {}
+        Self { cgram: [0; 512] }
     }
 
     /// Read a register on the ppu

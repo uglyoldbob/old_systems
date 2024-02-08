@@ -955,16 +955,16 @@ impl TrackedWindow for MainNesWindow {
                             })
                             .sense(egui::Sense::click_and_drag()),
                         );
-                        if (r.clicked() || r.dragged()) && !self.mouse {
-                            self.mouse = true;
-                            self.mouse_miss = false;
-                            self.mouse_delay = 15;
-                        } else if (r.clicked_by(egui::PointerButton::Secondary)
+                        if (r.clicked_by(egui::PointerButton::Secondary)
                             || r.dragged_by(egui::PointerButton::Secondary))
                             && !self.mouse
                         {
                             self.mouse = true;
                             self.mouse_miss = true;
+                            self.mouse_delay = 15;
+                        } else if (r.clicked() || r.dragged()) && !self.mouse {
+                            self.mouse = true;
+                            self.mouse_miss = false;
                             self.mouse_delay = 15;
                         }
                         if r.hovered() {
@@ -992,11 +992,7 @@ impl TrackedWindow for MainNesWindow {
                                     && pixel.b() > 100;
 
                                 //println!("Hover at {:?}", pos - r.rect.left_top());
-                            } else {
-                                self.mouse_vision = false;
                             }
-                        } else {
-                            self.mouse_vision = false;
                         }
                     }
                 });

@@ -400,8 +400,6 @@ pub trait NesControllerTrait {
     fn read_data(
         &mut self,
         screen: &common_emulator::video::RgbImage,
-        ppux: u16,
-        ppuy: u16,
         x: u16,
         y: u16,
     ) -> u8;
@@ -579,14 +577,12 @@ impl NesControllerTrait for FourScore {
     fn read_data(
         &mut self,
         screen: &common_emulator::video::RgbImage,
-        ppux: u16,
-        ppuy: u16,
         x: u16,
         y: u16,
     ) -> u8 {
         match self.clock_counter {
-            0..=7 => self.controllers[0].read_data(screen, ppux, ppuy, x, y),
-            8..=15 => self.controllers[1].read_data(screen, ppux, ppuy, x, y),
+            0..=7 => self.controllers[0].read_data(screen, x, y),
+            8..=15 => self.controllers[1].read_data(screen, x, y),
             16..=17 => 0,
             18 => 0xFF,
             19..=23 => 0,
@@ -638,8 +634,6 @@ impl NesControllerTrait for DummyController {
     fn read_data(
         &mut self,
         screen: &common_emulator::video::RgbImage,
-        ppux: u16,
-        ppuy: u16,
         x: u16,
         y: u16,
     ) -> u8 {
@@ -705,8 +699,6 @@ impl NesControllerTrait for Zapper {
     fn read_data(
         &mut self,
         screen: &common_emulator::video::RgbImage,
-        ppux: u16,
-        ppuy: u16,
         x: u16,
         y: u16,
     ) -> u8 {
@@ -717,7 +709,6 @@ impl NesControllerTrait for Zapper {
                 y: y as f32,
             });
             if color[0] > 200 && color[1] > 200 && color[2] > 200 {
-                println!("Detect color at {},{} {},{}", ppux, ppuy, x, y);
                 d |= 1 << 3;
             }
         }
@@ -896,8 +887,6 @@ impl NesControllerTrait for StandardController {
     fn read_data(
         &mut self,
         screen: &common_emulator::video::RgbImage,
-        ppux: u16,
-        ppuy: u16,
         x: u16,
         y: u16,
     ) -> u8 {

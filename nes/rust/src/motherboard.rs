@@ -377,8 +377,6 @@ impl NesMotherboard {
                     0x4016 => {
                         let d = self.controllers[0].read_data(
                             per.ppu.get_frame(),
-                            per.ppu.column(),
-                            per.ppu.row(),
                             self.x,
                             self.y,
                         ) & 0x1f;
@@ -388,8 +386,6 @@ impl NesMotherboard {
                     0x4017 => {
                         let d = self.controllers[1].read_data(
                             per.ppu.get_frame(),
-                            per.ppu.column(),
-                            per.ppu.row(),
                             self.x,
                             self.y,
                         ) & 0x1f;
