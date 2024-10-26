@@ -43,7 +43,7 @@ set_global_assignment -name TOP_LEVEL_ENTITY nes
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 23.1STD.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "15:53:07  OCTOBER 24, 2024"
 set_global_assignment -name LAST_QUARTUS_VERSION "23.1std.1 Lite Edition"
-set_global_assignment -name VHDL_FILE nes_cpu.vhd
+set_global_assignment -name VHDL_FILE nes_cpu.vhd -hdl_version VHDL_2008
 set_global_assignment -name VHDL_FILE nes_cartridge.vhd
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 256

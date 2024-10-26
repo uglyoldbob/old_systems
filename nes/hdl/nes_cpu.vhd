@@ -1,5 +1,5 @@
 library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
+use ieee.std_logic_1164.all;
 use ieee.std_logic_misc.all;
 
 use IEEE.NUMERIC_STD.ALL;
@@ -39,7 +39,7 @@ begin
 end Behavioral;
 
 library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
+use ieee.std_logic_1164.all;
 use ieee.std_logic_misc.all;
 
 use IEEE.NUMERIC_STD.ALL;
@@ -88,6 +88,8 @@ architecture Behavioral of nes_cpu is
 	
 	signal reset_active: std_logic; --Indicates that the cpu is in reset
 	signal opcode: std_logic_vector(8 downto 0); -- bit 8 indicates the opcode is valid
+	signal op_byte_2: std_logic_vector(7 downto 0);
+	signal op_byte_3: std_logic_vector(7 downto 0);
 	signal dma_cycle: std_logic;
 	
 	signal subcycle: std_logic_vector(3 downto 0);
@@ -106,6 +108,12 @@ architecture Behavioral of nes_cpu is
 	signal stall_clocked: std_logic;
 	
 	signal instruction_length: std_logic_vector(1 downto 0);
+	signal done_fetching: std_logic;
+	
+	signal instruction_toggle: std_logic;
+	signal cycle_toggle: std_logic;
+	
+	signal cycle_counter: integer;
 begin
 
 	clockd: entity work.clock_divider port map (
@@ -163,11 +171,14 @@ begin
 	begin
 		if reset='1' then
 			sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000011");
-			flags <= flags OR "00000100";
 			read_cycle <= '1';
+			cycle_toggle <= '0';
 			memory_start <= '0';
+			cycle_counter <= 0;
 		elsif rising_edge(clocka) then
 			dma_cycle <= NOT dma_cycle;
+			cycle_toggle <= not cycle_toggle;
+			cycle_counter <= cycle_counter + 1;
 			if reset_active then
 				read_cycle <= '1';
 				next_pc <= pc;
@@ -196,7 +207,19 @@ begin
 					rw_address <= pc;
 					next_pc <= std_logic_vector(unsigned(pc(15 downto 0)) + "0000000000000001");
 					read_cycle <= '1';
-				else
+				elsif done_fetching = '0' then
+					rw_address <= pc;
+					next_pc <= std_logic_vector(unsigned(pc(15 downto 0)) + "0000000000000001");
+					read_cycle <= '1';
+				elsif done_fetching = '1' then
+					case opcode(7 downto 0) is
+						when x"86" =>
+							rw_address <= x"00" & op_byte_2;
+							read_cycle <= '0';
+							dout <= x;
+						when others =>
+							rw_address <= pc;
+					end case;
 				end if;
 			end if;
 		end if;
@@ -205,9 +228,14 @@ begin
 	process (all)
 	begin
 		case opcode(7 downto 0) is
-			when x"01" => instruction_length <= "01";
+			when x"4c" | x"86" => instruction_length <= "10";
 			when others => instruction_length <= "01";
 		end case;
+		if instruction_length = subcycle(1 downto 0) and "00" = subcycle(3 downto 2) then
+			done_fetching <= '1';
+		else
+			done_fetching <= '0';
+		end if;
 	end process;
 	
 	process (clockm)
@@ -221,9 +249,11 @@ begin
 	begin
 		if reset='1' then
 			pc <= x"FFFC";
+			flags(FLAG_INTERRUPT) <= '1';
 			opcode <= "011111111";
 			reset_active <= '1';
 			subcycle <= "0000";
+			instruction_toggle <= '0';
 		elsif rising_edge(clockb) then
 			if reset_active then
 				subcycle <= std_logic_vector(unsigned(subcycle(3 downto 0)) + "0001");
@@ -239,16 +269,54 @@ begin
 					when others =>
 						pc <= din & next_pc(7 downto 0);
 						reset_active <= '0';
+						instruction_toggle <= not instruction_toggle;
 						subcycle <= (others => '0');
+						opcode(8) <= '0';
 				end case;
 			elsif stall_clocked = '0' then
+				subcycle <= std_logic_vector(unsigned(subcycle(3 downto 0)) + "0001");
 				pc <= next_pc;
 				if opcode(8) = '0' then
 					opcode <= '1' & din;
-				else
+				elsif done_fetching = '1' then
 					case opcode(7 downto 0) is
-						when x"00" =>
+						when x"4c" =>
+							pc <= din & op_byte_2;
+							instruction_toggle <= not instruction_toggle;
+							subcycle <= (others => '0');
+							opcode(8) <= '0';
+						when x"78" =>
+							flags(FLAG_INTERRUPT) <= '1';
+							instruction_toggle <= not instruction_toggle;
+							subcycle <= (others => '0');
+							opcode(8) <= '0';
+						when x"86" =>
+							instruction_toggle <= not instruction_toggle;
+							subcycle <= (others => '0');
+							opcode(8) <= '0';
+						when x"a2" =>
+							x <= din;
+							flags(FLAG_NEGATIVE) <= '0';
+							if din = "00000000" then
+								flags(FLAG_ZERO) <= '1';
+							else
+								flags(FLAG_ZERO) <= '0';
+							end if;
+							flags(FLAG_NEGATIVE) <= din(7);
+							instruction_toggle <= not instruction_toggle;
+							subcycle <= (others => '0');
+							opcode(8) <= '0';
+						when x"d8" =>
+							flags(FLAG_DECIMAL) <= '0';
+							instruction_toggle <= not instruction_toggle;
+							subcycle <= (others => '0');
+							opcode(8) <= '0';
 						when others =>
+					end case;
+				else
+					case subcycle is
+						when "0001" => op_byte_2 <= din;
+						when others => op_byte_3 <= din;
 					end case;
 				end if;
 			end if;
