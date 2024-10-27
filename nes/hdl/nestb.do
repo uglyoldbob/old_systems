@@ -26,5 +26,5 @@ restart -force
 
 view structure
 view signals
-run 6us
-wave zoom range 900ns 6000ns
+run 8us
+wave zoom range 6us 8us

@@ -68,12 +68,12 @@ architecture Behavioral of nes_cpu is
 	signal clockb: std_logic;
 	signal clockm: std_logic;
 
-	signal a: std_logic_vector(7 downto 0);
-	signal x: std_logic_vector(7 downto 0);
-	signal y: std_logic_vector(7 downto 0);
+	signal a: std_logic_vector(7 downto 0) := x"00";
+	signal x: std_logic_vector(7 downto 0) := x"00";
+	signal y: std_logic_vector(7 downto 0) := x"00";
 	signal pc: std_logic_vector(15 downto 0);
-	signal sp: std_logic_vector(7 downto 0);
-	signal flags: std_logic_vector(7 downto 0);
+	signal sp: std_logic_vector(7 downto 0) := x"fd";
+	signal flags: std_logic_vector(7 downto 0) := x"24";
 	
 	signal next_pc: std_logic_vector(15 downto 0);
 	
@@ -107,9 +107,10 @@ architecture Behavioral of nes_cpu is
 	signal stall: std_logic;
 	signal stall_clocked: std_logic;
 	
-	signal instruction_length: std_logic_vector(1 downto 0);
+	signal instruction_length: std_logic_vector(3 downto 0);
 	signal done_fetching: std_logic;
 	
+	signal instruction_toggle_pre: std_logic;
 	signal instruction_toggle: std_logic;
 	signal cycle_toggle: std_logic;
 	
@@ -149,17 +150,8 @@ begin
 	begin
 		if read_cycle = '1' then
 			stall <= '0';
-			if dma_running then
-				rw <= '1';
-			else
-				address <= rw_address;
-				rw <= '1';
-				if dma_dmc(16) = '1' then
-					dma_running <= '1';
-				elsif dma_oam(8) = '1' then
-					dma_running <= '1';
-				end if;
-			end if;
+			address <= rw_address;
+			rw <= '1';
 		else
 			stall <= '0';
 			rw <= '0';
@@ -170,7 +162,6 @@ begin
 	process (reset, clocka)
 	begin
 		if reset='1' then
-			sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000011");
 			read_cycle <= '1';
 			cycle_toggle <= '0';
 			memory_start <= '0';
@@ -178,6 +169,7 @@ begin
 		elsif rising_edge(clocka) then
 			dma_cycle <= NOT dma_cycle;
 			cycle_toggle <= not cycle_toggle;
+			instruction_toggle <= instruction_toggle_pre;
 			cycle_counter <= cycle_counter + 1;
 			if reset_active then
 				read_cycle <= '1';
@@ -213,10 +205,31 @@ begin
 					read_cycle <= '1';
 				elsif done_fetching = '1' then
 					case opcode(7 downto 0) is
+						when x"20" =>
+							case subcycle(2 downto 0) is
+								when "011" =>
+									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									read_cycle <= '1';
+								when "100" =>
+									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									read_cycle <= '0';
+									dout <= pc(15 downto 8);
+								when "101" =>
+									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									read_cycle <= '0';
+									dout <= pc(7 downto 0);
+								when others =>
+									rw_address <= pc;
+									read_cycle <= '1';
+							end case;
 						when x"86" =>
 							rw_address <= x"00" & op_byte_2;
 							read_cycle <= '0';
 							dout <= x;
+						when x"a2" =>
+							rw_address <= pc;
+							next_pc <= std_logic_vector(unsigned(pc(15 downto 0)) + "0000000000000001");
+							read_cycle <= '1';
 						when others =>
 							rw_address <= pc;
 					end case;
@@ -228,10 +241,11 @@ begin
 	process (all)
 	begin
 		case opcode(7 downto 0) is
-			when x"4c" | x"86" => instruction_length <= "10";
-			when others => instruction_length <= "01";
+			when x"4c" | x"86" => instruction_length <= "0010";
+			when x"20" => instruction_length <= "0011";
+			when others => instruction_length <= "0001";
 		end case;
-		if instruction_length = subcycle(1 downto 0) and "00" = subcycle(3 downto 2) then
+		if instruction_length <= subcycle(3 downto 0) then
 			done_fetching <= '1';
 		else
 			done_fetching <= '0';
@@ -248,12 +262,13 @@ begin
 	process(reset, clockb)
 	begin
 		if reset='1' then
+			sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000011");
 			pc <= x"FFFC";
 			flags(FLAG_INTERRUPT) <= '1';
 			opcode <= "011111111";
 			reset_active <= '1';
 			subcycle <= "0000";
-			instruction_toggle <= '0';
+			instruction_toggle_pre <= '0';
 		elsif rising_edge(clockb) then
 			if reset_active then
 				subcycle <= std_logic_vector(unsigned(subcycle(3 downto 0)) + "0001");
@@ -269,7 +284,7 @@ begin
 					when others =>
 						pc <= din & next_pc(7 downto 0);
 						reset_active <= '0';
-						instruction_toggle <= not instruction_toggle;
+						instruction_toggle_pre <= not instruction_toggle_pre;
 						subcycle <= (others => '0');
 						opcode(8) <= '0';
 				end case;
@@ -280,18 +295,28 @@ begin
 					opcode <= '1' & din;
 				elsif done_fetching = '1' then
 					case opcode(7 downto 0) is
+						when x"20" =>
+							case subcycle(2 downto 0) is
+								when "011" | "100" =>
+									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
+								when others =>
+									pc <= op_byte_3 & op_byte_2;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"4c" =>
 							pc <= din & op_byte_2;
-							instruction_toggle <= not instruction_toggle;
+							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
 						when x"78" =>
 							flags(FLAG_INTERRUPT) <= '1';
-							instruction_toggle <= not instruction_toggle;
+							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
 						when x"86" =>
-							instruction_toggle <= not instruction_toggle;
+							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
 						when x"a2" =>
@@ -303,12 +328,12 @@ begin
 								flags(FLAG_ZERO) <= '0';
 							end if;
 							flags(FLAG_NEGATIVE) <= din(7);
-							instruction_toggle <= not instruction_toggle;
+							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
 						when x"d8" =>
 							flags(FLAG_DECIMAL) <= '0';
-							instruction_toggle <= not instruction_toggle;
+							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
 						when others =>
