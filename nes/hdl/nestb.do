@@ -5,6 +5,8 @@ if {[file exists rtl_work]} {
 vlib rtl_work
 vmap work rtl_work
 
+python ../../nestest.py ../../nestest.log
+
 cp ../../rom_processor.tcl ./
 cp ../../nestest.nes ./
 
@@ -26,5 +28,5 @@ restart -force
 
 view structure
 view signals
-run 8us
-wave zoom range 6us 8us
+run -all
+wave zoom range 8us 10us

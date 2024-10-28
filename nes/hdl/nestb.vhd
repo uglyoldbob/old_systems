@@ -1,5 +1,8 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use std.textio.all;
+use ieee.std_logic_textio.all;
+use std.env.finish;
 
 entity nestb is
     Port (whocares: out std_logic;
@@ -10,17 +13,77 @@ entity nestb is
 end nestb;
 
 architecture Behavioral of nestb is
+
+type NES_TEST_ENTRY is
+	record
+		pc: std_logic_vector(15 downto 0);
+		num_bytes: std_logic_vector(1 downto 0);
+		a: std_logic_vector(7 downto 0);
+		x: std_logic_vector(7 downto 0);
+		y: std_logic_vector(7 downto 0);
+		p: std_logic_vector(7 downto 0);
+		sp: std_logic_vector(7 downto 0);
+		cycle: std_logic_vector(14 downto 0);
+		dummy: std_logic_vector(7 downto 0);
+	end record;
+type NES_TEST_ENTRIES is array (integer range<>) of NES_TEST_ENTRY;
+
+impure function GetNestestResults (FileName : in string; entries: integer) return NES_TEST_ENTRIES is
+	variable results : NES_TEST_ENTRIES(0 to entries-1);
+	FILE romfile : text is in FileName;
+	variable open_status :FILE_OPEN_STATUS;
+	file     infile      :text;
+	variable RomFileLine : line;
+	begin
+		file_open(open_status, infile, filename, read_mode);
+		for i in 0 to entries-1 loop
+			readline(romfile, RomFileLine);
+			hread(RomFileLine, results(i).pc);
+			hread(RomFileLine, results(i).num_bytes);
+			hread(RomFileLine, results(i).a);
+			hread(RomFileLine, results(i).x);
+			hread(RomFileLine, results(i).y);
+			hread(RomFileLine, results(i).p);
+			hread(RomFileLine, results(i).sp);
+			hread(RomFileLine, results(i).cycle);
+			hread(RomFileLine, results(i).dummy);
+		end loop;
+		return results;
+	end function;
+
+	signal test_signals: NES_TEST_ENTRIES(0 to 8990) := GetNestestResults("nestest.txt", 8991);
 	signal cpu_clock: std_logic := '0';
 	signal cpu_reset: std_logic := '0';
 	signal cpu_address: std_logic_vector(15 downto 0);
 	signal cpu_dout: std_logic_vector(7 downto 0);
 	signal cpu_din: std_logic_vector(7 downto 0);
+	
+	signal cpu_a: std_logic_vector(7 downto 0);
+	signal cpu_x: std_logic_vector(7 downto 0);
+	signal cpu_y: std_logic_vector(7 downto 0);
+	signal cpu_pc: std_logic_vector(15 downto 0);
+	signal cpu_sp: std_logic_vector(7 downto 0);
+	signal cpu_flags: std_logic_vector(7 downto 0);
+	signal cpu_subcycle: std_logic_vector(3 downto 0);
+	
+	signal cpu_memory_clock: std_logic;
+	signal cpu_instruction: std_logic;
+	signal instruction_check: std_logic;
 begin
 	cpu_reset <= '1', '0' after 100ns;
 	cpu_clock <= NOT cpu_clock after 10ns;
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	nes: entity work.nes port map (
+		d_memory_clock => cpu_memory_clock,
+		d_a => cpu_a,
+		d_x => cpu_x,
+		d_y => cpu_y,
+		d_pc => cpu_pc,
+		d_sp => cpu_sp,
+		d_flags => cpu_flags,
+		d_subcycle => cpu_subcycle,
+		instruction_toggle_out => cpu_instruction,
 		reset => cpu_reset,
 		cpu_oe => cpu_oe,
 		cpu_memory_address => cpu_address,
@@ -29,5 +92,34 @@ begin
 		clock => cpu_clock
 		);
 
+	process
+	begin
+		instruction_check <= '0';
+		wait until cpu_reset = '0';
+		for i in 0 to 8990 loop
+			wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
+			assert cpu_a = test_signals(i).a
+				report "Failure of A on instruction: Expected(" & to_hstring(test_signals(i).a) & ") got (" & to_hstring(cpu_a) & ") " & to_string(i+1)
+				severity failure;
+			assert cpu_x = test_signals(i).x
+				report "Failure of X on instruction: Expected(" & to_hstring(test_signals(i).x) & ") got (" & to_hstring(cpu_x) & ") " & to_string(i+1)
+				severity failure;
+			assert cpu_y = test_signals(i).y
+				report "Failure of Y on instruction: Expected(" & to_hstring(test_signals(i).y) & ") got (" & to_hstring(cpu_y) & ") " & to_string(i+1)
+				severity failure;
+			assert cpu_sp = test_signals(i).sp
+				report "Failure of SP on instruction: Expected(" & to_hstring(test_signals(i).sp) & ") got (" & to_hstring(cpu_sp) & ") " & to_string(i+1)
+				severity failure;
+			assert cpu_flags = test_signals(i).p
+				report "Failure of FLAGS on instruction: Expected(" & to_hstring(test_signals(i).p) & ") got (" & to_hstring(cpu_flags) & ") " & to_string(i+1)
+				severity failure;
+			instruction_check <= cpu_instruction;
+			assert cpu_pc = test_signals(i).pc
+				report "Failure of PC on instruction: Expected(" & to_hstring(test_signals(i).pc) & ") got (" & to_hstring(cpu_pc) & ") " & to_string(i+1)
+				severity failure;
+		end loop;
+		report "Test complete";
+		assert false report "Not a failure, test complete" severity failure;
+	end process;
 end Behavioral;
 

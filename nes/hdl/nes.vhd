@@ -3,6 +3,15 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 entity nes is
     Port (
+		d_a: out std_logic_vector(7 downto 0) := x"00";
+		d_x: out std_logic_vector(7 downto 0) := x"00";
+		d_y: out std_logic_vector(7 downto 0) := x"00";
+		d_pc: out std_logic_vector(15 downto 0);
+		d_sp: out std_logic_vector(7 downto 0) := x"fd";
+		d_flags: out std_logic_vector(7 downto 0) := x"24";
+		d_memory_clock: out std_logic;
+		d_subcycle: out std_logic_vector(3 downto 0);
+		instruction_toggle_out: out std_logic;
 		reset: in std_logic;
 	   clock: in std_logic;
 		cpu_oe: out std_logic_vector(1 downto 0);
@@ -35,6 +44,8 @@ begin
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	cs_out <= cpu_ram_cs & cpu_ppu_cs & cpu_apu_cs & cpu_cartridge_cs;
+	
+	d_memory_clock <= memory_clock;
 	
 	process (all)
 	begin
@@ -90,6 +101,14 @@ begin
 	);
 	
 	cpu: entity work.nes_cpu port map (
+		d_a => d_a,
+		d_x => d_x,
+		d_y => d_y,
+		d_pc => d_pc,
+		d_sp => d_sp,
+		d_flags => d_flags,
+		d_subcycle => d_subcycle,
+		instruction_toggle_out => instruction_toggle_out,
 		clock => clock,
 		memory_clock => memory_clock,
 		memory_cycle_done => cpu_dready,
