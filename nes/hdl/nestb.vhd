@@ -64,6 +64,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal cpu_pc: std_logic_vector(15 downto 0);
 	signal cpu_sp: std_logic_vector(7 downto 0);
 	signal cpu_flags: std_logic_vector(7 downto 0);
+	signal cpu_cycle: std_logic_vector(14 downto 0);
 	signal cpu_subcycle: std_logic_vector(3 downto 0);
 	
 	signal cpu_memory_clock: std_logic;
@@ -83,6 +84,7 @@ begin
 		d_sp => cpu_sp,
 		d_flags => cpu_flags,
 		d_subcycle => cpu_subcycle,
+		d_cycle => cpu_cycle,
 		instruction_toggle_out => cpu_instruction,
 		reset => cpu_reset,
 		cpu_oe => cpu_oe,
@@ -99,23 +101,26 @@ begin
 		for i in 0 to 8990 loop
 			wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
 			assert cpu_a = test_signals(i).a
-				report "Failure of A on instruction: Expected(" & to_hstring(test_signals(i).a) & ") got (" & to_hstring(cpu_a) & ") " & to_string(i+1)
+				report "Failure of A on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).a) & ") got (" & to_hstring(cpu_a) & ")"
 				severity failure;
 			assert cpu_x = test_signals(i).x
-				report "Failure of X on instruction: Expected(" & to_hstring(test_signals(i).x) & ") got (" & to_hstring(cpu_x) & ") " & to_string(i+1)
+				report "Failure of X on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).x) & ") got (" & to_hstring(cpu_x) & ")"
 				severity failure;
 			assert cpu_y = test_signals(i).y
-				report "Failure of Y on instruction: Expected(" & to_hstring(test_signals(i).y) & ") got (" & to_hstring(cpu_y) & ") " & to_string(i+1)
+				report "Failure of Y on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).y) & ") got (" & to_hstring(cpu_y) & ")"
 				severity failure;
 			assert cpu_sp = test_signals(i).sp
-				report "Failure of SP on instruction: Expected(" & to_hstring(test_signals(i).sp) & ") got (" & to_hstring(cpu_sp) & ") " & to_string(i+1)
+				report "Failure of SP on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).sp) & ") got (" & to_hstring(cpu_sp) & ")"
 				severity failure;
 			assert cpu_flags = test_signals(i).p
-				report "Failure of FLAGS on instruction: Expected(" & to_hstring(test_signals(i).p) & ") got (" & to_hstring(cpu_flags) & ") " & to_string(i+1)
+				report "Failure of FLAGS on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).p) & ") got (" & to_hstring(cpu_flags) & ")"
 				severity failure;
 			instruction_check <= cpu_instruction;
 			assert cpu_pc = test_signals(i).pc
-				report "Failure of PC on instruction: Expected(" & to_hstring(test_signals(i).pc) & ") got (" & to_hstring(cpu_pc) & ") " & to_string(i+1)
+				report "Failure of PC on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).pc) & ") got (" & to_hstring(cpu_pc) & ")"
+				severity failure;
+			assert cpu_cycle = test_signals(i).cycle
+				report "Failure of cycle on instruction " & to_string(i+1) & ", Expected(0x" & to_hstring(test_signals(i).cycle) & ") got (0x" & to_hstring(cpu_cycle) & ")"
 				severity failure;
 		end loop;
 		report "Test complete";

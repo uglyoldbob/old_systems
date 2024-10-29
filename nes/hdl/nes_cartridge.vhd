@@ -41,6 +41,8 @@ begin
 				prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);
 				if cpu_addr(15) = '1' then
 					cpu_data_in <= prg_rom_data;
+				else
+					cpu_data_in <= (others => '0');
 				end if;
 			when others =>
 		end case;

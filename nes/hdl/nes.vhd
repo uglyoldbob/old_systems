@@ -11,6 +11,7 @@ entity nes is
 		d_flags: out std_logic_vector(7 downto 0) := x"24";
 		d_memory_clock: out std_logic;
 		d_subcycle: out std_logic_vector(3 downto 0);
+		d_cycle: out std_logic_vector(14 downto 0);
 		instruction_toggle_out: out std_logic;
 		reset: in std_logic;
 	   clock: in std_logic;
@@ -108,6 +109,7 @@ begin
 		d_sp => d_sp,
 		d_flags => d_flags,
 		d_subcycle => d_subcycle,
+		d_cycle => d_cycle,
 		instruction_toggle_out => instruction_toggle_out,
 		clock => clock,
 		memory_clock => memory_clock,
