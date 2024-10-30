@@ -73,10 +73,15 @@ entity nes_cpu is
 end nes_cpu;
 
 architecture Behavioral of nes_cpu is
+	signal cycle_counter: std_logic_vector(14 downto 0);
+
 	signal clocka: std_logic;
 	signal clockb: std_logic;
 	signal clockm: std_logic;
 
+	signal instruction_toggle: std_logic;
+	signal cycle_toggle: std_logic;
+	
 	signal pc: std_logic_vector(15 downto 0);
 	signal next_pc: std_logic_vector(15 downto 0);
 	
@@ -121,10 +126,6 @@ architecture Behavioral of nes_cpu is
 	signal pc_increment: std_logic;
 	
 	signal instruction_toggle_pre: std_logic;
-	signal instruction_toggle: std_logic;
-	signal cycle_toggle: std_logic;
-	
-	signal cycle_counter: std_logic_vector(14 downto 0);
 	
 	signal addr_calc1: std_logic_vector(15 downto 0);
 	signal addr_calc2: std_logic_vector(15 downto 0);
@@ -277,13 +278,12 @@ begin
 						when x"20" =>
 							case subcycle(2 downto 0) is
 								when "011" =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
-									read_cycle <= '1';
-								when "100" =>
+									report("Push to stack " & to_hstring(next_pc(15 downto 8)) & " @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
 									read_cycle <= '0';
 									dout <= next_pc(15 downto 8);
-								when "101" =>
+								when "100" =>
+									report("Push to stack " & to_hstring(next_pc(7 downto 0)) & " @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
 									read_cycle <= '0';
 									dout <= next_pc(7 downto 0);
@@ -292,18 +292,13 @@ begin
 									read_cycle <= '1';
 							end case;
 						when x"60" =>
-							report("RTS MEMORY phase " & to_hstring(subcycle));
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
 								when "010" =>
+									report("Read from stack @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
 									read_cycle <= '1';
 								when "011" =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
-									read_cycle <= '1';
-								when "100" =>
+									report("Pop from stack @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
 									read_cycle <= '1';
 								when others =>
@@ -316,6 +311,7 @@ begin
 									rw_address <= pc;
 									read_cycle <= '1';
 								when others =>
+									report("Push to stack " & to_hstring(flags) & " @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
 									read_cycle <= '0';
 									dout <= flags;
@@ -327,20 +323,15 @@ begin
 									rw_address <= pc;
 									read_cycle <= '1';
 								when others =>
+									report("Push to stack " & to_hstring(a) & " @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
 									read_cycle <= '0';
-									report("Writing " & to_hstring(a) & " to " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
 									dout <= a;
 							end case;
 						when x"28" | x"68" =>
-							case subcycle(2 downto 0) is
-								when "001" | "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
-								when others =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
-									read_cycle <= '1';
-							end case;
+							report("Read from stack @ " & to_hstring(std_logic_vector(unsigned(sp(7 downto 0)) + x"0100")));
+							rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+							read_cycle <= '1';
 						when x"24" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -381,8 +372,14 @@ begin
 									dout <= x;
 							end case;
 						when x"ad" | x"ae" =>
-							rw_address <= op_byte_3 & op_byte_2;
-							read_cycle <= '1';
+							case subcycle(2 downto 0) is
+								when "010" =>
+									rw_address <= pc;
+									read_cycle <= '1';
+								when others =>
+									rw_address <= op_byte_3 & op_byte_2;
+									read_cycle <= '1';
+							end case;
 						when others =>
 							rw_address <= pc;
 					end case;
@@ -476,10 +473,12 @@ begin
 							end if;
 						when x"20" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-								when "010" =>
+								when "001" | "010" =>
 									pc <= next_pc;
-								when "011" | "100" =>
+								when "011" =>
+									pc <= next_pc;
+									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
+								when "100" =>
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
 								when others =>
 									pc <= op_byte_3 & op_byte_2;
@@ -540,7 +539,6 @@ begin
 							opcode(8) <= '0';
 						when x"85" | x"86" =>
 							if subcycle(1) then
-								report("Running command for 0x86");
 								instruction_toggle_pre <= not instruction_toggle_pre;
 								subcycle <= (others => '0');
 								opcode(8) <= '0';
@@ -654,7 +652,7 @@ begin
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
 						--load instructions
-						when x"a9" | x"ad" =>
+						when x"a9" =>
 							a <= din;
 							if din = "00000000" then
 								flags(FLAG_ZERO) <= '1';
@@ -666,6 +664,23 @@ begin
 							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
+						when x"ad" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									a <= din;
+									if din = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"a0" =>
 							y <= din;
 							if din = "00000000" then
@@ -678,7 +693,7 @@ begin
 							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
-						when x"a2" | x"ae" =>
+						when x"a2" =>
 							x <= din;
 							if din = "00000000" then
 								flags(FLAG_ZERO) <= '1';
@@ -690,6 +705,23 @@ begin
 							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
+						when x"ae" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									x <= din;
+									if din = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"98" =>
 							a <= y;
 							if y = "00000000" then
@@ -767,14 +799,15 @@ begin
 							end if;
 						--stack instructions
 						when x"60" =>
-							report("Running RTS " & to_hstring(subcycle));
 							case subcycle(2 downto 0) is
 								when "001" =>
+									report("Increment stack");
+									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
 								when "010" =>
+									report("Increment stack");
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
 									pc <= pc(15 downto 8) & din;
 								when "011" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
 									pc <= din & pc(7 downto 0);
 								when "100" =>
 								when others =>
@@ -785,9 +818,9 @@ begin
 						when x"08" | x"48" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
-								when others =>
 									pc <= next_pc;
+								when others =>
+									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -795,13 +828,14 @@ begin
 						when x"28" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
+									pc <= next_pc;
 								when "010" =>
-								when others =>
+									report("Increment stack");
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+								when others =>
 									flags <= din;
 									flags(FLAG_BREAK) <= '0';
 									flags(FLAG_UNUSED) <= '1';
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -809,9 +843,11 @@ begin
 						when x"68" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
+									pc <= next_pc;
 								when "010" =>
-								when others =>
+									report("Increment stack");
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+								when others =>
 									a <= din;
 									if din = "00000000" then
 										flags(FLAG_ZERO) <= '1';
