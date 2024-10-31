@@ -90,6 +90,7 @@ architecture Behavioral of nes_cpu is
 	signal y: std_logic_vector(7 downto 0) := x"00";
 	signal sp: std_logic_vector(7 downto 0) := x"fd";
 	signal flags: std_logic_vector(7 downto 0) := x"24";
+	signal next_dout: std_logic_vector(7 downto 0);
 	
 	constant FLAG_CARRY: integer := 0;
 	constant FLAG_ZERO: integer := 1;
@@ -129,6 +130,8 @@ architecture Behavioral of nes_cpu is
 	
 	signal addr_calc1: std_logic_vector(15 downto 0);
 	signal addr_calc2: std_logic_vector(15 downto 0);
+	signal indirect_y_addr: std_logic_vector(8 downto 0);
+	signal absolute_y_addr: std_logic_vector(8 downto 0);
 	
 	signal sub_in: std_logic_vector(7 downto 0);
 	signal sub: std_logic_vector(7 downto 0);
@@ -209,8 +212,8 @@ begin
 	process (all)
 	begin
 		case opcode(7 downto 0) is
-			when x"c0" | x"c4" => sub_in <= y;
-			when x"e0" | x"e4" => sub_in <= x;
+			when x"c0" | x"c4" | x"cc" => sub_in <= y;
+			when x"e0" | x"e4" | x"ec" => sub_in <= x;
 			when others => sub_in <= a;
 		end case;
 		sub <= std_logic_vector(unsigned(sub_in) - unsigned(din));
@@ -229,6 +232,12 @@ begin
 		else
 			next_pc <= pc;
 		end if;
+	end process;
+	
+	process(all)
+	begin
+		indirect_y_addr <= std_logic_vector(unsigned('0' & op_byte_3) + unsigned('0' & y));
+		absolute_y_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & y));
 	end process;
 	
 	process (reset, clocka)
@@ -367,6 +376,7 @@ begin
 									read_cycle <= '0';
 									dout <= a;
 							end case;
+						--zero page read
 						when x"24" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -413,14 +423,19 @@ begin
 								when "010" =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '1';
-								when "011" | "100" =>
+								when "011" =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '0';
-									dout <= op_byte_3;
+									dout <= din;
+								when "100" =>
+									rw_address <= x"00" & op_byte_2;
+									read_cycle <= '0';
+									dout <= next_dout;
 								when others =>
 									rw_address <= pc;
 									read_cycle <= '1';
 							end case;
+						--zero page write x
 						when x"86" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -442,6 +457,7 @@ begin
 									read_cycle <= '0';
 									dout <= a;
 							end case;
+						--absolute write x
 						when x"8e" =>
 							case subcycle(2 downto 0) is
 								when "010" =>
@@ -452,14 +468,103 @@ begin
 									read_cycle <= '0';
 									dout <= x;
 							end case;
-						--absolute read
-						when x"ac" | x"ad" | x"ae" =>
+						--absolute write y
+						when x"8c" =>
 							case subcycle(2 downto 0) is
 								when "010" =>
 									rw_address <= pc;
 									read_cycle <= '1';
 								when others =>
 									rw_address <= op_byte_3 & op_byte_2;
+									read_cycle <= '0';
+									dout <= y;
+							end case;
+						--absolute rmw
+						when x"0e" | x"2e" | x"4e" | x"6e" | x"ce" | x"ee" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									rw_address <= pc;
+									read_cycle <= '1';
+								when "011" =>
+									rw_address <= op_byte_3 & op_byte_2;
+									read_cycle <= '1';
+								when "100" =>
+									read_cycle <= '0';
+									rw_address <= op_byte_3 & op_byte_2;
+									dout <= din;
+								when others =>
+									read_cycle <= '0';
+									rw_address <= op_byte_3 & op_byte_2;
+									dout <= next_dout;
+							end case;
+						--absolute read
+						when	x"0d" | x"2c" | x"2d" | x"4d" | x"6d" | x"ac" | x"ad" | 
+								x"ae" | x"cc" | x"cd" | x"ec" | x"ed" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									rw_address <= pc;
+									read_cycle <= '1';
+								when others =>
+									rw_address <= op_byte_3 & op_byte_2;
+									read_cycle <= '1';
+							end case;
+						--absolute y read
+						when x"19" | x"b9" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									rw_address <= pc;
+									read_cycle <= '1';
+								when others =>
+									rw_address <= addr_calc2;
+									read_cycle <= '1';
+							end case;
+						--indirect y write
+						when x"91" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									rw_address <= pc;
+									read_cycle <= '1';
+								when "010" =>
+									rw_address <= x"00" & din;
+									read_cycle <= '1';
+								when "011" =>
+									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									read_cycle <= '1';
+								when "100" =>
+									rw_address <= addr_calc2;
+									read_cycle <= '1';
+								when others =>
+									rw_address <= addr_calc2;
+									dout <= next_dout;
+									read_cycle <= '0';
+							end case;
+						--indirect y read
+						when x"11" | x"31" | x"51" | x"71" | x"b1" | x"d1" | x"f1" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									rw_address <= pc;
+									read_cycle <= '1';
+								when "010" =>
+									rw_address <= x"00" & din;
+									read_cycle <= '1';
+								when "011" =>
+									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									read_cycle <= '1';
+								when others =>
+									rw_address <= addr_calc2;
+									read_cycle <= '1';
+							end case;
+						--indirect jmp
+						when x"6c" =>
+							case subcycle(2 downto 0) is
+								when "011" =>
+									rw_address <= op_byte_3 & op_byte_2;
+									read_cycle <= '1';
+								when "100" =>
+									rw_address <= op_byte_3 & std_logic_vector(unsigned(op_byte_2) + 1);
+									read_cycle <= '1';
+								when others =>
+									rw_address <= pc;
 									read_cycle <= '1';
 							end case;
 						when others =>
@@ -473,11 +578,13 @@ begin
 	process (all)
 	begin
 		case opcode(7 downto 0) is
-			when x"01" | x"05" | x"06" | x"09" | x"10" | x"21" | x"24" | x"25" | x"26" | x"29" | x"30" | x"41" | x"45" | 
-			     x"46" | x"49" | x"50" | x"61" | x"65" | x"66" | x"69" | x"70" | x"81" | x"84" | x"85" | x"86" | x"90" | 
-				  x"a0" | x"a1" | x"a2" | x"a4" | x"a5" | x"a6" | x"a9" | x"b0" | x"c0" | x"c1" | x"c4" | x"c5" | x"c6" |
-				  x"c9" | x"d0" | x"e0" | x"e1" | x"e4" | x"e5" | x"e6" | x"e9" | x"f0" => instruction_length <= "0001";
-			when x"20" | x"4c" | x"8d" | x"8e" | x"ac" | x"ad" | x"ae" => instruction_length <= "0010";
+			when	x"01" | x"05" | x"06" | x"09" | x"10" | x"11" | x"21" | x"24" | x"25" | x"26" | x"29" | x"30" | x"31" |
+					x"41" | x"45" | x"46" | x"49" | x"50" | x"51" | x"61" | x"65" | x"66" | x"69" | x"70" | x"71" | x"81" | 
+					x"84" | x"85" | x"86" | x"90" | x"91" | x"a0" | x"a1" | x"a2" | x"a4" | x"a5" | x"a6" | x"a9" | x"b0" | 
+					x"b1" | x"c0" | x"c1" | x"c4" | x"c5" | x"c6" | x"c9" | x"d0" | x"d1" | x"e0" | x"e1" | x"e4" | x"e5" | 
+					x"e6" | x"e9" | x"f0" | x"f1" => instruction_length <= "0001";
+			when	x"0d" | x"0e" | x"19" | x"20" | x"2c" | x"2d" | x"2e" | x"4c" | x"4d" | x"4e" | x"6c" | x"6d" | x"6e" | 
+					x"8c" | x"8d" | x"8e" | x"ac" | x"ad" | x"ae" | x"b9" | x"cc" | x"cd" | x"ce" | x"ec" | x"ed" | x"ee" => instruction_length <= "0010";
 			when others => instruction_length <= "0000";
 		end case;
 		if instruction_length <= subcycle(3 downto 0) then
@@ -535,6 +642,8 @@ begin
 				if opcode(8) = '0' then
 					pc <= next_pc;
 					opcode <= '1' & din;
+					op_byte_2 <= x"00";
+					op_byte_3 <= x"00";
 				elsif done_fetching = '0' then
 					pc <= next_pc;
 					case subcycle is
@@ -584,6 +693,22 @@ begin
 							else
 								pc <= next_pc;
 							end if;
+						when x"2c" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									flags(FLAG_OVERFLOW) <= din(FLAG_OVERFLOW);
+									flags(FLAG_NEGATIVE) <= din(FLAG_NEGATIVE);
+									if (din and a) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						--flag modifying instructions
 						when x"18" =>
 							flags(FLAG_CARRY) <= '0';
@@ -620,6 +745,17 @@ begin
 							instruction_toggle_pre <= not instruction_toggle_pre;
 							subcycle <= (others => '0');
 							opcode(8) <= '0';
+						when x"6c" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+								when "011" =>
+									addr_calc2(7 downto 0) <= din;
+								when others =>
+									pc <= din & addr_calc2(7 downto 0);
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"85" | x"86" =>
 							if subcycle(1) then
 								instruction_toggle_pre <= not instruction_toggle_pre;
@@ -658,6 +794,56 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"0d" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									a <= a or din;
+									if (a or din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) or din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"19" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+									addr_calc2 <= din & absolute_y_addr(7 downto 0);
+								when "011" =>
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_2) + unsigned(x"00" & y));
+									if absolute_y_addr(8) = '0' then
+										a <= a or din;
+										if (a or din) = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= a(7) or din(7);
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+								when others =>
+									a <= a or din;
+									if (a or din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) or din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"01" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -668,6 +854,42 @@ begin
 									addr_calc2(7 downto 0) <= din;
 								when "100" =>
 									addr_calc2(15 downto 8) <= din;
+								when others =>
+									a <= a or din;
+									if (a or din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) or din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"11" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										a <= a or din;
+										if (a or din) = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= a(7) or din(7);
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
 								when others =>
 									a <= a or din;
 									if (a or din) = "00000000" then
@@ -710,6 +932,23 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"2d" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									a <= a and din;
+									if (a and din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) and din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"21" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -720,6 +959,42 @@ begin
 									addr_calc2(7 downto 0) <= din;
 								when "100" =>
 									addr_calc2(15 downto 8) <= din;
+								when others =>
+									a <= a and din;
+									if (a and din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) and din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"31" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										a <= a and din;
+										if (a and din) = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= a(7) and din(7);
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
 								when others =>
 									a <= a and din;
 									if (a and din) = "00000000" then
@@ -762,6 +1037,23 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"4d" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									a <= a xor din;
+									if (a xor din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"41" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -772,6 +1064,42 @@ begin
 									addr_calc2(7 downto 0) <= din;
 								when "100" =>
 									addr_calc2(15 downto 8) <= din;
+								when others =>
+									a <= a xor din;
+									if (a xor din) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"51" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										a <= a xor din;
+										if (a xor din) = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= a(7) xor din(7);
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
 								when others =>
 									a <= a xor din;
 									if (a xor din) = "00000000" then
@@ -822,6 +1150,27 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"cc" | x"cd" | x"ec"=>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									if sub = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									if sub_in >= din then
+										flags(FLAG_CARRY) <= '1';
+									else
+										flags(FLAG_CARRY) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= sub(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"c1" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -849,21 +1198,83 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"d1" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										if sub = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										if sub_in >= din then
+											flags(FLAG_CARRY) <= '1';
+										else
+											flags(FLAG_CARRY) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= sub(7);
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
+								when others =>
+									if sub = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									if sub_in >= din then
+										flags(FLAG_CARRY) <= '1';
+									else
+										flags(FLAG_CARRY) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= sub(7);
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						--math instructions
 						when x"e6" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
+									next_dout <= std_logic_vector(unsigned(din) + 1);
 								when "011" =>
-									op_byte_3 <= std_logic_vector(unsigned(op_byte_3) + 1);
-								when others =>
-									if op_byte_3 = "00000000" then
+									if next_dout = "00000000" then
 										flags(FLAG_ZERO) <= '1';
 									else
 										flags(FLAG_ZERO) <= '0';
 									end if;
-									flags(FLAG_NEGATIVE) <= op_byte_3(7);
+									flags(FLAG_NEGATIVE) <= next_dout(7);
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"ee" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when "011" =>
+									next_dout <= std_logic_vector(unsigned(din) + 1);
+								when "100" =>
+									if next_dout = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= next_dout(7);
+								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -873,15 +1284,33 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
+									next_dout <= std_logic_vector(unsigned(din) - 1);
 								when "011" =>
-									op_byte_3 <= std_logic_vector(unsigned(op_byte_3) - 1);
-								when others =>
-									if op_byte_3 = "00000000" then
+									if next_dout = "00000000" then
 										flags(FLAG_ZERO) <= '1';
 									else
 										flags(FLAG_ZERO) <= '0';
 									end if;
-									flags(FLAG_NEGATIVE) <= op_byte_3(7);
+									flags(FLAG_NEGATIVE) <= next_dout(7);
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"ce" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when "011" =>
+									next_dout <= std_logic_vector(unsigned(din) - 1);
+								when "100" =>
+									if next_dout = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= next_dout(7);
+								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -905,15 +1334,34 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-								when "011" =>
-									op_byte_3 <= op_byte_3(6 downto 0) & '0';
-									flags(FLAG_CARRY) <= op_byte_3(7);
-									if op_byte_3(6 downto 0) = "0000000" then
+									next_dout <= din(6 downto 0) & '0';
+									flags(FLAG_CARRY) <= din(7);
+									if din(6 downto 0) = "0000000" then
 										flags(FLAG_ZERO) <= '1';
 									else
 										flags(FLAG_ZERO) <= '0';
 									end if;
-									flags(FLAG_NEGATIVE) <= op_byte_3(6);
+									flags(FLAG_NEGATIVE) <= din(6);
+								when "011" =>
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"0e" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when "011" =>
+									next_dout <= din(6 downto 0) & '0';
+									flags(FLAG_CARRY) <= din(7);
+									if din(6 downto 0) = "0000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= din(6);
+								when "100" =>
 								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
@@ -938,15 +1386,34 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-								when "011" =>
-									op_byte_3 <= '0' & op_byte_3(7 downto 1);
-									flags(FLAG_CARRY) <= op_byte_3(0);
-									if op_byte_3(7 downto 1) = "0000000" then
+									next_dout <= '0' & din(7 downto 1);
+									flags(FLAG_CARRY) <= din(0);
+									if din(7 downto 1) = "0000000" then
 										flags(FLAG_ZERO) <= '1';
 									else
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= '0';
+								when "011" =>
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"4e" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when "011" =>
+									next_dout <= '0' & din(7 downto 1);
+									flags(FLAG_CARRY) <= din(0);
+									if din(7 downto 1) = "0000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= '0';
+								when "100" =>
 								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
@@ -971,15 +1438,34 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-								when "011" =>
-									op_byte_3 <= op_byte_3(6 downto 0) & flags(FLAG_CARRY);
-									flags(FLAG_CARRY) <= op_byte_3(7);
-									if (op_byte_3(6 downto 0) & flags(FLAG_CARRY)) = "00000000" then
+									next_dout <= din(6 downto 0) & flags(FLAG_CARRY);
+									flags(FLAG_CARRY) <= din(7);
+									if (din(6 downto 0) & flags(FLAG_CARRY)) = "00000000" then
 										flags(FLAG_ZERO) <= '1';
 									else
 										flags(FLAG_ZERO) <= '0';
 									end if;
-									flags(FLAG_NEGATIVE) <= op_byte_3(6);
+									flags(FLAG_NEGATIVE) <= din(6);
+								when "011" =>
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"2e" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when "011" =>
+									next_dout <= din(6 downto 0) & flags(FLAG_CARRY);
+									flags(FLAG_CARRY) <= din(7);
+									if (din(6 downto 0) & flags(FLAG_CARRY)) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= din(6);
+								when "100" =>
 								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
@@ -1004,15 +1490,34 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-								when "011" =>
-									op_byte_3 <= flags(FLAG_CARRY) & op_byte_3(7 downto 1);
-									flags(FLAG_CARRY) <= op_byte_3(0);
-									if (flags(FLAG_CARRY) & op_byte_3(7 downto 1)) = "00000000" then
+									next_dout <= flags(FLAG_CARRY) & din(7 downto 1);
+									flags(FLAG_CARRY) <= din(0);
+									if (flags(FLAG_CARRY) & din(7 downto 1)) = "00000000" then
 										flags(FLAG_ZERO) <= '1';
 									else
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= flags(FLAG_CARRY);
+								when "011" =>
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"6e" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when "011" =>
+									next_dout <= flags(FLAG_CARRY) & din(7 downto 1);
+									flags(FLAG_CARRY) <= din(0);
+									if (flags(FLAG_CARRY) & din(7 downto 1)) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= flags(FLAG_CARRY);
+								when "100" =>
 								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
@@ -1051,6 +1556,25 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"6d" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									a <= adc_result(7 downto 0);
+									if adc_result(7 downto 0) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= adc_result(7);
+									flags(FLAG_CARRY) <= adc_result(8);
+									flags(FLAG_OVERFLOW) <= adc_overflow;
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"61" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -1061,6 +1585,46 @@ begin
 									addr_calc2(7 downto 0) <= din;
 								when "100" =>
 									addr_calc2(15 downto 8) <= din;
+								when others =>
+									a <= adc_result(7 downto 0);
+									if adc_result(7 downto 0) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= adc_result(7);
+									flags(FLAG_CARRY) <= adc_result(8);
+									flags(FLAG_OVERFLOW) <= adc_overflow;
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"71" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										a <= adc_result(7 downto 0);
+										if adc_result(7 downto 0) = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= adc_result(7);
+										flags(FLAG_CARRY) <= adc_result(8);
+										flags(FLAG_OVERFLOW) <= adc_overflow;
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
 								when others =>
 									a <= adc_result(7 downto 0);
 									if adc_result(7 downto 0) = "00000000" then
@@ -1109,6 +1673,25 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"ed" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									a <= sbc_result(7 downto 0);
+									if sbc_result(7 downto 0) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= sbc_result(7);
+									flags(FLAG_CARRY) <= not sbc_result(8);
+									flags(FLAG_OVERFLOW) <= sbc_overflow;
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"e1" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -1119,6 +1702,46 @@ begin
 									addr_calc2(7 downto 0) <= din;
 								when "100" =>
 									addr_calc2(15 downto 8) <= din;
+								when others =>
+									a <= sbc_result(7 downto 0);
+									if sbc_result(7 downto 0) = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= sbc_result(7);
+									flags(FLAG_CARRY) <= not sbc_result(8);
+									flags(FLAG_OVERFLOW) <= sbc_overflow;
+									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"f1" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										a <= sbc_result(7 downto 0);
+										if sbc_result(7 downto 0) = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= sbc_result(7);
+										flags(FLAG_CARRY) <= not sbc_result(8);
+										flags(FLAG_OVERFLOW) <= sbc_overflow;
+										pc <= next_pc;
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
 								when others =>
 									a <= sbc_result(7 downto 0);
 									if sbc_result(7 downto 0) = "00000000" then
@@ -1203,6 +1826,52 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"91" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+								when "100" =>
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
+									next_dout <= a;
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"b9" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+									addr_calc2 <= din & absolute_y_addr(7 downto 0);
+								when "011" =>
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_2) + unsigned(x"00" & y));
+									if absolute_y_addr(8) = '0' then
+										a <= din;
+										if din = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= din(7);
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+								when others =>
+									a <= din;
+									if din = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= din(7);
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						when x"a1" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
@@ -1222,6 +1891,40 @@ begin
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
 									pc <= next_pc;
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
+						when x"b1" =>
+							case subcycle(2 downto 0) is
+								when "001" =>
+									pc <= next_pc;
+								when "010" =>
+								when "011" =>
+									addr_calc2 <= din & indirect_y_addr(7 downto 0);
+									flags(FLAG_ZERO) <= indirect_y_addr(8);
+								when "100" =>
+									if flags(FLAG_ZERO) = '0' then
+										a <= din;
+										if din = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= din(7);
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+									end if;
+									addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
+								when others =>
+									a <= din;
+									if din = "00000000" then
+										flags(FLAG_ZERO) <= '1';
+									else
+										flags(FLAG_ZERO) <= '0';
+									end if;
+									flags(FLAG_NEGATIVE) <= din(7);
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1419,6 +2122,15 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"8c" =>
+							case subcycle(2 downto 0) is
+								when "010" =>
+									pc <= next_pc;
+								when others =>
+									instruction_toggle_pre <= not instruction_toggle_pre;
+									subcycle <= (others => '0');
+									opcode(8) <= '0';
+							end case;
 						--stack instructions
 						when x"40" =>
 							case subcycle(2 downto 0) is
@@ -1470,7 +2182,6 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-									report("Increment stack");
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
 								when others =>
 									flags <= din;
@@ -1485,7 +2196,6 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-									report("Increment stack");
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
 								when others =>
 									a <= din;
