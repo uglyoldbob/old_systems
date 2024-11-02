@@ -36,6 +36,8 @@ architecture Behavioral of nes_cartridge is
 begin
 	process (all)
 	begin
+		chr_rom_cs <= '0';
+		prg_rom_cs <= '1';
 		case mapper is
 			when x"0000" =>
 				prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);

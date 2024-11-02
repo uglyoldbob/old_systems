@@ -5,7 +5,7 @@ if {[file exists rtl_work]} {
 vlib rtl_work
 vmap work rtl_work
 
-python ../../nestest.py ../../nestest.log
+python ../../nestest.py ../../../test_roms/other/nestest.log
 
 cp ../../rom_processor.tcl ./
 cp ../../nestest.nes ./

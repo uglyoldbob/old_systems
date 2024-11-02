@@ -29,7 +29,7 @@ begin
 		elsif rising_edge(clock) then
 			c3 <= clocko;
 			counter <= std_logic_vector(unsigned(counter(2 downto 0)) + "001");
-			if counter = "110" then
+			if counter = "101" then
 				counter <= "000";
 				clocko <= not clocko;
 				clocko2 <= not clocko2;
@@ -268,6 +268,7 @@ begin
 		indirect_y_addr <= std_logic_vector(unsigned('0' & op_byte_3) + unsigned('0' & y));
 		absolute_y_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & y));
 		absolute_x_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & x));
+		memory_start <= '0';
 	end process;
 	
 	process (reset, clocka)
@@ -275,7 +276,6 @@ begin
 		if reset='1' then
 			read_cycle <= '1';
 			cycle_toggle <= '0';
-			memory_start <= '0';
 			cycle_counter <= (others => '0');
 		elsif rising_edge(clocka) then
 			dma_cycle <= NOT dma_cycle;

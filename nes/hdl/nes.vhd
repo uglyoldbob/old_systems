@@ -75,16 +75,12 @@ begin
 		end if;
 	end process;
 	
-	process (memory_clock)
+	process (reset, memory_clock)
 	begin
 		if reset = '1' then
 			cpu_dready <= '0';
 		elsif rising_edge(memory_clock) then
-			if cpu_ram_cs = '1' then
-				cpu_dready <= '1';
-			elsif cpu_cartridge_cs = '1' then
-			   cpu_dready <= '1';
-			else
+			if cpu_ram_cs or cpu_cartridge_cs then
 				cpu_dready <= '1';
 			end if;
 		end if;

@@ -46,10 +46,9 @@ begin
 			if cs = '1' then
 				if rw = '0' then
 					ram(to_integer(unsigned(address))) <= din;
+				else
+					dout <= ram(to_integer(unsigned(address)));
 				end if;
-			end if;
-			if rw = '1' then
-				dout <= ram(to_integer(unsigned(address)));
 			end if;
 		end if;
 	end process;
