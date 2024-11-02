@@ -37,16 +37,18 @@ begin
 	process (all)
 	begin
 		chr_rom_cs <= '0';
-		prg_rom_cs <= '1';
 		case mapper is
 			when x"0000" =>
 				prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);
 				if cpu_addr(15) = '1' then
+					prg_rom_cs <= '1';
 					cpu_data_in <= prg_rom_data;
 				else
+					prg_rom_cs <= '0';
 					cpu_data_in <= (others => '0');
 				end if;
 			when others =>
+				prg_rom_cs <= '0';
 		end case;
 	end process;
 	
