@@ -81,9 +81,10 @@ begin
 	
 	memory: if (unified_ram = '0' and ramtype = "sram") generate
 		prg_rom: entity work.clocked_sram 
-			generic map (bits => 14)
+			generic map (bits => 14, delay => 3)
 			port map(
 				clock => m2,
+				fast_clock => clock,
 				address => prg_rom_address(13 downto 0),
 				rw => prg_rom_rw,
 				cs => prg_rom_cs,

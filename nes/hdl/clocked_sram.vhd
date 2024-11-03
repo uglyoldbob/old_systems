@@ -6,9 +6,11 @@ use ieee.std_logic_textio.all;
 
 entity clocked_sram is
 	Generic (
-		bits: integer := 11);
+		bits: integer := 11;
+		delay: integer:= 0);
 	Port (
 		clock: in std_logic;
+		fast_clock: in std_logic := '0';
 		cs: in std_logic;
 		address: in std_logic_vector(bits-1 downto 0);
 		rw: in std_logic;
@@ -18,9 +20,23 @@ entity clocked_sram is
 end clocked_sram;
 
 architecture Behavioral of clocked_sram is
+type DELAY_ARRAY is array(delay-1 downto 0) of std_logic_vector (7 downto 0);
 type RAM_ARRAY is array (2**bits-1 downto 0) of std_logic_vector (7 downto 0);
+signal dout_buffer: std_logic_vector(7 downto 0);
+signal dout1: std_logic_vector(7 downto 0);
+signal dout2: std_logic_vector(7 downto 0);
 signal ram: RAM_ARRAY;
+signal delay_data: DELAY_ARRAY;
 begin
+	process (all)
+	begin
+		if delay /= 0 then
+			dout <= dout2;
+		else
+			dout <= dout1;
+		end if;
+	end process;
+
 	process (clock)
 	begin
 		if rising_edge(clock) then
@@ -28,8 +44,26 @@ begin
 				if not rw then
 					ram(to_integer(unsigned(address))) <= din;
 				else
-					dout <= ram(to_integer(unsigned(address)));
+					dout1 <= ram(to_integer(unsigned(address)));
+					if delay /= 0 then
+						dout_buffer <= ram(to_integer(unsigned(address)));
+					end if;
 				end if;
+			end if;
+		end if;
+	end process;
+	
+	process (fast_clock)
+	begin
+		if rising_edge(fast_clock) then
+			if delay = 1 then
+				dout2 <= dout_buffer;
+			elsif delay /= 0 then
+				delay_data(delay-2) <= dout_buffer;
+				for i in 0 to delay-3 loop
+					delay_data(i) <= delay_data(i+1);
+				end loop;
+				dout2 <= delay_data(0);
 			end if;
 		end if;
 	end process;
