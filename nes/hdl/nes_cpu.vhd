@@ -6,6 +6,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity clock_divider is
 	Port (
+		pause_cpu: in std_logic;
 		reset: in std_logic;
 		clock: in std_logic;
 		c1: out std_logic;
@@ -27,12 +28,14 @@ begin
 			clocko <= '0';
 			clocko2 <= '1';
 		elsif rising_edge(clock) then
-			c3 <= clocko;
-			counter <= std_logic_vector(unsigned(counter(2 downto 0)) + "001");
-			if counter = "101" then
-				counter <= "000";
-				clocko <= not clocko;
-				clocko2 <= not clocko2;
+			if pause_cpu = '0' then
+				c3 <= clocko;
+				counter <= std_logic_vector(unsigned(counter(2 downto 0)) + "001");
+				if counter = "101" then
+					counter <= "000";
+					clocko <= not clocko;
+					clocko2 <= not clocko2;
+				end if;
 			end if;
 		end if;
 	end process;
@@ -45,7 +48,10 @@ use ieee.std_logic_misc.all;
 use IEEE.NUMERIC_STD.ALL;
 
 entity nes_cpu is
-   Port (clock : in STD_LOGIC;
+	Generic (
+		ramtype: string := "sram");
+   Port (pause_cpu: in std_logic;
+			clock : in STD_LOGIC;
          audio : out STD_LOGIC_VECTOR (1 downto 0);
          address : out STD_LOGIC_VECTOR (15 downto 0);
 			memory_start: out std_logic;
@@ -166,6 +172,7 @@ begin
 	d_cycle <= cycle_counter;
 
 	clockd: entity work.clock_divider port map (
+		pause_cpu => pause_cpu,
 		reset => reset,
 		clock => clock,
 		c1 => clocka,

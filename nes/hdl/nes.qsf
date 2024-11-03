@@ -65,6 +65,10 @@ set_global_assignment -name EDA_TEST_BENCH_ENABLE_STATUS COMMAND_MACRO_MODE -sec
 set_global_assignment -name EDA_NATIVELINK_SIMULATION_TEST_BENCH nestb -section_id eda_simulation
 set_global_assignment -name EDA_EXTRA_ELAB_OPTION "\"\"" -section_id eda_simulation
 set_global_assignment -name EDA_SIMULATION_RUN_SCRIPT nestb.do -section_id eda_simulation
+set_global_assignment -name VERILOG_MACRO den4096Mb
+
+set_global_assignment -name VHDL_FILE clocked_sram_init.vhd
+set_global_assignment -name VERILOG_FILE ddr3.v -hdl_version SystemVerilog_2005
 set_global_assignment -name VHDL_FILE sram.vhd
 set_global_assignment -name VHDL_FILE nes_cpu.vhd -hdl_version VHDL_2008
 set_global_assignment -name VHDL_FILE nes_cartridge.vhd

@@ -2,7 +2,17 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity nes is
-    Port (
+	Generic (
+		ramtype: string := "sram";
+		unified_ram: std_logic := '0');
+   Port (
+		external_memory_write: in std_logic := '0';
+		write_signal: in std_logic := '0';
+		write_address: in std_logic_vector(19 downto 0) := (others=>'0');
+		write_value: in std_logic_vector(7 downto 0) := (others=>'0');
+		write_trigger: in std_logic := '0';
+		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
+		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
 		d_x: out std_logic_vector(7 downto 0) := x"00";
 		d_y: out std_logic_vector(7 downto 0) := x"00";
@@ -40,6 +50,8 @@ architecture Behavioral of nes is
 	signal cpu_cartridge_cs: std_logic;
 	signal cpu_cartridge_din: std_logic_vector(7 downto 0);
 	signal cpu_cartridge_dout: std_logic_vector(7 downto 0);
+	
+	signal pause: std_logic;
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -47,6 +59,7 @@ begin
 	cs_out <= cpu_ram_cs & cpu_ppu_cs & cpu_apu_cs & cpu_cartridge_cs;
 	
 	d_memory_clock <= memory_clock;
+	pause <= not cpu_dready or external_memory_write;
 	
 	process (all)
 	begin
@@ -86,18 +99,22 @@ begin
 		end if;
 	end process;
 	
-	cpu_ram: entity work.clocked_sram generic map (
-		bits => 11
-	) port map (
-		clock => memory_clock,
-		cs => cpu_ram_cs,
-		address => cpu_address(10 downto 0),
-		rw => cpu_rw,
-		din => cpu_dout,
-		dout => cpu_sram_dout
-	);
+	ram_nonunified: if (unified_ram = '0' and ramtype = "sram") generate
+		cpu_ram: entity work.clocked_sram generic map (
+			bits => 11
+		) port map (
+			clock => memory_clock,
+			cs => cpu_ram_cs,
+			address => cpu_address(10 downto 0),
+			rw => cpu_rw,
+			din => cpu_dout,
+			dout => cpu_sram_dout
+		);
+	end generate;
 	
-	cpu: entity work.nes_cpu port map (
+	cpu: entity work.nes_cpu generic map(
+		ramtype => ramtype) port map (
+		pause_cpu => pause,
 		d_a => d_a,
 		d_x => d_x,
 		d_y => d_y,
@@ -120,7 +137,9 @@ begin
 		tst => '0',
 		address => cpu_address);
 	
-	cartridge: entity work.nes_cartridge port map (
+	cartridge: entity work.nes_cartridge generic map(
+		ramtype => ramtype,
+		unified_ram => unified_ram) port map (
 		cpu_data_out => cpu_cartridge_dout,
 		cpu_data_in => cpu_cartridge_din,
 		cpu_addr => cpu_address,
@@ -132,7 +151,12 @@ begin
 		cpu_rw => cpu_rw,
 		romsel => cpu_address(15),
 		m2 => memory_clock,
-		clock => clock
+		clock => clock,
+		write_signal => write_signal,
+		write_address => write_address,
+		write_value => write_value,
+		write_trigger => write_trigger,
+		write_cs => write_cs
 	);
 
 end Behavioral;

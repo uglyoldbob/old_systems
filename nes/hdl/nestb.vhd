@@ -2,6 +2,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use std.textio.all;
 use ieee.std_logic_textio.all;
+use ieee.numeric_std.all;
 use std.env.finish;
 
 entity nestb is
@@ -51,6 +52,12 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		return results;
 	end function;
 
+	signal write_signal: std_logic;
+	signal write_address: std_logic_vector(19 downto 0);
+	signal write_value: std_logic_vector(7 downto 0);
+	signal write_trigger: std_logic;
+	signal write_cs: std_logic_vector(1 downto 0);
+	
 	signal test_signals: NES_TEST_ENTRIES(0 to 8990) := GetNestestResults("nestest.txt", 8991);
 	signal cpu_clock: std_logic := '0';
 	signal cpu_reset: std_logic := '0';
@@ -70,12 +77,16 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal cpu_memory_clock: std_logic;
 	signal cpu_instruction: std_logic;
 	signal instruction_check: std_logic;
+	
+	type RAM_ARRAY is array (2**19 downto 0) of std_logic_vector (7 downto 0);
+	signal rom : RAM_ARRAY;
+	FILE romfile : text;
 begin
-	cpu_reset <= '1', '0' after 100ns;
 	cpu_clock <= NOT cpu_clock after 10ns;
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	nes: entity work.nes port map (
+		external_memory_write => write_signal,
 		d_memory_clock => cpu_memory_clock,
 		d_a => cpu_a,
 		d_x => cpu_x,
@@ -95,7 +106,38 @@ begin
 		);
 
 	process
+		variable RomFileLine : line;
+		variable rom_value: std_logic_vector(7 downto 0);
+		variable i: integer;
+		variable size: integer;
 	begin
+		cpu_reset <= '1';
+		write_signal <= '0';
+		write_trigger <= '0';
+		file_open(romfile, "rom_prg_rom.txt", read_mode);
+		i := 0;
+		while not endfile(romfile) loop
+			readline(romfile, RomFileLine);
+			hread(RomFileLine, rom_value);
+			rom(i) <= rom_value;
+			i := i + 1;
+		end loop;
+		report("Read " & to_string(i) & " bytes");
+		write_signal <= '1';
+		size := i;
+		i := 0;
+		write_cs <= "00";
+		wait until rising_edge(cpu_clock);
+		for i in 0 to size-1 loop
+			write_address <= std_logic_vector(to_unsigned(i, 20));
+			write_value <= rom(i);
+			wait until rising_edge(cpu_clock);
+			write_trigger <= '1';
+			wait until rising_edge(cpu_clock);
+			write_trigger <= '0';
+		end loop;
+		
+		cpu_reset <= '0' after 100ns;
 		instruction_check <= '0';
 		wait until cpu_reset = '0';
 		for i in 0 to 8990 loop
