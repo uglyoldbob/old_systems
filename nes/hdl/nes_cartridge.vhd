@@ -26,6 +26,7 @@ entity nes_cartridge is
 			write_address: in std_logic_vector(19 downto 0) := (others=>'0');
 			write_value: in std_logic_vector(7 downto 0) := (others=>'0');
 			write_trigger: in std_logic := '0';
+			write_rw: in std_logic;
 			write_cs: in std_logic_vector(1 downto 0) := (others=>'0'));
 end nes_cartridge;
 
@@ -33,10 +34,12 @@ architecture Behavioral of nes_cartridge is
 	signal mapper: std_logic_vector(15 downto 0) := x"0000";
 	
 	signal mirroring: std_logic;
-	
+
+	signal prg_rom_din: std_logic_vector(7 downto 0);
 	signal prg_rom_address: std_logic_vector(14 downto 0);
 	signal prg_rom_data: std_logic_vector(7 downto 0);
 	signal prg_rom_cs: std_logic;
+	signal prg_rom_rw: std_logic;
 	
 	signal chr_rom_address: std_logic_vector(12 downto 0);
 	signal chr_rom_data: std_logic_vector(7 downto 0);
@@ -53,10 +56,23 @@ begin
 					prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);
 				end if;
 				cpu_data_in <= prg_rom_data;
-				if cpu_addr(15) = '1' then
-					prg_rom_cs <= '1';
+				if write_signal then
+					case write_cs is
+						when "00" => 
+							prg_rom_cs <= '1';
+						when others => 
+							prg_rom_cs <= '0';
+					end case;
+					prg_rom_rw <= write_rw;
+					prg_rom_din <= write_value;
 				else
-					prg_rom_cs <= '0';
+					prg_rom_din <= (others => '0');
+					prg_rom_rw <= '1';
+					if cpu_addr(15) = '1' then
+						prg_rom_cs <= '1';
+					else
+						prg_rom_cs <= '0';
+					end if;
 				end if;
 			when others =>
 				prg_rom_cs <= '0';
@@ -69,10 +85,10 @@ begin
 			port map(
 				clock => m2,
 				address => prg_rom_address(13 downto 0),
-				rw => '1',
+				rw => prg_rom_rw,
 				cs => prg_rom_cs,
 				dout => prg_rom_data,
-				din => (others=>'0'));
+				din => prg_rom_din);
 		chr_rom: entity work.clocked_sram
 			generic map (bits => 13)
 			port map(

@@ -56,6 +56,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal write_address: std_logic_vector(19 downto 0);
 	signal write_value: std_logic_vector(7 downto 0);
 	signal write_trigger: std_logic;
+	signal write_rw: std_logic;
 	signal write_cs: std_logic_vector(1 downto 0);
 	
 	signal test_signals: NES_TEST_ENTRIES(0 to 8990) := GetNestestResults("nestest.txt", 8991);
@@ -86,7 +87,12 @@ begin
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	nes: entity work.nes port map (
-		external_memory_write => write_signal,
+		write_signal => write_signal,
+		write_address => write_address,
+		write_value => write_value,
+		write_trigger => write_trigger,
+		write_rw => write_rw,
+		write_cs => write_cs,
 		d_memory_clock => cpu_memory_clock,
 		d_a => cpu_a,
 		d_x => cpu_x,
@@ -112,6 +118,7 @@ begin
 		variable size: integer;
 	begin
 		cpu_reset <= '1';
+		write_rw <= '1';
 		write_signal <= '0';
 		write_trigger <= '0';
 		file_open(romfile, "rom_prg_rom.txt", read_mode);
@@ -128,14 +135,18 @@ begin
 		i := 0;
 		write_cs <= "00";
 		wait until rising_edge(cpu_clock);
+		write_rw <= '0';
 		for i in 0 to size-1 loop
 			write_address <= std_logic_vector(to_unsigned(i, 20));
 			write_value <= rom(i);
-			wait until rising_edge(cpu_clock);
 			write_trigger <= '1';
 			wait until rising_edge(cpu_clock);
 			write_trigger <= '0';
+			wait until rising_edge(cpu_clock);
 		end loop;
+		write_signal <= '0';
+		write_rw <= '1';
+		wait until rising_edge(cpu_clock);
 		
 		cpu_reset <= '0' after 100ns;
 		instruction_check <= '0';

@@ -6,11 +6,11 @@ entity nes is
 		ramtype: string := "sram";
 		unified_ram: std_logic := '0');
    Port (
-		external_memory_write: in std_logic := '0';
 		write_signal: in std_logic := '0';
 		write_address: in std_logic_vector(19 downto 0) := (others=>'0');
 		write_value: in std_logic_vector(7 downto 0) := (others=>'0');
 		write_trigger: in std_logic := '0';
+		write_rw: in std_logic;
 		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
 		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
@@ -38,6 +38,7 @@ architecture Behavioral of nes is
 	signal cpu_din: std_logic_vector(7 downto 0);
 	signal cpu_dready: std_logic;
 	signal cpu_rw: std_logic;
+	signal cpu_memory_clock: std_logic;
 	signal memory_clock: std_logic;
 	
 	signal cpu_sram_din: std_logic_vector(7 downto 0);
@@ -59,7 +60,7 @@ begin
 	cs_out <= cpu_ram_cs & cpu_ppu_cs & cpu_apu_cs & cpu_cartridge_cs;
 	
 	d_memory_clock <= memory_clock;
-	pause <= not cpu_dready or external_memory_write;
+	pause <= write_signal;
 	
 	process (all)
 	begin
@@ -85,6 +86,17 @@ begin
 			cpu_din <= cpu_cartridge_din;
 		else
 			cpu_din <= "00000000";
+		end if;
+	end process;
+	
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			if write_signal then
+				memory_clock <= write_trigger;
+			else
+				memory_clock <= cpu_memory_clock;
+			end if;
 		end if;
 	end process;
 	
@@ -125,7 +137,7 @@ begin
 		d_cycle => d_cycle,
 		instruction_toggle_out => instruction_toggle_out,
 		clock => clock,
-		memory_clock => memory_clock,
+		memory_clock => cpu_memory_clock,
 		memory_cycle_done => cpu_dready,
 		rw => cpu_rw,
 		oe => cpu_oe,
@@ -156,6 +168,7 @@ begin
 		write_address => write_address,
 		write_value => write_value,
 		write_trigger => write_trigger,
+		write_rw => write_rw,
 		write_cs => write_cs
 	);
 
