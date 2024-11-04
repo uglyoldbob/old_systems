@@ -40,6 +40,7 @@ architecture Behavioral of nes is
 	signal cpu_rw: std_logic;
 	signal cpu_memory_clock: std_logic;
 	signal memory_clock: std_logic;
+	signal memory_start: std_logic;
 	
 	signal cpu_sram_din: std_logic_vector(7 downto 0);
 	signal cpu_sram_dout: std_logic_vector(7 downto 0);
@@ -138,6 +139,7 @@ begin
 		instruction_toggle_out => instruction_toggle_out,
 		clock => clock,
 		memory_clock => cpu_memory_clock,
+		memory_start => memory_start,
 		memory_cycle_done => cpu_dready,
 		rw => cpu_rw,
 		oe => cpu_oe,

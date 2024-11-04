@@ -15,6 +15,7 @@ entity clocked_sram is
 		address: in std_logic_vector(bits-1 downto 0);
 		rw: in std_logic;
 		din: in std_logic_vector(7 downto 0);
+		dout_valid: out std_logic;
 		dout: out std_logic_vector(7 downto 0)
 		);
 end clocked_sram;
@@ -22,6 +23,9 @@ end clocked_sram;
 architecture Behavioral of clocked_sram is
 type DELAY_ARRAY is array(delay-1 downto 0) of std_logic_vector (7 downto 0);
 type RAM_ARRAY is array (2**bits-1 downto 0) of std_logic_vector (7 downto 0);
+signal prev_address: std_logic_vector(bits-1 downto 0);
+signal ready_signal: std_logic_vector(delay-1 downto 0);
+signal ready_delay: std_logic;
 signal dout_buffer: std_logic_vector(7 downto 0);
 signal dout1: std_logic_vector(7 downto 0);
 signal dout2: std_logic_vector(7 downto 0);
@@ -32,8 +36,10 @@ begin
 	begin
 		if delay /= 0 then
 			dout <= dout2;
+			dout_valid <= ready_delay;
 		else
 			dout <= dout1;
+			dout_valid <= '1';
 		end if;
 	end process;
 
@@ -44,6 +50,7 @@ begin
 				if not rw then
 					ram(to_integer(unsigned(address))) <= din;
 				else
+					prev_address <= address;
 					dout1 <= ram(to_integer(unsigned(address)));
 					if delay /= 0 then
 						dout_buffer <= ram(to_integer(unsigned(address)));
@@ -56,6 +63,13 @@ begin
 	process (fast_clock)
 	begin
 		if rising_edge(fast_clock) then
+			if cs then
+				if prev_address /= address then
+					ready_delay <= '1';
+				else
+					ready_delay <= '0';
+				end if;
+			end if;
 			if delay = 1 then
 				dout2 <= dout_buffer;
 			elsif delay /= 0 then

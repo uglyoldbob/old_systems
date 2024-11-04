@@ -275,7 +275,13 @@ begin
 		indirect_y_addr <= std_logic_vector(unsigned('0' & op_byte_3) + unsigned('0' & y));
 		absolute_y_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & y));
 		absolute_x_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & x));
-		memory_start <= '0';
+	end process;
+	
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			memory_start <= (clocka xor clockm) and clocka and not clockm;
+		end if;
 	end process;
 	
 	process (reset, clocka)
