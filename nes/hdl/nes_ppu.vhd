@@ -29,6 +29,223 @@ architecture Behavioral of nes_ppu is
 type REGISTERS is array (7 downto 0) of std_logic_vector (7 downto 0);
 type OAM_DATA is array(255 downto 0) of std_logic_vector(7 downto 0);
 type PALETTE_DATA is array(31 downto 0) of std_logic_vector(5 downto 0);
+
+type PALETTE_LOOKUP_DATA is array (63 downto 0) of std_logic_vector(7 downto 0);
+
+signal palette_r: PALETTE_LOOKUP_DATA := (
+	std_logic_vector(to_unsigned(84, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(8, 8)),
+	std_logic_vector(to_unsigned(48, 8)),
+	std_logic_vector(to_unsigned(68, 8)),
+	std_logic_vector(to_unsigned(92, 8)),
+	std_logic_vector(to_unsigned(84, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(32, 8)),
+	std_logic_vector(to_unsigned(8, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(152, 8)),
+	std_logic_vector(to_unsigned(8, 8)),
+	std_logic_vector(to_unsigned(48, 8)),
+	std_logic_vector(to_unsigned(92, 8)),
+	std_logic_vector(to_unsigned(136, 8)),
+	std_logic_vector(to_unsigned(160, 8)),
+	std_logic_vector(to_unsigned(152, 8)),
+	std_logic_vector(to_unsigned(120, 8)),
+	std_logic_vector(to_unsigned(84, 8)),
+	std_logic_vector(to_unsigned(40, 8)),
+	std_logic_vector(to_unsigned(8, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(76, 8)),
+	std_logic_vector(to_unsigned(120, 8)),
+	std_logic_vector(to_unsigned(176, 8)),
+	std_logic_vector(to_unsigned(228, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(212, 8)),
+	std_logic_vector(to_unsigned(160, 8)),
+	std_logic_vector(to_unsigned(116, 8)),
+	std_logic_vector(to_unsigned(76, 8)),
+	std_logic_vector(to_unsigned(56, 8)),
+	std_logic_vector(to_unsigned(56, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(168, 8)),
+	std_logic_vector(to_unsigned(188, 8)),
+	std_logic_vector(to_unsigned(212, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(228, 8)),
+	std_logic_vector(to_unsigned(204, 8)),
+	std_logic_vector(to_unsigned(180, 8)),
+	std_logic_vector(to_unsigned(168, 8)),
+	std_logic_vector(to_unsigned(152, 8)),
+	std_logic_vector(to_unsigned(160, 8)),
+	std_logic_vector(to_unsigned(160, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8))
+);
+
+signal palette_g: PALETTE_LOOKUP_DATA := (
+	std_logic_vector(to_unsigned(84, 8)),
+	std_logic_vector(to_unsigned(30, 8)),
+	std_logic_vector(to_unsigned(16, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(4, 8)),
+	std_logic_vector(to_unsigned(24, 8)),
+	std_logic_vector(to_unsigned(42, 8)),
+	std_logic_vector(to_unsigned(58, 8)),
+	std_logic_vector(to_unsigned(64, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(50, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(150, 8)),
+	std_logic_vector(to_unsigned(76, 8)),
+	std_logic_vector(to_unsigned(50, 8)),
+	std_logic_vector(to_unsigned(30, 8)),
+	std_logic_vector(to_unsigned(20, 8)),
+	std_logic_vector(to_unsigned(20, 8)),
+	std_logic_vector(to_unsigned(34, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(90, 8)),
+	std_logic_vector(to_unsigned(114, 8)),
+	std_logic_vector(to_unsigned(124, 8)),
+	std_logic_vector(to_unsigned(118, 8)),
+	std_logic_vector(to_unsigned(102, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(238, 8)),
+	std_logic_vector(to_unsigned(154, 8)),
+	std_logic_vector(to_unsigned(124, 8)),
+	std_logic_vector(to_unsigned(98, 8)),
+	std_logic_vector(to_unsigned(84, 8)),
+	std_logic_vector(to_unsigned(88, 8)),
+	std_logic_vector(to_unsigned(106, 8)),
+	std_logic_vector(to_unsigned(136, 8)),
+	std_logic_vector(to_unsigned(170, 8)),
+	std_logic_vector(to_unsigned(196, 8)),
+	std_logic_vector(to_unsigned(208, 8)),
+	std_logic_vector(to_unsigned(204, 8)),
+	std_logic_vector(to_unsigned(180, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(238, 8)),
+	std_logic_vector(to_unsigned(204, 8)),
+	std_logic_vector(to_unsigned(188, 8)),
+	std_logic_vector(to_unsigned(178, 8)),
+	std_logic_vector(to_unsigned(174, 8)),
+	std_logic_vector(to_unsigned(174, 8)),
+	std_logic_vector(to_unsigned(180, 8)),
+	std_logic_vector(to_unsigned(196, 8)),
+	std_logic_vector(to_unsigned(210, 8)),
+	std_logic_vector(to_unsigned(222, 8)),
+	std_logic_vector(to_unsigned(2226, 8)),
+	std_logic_vector(to_unsigned(226, 8)),
+	std_logic_vector(to_unsigned(214, 8)),
+	std_logic_vector(to_unsigned(162, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8))
+);
+
+signal palette_b: PALETTE_LOOKUP_DATA := (
+	std_logic_vector(to_unsigned(84, 8)),
+	std_logic_vector(to_unsigned(1116, 8)),
+	std_logic_vector(to_unsigned(1144, 8)),
+	std_logic_vector(to_unsigned(136, 8)),
+	std_logic_vector(to_unsigned(100, 8)),
+	std_logic_vector(to_unsigned(48, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(152, 8)),
+	std_logic_vector(to_unsigned(196, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(228, 8)),
+	std_logic_vector(to_unsigned(176, 8)),
+	std_logic_vector(to_unsigned(100, 8)),
+	std_logic_vector(to_unsigned(32, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(40, 8)),
+	std_logic_vector(to_unsigned(120, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(180, 8)),
+	std_logic_vector(to_unsigned(100, 8)),
+	std_logic_vector(to_unsigned(32, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(32, 8)),
+	std_logic_vector(to_unsigned(108, 8)),
+	std_logic_vector(to_unsigned(204, 8)),
+	std_logic_vector(to_unsigned(60, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(236, 8)),
+	std_logic_vector(to_unsigned(212, 8)),
+	std_logic_vector(to_unsigned(176, 8)),
+	std_logic_vector(to_unsigned(144, 8)),
+	std_logic_vector(to_unsigned(120, 8)),
+	std_logic_vector(to_unsigned(120, 8)),
+	std_logic_vector(to_unsigned(144, 8)),
+	std_logic_vector(to_unsigned(180, 8)),
+	std_logic_vector(to_unsigned(228, 8)),
+	std_logic_vector(to_unsigned(160, 8)),
+	std_logic_vector(to_unsigned(0, 8)),
+	std_logic_vector(to_unsigned(0, 8))
+);
+
+signal r_out: std_logic_vector(7 downto 0);
+signal g_out: std_logic_vector(7 downto 0);
+signal b_out: std_logic_vector(7 downto 0);
+
 signal regs: REGISTERS;
 signal oam: OAM_DATA;
 signal palette: PALETTE_DATA;
@@ -66,6 +283,14 @@ signal should_eval_sprites: std_logic;
 signal scanline_number: std_logic_vector(8 downto 0) := (others => '0');
 signal scanline_cycle: std_logic_vector(8 downto 0) := (others => '0');
 signal frame_odd: std_logic := '0';
+
+signal background_pixel : std_logic_vector(6 downto 0);
+signal sprite_pixel: std_logic_vector(6 downto 0);
+signal palette_pixel: std_logic_vector(5 downto 0);
+signal pixel: std_logic_vector(5 downto 0);
+signal priority_sprite: std_logic;
+
+signal cycle1: std_logic_vector(8 downto 0);
 begin
 	process (all)
 	begin
@@ -90,6 +315,7 @@ begin
 	process (all)
 	begin
 		should_eval_sprites <= regs(1)(REG1_DRAW_SPRITES) or regs(1)(REG1_DRAW_SPRITES_FIRST_COLUMN) or regs(1)(REG1_DRAW_BACKGROUND) or regs(1)(REG1_DRAW_BACKGROUND_FIRST_COLUMN);
+		cycle1 <= std_logic_vector(unsigned(scanline_cycle) - 1);
 	end process;
 	
 	process (reset, clock)
@@ -99,6 +325,51 @@ begin
 		elsif rising_edge(clock) then
 			if should_eval_sprites then
 				--TODO
+			end if;
+		end if;
+	end process;
+	
+	process (all)
+	begin
+		--TODO color emphasis not yet implemented
+		r_out <= palette_r(to_integer(unsigned(pixel)));
+		g_out <= palette_g(to_integer(unsigned(pixel)));
+		b_out <= palette_b(to_integer(unsigned(pixel)));
+		
+		if vram_address(15 downto 8) = x"3f" then
+			if not regs(1)(REG1_DRAW_BACKGROUND) and not regs(1)(REG1_DRAW_SPRITES) then
+				palette_pixel <= palette(to_integer(unsigned(vram_address(5 downto 0))));
+			else
+				palette_pixel <= palette(0);
+			end if;
+		else
+			palette_pixel <= palette(0);
+		end if;
+		
+		if priority_sprite then
+			if sprite_pixel(6) then
+				pixel <= sprite_pixel(5 downto 0);
+			elsif background_pixel(6) then
+				pixel <= background_pixel(5 downto 0);
+			else
+				pixel <= palette_pixel;
+			end if;
+		else
+			if background_pixel(6) then
+				pixel <= background_pixel(5 downto 0);
+			elsif sprite_pixel(6) then
+				pixel <= sprite_pixel(5 downto 0);
+			else
+				pixel <= palette_pixel;
+			end if;
+		end if;
+	end process;
+	
+	process (reset, clock)
+	begin
+		if reset then
+		elsif rising_edge(clock) then
+			if scanline_number < std_logic_vector(to_unsigned(240, 9)) then
 			end if;
 		end if;
 	end process;
@@ -235,7 +506,7 @@ begin
 								pending_vram_write <= cpu_dout;
 							else
 								palette(to_integer(unsigned(palette_addr))) <= cpu_dout(5 downto 0);
-								--TODO increment vram
+								--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 1);
 							end if;
 						when others =>
 							--TODO check write ignore counter
