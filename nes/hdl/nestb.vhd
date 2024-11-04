@@ -144,6 +144,14 @@ begin
 			write_trigger <= '0';
 			wait until rising_edge(cpu_clock);
 		end loop;
+		--provide a start address mod for nestest rom
+		write_address <= x"03ffc";
+		write_value <= x"00";
+		write_trigger <= '1';
+		wait until rising_edge(cpu_clock);
+		write_trigger <= '0';
+		wait until rising_edge(cpu_clock);
+		
 		write_signal <= '0';
 		write_rw <= '1';
 		wait until rising_edge(cpu_clock);
