@@ -184,8 +184,33 @@ begin
 				report "Failure of cycle on instruction " & to_string(i+1) & ", Expected(0x" & to_hstring(test_signals(i).cycle) & ") got (0x" & to_hstring(cpu_cycle) & ")"
 				severity failure;
 		end loop;
+		
+		write_cs <= "00";
+		wait until rising_edge(cpu_clock);
+		write_rw <= '0';
+		--restore original value for nestest rom
+		write_address <= x"03ffc";
+		write_value <= x"04";
+		write_trigger <= '1';
+		wait until rising_edge(cpu_clock);
+		write_trigger <= '0';
+		wait until rising_edge(cpu_clock);
+		write_signal <= '0';
+		write_rw <= '1';
+		wait until rising_edge(cpu_clock);
+		cpu_reset <= '1';
+		wait for 100ns;
+		cpu_reset <= '0';
+		instruction_check <= '0';
+		for i in 0 to 8990 loop
+			wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
+			instruction_check <= cpu_instruction;
+		end loop;
+		wait for 40000000ns;
+		report "Just checking" severity failure;
+		
 		report "Test complete";
-		assert false report "Not a failure, test complete" severity failure;
+		finish;
 	end process;
 end Behavioral;
 

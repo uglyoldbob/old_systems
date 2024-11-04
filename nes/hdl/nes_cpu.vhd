@@ -34,13 +34,14 @@ begin
 		elsif rising_edge(clock) then
 			if pause_cpu = '0' then
 				c3 <= clocko;
-				counter <= std_logic_vector(unsigned(counter(2 downto 0)) + "001");
+				counter <= std_logic_vector(unsigned(counter) + "001");
+				counter2 <= std_logic_vector(unsigned(counter2) + "001");
 				if counter = "101" then
 					counter <= "000";
 					clocko <= not clocko;
 					clocko2 <= not clocko2;
 				end if;
-				if counter = "010" then
+				if counter2 = "011" then
 					counter2 <= "000";
 					c4 <= not c4;
 				end if;
