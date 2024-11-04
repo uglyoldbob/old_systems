@@ -36,6 +36,7 @@ architecture Behavioral of nes is
 	signal cpu_address: std_logic_vector(15 downto 0);
 	signal cpu_dout: std_logic_vector(7 downto 0);
 	signal cpu_din: std_logic_vector(7 downto 0);
+	signal cpu_din_ready: std_logic;
 	signal cpu_dready: std_logic;
 	signal cpu_rw: std_logic;
 	signal cpu_memory_clock: std_logic;
@@ -51,6 +52,7 @@ architecture Behavioral of nes is
 	
 	signal cpu_cartridge_cs: std_logic;
 	signal cpu_cartridge_din: std_logic_vector(7 downto 0);
+	signal cpu_cartridge_din_ready: std_logic;
 	signal cpu_cartridge_dout: std_logic_vector(7 downto 0);
 	
 	signal pause: std_logic;
@@ -61,7 +63,7 @@ begin
 	cs_out <= cpu_ram_cs & cpu_ppu_cs & cpu_apu_cs & cpu_cartridge_cs;
 	
 	d_memory_clock <= memory_clock;
-	pause <= write_signal;
+	pause <= write_signal or (cpu_memory_clock and not cpu_din_ready);
 	
 	process (all)
 	begin
@@ -87,6 +89,11 @@ begin
 			cpu_din <= cpu_cartridge_din;
 		else
 			cpu_din <= "00000000";
+		end if;
+		if cpu_cartridge_cs then
+			cpu_din_ready <= cpu_cartridge_din_ready;
+		else
+			cpu_din_ready <= '1';
 		end if;
 	end process;
 	
@@ -156,6 +163,7 @@ begin
 		unified_ram => unified_ram) port map (
 		cpu_data_out => cpu_cartridge_dout,
 		cpu_data_in => cpu_cartridge_din,
+		cpu_data_in_ready => cpu_cartridge_din_ready,
 		cpu_addr => cpu_address,
 		ppu_data_in => "00000000",
 		ppu_addr => "00000000000000",

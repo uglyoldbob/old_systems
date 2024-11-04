@@ -64,9 +64,20 @@ begin
 	begin
 		if rising_edge(fast_clock) then
 			if cs then
-				if prev_address /= address then
-					ready_delay <= '1';
+				if prev_address = address then
+					if delay = 1 then
+						ready_signal(0) <= '1';
+					else
+						ready_signal(delay-2) <= '1';
+						for i in 0 to delay-3 loop
+							ready_signal(i) <= ready_signal(i+1);
+						end loop;
+					end if;
+					ready_delay <= ready_signal(0);
 				else
+					for i in 0 to delay-1 loop
+						ready_signal(i) <= '0';
+					end loop;
 					ready_delay <= '0';
 				end if;
 			end if;

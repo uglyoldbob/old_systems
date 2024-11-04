@@ -19,6 +19,7 @@ entity nes_cartridge is
 			romsel: in std_logic;
 			cpu_data_in: out std_logic_vector(7 downto 0);
 			cpu_data_out: in std_logic_vector(7 downto 0);
+			cpu_data_in_ready: out std_logic;
 			cpu_addr: in std_logic_vector(15 downto 0);
 			m2: in std_logic;
 			clock: in std_logic;
@@ -38,6 +39,7 @@ architecture Behavioral of nes_cartridge is
 	signal prg_rom_din: std_logic_vector(7 downto 0);
 	signal prg_rom_address: std_logic_vector(14 downto 0);
 	signal prg_rom_data: std_logic_vector(7 downto 0);
+	signal prg_rom_data_ready: std_logic;
 	signal prg_rom_cs: std_logic;
 	signal prg_rom_rw: std_logic;
 	
@@ -70,8 +72,10 @@ begin
 					prg_rom_rw <= '1';
 					if cpu_addr(15) = '1' then
 						prg_rom_cs <= '1';
+						cpu_data_in_ready <= prg_rom_data_ready;
 					else
 						prg_rom_cs <= '0';
+						cpu_data_in_ready <= '1';
 					end if;
 				end if;
 			when others =>
@@ -81,7 +85,7 @@ begin
 	
 	memory: if (unified_ram = '0' and ramtype = "sram") generate
 		prg_rom: entity work.clocked_sram 
-			generic map (bits => 14, delay => 1)
+			generic map (bits => 14, delay => 8)
 			port map(
 				clock => m2,
 				fast_clock => clock,
@@ -89,6 +93,7 @@ begin
 				rw => prg_rom_rw,
 				cs => prg_rom_cs,
 				dout => prg_rom_data,
+				dout_valid => prg_rom_data_ready,
 				din => prg_rom_din);
 		chr_rom: entity work.clocked_sram
 			generic map (bits => 13)
