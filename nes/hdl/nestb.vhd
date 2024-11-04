@@ -121,7 +121,7 @@ begin
 		write_rw <= '1';
 		write_signal <= '0';
 		write_trigger <= '0';
-		file_open(romfile, "rom_prg_rom.txt", read_mode);
+		file_open(romfile, "nestest_prg_rom.txt", read_mode);
 		i := 0;
 		while not endfile(romfile) loop
 			readline(romfile, RomFileLine);

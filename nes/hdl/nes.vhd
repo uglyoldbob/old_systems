@@ -48,6 +48,18 @@ architecture Behavioral of nes is
 	signal cpu_ram_cs: std_logic;
 	
 	signal cpu_ppu_cs: std_logic;
+	signal cpu_ppu_din: std_logic_vector(7 downto 0);
+	signal cpu_ppu_dout: std_logic_vector(7 downto 0);
+	
+	signal ppu_int: std_logic;
+	signal ppu_ale: std_logic;
+	signal ppu_ad: std_logic_vector(7 downto 0);
+	signal ppu_a: std_logic_vector(5 downto 0);
+	signal ppu_din: std_logic_vector(7 downto 0);
+	signal ppu_rd: std_logic;
+	signal ppu_wr: std_logic;
+	signal ppu_clock: std_logic;
+	
 	signal cpu_apu_cs: std_logic;
 	
 	signal cpu_cartridge_cs: std_logic;
@@ -145,6 +157,7 @@ begin
 		d_cycle => d_cycle,
 		instruction_toggle_out => instruction_toggle_out,
 		clock => clock,
+		ppu_clock => ppu_clock,
 		memory_clock => cpu_memory_clock,
 		memory_start => memory_start,
 		memory_cycle_done => cpu_dready,
@@ -157,6 +170,24 @@ begin
 		irq => '1',
 		tst => '0',
 		address => cpu_address);
+	
+	ppu: entity work.nes_ppu generic map(
+		ramtype => ramtype) port map (
+		clock => ppu_clock,
+		reset => reset,
+		cpu_addr => cpu_address(2 downto 0),
+		cpu_cs => cpu_ppu_cs,
+		cpu_rw => cpu_rw,
+		cpu_dout => cpu_dout,
+		cpu_din => cpu_ppu_din,
+		cpu_mem_clock => memory_clock,
+		int => ppu_int,
+		ppu_ale => ppu_ale,
+		ppu_ad => ppu_ad,
+		ppu_a => ppu_a,
+		ppu_din => ppu_din,
+		ppu_rd => ppu_rd,
+		ppu_wr => ppu_wr);
 	
 	cartridge: entity work.nes_cartridge generic map(
 		ramtype => ramtype,

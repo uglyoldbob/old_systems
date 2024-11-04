@@ -67,13 +67,16 @@ begin
 				if prev_address = address then
 					if delay = 1 then
 						ready_signal(0) <= '1';
-					else
+						ready_delay <= ready_signal(0);
+					elsif delay /= 0 then
 						ready_signal(delay-2) <= '1';
 						for i in 0 to delay-3 loop
 							ready_signal(i) <= ready_signal(i+1);
 						end loop;
+						ready_delay <= ready_signal(0);
+					else
+						ready_delay <= '1';
 					end if;
-					ready_delay <= ready_signal(0);
 				else
 					for i in 0 to delay-1 loop
 						ready_signal(i) <= '0';

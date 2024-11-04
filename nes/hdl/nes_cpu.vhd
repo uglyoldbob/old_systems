@@ -11,11 +11,13 @@ entity clock_divider is
 		clock: in std_logic;
 		c1: out std_logic;
 		c2: out std_logic;
-		c3: out std_logic);
+		c3: out std_logic;
+		c4: out std_logic);
 end clock_divider;
 
 architecture Behavioral of clock_divider is
 	signal counter: std_logic_vector(2 downto 0);
+	signal counter2: std_logic_vector(2 downto 0);
 	signal clocko: std_logic;
 	signal clocko2: std_logic;
 begin
@@ -25,6 +27,8 @@ begin
 	begin
 		if reset='1' then
 			counter <= "000";
+			counter2 <= "000";
+			c4 <= '0';
 			clocko <= '0';
 			clocko2 <= '1';
 		elsif rising_edge(clock) then
@@ -35,6 +39,10 @@ begin
 					counter <= "000";
 					clocko <= not clocko;
 					clocko2 <= not clocko2;
+				end if;
+				if counter = "010" then
+					counter2 <= "000";
+					c4 <= not c4;
 				end if;
 			end if;
 		end if;
@@ -56,6 +64,7 @@ entity nes_cpu is
          address : out STD_LOGIC_VECTOR (15 downto 0);
 			memory_start: out std_logic;
 			memory_clock: out std_logic;
+			ppu_clock: out std_logic;
 			memory_cycle_done: in std_logic;
          dout : out STD_LOGIC_VECTOR (7 downto 0);
 			din: in STD_LOGIC_VECTOR (7 downto 0);
@@ -177,7 +186,8 @@ begin
 		clock => clock,
 		c1 => clocka,
 		c2 => clockb,
-		c3 => clockm
+		c3 => clockm,
+		c4 => ppu_clock
 		);
 
 	memory_clock <= clockm;

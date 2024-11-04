@@ -13,6 +13,7 @@ cp ../../nestest.nes ./
 source rom_processor.tcl
 
 vcom -2008 -work work {../../nes_cpu.vhd}
+vcom -2008 -work work {../../nes_ppu.vhd}
 vcom -2008 -work work {../../clocked_sram.vhd}
 vcom -2008 -work work {../../nes_cartridge.vhd}
 vcom -2008 -work work {../../nes.vhd}
@@ -20,7 +21,7 @@ vcom -2008 -work work {../../nestb.vhd}
 
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
-add wave /nestb/nes/cpu/*
+add wave /nestb/nes/cartridge/memory/prg_rom/*
 
 log * -r
 
