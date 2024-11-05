@@ -1,0 +1,17 @@
+<?xml version="1" encoding="UTF-8"?>
+<!DOCTYPE gowin-fpga-project>
+<Project>
+    <Template>FPGA</Template>
+    <Version>5</Version>
+    <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
+    <FileList>
+        <File path="clocked_sram.vhd" type="file.vhdl" enable="1"/>
+        <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
+        <File path="nes.vhd" type="file.vhdl" enable="1"/>
+        <File path="nes_cartridge.vhd" type="file.vhdl" enable="1"/>
+        <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>
+        <File path="nes_ppu.vhd" type="file.vhdl" enable="1"/>
+        <File path="sram.vhd" type="file.vhdl" enable="1"/>
+        <File path="sram_inout.vhd" type="file.vhdl" enable="1"/>
+    </FileList>
+</Project>

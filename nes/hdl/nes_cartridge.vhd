@@ -67,6 +67,7 @@ begin
 					end case;
 					prg_rom_rw <= write_rw;
 					prg_rom_din <= write_value;
+					cpu_data_in_ready <= '1';
 				else
 					prg_rom_din <= (others => '0');
 					prg_rom_rw <= '1';

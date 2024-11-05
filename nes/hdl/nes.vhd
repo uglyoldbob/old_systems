@@ -13,6 +13,10 @@ entity nes is
 		write_rw: in std_logic;
 		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
 		
+		ppu_r: out std_logic_vector(7 downto 0);
+		ppu_g: out std_logic_vector(7 downto 0);
+		ppu_b: out std_logic_vector(7 downto 0);
+		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
 		d_x: out std_logic_vector(7 downto 0) := x"00";
 		d_y: out std_logic_vector(7 downto 0) := x"00";
@@ -66,7 +70,7 @@ architecture Behavioral of nes is
 	signal cpu_cartridge_din: std_logic_vector(7 downto 0);
 	signal cpu_cartridge_din_ready: std_logic;
 	signal cpu_cartridge_dout: std_logic_vector(7 downto 0);
-	
+
 	signal pause: std_logic;
 begin
 	whocares <= clock;
@@ -95,9 +99,11 @@ begin
 			cpu_apu_cs <= '0';
 		end if;
 		cpu_cartridge_cs <= not (cpu_ram_cs or cpu_ppu_cs or cpu_apu_cs);
-		if cpu_ram_cs = '1' then
+		if cpu_ram_cs then
 			cpu_din <= cpu_sram_dout;
-		elsif cpu_cartridge_cs = '1' then
+		elsif cpu_ppu_cs then
+			cpu_din <= cpu_ppu_din;
+		elsif cpu_cartridge_cs then
 			cpu_din <= cpu_cartridge_din;
 		else
 			cpu_din <= "00000000";
@@ -173,6 +179,9 @@ begin
 	
 	ppu: entity work.nes_ppu generic map(
 		ramtype => ramtype) port map (
+		r_out => ppu_r,
+		g_out => ppu_g,
+		b_out => ppu_b,
 		clock => ppu_clock,
 		reset => reset,
 		cpu_addr => cpu_address(2 downto 0),

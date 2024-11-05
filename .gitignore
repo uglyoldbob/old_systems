@@ -82,3 +82,5 @@ nes/hdl/simulation/*
 nes/hdl/db/*
 nes/hdl/incremental_db/*
 nes/hdl/output_files/*
+nes/hdl/impl/*
+nes/hdl/*.user

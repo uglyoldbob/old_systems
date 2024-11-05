@@ -51,6 +51,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		end loop;
 		return results;
 	end function;
+	
+	signal run_benches: std_logic_vector(1 downto 0) := "10";
 
 	signal write_signal: std_logic;
 	signal write_address: std_logic_vector(19 downto 0);
@@ -75,6 +77,10 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal cpu_cycle: std_logic_vector(14 downto 0);
 	signal cpu_subcycle: std_logic_vector(3 downto 0);
 	
+	signal ppu_r: std_logic_vector(7 downto 0);
+	signal ppu_g: std_logic_vector(7 downto 0);
+	signal ppu_b: std_logic_vector(7 downto 0);
+	
 	signal cpu_memory_clock: std_logic;
 	signal cpu_instruction: std_logic;
 	signal instruction_check: std_logic;
@@ -87,6 +93,9 @@ begin
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	nes: entity work.nes port map (
+		ppu_r => ppu_r,
+		ppu_g => ppu_g,
+		ppu_b => ppu_b,
 		write_signal => write_signal,
 		write_address => write_address,
 		write_value => write_value,
@@ -118,95 +127,107 @@ begin
 		variable size: integer;
 	begin
 		cpu_reset <= '1';
-		write_rw <= '1';
-		write_signal <= '0';
-		write_trigger <= '0';
-		file_open(romfile, "nestest_prg_rom.txt", read_mode);
-		i := 0;
-		while not endfile(romfile) loop
-			readline(romfile, RomFileLine);
-			hread(RomFileLine, rom_value);
-			rom(i) <= rom_value;
-			i := i + 1;
-		end loop;
-		report("Read " & to_string(i) & " bytes");
-		write_signal <= '1';
-		size := i;
-		i := 0;
-		write_cs <= "00";
-		wait until rising_edge(cpu_clock);
-		write_rw <= '0';
-		for i in 0 to size-1 loop
-			write_address <= std_logic_vector(to_unsigned(i, 20));
-			write_value <= rom(i);
+		
+		if run_benches(0) or run_benches(1) then
+			write_rw <= '1';
+			write_signal <= '0';
+			write_trigger <= '0';
+			file_open(romfile, "nestest_prg_rom.txt", read_mode);
+			i := 0;
+			while not endfile(romfile) loop
+				readline(romfile, RomFileLine);
+				hread(RomFileLine, rom_value);
+				rom(i) <= rom_value;
+				i := i + 1;
+			end loop;
+			report("Read " & to_string(i) & " bytes");
+			write_signal <= '1';
+			size := i;
+			i := 0;
+			write_cs <= "00";
+			wait until rising_edge(cpu_clock);
+			write_rw <= '0';
+			for i in 0 to size-1 loop
+				write_address <= std_logic_vector(to_unsigned(i, 20));
+				write_value <= rom(i);
+				write_trigger <= '1';
+				wait until rising_edge(cpu_clock);
+				write_trigger <= '0';
+				wait until rising_edge(cpu_clock);
+			end loop;
+			--provide a start address mod for nestest rom
+			if run_benches(0) then
+				write_address <= x"03ffc";
+				write_value <= x"00";
+				write_trigger <= '1';
+				wait until rising_edge(cpu_clock);
+				write_trigger <= '0';
+				wait until rising_edge(cpu_clock);
+				
+				write_signal <= '0';
+				write_rw <= '1';
+				wait until rising_edge(cpu_clock);
+			end if;
+		end if;
+		
+		cpu_reset <= '0' after 100ns;
+		if run_benches(0) then
+			report "Running basic nestest to check cpu" severity failure;
+			instruction_check <= '0';
+			wait until cpu_reset = '0';
+			for i in 0 to 8990 loop
+				wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
+				assert cpu_a = test_signals(i).a
+					report "Failure of A on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).a) & ") got (" & to_hstring(cpu_a) & ")"
+					severity failure;
+				assert cpu_x = test_signals(i).x
+					report "Failure of X on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).x) & ") got (" & to_hstring(cpu_x) & ")"
+					severity failure;
+				assert cpu_y = test_signals(i).y
+					report "Failure of Y on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).y) & ") got (" & to_hstring(cpu_y) & ")"
+					severity failure;
+				assert cpu_sp = test_signals(i).sp
+					report "Failure of SP on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).sp) & ") got (" & to_hstring(cpu_sp) & ")"
+					severity failure;
+				assert cpu_flags = test_signals(i).p
+					report "Failure of FLAGS on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).p) & ") got (" & to_hstring(cpu_flags) & ")"
+					severity failure;
+				instruction_check <= cpu_instruction;
+				assert cpu_pc = test_signals(i).pc
+					report "Failure of PC on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).pc) & ") got (" & to_hstring(cpu_pc) & ")"
+					severity failure;
+				assert cpu_cycle = test_signals(i).cycle
+					report "Failure of cycle on instruction " & to_string(i+1) & ", Expected(0x" & to_hstring(test_signals(i).cycle) & ") got (0x" & to_hstring(cpu_cycle) & ")"
+					severity failure;
+			end loop;
+		end if;
+		
+		if run_benches(1) then
+			write_cs <= "00";
+			wait until rising_edge(cpu_clock);
+			write_rw <= '0';
+			wait until rising_edge(cpu_clock);
+			--restore original value for nestest rom
+			write_address <= x"03ffc";
+			write_value <= x"04";
 			write_trigger <= '1';
 			wait until rising_edge(cpu_clock);
 			write_trigger <= '0';
 			wait until rising_edge(cpu_clock);
-		end loop;
-		--provide a start address mod for nestest rom
-		write_address <= x"03ffc";
-		write_value <= x"00";
-		write_trigger <= '1';
-		wait until rising_edge(cpu_clock);
-		write_trigger <= '0';
-		wait until rising_edge(cpu_clock);
-		
-		write_signal <= '0';
-		write_rw <= '1';
-		wait until rising_edge(cpu_clock);
-		
-		cpu_reset <= '0' after 100ns;
-		instruction_check <= '0';
-		wait until cpu_reset = '0';
-		for i in 0 to 8990 loop
-			wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
-			assert cpu_a = test_signals(i).a
-				report "Failure of A on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).a) & ") got (" & to_hstring(cpu_a) & ")"
-				severity failure;
-			assert cpu_x = test_signals(i).x
-				report "Failure of X on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).x) & ") got (" & to_hstring(cpu_x) & ")"
-				severity failure;
-			assert cpu_y = test_signals(i).y
-				report "Failure of Y on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).y) & ") got (" & to_hstring(cpu_y) & ")"
-				severity failure;
-			assert cpu_sp = test_signals(i).sp
-				report "Failure of SP on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).sp) & ") got (" & to_hstring(cpu_sp) & ")"
-				severity failure;
-			assert cpu_flags = test_signals(i).p
-				report "Failure of FLAGS on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).p) & ") got (" & to_hstring(cpu_flags) & ")"
-				severity failure;
-			instruction_check <= cpu_instruction;
-			assert cpu_pc = test_signals(i).pc
-				report "Failure of PC on instruction " & to_string(i+1) & ", Expected(" & to_hstring(test_signals(i).pc) & ") got (" & to_hstring(cpu_pc) & ")"
-				severity failure;
-			assert cpu_cycle = test_signals(i).cycle
-				report "Failure of cycle on instruction " & to_string(i+1) & ", Expected(0x" & to_hstring(test_signals(i).cycle) & ") got (0x" & to_hstring(cpu_cycle) & ")"
-				severity failure;
-		end loop;
-		
-		write_cs <= "00";
-		wait until rising_edge(cpu_clock);
-		write_rw <= '0';
-		--restore original value for nestest rom
-		write_address <= x"03ffc";
-		write_value <= x"04";
-		write_trigger <= '1';
-		wait until rising_edge(cpu_clock);
-		write_trigger <= '0';
-		wait until rising_edge(cpu_clock);
-		write_signal <= '0';
-		write_rw <= '1';
-		wait until rising_edge(cpu_clock);
-		cpu_reset <= '1';
-		wait for 100ns;
-		cpu_reset <= '0';
-		instruction_check <= '0';
-		for i in 0 to 8990 loop
-			wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
-			instruction_check <= cpu_instruction;
-		end loop;
-		wait for 40000000ns;
+			write_signal <= '0';
+			write_rw <= '1';
+			wait until rising_edge(cpu_clock);
+			cpu_reset <= '1';
+			report "Running normal nestest to check cpu";
+			wait for 100ns;
+			cpu_reset <= '0';
+			instruction_check <= '0';
+			for i in 0 to 8990 loop
+				wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
+				instruction_check <= cpu_instruction;
+			end loop;
+			wait for 80000000ns;
+		end if;
 		report "Just checking" severity failure;
 		
 		report "Test complete";
