@@ -313,11 +313,11 @@ begin
 					when "0001" =>
 						rw_address <= pc;
 					when "0010" =>
-						rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+						rw_address <= x"01" & sp;
 					when "0011" =>
-						rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"00ff");
+						rw_address <= x"01" & sp;
 					when "0100" =>
-						rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"00fe");
+						rw_address <= x"01" & sp;
 					when "0101" =>
 						rw_address <= x"FFFC";
 					when "0110" =>
@@ -335,17 +335,13 @@ begin
 				elsif done_fetching = '1' then
 					rw_address <= pc;
 					read_cycle <= '1';
+					dout <= next_dout;
 					case opcode(7 downto 0) is
 						when x"20" =>
 							case subcycle(2 downto 0) is
-								when "011" =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+								when "011" | "100" =>
+									rw_address <= x"01" & sp;
 									read_cycle <= '0';
-									dout <= pc(15 downto 8);
-								when "100" =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
-									read_cycle <= '0';
-									dout <= pc(7 downto 0);
 								when others =>
 									rw_address <= pc;
 									read_cycle <= '1';
@@ -356,44 +352,32 @@ begin
 									rw_address <= pc;
 									read_cycle <= '1';
 								when others =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									rw_address <= x"01" & sp;
 									read_cycle <= '1';
 							end case;
 						when x"60" =>
 							case subcycle(2 downto 0) is
 								when "010" =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									rw_address <= x"01" & sp;
 									read_cycle <= '1';
 								when "011" =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									rw_address <= x"01" & sp;
 									read_cycle <= '1';
 								when others =>
 									rw_address <= pc;
 									read_cycle <= '1';
 							end case;
-						when x"08" =>
+						when x"08" | x"48" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
 									rw_address <= pc;
 									read_cycle <= '1';
 								when others =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+									rw_address <= x"01" & sp;
 									read_cycle <= '0';
-									dout <= flags;
-									dout(FLAG_BREAK) <= '1';
-							end case;
-						when x"48" =>
-							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
-								when others =>
-									rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
-									read_cycle <= '0';
-									dout <= a;
 							end case;
 						when x"28" | x"68" =>
-							rw_address <= std_logic_vector(unsigned(sp(7 downto 0)) + x"0100");
+							rw_address <= x"01" & sp;
 							read_cycle <= '1';
 						--nop indirect x
 						when x"14" | x"34" | x"54" | x"74" | x"d4" | x"f4" =>
@@ -436,7 +420,6 @@ begin
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--indirect x/y rmw
 						when x"03" | x"13" | x"23" | x"33" | x"43" | x"53" | x"63" | x"73" | x"c3" | x"e3" | x"f3" =>
@@ -456,7 +439,6 @@ begin
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--dcp indirect y write
 						when x"d3" =>
@@ -475,7 +457,6 @@ begin
 									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
-									dout <= next_dout;
 									read_cycle <= '0';
 							end case;
 						--indirect y write
@@ -495,7 +476,6 @@ begin
 									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
-									dout <= next_dout;
 									read_cycle <= '0';
 							end case;
 						--indirect y read
@@ -539,7 +519,6 @@ begin
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(y));
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--zero page x write
 						when x"94" | x"95" =>
@@ -553,7 +532,6 @@ begin
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(x));
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--zero page y
 						when x"b7" =>
@@ -629,7 +607,6 @@ begin
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(x));
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--zero page rmw
 						when x"06" | x"07" | x"26" | x"27" | x"46" | x"47" | x"66" | x"67" | x"c6" | x"c7" | x"e6" | x"e7" =>
@@ -644,7 +621,6 @@ begin
 								when "100" =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '0';
-									dout <= next_dout;
 								when others =>
 									rw_address <= pc;
 									read_cycle <= '1';
@@ -658,7 +634,6 @@ begin
 								when others =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--absolute write a
 						when x"8d" | x"8f" =>
@@ -669,10 +644,9 @@ begin
 								when others =>
 									rw_address <= op_byte_3 & op_byte_2;
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
-						--absolute write x
-						when x"8e" =>
+						--absolute write x/y
+						when x"8c" | x"8e" =>
 							case subcycle(2 downto 0) is
 								when "010" =>
 									rw_address <= pc;
@@ -680,18 +654,6 @@ begin
 								when others =>
 									rw_address <= op_byte_3 & op_byte_2;
 									read_cycle <= '0';
-									dout <= x;
-							end case;
-						--absolute write y
-						when x"8c" =>
-							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
-								when others =>
-									rw_address <= op_byte_3 & op_byte_2;
-									read_cycle <= '0';
-									dout <= y;
 							end case;
 						--absolute rmw
 						when x"0e" | x"0f" | x"2e" | x"2f" | x"4e" | x"4f" | x"6e" | x"6f" | x"ce" | x"cf" | x"ee" | x"ef" =>
@@ -709,7 +671,6 @@ begin
 								when others =>
 									read_cycle <= '0';
 									rw_address <= op_byte_3 & op_byte_2;
-									dout <= next_dout;
 							end case;
 						--absolute read
 						when	x"0c" | x"0d" | x"2c" | x"2d" | x"4d" | x"6d" | x"ac" | x"ad" | 
@@ -734,7 +695,6 @@ begin
 								when others =>
 									rw_address <=  std_logic_vector(unsigned(op_byte_3 & op_byte_2) + unsigned(x"00" & y));
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--absolute x/y rmw
 						when	x"1b" | x"1e" | x"1f" | x"3b" | x"3e" | x"3f" | x"5b" | x"5e" | 
@@ -750,7 +710,6 @@ begin
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--absolute x/y write
 						when x"9d" =>
@@ -764,7 +723,6 @@ begin
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
-									dout <= next_dout;
 							end case;
 						--absolute x/y read
 						when	x"19" | x"1c" | x"1d" | x"39" | x"3c" | x"3d" | x"59" | x"5c" | 
@@ -946,7 +904,9 @@ begin
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
+									next_dout <= pc(15 downto 8);
 								when "011" =>
+									next_dout <= pc(7 downto 0);
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
 								when "100" =>
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
@@ -1102,7 +1062,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1121,7 +1080,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1138,7 +1096,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1189,7 +1146,6 @@ begin
 											flags(FLAG_ZERO) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= a(7) or din(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1225,7 +1181,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1247,7 +1202,6 @@ begin
 											flags(FLAG_ZERO) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= a(7) or din(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1261,7 +1215,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1290,7 +1243,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1325,7 +1277,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1376,7 +1327,6 @@ begin
 											flags(FLAG_ZERO) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= a(7) and din(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1389,7 +1339,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1412,7 +1361,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1434,7 +1382,6 @@ begin
 											flags(FLAG_ZERO) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= a(7) and din(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1448,7 +1395,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1477,7 +1423,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1496,7 +1441,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1513,7 +1457,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1564,7 +1507,6 @@ begin
 											flags(FLAG_ZERO) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1577,7 +1519,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1600,7 +1541,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1622,7 +1562,6 @@ begin
 											flags(FLAG_ZERO) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1636,7 +1575,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1673,7 +1611,6 @@ begin
 										flags(FLAG_CARRY) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= sub(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1695,7 +1632,6 @@ begin
 										flags(FLAG_CARRY) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= sub(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1716,7 +1652,6 @@ begin
 										flags(FLAG_CARRY) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= sub(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1779,7 +1714,6 @@ begin
 											flags(FLAG_CARRY) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= sub(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1796,7 +1730,6 @@ begin
 										flags(FLAG_CARRY) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= sub(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1823,7 +1756,6 @@ begin
 										flags(FLAG_CARRY) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= sub(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2232,7 +2164,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2255,7 +2186,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2278,7 +2208,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2308,7 +2237,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2334,7 +2262,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2360,7 +2287,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2386,7 +2312,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) or next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2415,7 +2340,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2438,7 +2362,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2461,7 +2384,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2491,7 +2413,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2517,7 +2438,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2543,7 +2463,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2569,7 +2488,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) and next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2598,7 +2516,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2621,7 +2538,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2644,7 +2560,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2674,7 +2589,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2700,7 +2614,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2726,7 +2639,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2752,7 +2664,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= a(7) xor next_dout(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2783,7 +2694,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2808,7 +2718,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2833,7 +2742,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2865,7 +2773,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2893,7 +2800,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2921,7 +2827,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2949,7 +2854,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adcm_result(7);
 									flags(FLAG_CARRY) <= adcm_result(8);
 									flags(FLAG_OVERFLOW) <= adcm_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -2975,7 +2879,6 @@ begin
 											flags(FLAG_CARRY) <= '0';
 										end if;
 										flags(FLAG_NEGATIVE) <= sub(7);
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -3561,7 +3464,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adc_result(7);
 									flags(FLAG_CARRY) <= adc_result(8);
 									flags(FLAG_OVERFLOW) <= adc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3600,7 +3502,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adc_result(7);
 									flags(FLAG_CARRY) <= adc_result(8);
 									flags(FLAG_OVERFLOW) <= adc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3657,7 +3558,6 @@ begin
 										flags(FLAG_NEGATIVE) <= adc_result(7);
 										flags(FLAG_CARRY) <= adc_result(8);
 										flags(FLAG_OVERFLOW) <= adc_overflow;
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -3672,7 +3572,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adc_result(7);
 									flags(FLAG_CARRY) <= adc_result(8);
 									flags(FLAG_OVERFLOW) <= adc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3697,7 +3596,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adc_result(7);
 									flags(FLAG_CARRY) <= adc_result(8);
 									flags(FLAG_OVERFLOW) <= adc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3721,7 +3619,6 @@ begin
 										flags(FLAG_NEGATIVE) <= adc_result(7);
 										flags(FLAG_CARRY) <= adc_result(8);
 										flags(FLAG_OVERFLOW) <= adc_overflow;
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -3737,7 +3634,6 @@ begin
 									flags(FLAG_NEGATIVE) <= adc_result(7);
 									flags(FLAG_CARRY) <= adc_result(8);
 									flags(FLAG_OVERFLOW) <= adc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3770,7 +3666,6 @@ begin
 									flags(FLAG_NEGATIVE) <= sbc_result(7);
 									flags(FLAG_CARRY) <= not sbc_result(8);
 									flags(FLAG_OVERFLOW) <= sbc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3808,7 +3703,6 @@ begin
 									flags(FLAG_NEGATIVE) <= sbc_result(7);
 									flags(FLAG_CARRY) <= not sbc_result(8);
 									flags(FLAG_OVERFLOW) <= sbc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3865,7 +3759,6 @@ begin
 										flags(FLAG_NEGATIVE) <= sbc_result(7);
 										flags(FLAG_CARRY) <= not sbc_result(8);
 										flags(FLAG_OVERFLOW) <= sbc_overflow;
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -3880,7 +3773,6 @@ begin
 									flags(FLAG_NEGATIVE) <= sbc_result(7);
 									flags(FLAG_CARRY) <= not sbc_result(8);
 									flags(FLAG_OVERFLOW) <= sbc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3905,7 +3797,6 @@ begin
 									flags(FLAG_NEGATIVE) <= sbc_result(7);
 									flags(FLAG_CARRY) <= not sbc_result(8);
 									flags(FLAG_OVERFLOW) <= sbc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3929,7 +3820,6 @@ begin
 										flags(FLAG_NEGATIVE) <= sbc_result(7);
 										flags(FLAG_CARRY) <= not sbc_result(8);
 										flags(FLAG_OVERFLOW) <= sbc_overflow;
-										pc <= next_pc;
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -3945,7 +3835,6 @@ begin
 									flags(FLAG_NEGATIVE) <= sbc_result(7);
 									flags(FLAG_CARRY) <= not sbc_result(8);
 									flags(FLAG_OVERFLOW) <= sbc_overflow;
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -3999,7 +3888,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4017,7 +3905,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4035,7 +3922,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4054,7 +3940,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4066,7 +3951,6 @@ begin
 								when "011" =>
 									next_dout <= a;
 								when others =>
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4200,7 +4084,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4224,7 +4107,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4311,7 +4193,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4329,7 +4210,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4389,7 +4269,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4440,7 +4319,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4500,7 +4378,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4517,7 +4394,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4676,6 +4552,7 @@ begin
 							case subcycle(2 downto 0) is
 								when "010" =>
 									pc <= next_pc;
+									next_dout <= y;
 								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
@@ -4721,6 +4598,12 @@ begin
 							case subcycle(2 downto 0) is
 								when "001" =>
 									pc <= next_pc;
+									if opcode(6) then
+										next_dout <= a;
+									else
+										next_dout <= flags;
+										next_dout(FLAG_BREAK) <= '1';
+									end if;
 								when others =>
 									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
 									instruction_toggle_pre <= not instruction_toggle_pre;
@@ -4755,7 +4638,6 @@ begin
 										flags(FLAG_ZERO) <= '0';
 									end if;
 									flags(FLAG_NEGATIVE) <= din(7);
-									pc <= next_pc;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
