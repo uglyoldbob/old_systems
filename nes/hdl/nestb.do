@@ -11,6 +11,7 @@ cp ../../rom_processor.tcl ./
 
 source rom_processor.tcl
 
+vcom -2008 -work work {../../ddr.vhd}
 vcom -2008 -work work {../../nes_cpu.vhd}
 vcom -2008 -work work {../../nes_ppu.vhd}
 vcom -2008 -work work {../../clocked_sram.vhd}

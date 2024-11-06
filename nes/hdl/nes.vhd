@@ -12,7 +12,7 @@ entity nes is
 		write_trigger: in std_logic := '0';
 		write_rw: in std_logic;
 		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
-		
+		asdf: out std_logic;
 		ppu_r: out std_logic_vector(7 downto 0);
 		ppu_g: out std_logic_vector(7 downto 0);
 		ppu_b: out std_logic_vector(7 downto 0);
@@ -136,6 +136,12 @@ begin
 			end if;
 		end if;
 	end process;
+	
+	ddrtest: entity work.ddr generic map (t => "mux")
+		port map(
+			din => cpu_address(1 downto 0),
+			dout => asdf,
+			clock => clock);
 	
 	ram_nonunified: if (unified_ram = '0' and ramtype = "sram") generate
 		cpu_ram: entity work.clocked_sram generic map (
