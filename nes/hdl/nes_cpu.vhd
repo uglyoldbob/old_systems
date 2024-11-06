@@ -132,6 +132,9 @@ architecture Behavioral of nes_cpu is
 	signal dma_count: std_logic_vector(8 downto 0);
 	signal dma_dmc_counter: std_logic_vector(7 downto 0);
 	
+	signal sp_plus: std_logic_vector(7 downto 0);
+	signal sp_minus: std_logic_vector(7 downto 0);
+	
 	signal rw_address: std_logic_vector(15 downto 0);
 	signal read_cycle: std_logic; --indicates a read cycle when true
 	signal stall: std_logic;
@@ -250,6 +253,9 @@ begin
 		sbcm_result <= std_logic_vector(unsigned('0' & a) - unsigned('0' & next_dout) - unsigned(sbc_carry_in));
 		sbc_overflow <= (a(7) xor sbc_result(7)) and (din(7) xor sbc_result(7) xor '1');
 		sbcm_overflow <= (a(7) xor sbcm_result(7)) and (next_dout(7) xor sbcm_result(7) xor '1');
+		
+		sp_plus <= std_logic_vector(unsigned(sp) + "00000001");
+		sp_minus <= std_logic_vector(unsigned(sp) - "00000001");
 	end process;
 	
 	process (all)
@@ -692,7 +698,7 @@ begin
 				case subcycle(2 downto 0) is
 					when "000" | "001" => null;
 					when "010" | "011" | "100" =>
-						sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
+						sp <= sp_minus;
 					when "101" =>
 						pc <= pc(15 downto 8) & din;
 					when others =>
@@ -788,9 +794,9 @@ begin
 									next_dout <= pc(15 downto 8);
 								when "011" =>
 									next_dout <= pc(7 downto 0);
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
+									sp <= sp_minus;
 								when "100" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
+									sp <= sp_minus;
 								when others =>
 									pc <= op_byte_3 & op_byte_2;
 									instruction_toggle_pre <= not instruction_toggle_pre;
@@ -871,49 +877,6 @@ begin
 									addr_calc2(7 downto 0) <= din;
 								when others =>
 									pc <= din & addr_calc2(7 downto 0);
-									instruction_toggle_pre <= not instruction_toggle_pre;
-									subcycle <= (others => '0');
-									opcode(8) <= '0';
-							end case;
-						when x"86" =>
-							if subcycle(1) then
-								instruction_toggle_pre <= not instruction_toggle_pre;
-								subcycle <= (others => '0');
-								opcode(8) <= '0';
-							else
-								pc <= next_pc;
-								next_dout <= x;
-							end if;
-						when x"85" =>
-							if subcycle(1) then
-								instruction_toggle_pre <= not instruction_toggle_pre;
-								subcycle <= (others => '0');
-								opcode(8) <= '0';
-							else
-								pc <= next_pc;
-								next_dout <= a;
-							end if;
-						when x"87" =>
-							if subcycle(1) then
-								instruction_toggle_pre <= not instruction_toggle_pre;
-								subcycle <= (others => '0');
-								opcode(8) <= '0';
-							else
-								pc <= next_pc;
-								next_dout <= a and x;
-							end if;
-						when x"94" | x"95" | x"96" | x"97"=>
-							case subcycle(2 downto 0) is
-								when "001" =>
-									pc <= next_pc;
-								when "010" =>
-									case opcode(7 downto 0) is
-										when x"94" => next_dout <= y;
-										when x"95" => next_dout <= a;
-										when x"97" => next_dout <= a and x;
-										when others => next_dout <= x;
-									end case;
-								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -4419,40 +4382,72 @@ begin
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
-						when x"84" =>
+						when x"94" | x"95" | x"96" | x"97"=>
 							case subcycle(2 downto 0) is
 								when "001" =>
 									pc <= next_pc;
-									next_dout <= y;
-								when others =>
-									instruction_toggle_pre <= not instruction_toggle_pre;
-									subcycle <= (others => '0');
-									opcode(8) <= '0';
-							end case;
-						when x"8c" =>
-							case subcycle(2 downto 0) is
 								when "010" =>
-									pc <= next_pc;
-									next_dout <= y;
+									case opcode(7 downto 0) is
+										when x"94" => next_dout <= y;
+										when x"95" => next_dout <= a;
+										when x"97" => next_dout <= a and x;
+										when others => next_dout <= x;
+									end case;
 								when others =>
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
+						when x"86" =>
+							if subcycle(1) then
+								instruction_toggle_pre <= not instruction_toggle_pre;
+								subcycle <= (others => '0');
+								opcode(8) <= '0';
+							else
+								pc <= next_pc;
+								next_dout <= x;
+							end if;
+						when x"85" =>
+							if subcycle(1) then
+								instruction_toggle_pre <= not instruction_toggle_pre;
+								subcycle <= (others => '0');
+								opcode(8) <= '0';
+							else
+								pc <= next_pc;
+								next_dout <= a;
+							end if;
+						when x"87" =>
+							if subcycle(1) then
+								instruction_toggle_pre <= not instruction_toggle_pre;
+								subcycle <= (others => '0');
+								opcode(8) <= '0';
+							else
+								pc <= next_pc;
+								next_dout <= a and x;
+							end if;
+						when x"84" | x"8c" =>
+							if instruction_length(2 downto 0) = subcycle(2 downto 0) then
+								pc <= next_pc;
+								next_dout <= y;
+							else
+								instruction_toggle_pre <= not instruction_toggle_pre;
+								subcycle <= (others => '0');
+								opcode(8) <= '0';
+							end if;
 						--stack instructions
 						when x"40" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
 								when "010" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+									sp <= sp_plus;
 								when "011" =>
 									flags <= din;
 									flags(FLAG_BREAK) <= '0';
 									flags(FLAG_UNUSED) <= '1';
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+									sp <= sp_plus;
 								when "100" =>
 									pc <= pc(15 downto 8) & din;
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+									sp <= sp_plus;
 								when others =>
 									pc <= din & pc(7 downto 0);
 									instruction_toggle_pre <= not instruction_toggle_pre;
@@ -4462,9 +4457,9 @@ begin
 						when x"60" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+									sp <= sp_plus;
 								when "010" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+									sp <= sp_plus;
 									pc <= pc(15 downto 8) & din;
 								when "011" =>
 									pc <= din & pc(7 downto 0);
@@ -4486,39 +4481,31 @@ begin
 										next_dout(FLAG_BREAK) <= '1';
 									end if;
 								when others =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
+									sp <= sp_minus;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
 							end case;
-						when x"28" =>
+						when x"28" | x"68" =>
 							case subcycle(2 downto 0) is
 								when "001" =>
 									pc <= next_pc;
 								when "010" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
+									sp <= sp_plus;
 								when others =>
-									flags <= din;
-									flags(FLAG_BREAK) <= '0';
-									flags(FLAG_UNUSED) <= '1';
-									instruction_toggle_pre <= not instruction_toggle_pre;
-									subcycle <= (others => '0');
-									opcode(8) <= '0';
-							end case;
-						when x"68" =>
-							case subcycle(2 downto 0) is
-								when "001" =>
-									pc <= next_pc;
-								when "010" =>
-									sp <= std_logic_vector(unsigned(sp(7 downto 0)) + "00000001");
-								when others =>
-									a <= din;
-									if din = "00000000" then
-										flags(FLAG_ZERO) <= '1';
+									if opcode(6) then
+										a <= din;
+										if din = "00000000" then
+											flags(FLAG_ZERO) <= '1';
+										else
+											flags(FLAG_ZERO) <= '0';
+										end if;
+										flags(FLAG_NEGATIVE) <= din(7);
 									else
-										flags(FLAG_ZERO) <= '0';
+										flags <= din;
+										flags(FLAG_BREAK) <= '0';
+										flags(FLAG_UNUSED) <= '1';
 									end if;
-									flags(FLAG_NEGATIVE) <= din(7);
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
