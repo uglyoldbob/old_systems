@@ -103,7 +103,7 @@ architecture Behavioral of nes_cpu is
 	signal a: std_logic_vector(7 downto 0) := x"00";
 	signal x: std_logic_vector(7 downto 0) := x"00";
 	signal y: std_logic_vector(7 downto 0) := x"00";
-	signal sp: std_logic_vector(7 downto 0) := x"fd";
+	signal sp: std_logic_vector(7 downto 0) := x"00";
 	signal flags: std_logic_vector(7 downto 0) := x"24";
 	signal next_dout: std_logic_vector(7 downto 0);
 	
@@ -305,13 +305,12 @@ begin
 			instruction_toggle_out <= instruction_toggle_pre;
 			instruction_toggle <= instruction_toggle_pre;
 			cycle_counter <= std_logic_vector(unsigned(cycle_counter) + 1);
+			read_cycle <= '1';
+			rw_address <= pc;
 			if reset_active then
-				read_cycle <= '1';
 				case subcycle is
-					when "0000" =>
-						rw_address <= pc;
-					when "0001" =>
-						rw_address <= pc;
+					when "0000" => null;
+					when "0001" => null;
 					when "0010" =>
 						rw_address <= x"01" & sp;
 					when "0011" =>
@@ -326,97 +325,70 @@ begin
 					   rw_address <= "XXXXXXXXXXXXXXXX";
 				end case;
 			else
+				
+				dout <= next_dout;
 				if opcode(8) = '0' then
-					rw_address <= pc;
-					read_cycle <= '1';
+					null;
 				elsif done_fetching = '0' then
-					rw_address <= pc;
-					read_cycle <= '1';
+					null;
 				elsif done_fetching = '1' then
-					rw_address <= pc;
-					read_cycle <= '1';
-					dout <= next_dout;
 					case opcode(7 downto 0) is
 						when x"20" =>
 							case subcycle(2 downto 0) is
 								when "011" | "100" =>
 									rw_address <= x"01" & sp;
 									read_cycle <= '0';
-								when others =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when others => null;
 							end case;
 						when x"40" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when others =>
 									rw_address <= x"01" & sp;
-									read_cycle <= '1';
 							end case;
 						when x"60" =>
 							case subcycle(2 downto 0) is
 								when "010" =>
 									rw_address <= x"01" & sp;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"01" & sp;
-									read_cycle <= '1';
-								when others =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when others => null;
 							end case;
 						when x"08" | x"48" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when others =>
 									rw_address <= x"01" & sp;
 									read_cycle <= '0';
 							end case;
 						when x"28" | x"68" =>
 							rw_address <= x"01" & sp;
-							read_cycle <= '1';
 						--nop indirect x
 						when x"14" | x"34" | x"54" | x"74" | x"d4" | x"f4" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when others =>
 									rw_address <= x"00" & op_byte_2; --not technically correct for last cycle, doesn't matter for zero page
-									read_cycle <= '1';
 							end case;
 						--indirect x
 						when x"01" | x"21" | x"41" | x"61" | x"a1" | x"a3" | x"c1" | x"e1" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" | "011" =>
 									rw_address <= x"00" & op_byte_2;
-									read_cycle <= '1';
 								when "100" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 							end case;
 						--indirect x store
 						when x"81" | x"83" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" | "011" =>
 									rw_address <= x"00" & op_byte_2;
-									read_cycle <= '1';
 								when "100" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -424,18 +396,13 @@ begin
 						--indirect x/y rmw
 						when x"03" | x"13" | x"23" | x"33" | x"43" | x"53" | x"63" | x"73" | x"c3" | x"e3" | x"f3" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & op_byte_2;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
 								when "100" | "101" =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -443,18 +410,13 @@ begin
 						--dcp indirect y write
 						when x"d3" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
 								when "100" | "101" =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -462,18 +424,13 @@ begin
 						--indirect y write
 						when x"91" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
 								when "100" =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -481,41 +438,29 @@ begin
 						--indirect y read
 						when x"11" | x"31" | x"51" | x"71" | x"b1" | x"b3" | x"d1" | x"f1" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 							end case;
 						--indirect jmp
 						when x"6c" =>
 							case subcycle(2 downto 0) is
 								when "011" =>
 									rw_address <= op_byte_3 & op_byte_2;
-									read_cycle <= '1';
 								when "100" =>
 									rw_address <= op_byte_3 & std_logic_vector(unsigned(op_byte_2) + 1);
-									read_cycle <= '1';
-								when others =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when others => null;
 							end case;
 						--zero page y write
 						when x"96" | x"97" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(y));
 									read_cycle <= '0';
@@ -523,12 +468,9 @@ begin
 						--zero page x write
 						when x"94" | x"95" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(x));
 									read_cycle <= '0';
@@ -536,74 +478,52 @@ begin
 						--zero page y
 						when x"b7" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(y));
-									read_cycle <= '1';
 							end case;
 						--zero page x
 						when x"15" | x"35" | x"55" | x"75" | x"b4" | x"b5" | x"d5" | x"f5" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(x));
-									read_cycle <= '1';
 							end case;
 						--zero page y
 						when x"b6" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(y));
-									read_cycle <= '1';
 							end case;
 						--zero page read
 						when x"04" | x"24" | x"44" | x"64" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when others =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 							end case;
 						--zero page read
 						when x"05" | x"25" | x"45" | x"65" | x"a4" | x"a5" | x"a6" | x"a7" | x"c4" | x"c5" | x"e4" | x"e5" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when others =>
 									rw_address <= x"00" & op_byte_2;
-									read_cycle <= '1';
 							end case;
 						--zero page x rmw
 						when x"16" | x"17" | x"36" | x"37" | x"56" | x"57" | x"76" | x"77" | x"d6" | x"d7" | x"f6" | x"f7" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(x));
-									read_cycle <= '1';
 								when others =>
 									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + unsigned(x));
 									read_cycle <= '0';
@@ -613,7 +533,6 @@ begin
 							case subcycle(2 downto 0) is
 								when "010" =>
 									rw_address <= x"00" & op_byte_2;
-									read_cycle <= '1';
 								when "011" =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '0';
@@ -621,36 +540,20 @@ begin
 								when "100" =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '0';
-								when others =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when others => null;
 							end case;
 						--zero page write
 						when x"84" | x"85" | x"86" | x"87" =>
 							case subcycle(2 downto 0) is
-								when "001" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "001" => null;
 								when others =>
 									rw_address <= x"00" & op_byte_2;
 									read_cycle <= '0';
 							end case;
-						--absolute write a
-						when x"8d" | x"8f" =>
+						--absolute write a/x/y
+						when x"8c" | x"8d" | x"8e" | x"8f" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
-								when others =>
-									rw_address <= op_byte_3 & op_byte_2;
-									read_cycle <= '0';
-							end case;
-						--absolute write x/y
-						when x"8c" | x"8e" =>
-							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when others =>
 									rw_address <= op_byte_3 & op_byte_2;
 									read_cycle <= '0';
@@ -658,12 +561,9 @@ begin
 						--absolute rmw
 						when x"0e" | x"0f" | x"2e" | x"2f" | x"4e" | x"4f" | x"6e" | x"6f" | x"ce" | x"cf" | x"ee" | x"ef" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when "011" =>
 									rw_address <= op_byte_3 & op_byte_2;
-									read_cycle <= '1';
 								when "100" =>
 									read_cycle <= '0';
 									rw_address <= op_byte_3 & op_byte_2;
@@ -676,22 +576,16 @@ begin
 						when	x"0c" | x"0d" | x"2c" | x"2d" | x"4d" | x"6d" | x"ac" | x"ad" | 
 								x"ae" | x"af" | x"cc" | x"cd" | x"ec" | x"ed" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when others =>
 									rw_address <= op_byte_3 & op_byte_2;
-									read_cycle <= '1';
 							end case;
 						--absolute y write
 						when x"99" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when "011" =>
 									rw_address <= din & std_logic_vector(unsigned(op_byte_2) + unsigned(y));
-									read_cycle <= '1';
 								when others =>
 									rw_address <=  std_logic_vector(unsigned(op_byte_3 & op_byte_2) + unsigned(x"00" & y));
 									read_cycle <= '0';
@@ -701,12 +595,9 @@ begin
 								x"5f" | x"7b" | x"7e" | x"7f" | x"db" | x"de" | x"df" | x"fb" | 
 								x"fe" | x"ff" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when "011" | "100" =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -714,12 +605,9 @@ begin
 						--absolute x/y write
 						when x"9d" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when "011" =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -729,15 +617,11 @@ begin
 								x"5d" | x"79" | x"7c" | x"7d" | x"b9" | x"bc" | x"bd" | x"be" | 
 								x"bf" | x"d9" | x"dc" | x"dd" | x"f9" | x"fc" | x"fd" =>
 							case subcycle(2 downto 0) is
-								when "010" =>
-									rw_address <= pc;
-									read_cycle <= '1';
+								when "010" => null;
 								when others =>
 									rw_address <= addr_calc2;
-									read_cycle <= '1';
 							end case;
-						when others =>
-							rw_address <= pc;
+						when others => null;
 					end case;
 				end if;
 			end if;
@@ -757,8 +641,8 @@ begin
 					x"97" | x"a0" | x"a1" | x"a2" | x"a3" | x"a4" | x"a5" | x"a6" | 
 					x"a7" | x"a9" | x"b0" | x"b1" | x"b3" | x"b4" | x"b5" | x"b6" | 
 					x"b7" | x"c0" | x"c1" | x"c3" | x"c4" | x"c5" | x"c6" | x"c7" | 
-					x"c9" | x"d0" | x"d1" | x"d4" | x"d5" | x"d6" | x"e0" | x"d3" | 
-					x"d7" | x"e1" | x"e3" | x"e4" | x"e5" | x"e6" | x"e7" | x"e9" | 
+					x"c9" | x"d0" | x"d1" | x"d3" | x"d4" | x"d5" | x"d6" | x"d7" | 
+					x"e0" | x"e1" | x"e3" | x"e4" | x"e5" | x"e6" | x"e7" | x"e9" | 
 					x"eb" | x"f0" | x"f1" | x"f3" | x"f4" | x"f5" | x"f6" | x"f7" => instruction_length <= "0001";
 			when	x"0c" | x"0d" | x"0e" | x"0f" | x"19" | x"1b" | x"1c" | x"1d" | 
 					x"1e" | x"1f" | x"20" | x"2c" | x"2d" | x"2e" | x"2f" | x"39" | x"3b" | x"3c" | 
@@ -795,7 +679,6 @@ begin
 	process(reset, clockm)
 	begin
 		if reset='1' then
-			sp <= x"FD";
 			pc <= x"FFFC";
 			flags(FLAG_INTERRUPT) <= '1';
 			opcode <= "011111111";
@@ -807,11 +690,9 @@ begin
 				subcycle <= std_logic_vector(unsigned(subcycle(3 downto 0)) + "0001");
 				pc <= next_pc;
 				case subcycle(2 downto 0) is
-					when "000" =>
-					when "001" =>
-					when "010" =>
-					when "011" =>
-					when "100" =>
+					when "000" | "001" => null;
+					when "010" | "011" | "100" =>
+						sp <= std_logic_vector(unsigned(sp(7 downto 0)) - "00000001");
 					when "101" =>
 						pc <= pc(15 downto 8) & din;
 					when others =>
