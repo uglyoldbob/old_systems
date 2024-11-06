@@ -92,7 +92,6 @@ architecture Behavioral of nes_cpu is
 	signal cycle_counter: std_logic_vector(14 downto 0);
 
 	signal clocka: std_logic;
-	signal clockb: std_logic;
 	signal clockm: std_logic;
 
 	signal instruction_toggle: std_logic;
@@ -186,7 +185,6 @@ begin
 		reset => reset,
 		clock => clock,
 		c1 => clocka,
-		c2 => clockb,
 		c3 => clockm,
 		c4 => ppu_clock
 		);
@@ -836,7 +834,7 @@ begin
 		end if;
 	end process;
 	
-	process(reset, clockb)
+	process(reset, clockm)
 	begin
 		if reset='1' then
 			sp <= x"FD";
@@ -846,7 +844,7 @@ begin
 			reset_active <= '1';
 			subcycle <= "0000";
 			instruction_toggle_pre <= '0';
-		elsif rising_edge(clockb) then
+		elsif falling_edge(clockm) then
 			if reset_active then
 				subcycle <= std_logic_vector(unsigned(subcycle(3 downto 0)) + "0001");
 				pc <= next_pc;
