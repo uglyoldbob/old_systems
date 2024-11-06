@@ -5,6 +5,7 @@ entity ddr is
 	Generic(t: string := "clock");
 	Port( din: in std_logic_vector(1 downto 0);
 			dout: out std_logic;
+			doutn: out std_logic;
 			clock: in std_logic);
 end ddr;
 
@@ -15,14 +16,18 @@ begin
 		if t = "clock" then
 			if rising_edge(clock) then
 				dout <= din(0);
+				doutn <= not din(0);
 			elsif falling_edge(clock) then
 				dout <= din(1);
+				doutn <= not din(1);
 			end if;
 		elsif t = "mux" then
 			if clock then
 				dout <= din(0);
+				doutn <= not din(0);
 			else
 				dout <= din(1);
+				doutn <= not din(1);
 			end if;
 		end if;
 	end process;

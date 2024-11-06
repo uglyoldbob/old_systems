@@ -67,6 +67,7 @@ set_global_assignment -name EDA_EXTRA_ELAB_OPTION "\"\"" -section_id eda_simulat
 set_global_assignment -name EDA_SIMULATION_RUN_SCRIPT nestb.do -section_id eda_simulation
 set_global_assignment -name VERILOG_MACRO den4096Mb
 
+set_global_assignment -name VHDL_FILE hdmi.vhd
 set_global_assignment -name VHDL_FILE ddr.vhd
 set_global_assignment -name VHDL_FILE clocked_sram_init.vhd
 set_global_assignment -name VERILOG_FILE ddr3.v -hdl_version SystemVerilog_2005

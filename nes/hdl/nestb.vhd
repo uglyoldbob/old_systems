@@ -52,7 +52,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		return results;
 	end function;
 	
-	signal run_benches: std_logic_vector(1 downto 0) := "10";
+	signal run_benches: std_logic_vector(2 downto 0) := "100";
 
 	signal write_signal: std_logic;
 	signal write_address: std_logic_vector(19 downto 0);
@@ -85,13 +85,56 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal cpu_instruction: std_logic;
 	signal instruction_check: std_logic;
 	
+	signal hdmi_tmds_clock: std_logic := '0';
+	signal hdmi_d_0_p: std_logic;
+	signal hdmi_d_0_n: std_logic;
+	signal hdmi_d_1_p: std_logic;
+	signal hdmi_d_1_n: std_logic;
+	signal hdmi_d_2_p: std_logic;
+	signal hdmi_d_2_n: std_logic;
+	signal hdmi_ck_p: std_logic;
+	signal hdmi_ck_n: std_logic;
+	signal hdmi_cec: std_logic;
+	signal hdmi_i2c_scl: std_logic;
+	signal hdmi_i2c_sda: std_logic;
+	signal hdmi_hpd: std_logic;
+	
 	type RAM_ARRAY is array (2**19 downto 0) of std_logic_vector (7 downto 0);
 	signal rom : RAM_ARRAY;
 	FILE romfile : text;
 begin
 	cpu_clock <= NOT cpu_clock after 10ns;
+	hdmi_tmds_clock <= not hdmi_tmds_clock after 2 ns;
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
+	
+	hdmi_i2c_scl <= 'H';
+	hdmi_i2c_sda <= 'H';
+	
+	hdmi: entity work.hdmi generic map(
+		h => 1280,
+		v => 720,
+		hblank => 384,
+		vblank => 28) port map (
+		d_0_p => hdmi_d_0_p,
+		d_0_n => hdmi_d_0_n,
+		d_1_p => hdmi_d_1_p,
+		d_1_n => hdmi_d_1_n,
+		d_2_p => hdmi_d_2_p,
+		d_2_n => hdmi_d_2_n,
+		ck_p => hdmi_ck_p,
+		ck_n => hdmi_ck_n,
+		cec => hdmi_cec,
+		i2c_scl => hdmi_i2c_scl,
+		i2c_sda => hdmi_i2c_sda,
+		hpd => hdmi_hpd,
+		pixel_clock => cpu_clock,
+		tmds_clock => hdmi_tmds_clock,
+		r => "00000000",
+		g => "10101010",
+		b => "11001100"
+	);
+	
 	nes: entity work.nes port map (
 		ppu_r => ppu_r,
 		ppu_g => ppu_g,
@@ -228,6 +271,11 @@ begin
 			end loop;
 			wait for 80000000ns;
 		end if;
+		
+		if run_benches(2) then
+			wait for 160000000ns;
+		end if;
+		
 		report "Just checking" severity failure;
 		
 		report "Test complete";
