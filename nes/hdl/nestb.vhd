@@ -274,13 +274,13 @@ begin
 				instruction_check <= cpu_instruction;
 			end loop;
 			wait for 80000000ns;
+			report "Just checking" severity failure;
 		end if;
 		
 		if run_benches(2) then
 			wait for 160000000ns;
+			report "Just checking" severity failure;
 		end if;
-		
-		report "Just checking" severity failure;
 		
 		report "Test complete";
 		finish;
