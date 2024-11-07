@@ -52,7 +52,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		return results;
 	end function;
 	
-	signal run_benches: std_logic_vector(2 downto 0) := "100";
+	signal run_benches: std_logic_vector(2 downto 0) := "001";
 
 	signal write_signal: std_logic;
 	signal write_address: std_logic_vector(19 downto 0);
@@ -215,7 +215,7 @@ begin
 		
 		cpu_reset <= '0' after 100ns;
 		if run_benches(0) then
-			report "Running basic nestest to check cpu" severity failure;
+			report "Running basic nestest to check cpu";
 			instruction_check <= '0';
 			wait until cpu_reset = '0';
 			for i in 0 to 8990 loop

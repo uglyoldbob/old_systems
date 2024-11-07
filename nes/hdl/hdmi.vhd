@@ -590,6 +590,26 @@ begin
 						when "10" => output <= "0101010100";
 						when others => output <= "1010101011";
 					end case;
+				when "10" =>
+					disparity <= 0;
+					case aux is
+						when "0000" => output <= "1010011100";
+						when "0001" => output <= "1001100011";
+						when "0010" => output <= "1011100100";
+						when "0011" => output <= "1011100010";
+						when "0100" => output <= "0101110001";
+						when "0101" => output <= "0100011110";
+						when "0110" => output <= "0110001110";
+						when "0111" => output <= "0100111100";
+						when "1000" => output <= "1011001100";
+						when "1001" => output <= "0100111001";
+						when "1010" => output <= "0110011100";
+						when "1011" => output <= "1011000110";
+						when "1100" => output <= "1010001110";
+						when "1101" => output <= "1001110001";
+						when "1110" => output <= "0101100011";
+						when others => output <= "1011000011";
+					end case;
 				when others => null;
 			end case;
 		end if;
@@ -670,6 +690,10 @@ architecture Behavioral of hdmi is
 	signal tmds_1: std_logic_vector(9 downto 0);
 	signal tmds_2: std_logic_vector(9 downto 0);
 	
+	signal tmds_0_mux: std_logic_vector(9 downto 0);
+	signal tmds_1_mux: std_logic_vector(9 downto 0);
+	signal tmds_2_mux: std_logic_vector(9 downto 0);
+	
 	signal tmds_0_ddr: std_logic_vector(1 downto 0);
 	signal tmds_1_ddr: std_logic_vector(1 downto 0);
 	signal tmds_2_ddr: std_logic_vector(1 downto 0);
@@ -682,31 +706,93 @@ architecture Behavioral of hdmi is
 	
 	signal hsync: std_logic;
 	signal vsync: std_logic;
+	signal control_period: std_logic;
+	signal pixels_guard: std_logic;
 	signal pixels: std_logic;
+	signal data_island_guard: std_logic;
+	signal data_island: std_logic;
+	signal data_island_preamble: std_logic;
+	signal pixel_preamble: std_logic;
+	
+	signal request_data_island: std_logic;
+	signal data_island_mode: std_logic_vector(2 downto 0) := (others => '0');
+	signal data_island_guard_count: std_logic := '0';
+	signal data_island_counter: std_logic_vector(9 downto 0) := (others => '0');
 	
 	signal selection: std_logic_vector(1 downto 0);
 begin
     clock_freq <= htotal * vtotal * rate;
 	 
+	 data_island_guard <= data_island_mode(1);
+	 data_island_preamble <= data_island_mode(2);
+	 process (pixel_clock)
+	 begin
+		if rising_edge(pixel_clock) then
+			case data_island_mode is
+				when "000" =>
+					if request_data_island then
+						data_island_mode <= "100";
+					end if;
+				when "100" =>
+					data_island_counter <= std_logic_vector(unsigned(data_island_counter) + 1);
+					if data_island_counter(4 downto 0) = "00111" then
+						data_island_mode <= "010";
+						data_island_counter <= (others => '0');
+					end if;
+				when "010" =>
+					data_island_guard_count <= not data_island_guard_count;
+					if data_island_guard_count then
+						data_island_mode <= "001";
+					end if;
+				when "011" =>
+					data_island_guard_count <= not data_island_guard_count;
+					if data_island_guard_count then
+						data_island_mode <= "000";
+					end if;
+				when others =>
+					data_island_counter <= std_logic_vector(unsigned(data_island_counter) + 1);
+					if data_island_counter(4 downto 0) = "11111" then
+						data_island_mode <= "011";
+						data_island_counter <= (others => '0');
+					end if;
+			end case;
+		end if;
+	 end process;
+	 
 	 process (all)
 	 begin
-		if column >= h then
+		if column = 15 then
+			request_data_island <= '1';
+		else
+			request_data_island <= '0';
+		end if;
+		if column < (hblank-2) then
 			hsync <= '1';
 		else
 			hsync <= '0';
 		end if;
-		if row >= v then
+		if column = (hblank-1) or column = (hblank-2) then
+			pixels_guard <= '1';
+		else
+			pixels_guard <= '0';
+		end if;
+		if column >= (hblank-10) and column <= (hblank - 3) then
+			pixel_preamble <= '1';
+		else
+			pixel_preamble <= '0';
+		end if;
+		if row < vblank then
 			vsync <= '1';
 		else
 			vsync <= '0';
 		end if;
-		pixels <= hsync nor vsync;
+		pixels <= (hsync or pixels_guard) nor vsync;
 		if pixels then
 			selection <= "00";
-		elsif hsync then
-			selection <= "01";
-		elsif vsync then
+		elsif data_island then
 			selection <= "10";
+		elsif hsync or vsync then
+			selection <= "01";
 		else
 			selection <= "11";
 		end if;
@@ -739,7 +825,7 @@ begin
 	
 	d0_mux: entity work.tmds_multiplexer port map(
 		clock => tmds_clock,
-		din => tmds_0,
+		din => tmds_0_mux,
 		dout => tmds_0_ddr
 	);
 	
@@ -750,6 +836,34 @@ begin
 			doutn => d_0_n,
 			clock => tmds_clock
 	);
+	
+	process (all)
+	begin
+		if data_island_preamble then
+			control <= "0101";
+		elsif pixel_preamble then
+			control <= "0001";
+		else
+			control <= "0000";
+		end if;
+	end process;
+	
+	process (all)
+	begin
+		if pixels_guard then
+			tmds_0_mux <= "1011001100";
+			tmds_1_mux <= "0100110011";
+			tmds_2_mux <= "1011001100";
+		elsif data_island_guard then
+			tmds_0_mux <= tmds_0;
+			tmds_1_mux <= "0100110011";
+			tmds_2_mux <= "0100110011";
+		else
+			tmds_0_mux <= tmds_0;
+			tmds_1_mux <= tmds_1;
+			tmds_2_mux <= tmds_2;
+		end if;
+	end process;
 	
 	d1_encoder: entity work.tmds_encoder port map(
 		clock => pixel_clock,
@@ -762,7 +876,7 @@ begin
 	
 	d1_mux: entity work.tmds_multiplexer port map(
 		clock => tmds_clock,
-		din => tmds_1,
+		din => tmds_1_mux,
 		dout => tmds_1_ddr
 	);
 	
@@ -785,7 +899,7 @@ begin
 	
 	d2_mux: entity work.tmds_multiplexer port map(
 		clock => tmds_clock,
-		din => tmds_2,
+		din => tmds_2_mux,
 		dout => tmds_2_ddr
 	);
 	
