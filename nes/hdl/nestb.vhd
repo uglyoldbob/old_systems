@@ -114,8 +114,12 @@ begin
 	hdmi: entity work.hdmi generic map(
 		h => 1280,
 		v => 720,
-		hblank => 384,
-		vblank => 28) port map (
+		hblank_width => 384,
+		hsync_porch => 64,
+		hsync_width => 128,
+		vblank_width => 28,
+		vsync_porch => 3,
+		vsync_width => 5) port map (
 		d_0_p => hdmi_d_0_p,
 		d_0_n => hdmi_d_0_n,
 		d_1_p => hdmi_d_1_p,

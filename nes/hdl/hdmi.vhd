@@ -656,8 +656,14 @@ entity hdmi is
 	Generic(t: string := "clock";
         h: integer := 1920;
         v: integer := 1080;
-        hblank: integer := 656;
-        vblank: integer := 40;
+        hblank_width: integer := 656;
+        vblank_width: integer := 40;
+		  hsync_polarity: std_logic := '0';
+		  hsync_porch: integer := 128;
+		  hsync_width: integer := 200;
+		  vsync_width: integer := 5;
+		  vsync_porch: integer := 3;
+		  vsync_polarity: std_logic := '1';
         rate: integer := 60);
 	Port(
 		clock_freq: out integer;
@@ -698,12 +704,14 @@ architecture Behavioral of hdmi is
 	signal tmds_1_ddr: std_logic_vector(1 downto 0);
 	signal tmds_2_ddr: std_logic_vector(1 downto 0);
 	
-	signal htotal: integer := (h + hblank);
-	signal vtotal: integer := (v + vblank);
+	signal htotal: integer := (h + hblank_width);
+	signal vtotal: integer := (v + vblank_width);
 	
-	signal column: integer range 0 to h+hblank-1 := 0;
-	signal row: integer range 0 to v+vblank-1:= 0;
+	signal column: integer range 0 to h+hblank_width-1 := 0;
+	signal row: integer range 0 to v+vblank_width-1:= 0;
 	
+	signal hblank: std_logic;
+	signal vblank: std_logic;
 	signal hsync: std_logic;
 	signal vsync: std_logic;
 	signal control_period: std_logic;
@@ -766,32 +774,42 @@ begin
 		else
 			request_data_island <= '0';
 		end if;
-		if column < (hblank-2) then
-			hsync <= '1';
+		if column < (hblank_width-2) then
+			hblank <= '1';
 		else
-			hsync <= '0';
+			hblank <= '0';
 		end if;
-		if column = (hblank-1) or column = (hblank-2) then
+		if column = (hblank_width-1) or column = (hblank_width-2) then
 			pixels_guard <= '1';
 		else
 			pixels_guard <= '0';
 		end if;
-		if column >= (hblank-10) and column <= (hblank - 3) then
+		if column >= (hsync_porch) and column < (hsync_width + hsync_porch) then
+			hsync <= hsync_polarity;
+		else
+			hsync <= not hsync_polarity;
+		end if;
+		if row >= (vsync_porch) and row < (vsync_width + vsync_porch) then
+			vsync <= vsync_polarity;
+		else
+			vsync <= not vsync_polarity;
+		end if;
+		if column >= (hblank_width-10) and column <= (hblank_width - 3) then
 			pixel_preamble <= '1';
 		else
 			pixel_preamble <= '0';
 		end if;
-		if row < vblank then
-			vsync <= '1';
+		if row < vblank_width then
+			vblank <= '1';
 		else
-			vsync <= '0';
+			vblank <= '0';
 		end if;
-		pixels <= (hsync or pixels_guard) nor vsync;
+		pixels <= (hblank or pixels_guard) nor vblank;
 		if pixels then
 			selection <= "00";
 		elsif data_island then
 			selection <= "10";
-		elsif hsync or vsync then
+		elsif hblank or vblank then
 			selection <= "01";
 		else
 			selection <= "11";
