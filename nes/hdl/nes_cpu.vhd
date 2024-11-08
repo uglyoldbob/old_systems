@@ -784,8 +784,25 @@ begin
 										op_byte_2 <= std_logic_vector(unsigned(din) + unsigned(x));
 									when "010" =>
 										addr_calc2(7 downto 0) <= din;
-									when others =>
+									when "011" =>
 										addr_calc2(15 downto 8) <= din;
+									when others =>
+										null;
+								end case;
+							--indirect, y dcp
+							when x"d3" =>
+								case subcycle(2 downto 0) is
+									when "001" =>
+									when "010" =>
+									when "011" =>
+										addr_calc2 <= din & indirect_y_addr(7 downto 0);
+										if indirect_y_addr(8) then
+											extra_cycle <= "0001";
+										else
+											extra_cycle <= "0000";
+										end if;
+									when others =>
+										addr_calc2 <= std_logic_vector(unsigned(addr_calc2(15 downto 8) & op_byte_3) + unsigned(x"00" & y));
 								end case;
 							--indirect, x
 							when x"01" | x"21" | x"41" | x"c1" | x"e1" =>
@@ -800,7 +817,7 @@ begin
 										addr_calc2(15 downto 8) <= din;
 								end case;
 							--indirect, y
-							when x"11" | x"31" | x"51" | x"d1" | x"d3" | x"f1" =>
+							when x"11" | x"31" | x"51" | x"d1" | x"f1" =>
 								case subcycle(2 downto 0) is
 									when "001" =>
 									when "010" =>
