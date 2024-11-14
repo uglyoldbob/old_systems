@@ -9,6 +9,7 @@
         <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
         <File path="ddr.vhd" type="file.vhdl" enable="1"/>
         <File path="hdmi.vhd" type="file.vhdl" enable="1"/>
+        <File path="lfsr.vhd" type="file.vhdl" enable="1"/>
         <File path="nes.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_cartridge.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>

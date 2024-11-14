@@ -52,7 +52,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		return results;
 	end function;
 	
-	signal run_benches: std_logic_vector(2 downto 0) := "001";
+	signal run_benches: std_logic_vector(2 downto 0) := "100";
 
 	signal write_signal: std_logic;
 	signal write_address: std_logic_vector(19 downto 0);
@@ -112,6 +112,7 @@ begin
 	hdmi_i2c_sda <= 'H';
 	
 	hdmi: entity work.hdmi generic map(
+		t => "mux",
 		h => 1280,
 		v => 720,
 		hblank_width => 384,
@@ -120,6 +121,7 @@ begin
 		vblank_width => 28,
 		vsync_porch => 3,
 		vsync_width => 5) port map (
+		reset => cpu_reset,
 		d_0_p => hdmi_d_0_p,
 		d_0_n => hdmi_d_0_n,
 		d_1_p => hdmi_d_1_p,

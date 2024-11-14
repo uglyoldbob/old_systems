@@ -24,6 +24,7 @@ entity nes_tang_nano_20k is
 end nes_tang_nano_20k;
 
 architecture Behavioral of nes_tang_nano_20k is
+    signal random_data: std_logic_vector(31 downto 0);
     signal hdmi_pixel_clock: std_logic;
     signal tmds_clock: std_logic;
 
@@ -44,6 +45,7 @@ architecture Behavioral of nes_tang_nano_20k is
 
 begin
     leds(5 downto 1) <= "10101";
+    leds(0) <= not hdmi_hpd;
 
     hdmi_pll: tmds_pll port map(
         clkout => tmds_clock,
@@ -58,9 +60,14 @@ begin
     hdmi_converter: entity work.hdmi generic map(
         t => "mux",
         h => 1280,
-        v => 720,
-        hblank => 384,
-        vblank => 28) port map(
+		v => 720,
+		hblank_width => 384,
+		hsync_porch => 64,
+		hsync_width => 128,
+		vblank_width => 28,
+		vsync_porch => 3,
+		vsync_width => 5) port map(
+        reset => '0',
         pixel_clock => hdmi_pixel_clock,
         tmds_clock => tmds_clock,
         d_0_p => hdmi_d_0_p,
@@ -75,17 +82,12 @@ begin
         i2c_scl => hdmi_i2c_scl,
         i2c_sda => hdmi_i2c_sda,
         hpd => hdmi_hpd,
-        r => "00000000",
-        g => "10101010",
-        b => "11001100",
-        hsync => '0',
-        vsync => '0');
+        r => random_data(23 downto 16),
+        g => random_data(15 downto 8),
+        b => random_data(7 downto 0));
 
-    process (clock)
-    begin
-        if rising_edge(clock) then
-            leds(0) <= not leds(0);
-        end if;
-    end process;
+    random: entity work.lfsr32 port map(
+		clock => hdmi_pixel_clock,
+		dout => random_data);
 end Behavioral;
 

@@ -554,7 +554,7 @@ begin
 				q_m(8) <= '1';
 			end if;
 		end if;
-		if falling_edge(clock) then
+		if rising_edge(clock) then
 			case sel is
 				when "00" =>
 					if disparity = 0 or ones_count_qm = 4 then
@@ -624,6 +624,8 @@ use IEEE.NUMERIC_STD.ALL;
 entity tmds_multiplexer is
 	Port(
 		clock: in std_logic;
+		pixel_clock: in std_logic;
+		reset: in std_logic;
 		din: in std_logic_vector(9 downto 0);
 		dout: out std_logic_vector(1 downto 0));
 end tmds_multiplexer;
@@ -631,19 +633,29 @@ end tmds_multiplexer;
 architecture Behavioral of tmds_multiplexer is
 signal counter: std_logic_vector(2 downto 0) := "000";
 begin
-	process (clock)
+
+	process (all)
+	begin
+		case counter is
+			when "000" => dout <= din(1 downto 0);
+			when "001" => dout <= din(3 downto 2);
+			when "010" => dout <= din(5 downto 4);
+			when "011" => dout <= din(7 downto 6);
+			when others => dout <= din(9 downto 8);
+		end case;
+	end process;
+
+	process (reset, clock)
 	begin
 		if rising_edge(clock) then
-			counter <= std_logic_vector(unsigned(counter) + 1);
-			case counter is
-				when "000" => dout <= din(1 downto 0);
-				when "001" => dout <= din(3 downto 2);
-				when "010" => dout <= din(5 downto 4);
-				when "011" => dout <= din(7 downto 6);
-				when others => 
-					dout <= din(9 downto 8);
+			if reset then
+				counter <= "000";
+			else
+				counter <= std_logic_vector(unsigned(counter) + 1);
+				if counter = "100" then
 					counter <= "000";
-			end case;
+				end if;
+			end if;
 		end if;
 	end process;
 end Behavioral;
@@ -666,6 +678,7 @@ entity hdmi is
 		  vsync_polarity: std_logic := '1';
         rate: integer := 60);
 	Port(
+		reset: in std_logic;
 		clock_freq: out integer;
 		pixel_clock: in std_logic;
 		tmds_clock: in std_logic;
@@ -842,7 +855,9 @@ begin
 	);
 	
 	d0_mux: entity work.tmds_multiplexer port map(
+		reset => reset,
 		clock => tmds_clock,
+		pixel_clock => pixel_clock,
 		din => tmds_0_mux,
 		dout => tmds_0_ddr
 	);
@@ -866,21 +881,23 @@ begin
 		end if;
 	end process;
 	
-	process (all)
+	process (pixel_clock)
 	begin
-		if pixels_guard then
-			tmds_0_mux <= "1011001100";
-			tmds_1_mux <= "0100110011";
-			tmds_2_mux <= "1011001100";
-		elsif data_island_guard then
-			tmds_0_mux <= tmds_0;
-			tmds_1_mux <= "0100110011";
-			tmds_2_mux <= "0100110011";
-		else
-			tmds_0_mux <= tmds_0;
-			tmds_1_mux <= tmds_1;
-			tmds_2_mux <= tmds_2;
-		end if;
+        if rising_edge(pixel_clock) then
+            if pixels_guard then
+                tmds_0_mux <= "1011001100";
+                tmds_1_mux <= "0100110011";
+                tmds_2_mux <= "1011001100";
+            elsif data_island_guard then
+                tmds_0_mux <= tmds_0;
+                tmds_1_mux <= "0100110011";
+                tmds_2_mux <= "0100110011";
+            else
+                tmds_0_mux <= tmds_0;
+                tmds_1_mux <= tmds_1;
+                tmds_2_mux <= tmds_2;
+            end if;
+        end if;
 	end process;
 	
 	d1_encoder: entity work.tmds_encoder port map(
@@ -893,7 +910,9 @@ begin
 	);
 	
 	d1_mux: entity work.tmds_multiplexer port map(
+		reset => reset,
 		clock => tmds_clock,
+		pixel_clock => pixel_clock,
 		din => tmds_1_mux,
 		dout => tmds_1_ddr
 	);
@@ -916,7 +935,9 @@ begin
 	);
 	
 	d2_mux: entity work.tmds_multiplexer port map(
+		reset => reset,
 		clock => tmds_clock,
+		pixel_clock => pixel_clock,
 		din => tmds_2_mux,
 		dout => tmds_2_ddr
 	);
@@ -928,7 +949,7 @@ begin
 			doutn => d_2_n,
 			clock => tmds_clock
 	);
-
+	
 	ck_p <= pixel_clock;
 	ck_n <= not pixel_clock;
 

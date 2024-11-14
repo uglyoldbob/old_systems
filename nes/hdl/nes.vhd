@@ -73,8 +73,6 @@ architecture Behavioral of nes is
 	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
-	
-	signal random_data: std_logic_vector(31 downto 0);
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -237,10 +235,6 @@ begin
 		write_rw => write_rw,
 		write_cs => write_cs
 	);
-	
-	random: entity work.lfsr32 port map(
-		clock => clock,
-		dout => random_data);
 
 end Behavioral;
 
