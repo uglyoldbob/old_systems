@@ -1519,52 +1519,25 @@ begin
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
 								end case;
-							when others => null;
-						end case;
-					end if;
-					
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					--REMOVE THIS CASE statement entirely-----------------------
-					------------------------------------------------------------
-					------------------------------------------------------------
-					case opcode(7 downto 0) is
-						--stack instructions
-						when x"60" =>
-							case subcycle(2 downto 0) is
-								when "001" =>
-									sp <= sp_plus;
-								when "010" =>
-									sp <= sp_plus;
-									pc <= pc(15 downto 8) & din;
-								when "011" =>
-									pc <= din & pc(7 downto 0);
-								when "100" =>
-									pc <= std_logic_vector(unsigned(pc) + 1);
-								when others =>
-									instruction_toggle_pre <= not instruction_toggle_pre;
-									subcycle <= (others => '0');
-									opcode(8) <= '0';
-							end case;
-						when x"08" | x"48" =>
-							case subcycle(2 downto 0) is
-								when "001" =>
+							when x"60" =>
+								case execution_cycle(2 downto 0) is
+									when "000" =>
+										sp <= sp_plus;
+									when "001" =>
+										sp <= sp_plus;
+										pc <= pc(15 downto 8) & din;
+									when "010" =>
+										pc <= din & pc(7 downto 0);
+									when "011" =>
+										pc <= std_logic_vector(unsigned(pc) + 1);
+									when others =>
+										extra_cycle <= "0000";
+										instruction_toggle_pre <= not instruction_toggle_pre;
+										subcycle <= (others => '0');
+										opcode(8) <= '0';
+								end case;
+							when x"08" | x"48" =>
+								if not execution_cycle(0) then
 									pc <= next_pc;
 									if opcode(6) then
 										next_dout <= a;
@@ -1572,62 +1545,62 @@ begin
 										next_dout <= flags;
 										next_dout(FLAG_BREAK) <= '1';
 									end if;
-								when others =>
+								else
 									sp <= sp_minus;
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
-							end case;
-						when x"28" | x"68" =>
-							case subcycle(2 downto 0) is
-								when "001" =>
-									pc <= next_pc;
-								when "010" =>
-									sp <= sp_plus;
-								when others =>
-									if opcode(6) then
-										a <= din;
-										if din = "00000000" then
-											flags(FLAG_ZERO) <= '1';
+								end if;
+							when x"28" | x"68" =>
+								case execution_cycle(2 downto 0) is
+									when "000" =>
+										pc <= next_pc;
+									when "001" =>
+										sp <= sp_plus;
+									when others =>
+										if opcode(6) then
+											a <= din;
+											if din = "00000000" then
+												flags(FLAG_ZERO) <= '1';
+											else
+												flags(FLAG_ZERO) <= '0';
+											end if;
+											flags(FLAG_NEGATIVE) <= din(7);
 										else
-											flags(FLAG_ZERO) <= '0';
+											flags <= din;
+											flags(FLAG_BREAK) <= '0';
+											flags(FLAG_UNUSED) <= '1';
 										end if;
-										flags(FLAG_NEGATIVE) <= din(7);
-									else
-										flags <= din;
-										flags(FLAG_BREAK) <= '0';
-										flags(FLAG_UNUSED) <= '1';
-									end if;
-									instruction_toggle_pre <= not instruction_toggle_pre;
-									subcycle <= (others => '0');
-									opcode(8) <= '0';
-							end case;
-						--branch instructions
-						when x"10" | x"30" | x"50" | x"70" | x"90" | x"b0" | x"d0" | x"f0" =>
-							case subcycle(2 downto 0) is
-								when "001" =>
-									pc <= next_pc;
-									if flag_check then
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
-									else
-										pc <= addr_calc1;
-										addr_calc2 <= std_logic_vector(unsigned(pc(15 downto 0)) + unsigned(din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din));
-									end if;
-								when "010" =>
-									if pc(15 downto 8) = addr_calc2(15 downto 8) then
-										instruction_toggle_pre <= not instruction_toggle_pre;
-										subcycle <= (others => '0');
-										opcode(8) <= '0';
-									end if;
-								when others =>
-									instruction_toggle_pre <= not instruction_toggle_pre;
-									subcycle <= (others => '0');
-									opcode(8) <= '0';
-							end case;
-						when others => null;
-					end case;
+								end case;
+								when x"10" | x"30" | x"50" | x"70" | x"90" | x"b0" | x"d0" | x"f0" =>
+									case execution_cycle(2 downto 0) is
+										when "000" =>
+											pc <= next_pc;
+											if flag_check then
+												instruction_toggle_pre <= not instruction_toggle_pre;
+												subcycle <= (others => '0');
+												opcode(8) <= '0';
+											else
+												pc <= addr_calc1;
+												addr_calc2 <= std_logic_vector(unsigned(pc(15 downto 0)) + unsigned(din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din));
+											end if;
+										when "001" =>
+											if pc(15 downto 8) = addr_calc2(15 downto 8) then
+												instruction_toggle_pre <= not instruction_toggle_pre;
+												subcycle <= (others => '0');
+												opcode(8) <= '0';
+											end if;
+										when others =>
+											instruction_toggle_pre <= not instruction_toggle_pre;
+											subcycle <= (others => '0');
+											opcode(8) <= '0';
+									end case;
+							when others => null;
+						end case;
+					end if;
 				end if;
 			end if;
 		end if;
