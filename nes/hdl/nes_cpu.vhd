@@ -153,7 +153,6 @@ architecture Behavioral of nes_cpu is
 	
 	signal addr_calc1: std_logic_vector(15 downto 0);
 	signal addr_calc2: std_logic_vector(15 downto 0);
-	signal indirect_x_addr: std_logic_vector(8 downto 0);
 	signal indirect_y_addr: std_logic_vector(8 downto 0);
 	signal absolute_y_addr: std_logic_vector(8 downto 0);
 	signal absolute_x_addr: std_logic_vector(8 downto 0);
@@ -180,6 +179,7 @@ architecture Behavioral of nes_cpu is
 	
 	signal op_byte_2_plus_x: std_logic_vector(7 downto 0);
 	signal op_byte_2_plus_y: std_logic_vector(7 downto 0);
+	signal op_byte_2_plus_one: std_logic_vector(7 downto 0);
 	
 	signal extra_cycle: std_logic_vector(3 downto 0) := (others => '0');
 begin
@@ -269,6 +269,7 @@ begin
 		
 		op_byte_2_plus_x <= std_logic_vector(unsigned(op_byte_2) + unsigned(x));
 		op_byte_2_plus_y <= std_logic_vector(unsigned(op_byte_2) + unsigned(y));
+		op_byte_2_plus_one <= std_logic_vector(unsigned(op_byte_2) + 1);
 	end process;
 	
 	process (all)
@@ -299,7 +300,6 @@ begin
 	
 	process(all)
 	begin
-		indirect_x_addr <= std_logic_vector(unsigned('0' & op_byte_3) + unsigned('0' & x));
 		indirect_y_addr <= std_logic_vector(unsigned('0' & op_byte_3) + unsigned('0' & y));
 		absolute_y_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & y));
 		absolute_x_addr <= std_logic_vector(unsigned('0' & op_byte_2) + unsigned('0' & x));
@@ -391,7 +391,7 @@ begin
 								when "010" | "011" =>
 									rw_address <= x"00" & op_byte_2;
 								when "100" =>
-									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									rw_address <= x"00" & op_byte_2_plus_one;
 								when others =>
 									rw_address <= addr_calc2;
 							end case;
@@ -402,7 +402,7 @@ begin
 								when "010" | "011" =>
 									rw_address <= x"00" & op_byte_2;
 								when "100" =>
-									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									rw_address <= x"00" & op_byte_2_plus_one;
 								when others =>
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
@@ -414,7 +414,21 @@ begin
 								when "010" =>
 									rw_address <= x"00" & op_byte_2;
 								when "011" =>
-									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									rw_address <= x"00" & op_byte_2_plus_one;
+								when "100" | "101" =>
+									rw_address <= addr_calc2;
+								when others =>
+									rw_address <= addr_calc2;
+									read_cycle <= '0';
+							end case;
+						--indirect y write dcp
+						when x"d3" =>
+							case subcycle(2 downto 0) is
+								when "001" => null;
+								when "010" =>
+									rw_address <= x"00" & din;
+								when "011" =>
+									rw_address <= x"00" & op_byte_2_plus_one;
 								when "100" | "101" =>
 									rw_address <= addr_calc2;
 								when others =>
@@ -422,13 +436,13 @@ begin
 									read_cycle <= '0';
 							end case;
 						--indirect y write
-						when x"91" | x"d3" =>
+						when x"91" =>
 							case subcycle(2 downto 0) is
 								when "001" => null;
 								when "010" =>
 									rw_address <= x"00" & din;
 								when "011" =>
-									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									rw_address <= x"00" & op_byte_2_plus_one;
 								when "100" =>
 									rw_address <= addr_calc2;
 								when others =>
@@ -442,7 +456,7 @@ begin
 								when "010" =>
 									rw_address <= x"00" & din;
 								when "011" =>
-									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
+									rw_address <= x"00" & op_byte_2_plus_one;
 								when others =>
 									rw_address <= addr_calc2;
 							end case;
@@ -452,7 +466,7 @@ begin
 								when "011" =>
 									rw_address <= op_byte_3 & op_byte_2;
 								when "100" =>
-									rw_address <= op_byte_3 & std_logic_vector(unsigned(op_byte_2) + 1);
+									rw_address <= op_byte_3 & op_byte_2_plus_one;
 								when others => null;
 							end case;
 						--zero page y write
@@ -708,8 +722,7 @@ begin
 		else
 			end_fetch <= '0';
 		end if;
-		addr_calc1 <= std_logic_vector(unsigned(next_pc(15 downto 0)) + 
-			unsigned(din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din));
+		addr_calc1 <= std_logic_vector(unsigned(next_pc(15 downto 0)) + unsigned(din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din));
 	end process;
 	
 	process (clockm)
@@ -1556,6 +1569,7 @@ begin
 								when x"10" | x"30" | x"50" | x"70" | x"90" | x"b0" | x"d0" | x"f0" =>
 									case execution_cycle(2 downto 0) is
 										when "000" =>
+											pc <= next_pc;
 											if flag_check then
 												extra_cycle <= "0000";
 												instruction_toggle_pre <= not instruction_toggle_pre;
@@ -1563,7 +1577,7 @@ begin
 												opcode(8) <= '0';
 											else
 												pc <= addr_calc1;
-												addr_calc2 <= addr_calc1;
+												addr_calc2 <= std_logic_vector(unsigned(pc(15 downto 0)) + unsigned(din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din));
 											end if;
 										when "001" =>
 											if pc(15 downto 8) = addr_calc2(15 downto 8) then

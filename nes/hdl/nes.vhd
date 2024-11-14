@@ -45,7 +45,6 @@ architecture Behavioral of nes is
 	signal cpu_rw: std_logic;
 	signal cpu_memory_clock: std_logic;
 	signal memory_clock: std_logic;
-	signal memory_start: std_logic;
 	
 	signal cpu_sram_din: std_logic_vector(7 downto 0);
 	signal cpu_sram_dout: std_logic_vector(7 downto 0);
@@ -69,9 +68,13 @@ architecture Behavioral of nes is
 	signal cpu_cartridge_cs: std_logic;
 	signal cpu_cartridge_din: std_logic_vector(7 downto 0);
 	signal cpu_cartridge_din_ready: std_logic;
-	signal cpu_cartridge_dout: std_logic_vector(7 downto 0);
 
 	signal pause: std_logic;
+	
+	signal reset_sync: std_logic;
+	signal reset_chain: std_logic;
+	
+	signal random_data: std_logic_vector(31 downto 0);
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -80,6 +83,14 @@ begin
 	
 	d_memory_clock <= memory_clock;
 	pause <= write_signal or (cpu_memory_clock and not cpu_din_ready);
+	
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			reset_sync <= reset_chain;
+			reset_chain <= reset;
+		end if;
+	end process;
 	
 	process (all)
 	begin
@@ -126,9 +137,9 @@ begin
 		end if;
 	end process;
 	
-	process (reset, memory_clock)
+	process (reset_sync, memory_clock)
 	begin
-		if reset = '1' then
+		if reset_sync = '1' then
 			cpu_dready <= '0';
 		elsif rising_edge(memory_clock) then
 			if cpu_ram_cs or cpu_cartridge_cs then
@@ -171,11 +182,10 @@ begin
 		clock => clock,
 		ppu_clock => ppu_clock,
 		memory_clock => cpu_memory_clock,
-		memory_start => memory_start,
 		memory_cycle_done => cpu_dready,
 		rw => cpu_rw,
 		oe => cpu_oe,
-		reset => reset,
+		reset => reset_sync,
 		din => cpu_din,
 		dout => cpu_dout,
 		nmi => '1',
@@ -189,7 +199,7 @@ begin
 		g_out => ppu_g,
 		b_out => ppu_b,
 		clock => ppu_clock,
-		reset => reset,
+		reset => reset_sync,
 		cpu_addr => cpu_address(2 downto 0),
 		cpu_cs => cpu_ppu_cs,
 		cpu_rw => cpu_rw,
@@ -207,7 +217,7 @@ begin
 	cartridge: entity work.nes_cartridge generic map(
 		ramtype => ramtype,
 		unified_ram => unified_ram) port map (
-		cpu_data_out => cpu_cartridge_dout,
+		cpu_data_out => cpu_dout,
 		cpu_data_in => cpu_cartridge_din,
 		cpu_data_in_ready => cpu_cartridge_din_ready,
 		cpu_addr => cpu_address,
@@ -227,6 +237,10 @@ begin
 		write_rw => write_rw,
 		write_cs => write_cs
 	);
+	
+	random: entity work.lfsr32 port map(
+		clock => clock,
+		dout => random_data);
 
 end Behavioral;
 
