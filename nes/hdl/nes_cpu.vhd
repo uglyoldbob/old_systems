@@ -421,22 +421,8 @@ begin
 									rw_address <= addr_calc2;
 									read_cycle <= '0';
 							end case;
-						--dcp indirect y write
-						when x"d3" =>
-							case subcycle(2 downto 0) is
-								when "001" => null;
-								when "010" =>
-									rw_address <= x"00" & din;
-								when "011" =>
-									rw_address <= x"00" & std_logic_vector(unsigned(op_byte_2) + 1);
-								when "100" | "101" =>
-									rw_address <= addr_calc2;
-								when others =>
-									rw_address <= addr_calc2;
-									read_cycle <= '0';
-							end case;
 						--indirect y write
-						when x"91" =>
+						when x"91" | x"d3" =>
 							case subcycle(2 downto 0) is
 								when "001" => null;
 								when "010" =>
@@ -490,7 +476,7 @@ begin
 									read_cycle <= '0';
 							end case;
 						--zero page y
-						when x"b7" =>
+						when x"b6" | x"b7" =>
 							case subcycle(2 downto 0) is
 								when "001" => null;
 								when "010" =>
@@ -506,15 +492,6 @@ begin
 									rw_address <= x"00" & din;
 								when others =>
 									rw_address <= x"00" & op_byte_2_plus_x;
-							end case;
-						--zero page y
-						when x"b6" =>
-							case subcycle(2 downto 0) is
-								when "001" => null;
-								when "010" =>
-									rw_address <= x"00" & din;
-								when others =>
-									rw_address <= x"00" & op_byte_2_plus_y;
 							end case;
 						--zero page read
 						when x"04" | x"24" | x"44" | x"64" =>
@@ -1510,10 +1487,10 @@ begin
 										flags(FLAG_UNUSED) <= '1';
 										sp <= sp_plus;
 									when "011" =>
-										pc <= pc(15 downto 8) & din;
+										pc(7 downto 0) <= din;
 										sp <= sp_plus;
 									when others =>
-										pc <= din & pc(7 downto 0);
+										pc(15 downto 8) <= din;
 										extra_cycle <= "0000";
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
@@ -1525,9 +1502,9 @@ begin
 										sp <= sp_plus;
 									when "001" =>
 										sp <= sp_plus;
-										pc <= pc(15 downto 8) & din;
+										pc(7 downto 0) <= din;
 									when "010" =>
-										pc <= din & pc(7 downto 0);
+										pc(15 downto 8) <= din;
 									when "011" =>
 										pc <= std_logic_vector(unsigned(pc) + 1);
 									when others =>
@@ -1547,6 +1524,7 @@ begin
 									end if;
 								else
 									sp <= sp_minus;
+									extra_cycle <= "0000";
 									instruction_toggle_pre <= not instruction_toggle_pre;
 									subcycle <= (others => '0');
 									opcode(8) <= '0';
@@ -1554,7 +1532,6 @@ begin
 							when x"28" | x"68" =>
 								case execution_cycle(2 downto 0) is
 									when "000" =>
-										pc <= next_pc;
 									when "001" =>
 										sp <= sp_plus;
 									when others =>
@@ -1571,6 +1548,7 @@ begin
 											flags(FLAG_BREAK) <= '0';
 											flags(FLAG_UNUSED) <= '1';
 										end if;
+										extra_cycle <= "0000";
 										instruction_toggle_pre <= not instruction_toggle_pre;
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
@@ -1578,22 +1556,24 @@ begin
 								when x"10" | x"30" | x"50" | x"70" | x"90" | x"b0" | x"d0" | x"f0" =>
 									case execution_cycle(2 downto 0) is
 										when "000" =>
-											pc <= next_pc;
 											if flag_check then
+												extra_cycle <= "0000";
 												instruction_toggle_pre <= not instruction_toggle_pre;
 												subcycle <= (others => '0');
 												opcode(8) <= '0';
 											else
 												pc <= addr_calc1;
-												addr_calc2 <= std_logic_vector(unsigned(pc(15 downto 0)) + unsigned(din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din(7) & din));
+												addr_calc2 <= addr_calc1;
 											end if;
 										when "001" =>
 											if pc(15 downto 8) = addr_calc2(15 downto 8) then
+												extra_cycle <= "0000";
 												instruction_toggle_pre <= not instruction_toggle_pre;
 												subcycle <= (others => '0');
 												opcode(8) <= '0';
 											end if;
 										when others =>
+											extra_cycle <= "0000";
 											instruction_toggle_pre <= not instruction_toggle_pre;
 											subcycle <= (others => '0');
 											opcode(8) <= '0';
