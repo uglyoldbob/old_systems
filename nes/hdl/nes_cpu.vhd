@@ -671,7 +671,7 @@ begin
 		end case;
 		execution_cycle <= std_logic_vector(unsigned(subcycle) - unsigned(pre_execution_length));
 		case opcode(7 downto 0) is
-			when x"81" | x"9d" => 
+			when x"81" | x"83" | x"9d" => 
 				if subcycle(2 downto 0) = "100" then
 					early_execute <= '1';
 				else
@@ -704,8 +704,10 @@ begin
 					x"ed" | x"ee" | x"ef" | x"f4" | x"f5" | x"f6" | x"f7" | x"f9" | x"fb" | x"fd" | x"ff" =>
 				pre_execution_length <= std_logic_vector(unsigned(extra_cycle) + "0011");
 			when	x"04" | x"05" | x"07" | x"20" | x"24" | x"25" | x"27" | x"44" | 
-					x"45" | x"47" | x"4c" | x"64" | x"65" | x"67" | x"8c" | x"8d" | x"8e" | x"94" | x"95" | x"96" |
-					x"a4" | x"a5" | x"a6" | x"a7" | x"c4" | x"c5" | x"c6" | x"c7" | x"e4" | x"e5" | x"e6" | x"e7" => 
+					x"45" | x"47" | x"4c" | x"64" | x"65" | x"67" | x"8c" | x"8d" | 
+					x"8e" | x"8f" | x"94" | x"95" | x"96" | x"97" |
+					x"a4" | x"a5" | x"a6" | x"a7" | x"c4" | x"c5" | x"c6" | x"c7" | 
+					x"e4" | x"e5" | x"e6" | x"e7" => 
 				pre_execution_length <= std_logic_vector(unsigned(extra_cycle) + "0010");
 			when others => pre_execution_length <= std_logic_vector(unsigned(extra_cycle) + "0001");
 		end case;
@@ -804,7 +806,7 @@ begin
 									end if;
 								end if;
 							--indirect, x undocumented (5)
-							when x"03" | x"23" | x"43" | x"63" | x"83" | x"c3" | x"e3" =>
+							when x"03" | x"23" | x"43" | x"63" | x"c3" | x"e3" =>
 								case subcycle(2 downto 0) is
 									when "001" =>
 										op_byte_2 <= std_logic_vector(unsigned(din) + unsigned(x));
@@ -816,7 +818,7 @@ begin
 										null;
 								end case;
 							--indirect, x (5)
-							when x"01" | x"21" | x"41" | x"61" | x"81" | x"a1" | x"a3" | x"c1" | x"e1" =>
+							when x"01" | x"21" | x"41" | x"61" | x"81" | x"83" | x"a1" | x"a3" | x"c1" | x"e1" =>
 								case subcycle(2 downto 0) is
 									when "001" =>
 										null;
@@ -865,7 +867,7 @@ begin
 									when others => null;
 								end case;
 							--absolute, y (3)
-							when x"19" | x"1b" | x"39" | x"3b" | x"59" | x"5b" | x"79" | x"7b" | x"99" | x"b9" | x"be" | x"bf" | x"d9" | x"db" | x"f9" | x"fb" =>
+							when x"19" | x"1b" | x"39" | x"3b" | x"59" | x"5b" | x"79" | x"7b" | x"97" | x"99" | x"b9" | x"be" | x"bf" | x"d9" | x"db" | x"f9" | x"fb" =>
 								case subcycle(2 downto 0) is
 									when "010" =>
 										addr_calc2 <= din & absolute_y_addr(7 downto 0);
@@ -1165,17 +1167,6 @@ begin
 										subcycle <= (others => '0');
 										opcode(8) <= '0';
 								end case;
-							--sax
-							when x"83" =>
-								case subcycle(2 downto 0) is
-									when "000" =>
-										next_dout <= a and x;
-									when others =>
-										extra_cycle <= "0000";
-										instruction_toggle_pre <= not instruction_toggle_pre;
-										subcycle <= (others => '0');
-										opcode(8) <= '0';
-								end case;
 							--lax
 							when x"a3" | x"af" | x"b3" | x"bf" =>
 								x <= din;
@@ -1415,7 +1406,8 @@ begin
 								instruction_toggle_pre <= not instruction_toggle_pre;
 								subcycle <= (others => '0');
 								opcode(8) <= '0';
-							when x"81" | x"84" | x"85" | x"86" | x"87" | x"8c" | x"8d" | x"8e" | x"8f" | x"91" | x"94" | x"95" | x"96" | x"99" | x"9d" =>
+							when	x"81" | x"83" | x"84" | x"85" | x"86" | x"87" | x"8c" | x"8d" | 
+									x"8e" | x"8f" | x"91" | x"94" | x"95" | x"96" | x"97" | x"99" | x"9d" =>
 								if not execution_cycle(0) then
 										case opcode(1 downto 0) is
 											when "00" => next_dout <= y;
