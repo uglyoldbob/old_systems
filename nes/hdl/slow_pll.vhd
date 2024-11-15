@@ -5,21 +5,21 @@
 --Part Number: GW2AR-LV18QN88C8/I7
 --Device: GW2AR-18
 --Device Version: C
---Created Time: Fri Nov 15 08:42:58 2024
+--Created Time: Fri Nov 15 10:42:59 2024
 
 library IEEE;
 use IEEE.std_logic_1164.all;
 
-entity tmds_pll is
+entity slow_pll is
     port (
         clkout: out std_logic;
-        lock: out std_logic;
         clkin: in std_logic
     );
-end tmds_pll;
+end slow_pll;
 
-architecture Behavioral of tmds_pll is
+architecture Behavioral of slow_pll is
 
+    signal lock_o: std_logic;
     signal clkoutp_o: std_logic;
     signal clkoutd_o: std_logic;
     signal clkoutd3_o: std_logic;
@@ -91,13 +91,13 @@ begin
             FCLKIN => "27",
             DEVICE => "GW2AR-18C",
             DYN_IDIV_SEL => "false",
-            IDIV_SEL => 3,
+            IDIV_SEL => 4,
             DYN_FBDIV_SEL => "false",
-            FBDIV_SEL => 54,
+            FBDIV_SEL => 0,
             DYN_ODIV_SEL => "false",
-            ODIV_SEL => 2,
+            ODIV_SEL => 96,
             PSDA_SEL => "0000",
-            DYN_DA_EN => "false",
+            DYN_DA_EN => "true",
             DUTYDA_SEL => "1000",
             CLKOUT_FT_DIR => '1',
             CLKOUTP_FT_DIR => '1',
@@ -113,7 +113,7 @@ begin
         )
         port map (
             CLKOUT => clkout,
-            LOCK => lock,
+            LOCK => lock_o,
             CLKOUTP => clkoutp_o,
             CLKOUTD => clkoutd_o,
             CLKOUTD3 => clkoutd3_o,
@@ -129,4 +129,4 @@ begin
             FDLY => FDLY_i
         );
 
-end Behavioral; --tmds_pll
+end Behavioral; --slow_pll

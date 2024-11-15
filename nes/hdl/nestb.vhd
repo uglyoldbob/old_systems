@@ -86,6 +86,9 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal instruction_check: std_logic;
 	
 	signal hdmi_tmds_clock: std_logic := '0';
+	signal hdmi_tmds_0: std_logic_vector(9 downto 0);
+	signal hdmi_tmds_1: std_logic_vector(9 downto 0);
+	signal hdmi_tmds_2: std_logic_vector(9 downto 0);
 	signal hdmi_d_0_p: std_logic;
 	signal hdmi_d_0_n: std_logic;
 	signal hdmi_d_1_p: std_logic;
@@ -122,14 +125,9 @@ begin
 		vsync_porch => 3,
 		vsync_width => 5) port map (
 		reset => cpu_reset,
-		d_0_p => hdmi_d_0_p,
-		d_0_n => hdmi_d_0_n,
-		d_1_p => hdmi_d_1_p,
-		d_1_n => hdmi_d_1_n,
-		d_2_p => hdmi_d_2_p,
-		d_2_n => hdmi_d_2_n,
-		ck_p => hdmi_ck_p,
-		ck_n => hdmi_ck_n,
+		tmds_0 => hdmi_tmds_0,
+		tmds_1 => hdmi_tmds_1,
+		tmds_2 => hdmi_tmds_2,
 		cec => hdmi_cec,
 		i2c_scl => hdmi_i2c_scl,
 		i2c_sda => hdmi_i2c_sda,

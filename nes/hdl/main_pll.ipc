@@ -1,7 +1,7 @@
 [General]
 ipc_version=4
-file=tmds_pll
-module=tmds_pll
+file=main_pll
+module=main_pll
 target_device=gw2ar18c-000
 type=clock_rpll
 version=1.0
@@ -14,11 +14,11 @@ CLKOUTD=false
 CLKOUTP=false
 CLKOUT_BYPASS=false
 CLKOUT_DIVIDE_DYN=true
-DYNAMIC=false
+CLKOUT_FREQ=173
+CLKOUT_TOLERANCE=2
+DYNAMIC=true
 LANG=1
-LOCK_EN=true
+LOCK_EN=false
 MODE_GENERAL=true
 PLL_PWD=false
 RESET_PLL=false
-CLKOUT_FREQ=371.25
-CLKOUT_TOLERANCE=0

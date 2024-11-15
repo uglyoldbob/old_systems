@@ -1,7 +1,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
-entity tmds_encoder is
+entity tmds_encoderb is
 	Port(
 		clock: in std_logic;
 		cin: in std_logic_vector(7 downto 0);
@@ -9,9 +9,9 @@ entity tmds_encoder is
 		aux: in std_logic_vector(3 downto 0);
 		sel: in std_logic_vector(1 downto 0);
 		output: out std_logic_vector(9 downto 0));
-end tmds_encoder;
+end tmds_encoderb;
 
-architecture Behavioral of tmds_encoder is
+architecture Behavioral of tmds_encoderb is
 	type LOOKUP is array (511 downto 0) of integer range 0 to 9;
 	--below is generated with a program, i'm not that crazy
 	signal ones_count : LOOKUP := (
@@ -682,12 +682,9 @@ entity hdmi is
 		clock_freq: out integer;
 		pixel_clock: in std_logic;
 		tmds_clock: in std_logic;
-		d_0_p: out std_logic;
-		d_0_n: out std_logic;
-		d_1_p: out std_logic;
-		d_1_n: out std_logic;
-		d_2_p: out std_logic;
-		d_2_n: out std_logic;
+		tmds_0: out std_logic_vector(9 downto 0);
+		tmds_1: out std_logic_vector(9 downto 0);
+		tmds_2: out std_logic_vector(9 downto 0);
 		ck_p: out std_logic;
 		ck_n: out std_logic;
 		cec: inout std_logic;
@@ -705,17 +702,9 @@ architecture Behavioral of hdmi is
 	signal aux2: std_logic_vector(3 downto 0) := (others => '0');
 	signal aux3: std_logic_vector(3 downto 0) := (others => '0');
 	
-	signal tmds_0: std_logic_vector(9 downto 0);
-	signal tmds_1: std_logic_vector(9 downto 0);
-	signal tmds_2: std_logic_vector(9 downto 0);
-	
-	signal tmds_0_mux: std_logic_vector(9 downto 0);
-	signal tmds_1_mux: std_logic_vector(9 downto 0);
-	signal tmds_2_mux: std_logic_vector(9 downto 0);
-	
-	signal tmds_0_ddr: std_logic_vector(1 downto 0);
-	signal tmds_1_ddr: std_logic_vector(1 downto 0);
-	signal tmds_2_ddr: std_logic_vector(1 downto 0);
+	signal tmds_0_pre: std_logic_vector(9 downto 0);
+	signal tmds_1_pre: std_logic_vector(9 downto 0);
+	signal tmds_2_pre: std_logic_vector(9 downto 0);
 	
 	signal htotal: integer := (h + hblank_width);
 	signal vtotal: integer := (v + vblank_width);
@@ -818,15 +807,6 @@ begin
 			vblank <= '0';
 		end if;
 		pixels <= (hblank or pixels_guard) nor vblank;
-		if pixels then
-			selection <= "00";
-		elsif data_island then
-			selection <= "10";
-		elsif hblank or vblank then
-			selection <= "01";
-		else
-			selection <= "11";
-		end if;
 	 end process;
 	 
 	 process (pixel_clock)
@@ -842,42 +822,37 @@ begin
 			else
 				column <= column + 1;
 			end if;
+			if pixels then
+				selection <= "00";  --normal pixel output
+			elsif data_island then
+				selection <= "10";  --aux output
+			elsif hblank or vblank then
+				selection <= "01";  --ctl output
+			else
+				selection <= "11";
+			end if;
 		end if;
 	 end process;
 
-	d0_encoder: entity work.tmds_encoder port map(
+	d0_encoder: entity work.tmds_encoderb port map(
 		clock => pixel_clock,
 		cin => r,
 		control => hsync & vsync,
 		aux => aux,
 		sel => selection,
-		output => tmds_0
+		output => tmds_0_pre
 	);
 	
-	d0_mux: entity work.tmds_multiplexer port map(
-		reset => reset,
-		clock => tmds_clock,
-		pixel_clock => pixel_clock,
-		din => tmds_0_mux,
-		dout => tmds_0_ddr
-	);
-	
-	d0_output: entity work.ddr generic map(t => t)
-		port map(
-			din => tmds_0_ddr,
-			dout => d_0_p,
-			doutn => d_0_n,
-			clock => tmds_clock
-	);
-	
-	process (all)
+	process (pixel_clock)
 	begin
-		if data_island_preamble then
-			control <= "0101";
-		elsif pixel_preamble then
-			control <= "0001";
-		else
-			control <= "0000";
+		if rising_edge(pixel_clock) then
+			if data_island_preamble then
+				control <= "0101";
+			elsif pixel_preamble then
+				control <= "0001";
+			else
+				control <= "0000";
+			end if;
 		end if;
 	end process;
 	
@@ -885,69 +860,37 @@ begin
 	begin
         if rising_edge(pixel_clock) then
             if pixels_guard then
-                tmds_0_mux <= "1011001100";
-                tmds_1_mux <= "0100110011";
-                tmds_2_mux <= "1011001100";
+                tmds_0 <= "1011001100";
+                tmds_1 <= "0100110011";
+                tmds_2 <= "1011001100";
             elsif data_island_guard then
-                tmds_0_mux <= tmds_0;
-                tmds_1_mux <= "0100110011";
-                tmds_2_mux <= "0100110011";
+                tmds_0 <= tmds_0_pre;
+                tmds_1 <= "0100110011";
+                tmds_2 <= "0100110011";
             else
-                tmds_0_mux <= tmds_0;
-                tmds_1_mux <= tmds_1;
-                tmds_2_mux <= tmds_2;
+                tmds_0 <= tmds_0_pre;
+                tmds_1 <= tmds_1_pre;
+                tmds_2 <= tmds_2_pre;
             end if;
         end if;
 	end process;
 	
-	d1_encoder: entity work.tmds_encoder port map(
+	d1_encoder: entity work.tmds_encoderb port map(
 		clock => pixel_clock,
 		cin => g,
 		control => control(1 downto 0),
 		aux => aux2,
 		sel => selection,
-		output => tmds_1
+		output => tmds_1_pre
 	);
 	
-	d1_mux: entity work.tmds_multiplexer port map(
-		reset => reset,
-		clock => tmds_clock,
-		pixel_clock => pixel_clock,
-		din => tmds_1_mux,
-		dout => tmds_1_ddr
-	);
-	
-	d1_output: entity work.ddr generic map(t => t)
-		port map(
-			din => tmds_1_ddr,
-			dout => d_1_p,
-			doutn => d_1_n,
-			clock => tmds_clock
-	);
-	
-	d2_encoder: entity work.tmds_encoder port map(
+	d2_encoder: entity work.tmds_encoderb port map(
 		clock => pixel_clock,
 		cin => b,
 		control => control(3 downto 2),
 		aux => aux3,
 		sel => selection,
-		output => tmds_2
-	);
-	
-	d2_mux: entity work.tmds_multiplexer port map(
-		reset => reset,
-		clock => tmds_clock,
-		pixel_clock => pixel_clock,
-		din => tmds_2_mux,
-		dout => tmds_2_ddr
-	);
-	
-	d2_output: entity work.ddr generic map(t => t)
-		port map(
-			din => tmds_2_ddr,
-			dout => d_2_p,
-			doutn => d_2_n,
-			clock => tmds_clock
+		output => tmds_2_pre
 	);
 	
 	ck_p <= pixel_clock;

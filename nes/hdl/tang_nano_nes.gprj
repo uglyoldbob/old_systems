@@ -8,6 +8,7 @@
         <File path="clocked_sram.vhd" type="file.vhdl" enable="1"/>
         <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
         <File path="ddr.vhd" type="file.vhdl" enable="1"/>
+        <File path="gowin_ddr.vhd" type="file.vhdl" enable="1"/>
         <File path="hdmi.vhd" type="file.vhdl" enable="1"/>
         <File path="lfsr.vhd" type="file.vhdl" enable="1"/>
         <File path="nes.vhd" type="file.vhdl" enable="1"/>
@@ -15,8 +16,11 @@
         <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_ppu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_tang_nano_20k.vhd" type="file.vhdl" enable="1"/>
+        <File path="slow_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="sram.vhd" type="file.vhdl" enable="1"/>
         <File path="sram_inout.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/gowin_rpll/tiny_hdmi_pll.vhd" type="file.vhdl" enable="1"/>
+        <File path="tiny_hdmi_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_div.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="src/tang_nano_nes.cst" type="file.cst" enable="1"/>
