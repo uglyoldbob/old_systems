@@ -610,7 +610,7 @@ begin
 						when "1110" => output <= "0101100011";
 						when others => output <= "1011000011";
 					end case;
-				when others => null;
+				when others => output <= "1111100000";
 			end case;
 		end if;
 	end process;
@@ -691,6 +691,7 @@ entity hdmi is
 		i2c_scl: inout std_logic;
 		i2c_sda: inout std_logic;
 		hpd: inout std_logic;
+		vsync_out: out std_logic;
 		r: in std_logic_vector(7 downto 0);
 		g: in std_logic_vector(7 downto 0);
 		b: in std_logic_vector(7 downto 0));
@@ -732,9 +733,19 @@ architecture Behavioral of hdmi is
 	signal selection: std_logic_vector(1 downto 0);
 begin
     clock_freq <= htotal * vtotal * rate;
-	 
-	 data_island_guard <= data_island_mode(1);
-	 data_island_preamble <= data_island_mode(2);
+
+    process (all)
+    begin
+		if vblank then
+			vsync_out <= '1';
+		else
+			vsync_out <= '0';
+		end if;
+    end process;
+
+	data_island <= '0'; --todo
+	data_island_guard <= '0';--data_island_mode(1);
+	 data_island_preamble <= '0';--data_island_mode(2);
 	 process (pixel_clock)
 	 begin
 		if rising_edge(pixel_clock) then
@@ -772,7 +783,7 @@ begin
 	 process (all)
 	 begin
 		if column = 15 then
-			request_data_island <= '1';
+			request_data_island <= '0';
 		else
 			request_data_island <= '0';
 		end if;
@@ -826,7 +837,7 @@ begin
 				selection <= "00";  --normal pixel output
 			elsif data_island then
 				selection <= "10";  --aux output
-			elsif hblank or vblank then
+			elsif pixels_guard or hblank or vblank then
 				selection <= "01";  --ctl output
 			else
 				selection <= "11";

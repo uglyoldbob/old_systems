@@ -5,6 +5,7 @@
     <Version>5</Version>
     <Device name="GW2AR-18C" pn="GW2AR-LV18QN88C8/I7">gw2ar18c-000</Device>
     <FileList>
+        <File path="test_hdmi_out.v" type="file.verilog" enable="1"/>
         <File path="clocked_sram.vhd" type="file.vhdl" enable="1"/>
         <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
         <File path="ddr.vhd" type="file.vhdl" enable="1"/>
@@ -19,7 +20,6 @@
         <File path="slow_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="sram.vhd" type="file.vhdl" enable="1"/>
         <File path="sram_inout.vhd" type="file.vhdl" enable="1"/>
-        <File path="src/gowin_rpll/tiny_hdmi_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="tiny_hdmi_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_div.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_pll.vhd" type="file.vhdl" enable="1"/>

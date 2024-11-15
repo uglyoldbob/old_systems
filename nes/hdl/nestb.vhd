@@ -106,8 +106,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal rom : RAM_ARRAY;
 	FILE romfile : text;
 begin
-	cpu_clock <= NOT cpu_clock after 10ns;
-	hdmi_tmds_clock <= not hdmi_tmds_clock after 2 ns;
+	cpu_clock <= NOT cpu_clock after 20ns;
+	hdmi_tmds_clock <= not hdmi_tmds_clock after 4 ns;
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	

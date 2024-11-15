@@ -5,7 +5,7 @@
 --Part Number: GW2AR-LV18QN88C8/I7
 --Device: GW2AR-18
 --Device Version: C
---Created Time: Fri Nov 15 11:27:53 2024
+--Created Time: Fri Nov 15 13:35:04 2024
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -91,11 +91,11 @@ begin
             FCLKIN => "27",
             DEVICE => "GW2AR-18C",
             DYN_IDIV_SEL => "false",
-            IDIV_SEL => 7,
+            IDIV_SEL => 4,
             DYN_FBDIV_SEL => "false",
             FBDIV_SEL => 36,
             DYN_ODIV_SEL => "false",
-            ODIV_SEL => 8,
+            ODIV_SEL => 4,
             PSDA_SEL => "0000",
             DYN_DA_EN => "true",
             DUTYDA_SEL => "1000",
