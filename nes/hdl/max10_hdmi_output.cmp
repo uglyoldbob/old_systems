@@ -1,0 +1,9 @@
+	component max10_hdmi_output is
+		port (
+			outclock  : in  std_logic                    := 'X';             -- export
+			din       : in  std_logic_vector(1 downto 0) := (others => 'X'); -- export
+			pad_out   : out std_logic_vector(0 downto 0);                    -- export
+			pad_out_b : out std_logic_vector(0 downto 0)                     -- export
+		);
+	end component max10_hdmi_output;
+

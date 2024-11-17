@@ -115,7 +115,6 @@ begin
 	hdmi_i2c_sda <= 'H';
 	
 	hdmi: entity work.hdmi generic map(
-		t => "mux",
 		hsync_polarity => '1',
 		vsync_polarity => '1',
 		h => 1280,

@@ -167,7 +167,6 @@ begin
     );
 
     hdmi_converter: entity work.hdmi generic map(
-			t => "mux",
 			hsync_polarity => '1',
 			vsync_polarity => '1',
 			h => 1280,

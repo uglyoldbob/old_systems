@@ -665,16 +665,15 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity hdmi is
-	Generic(t: string := "clock";
-        h: integer := 1920;
+	Generic(h: integer := 1920;
         v: integer := 1080;
-        hblank_width: integer := 656;
-        vblank_width: integer := 40;
-		  hsync_polarity: std_logic := '0';
-		  hsync_porch: integer := 128;
-		  hsync_width: integer := 200;
+        hblank_width: integer := 280;
+        vblank_width: integer := 45;
+		  hsync_polarity: std_logic := '1';
+		  hsync_porch: integer := 148;
+		  hsync_width: integer := 44;
 		  vsync_width: integer := 5;
-		  vsync_porch: integer := 3;
+		  vsync_porch: integer := 36;
 		  vsync_polarity: std_logic := '1';
         rate: integer := 60);
 	Port(

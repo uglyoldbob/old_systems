@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simPackage>
+ <file
+   path="max10_hdmi_output_sim/altera_gpio_lite/altera_gpio_lite.sv"
+   type="SYSTEM_VERILOG"
+   library="max10_hdmi_output" />
+ <file
+   path="max10_hdmi_output_sim/altera_gpio_lite/mentor/altera_gpio_lite.sv"
+   type="SYSTEM_VERILOG_ENCRYPT"
+   library="max10_hdmi_output"
+   simulator="modelsim" />
+ <file path="max10_hdmi_output_sim/max10_hdmi_output.vhd" type="VHDL" />
+ <topLevel name="max10_hdmi_output" />
+ <deviceFamily name="max10" />
+</simPackage>
