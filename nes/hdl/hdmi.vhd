@@ -787,32 +787,32 @@ begin
 		else
 			request_data_island <= '0';
 		end if;
-		if column < (hblank_width-2) then
-			hblank <= '1';
-		else
-			hblank <= '0';
-		end if;
-		if column = (hblank_width-1) or column = (hblank_width-2) then
+		if column = (hsync_porch + hsync_width-1) or column = (hsync_porch + hsync_width-2) then
 			pixels_guard <= '1';
 		else
 			pixels_guard <= '0';
 		end if;
-		if column >= (hsync_porch) and column < (hsync_width + hsync_porch) then
+		if column < hsync_width then
 			hsync <= hsync_polarity;
 		else
 			hsync <= not hsync_polarity;
 		end if;
-		if row >= (vsync_porch) and row < (vsync_width + vsync_porch) then
+		if row < vsync_width then
 			vsync <= vsync_polarity;
 		else
 			vsync <= not vsync_polarity;
 		end if;
-		if column >= (hblank_width-10) and column <= (hblank_width - 3) then
+		if column >= (hsync_porch + hsync_width-10) and column <= (hsync_porch + hsync_width - 3) then
 			pixel_preamble <= '1';
 		else
 			pixel_preamble <= '0';
 		end if;
-		if row < vblank_width then
+		if column < (hsync_width + hsync_porch) or column >= (hsync_width + hsync_porch + h) then
+			hblank <= '1';
+		else
+			hblank <= '0';
+		end if;
+		if row < (vsync_width + vsync_porch) or row >= (vsync_width + vsync_porch + v) then
 			vblank <= '1';
 		else
 			vblank <= '0';

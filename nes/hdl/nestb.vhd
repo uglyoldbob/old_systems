@@ -116,13 +116,15 @@ begin
 	
 	hdmi: entity work.hdmi generic map(
 		t => "mux",
+		hsync_polarity => '1',
+		vsync_polarity => '1',
 		h => 1280,
 		v => 720,
-		hblank_width => 384,
-		hsync_porch => 64,
-		hsync_width => 128,
-		vblank_width => 28,
-		vsync_porch => 3,
+		hblank_width => 370,
+		hsync_porch => 220,
+		hsync_width => 40,
+		vblank_width => 30,
+		vsync_porch => 20,
 		vsync_width => 5) port map (
 		reset => cpu_reset,
 		tmds_0 => hdmi_tmds_0,
