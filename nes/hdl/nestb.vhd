@@ -105,6 +105,12 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal hdmi_i2c_sda: std_logic;
 	signal hdmi_hpd: std_logic;
 	
+	signal hdmi_row: std_logic_vector(9 downto 0);
+	signal hdmi_column: std_logic_vector(10 downto 0);
+	signal hdmi_hstart: std_logic;
+	signal hdmi_vstart: std_logic;
+	signal hdmi_pvalid: std_logic;
+	
 	signal hdmi1_tmds: std_logic_vector(2 downto 0);
 	signal hdmi1_clk: std_logic;
 	signal hdmi1_cx: std_logic_vector(10 downto 0);
@@ -119,6 +125,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	FILE romfile : text;
 	
 	signal random_data: std_logic_vector(31 downto 0);
+	signal rgb: std_logic_vector(23 downto 0);
 begin
 	cpu_clock <= NOT cpu_clock after 20ns;
 	hdmi_tmds_clock <= not hdmi_tmds_clock after 4 ns;
@@ -170,10 +177,32 @@ begin
 		hpd => hdmi_hpd,
 		pixel_clock => cpu_clock,
 		tmds_clock => hdmi_tmds_clock,
-		r => random_data(23 downto 16),
-		g => random_data(15 downto 8),
-		b => random_data(7 downto 0)
+		row_out => hdmi_row,
+		column_out => hdmi_column,
+		hstart => hdmi_hstart,
+		vstart => hdmi_vstart,
+		pvalid => hdmi_pvalid,
+		r => rgb(23 downto 16),
+		g => rgb(15 downto 8),
+		b => rgb(7 downto 0)
 	);
+	
+	process (cpu_clock)
+	begin
+		if rising_edge(cpu_clock) then
+			if hdmi_column = std_logic_vector(to_unsigned(1278, 11)) or hdmi_column = std_logic_vector(to_unsigned(0, 11)) then
+				rgb <= "000000000000000000000000";
+			elsif hdmi_column = std_logic_vector(to_unsigned(1279, 11)) or hdmi_column = std_logic_vector(to_unsigned(1, 11)) then
+				rgb <= "000000000000000011111111";
+			elsif hdmi_column = std_logic_vector(to_unsigned(1280, 11)) or hdmi_column = std_logic_vector(to_unsigned(2, 11)) then
+				rgb <= "111111111111111111111111";
+			elsif hdmi_pvalid then
+				rgb <= random_data(23 downto 0);
+			else
+				rgb <= "000000001111111100000000";
+			end if;
+		end if;
+	end process;
 	
 	nes: entity work.nes port map (
 		ppu_r => ppu_r,

@@ -33,7 +33,16 @@ vcom -2008 -work work {../../nestb.vhd}
 
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
-add wave /nestb/hdmi2/*
+add wave /nestb/hdmi2/pixel_clock
+add wave /nestb/hdmi2/column
+add wave /nestb/hdmi2/row
+add wave /nestb/hdmi2/vsync
+add wave /nestb/hdmi2/hsync
+add wave /nestb/hdmi2/tmds_0
+add wave /nestb/hdmi2/tmds_1
+add wave /nestb/hdmi2/tmds_2
+add wave /nestb/hdmi2/pixels
+
 
 log * -r
 

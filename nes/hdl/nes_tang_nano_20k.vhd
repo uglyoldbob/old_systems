@@ -58,6 +58,7 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal hdmi_column: std_logic_vector(10 downto 0);
 	signal hdmi_hstart: std_logic;
 	signal hdmi_vstart: std_logic;
+	signal hdmi_pvalid: std_logic;
 
 	signal crosshair_row: std_logic_vector(9 downto 0) := std_logic_vector(to_unsigned(80, 10));
 	signal crosshair_column: std_logic_vector(10 downto 0) := std_logic_vector(to_unsigned(5, 11));
@@ -185,8 +186,6 @@ begin
         resetn => '1'
     );
 
-	test <= debounce_buttona & debounce_buttonb;
-
     hdmi_converter: entity work.hdmi2 generic map(
 			hsync_polarity => '1',
 			vsync_polarity => '1',
@@ -212,6 +211,8 @@ begin
 			column_out => hdmi_column,
 			hstart => hdmi_hstart,
 			vstart => hdmi_vstart,
+			pvalid => hdmi_pvalid,
+			test => test,
 			r => rgb(23 downto 16),
 			g => rgb(15 downto 8),
 			b => rgb(7 downto 0));
@@ -219,18 +220,28 @@ begin
 	process (hdmi_pixel_clock)
 	begin
 		if rising_edge(hdmi_pixel_clock) then
-			if hdmi_vstart then
+			if debounce_buttona then
 				if to_integer(unsigned(crosshair_column)) < 1279 then
 					crosshair_column <= std_logic_vector(unsigned(crosshair_column) + 1);
-				else
-					crosshair_column <= (others => '0');
+				end if;
+			elsif debounce_buttonb then
+				if to_integer(unsigned(crosshair_column)) > 0 then
+					crosshair_column <= std_logic_vector(unsigned(crosshair_column) - 1);
 				end if;
 			end if;
 			
 			if (hdmi_row = crosshair_row) or (hdmi_column = crosshair_column) then
 				rgb <= "111111110000000000000000";
-			else
+			elsif hdmi_column = std_logic_vector(to_unsigned(1278, 11)) or hdmi_column = std_logic_vector(to_unsigned(0, 11)) then
+				rgb <= "111111111111111100000000";
+			elsif hdmi_column = std_logic_vector(to_unsigned(1279, 11)) or hdmi_column = std_logic_vector(to_unsigned(1, 11)) then
+				rgb <= "000000001111111111111111";
+			elsif hdmi_column = std_logic_vector(to_unsigned(1280, 11)) or hdmi_column = std_logic_vector(to_unsigned(2, 11)) then
+				rgb <= "111111111111111111111111";
+			elsif hdmi_pvalid then
 				rgb <= random_data(23 downto 0);
+			else
+				rgb <= "111111110000000011111111";
 			end if;
 		end if;
 	end process;

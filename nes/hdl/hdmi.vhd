@@ -9,6 +9,8 @@ entity tmds_encoderb is
         ctrl : in  std_logic_vector(1 downto 0);
 		aux  : in std_logic_vector(3 downto 0);
         din  : in  std_logic_vector(7 downto 0);
+		pguard: in std_logic_vector(9 downto 0);
+		dguard: in std_logic_vector(10 downto 0);
         dout : out std_logic_vector(9 downto 0)
     );
 end tmds_encoderb;
@@ -131,7 +133,7 @@ begin
 						when "1110" => dout <= "0101100011";
 						when others => dout <= "1011000011";
 					end case;
-				when others => dout <= "1111100000";
+				when others => dout <= pguard;
              end case;
         end if;
     end process;
@@ -213,6 +215,7 @@ entity hdmi2 is
 		test: out std_logic_vector(1 downto 0);
 		hstart: out std_logic;
 		vstart: out std_logic;
+		pvalid: out std_logic;
 		row_out: out std_logic_vector(9 downto 0);
 		column_out: out std_logic_vector(10 downto 0);
 		r: in std_logic_vector(7 downto 0);
@@ -243,6 +246,8 @@ architecture Behavioral of hdmi2 is
 	signal hsync3: std_logic;
 	signal hsync4: std_logic;
 	signal vsync: std_logic;
+	signal vsync2: std_logic;
+	signal vsync3: std_logic;
 	signal control_period: std_logic;
 	signal pixels_guard: std_logic;
 	signal pixels_guard2: std_logic;
@@ -266,7 +271,7 @@ architecture Behavioral of hdmi2 is
 begin
     clock_freq <= htotal * vtotal * rate;
 
-	test <= vsync & pixels_guard;
+	test <= vsync & pixels_guard2;
 
 	data_island <= '0'; --todo
 	data_island_guard <= '0';--data_island_mode(1);
@@ -309,7 +314,9 @@ begin
 	begin
 		if data_island then
 			selection <= "10";  --aux output
-		elsif pixels_guard or hblank or vblank then
+		elsif pixels_guard then
+			selection <= "11"; 	--pixel guard output
+		elsif hblank or vblank then
 			selection <= "01";  --ctl output
 		elsif pixels then
 			selection <= "00";  --normal pixel output
@@ -323,6 +330,16 @@ begin
 		else
 			control <= "0000";
 		end if;
+		if column < hsync_width then
+			hsync <= hsync_polarity;
+		else
+			hsync <= not hsync_polarity;
+		end if;
+		if row > 0 and row < vsync_width + 1 then
+			vsync <= vsync_polarity;
+		else
+			vsync <= not vsync_polarity;
+		end if;
 	end process;
 	  
 	 process (pixel_clock)
@@ -332,6 +349,11 @@ begin
 				request_data_island <= '0';
 			else
 				request_data_island <= '0';
+			end if;
+			if column >= (hsync_porch + hsync_width) and column < (hsync_porch + hsync_width + h) then
+				pvalid <= '1' and not vblank;
+			else
+				pvalid <= '0';
 			end if;
 			if column = (hsync_porch + hsync_width - 1) then
 				hstart <= '1' and not vblank;
@@ -347,18 +369,18 @@ begin
 			else
 				vstart <= '0';
 			end if;
-			row_out <= std_logic_vector(to_unsigned(row - vsync_width - vsync_porch - 1, 10));
+			row_out <= std_logic_vector(to_unsigned(row - vsync_width - vsync_porch - 2, 10));
 			column_out <= std_logic_vector(to_unsigned(column - hsync_width - hsync_porch + 1, 11));
 			if column = (hsync_porch + hsync_width - 1) or column = (hsync_porch + hsync_width-2) then
-				pixels_guard <= '1' and not vblank;
+				pixels_guard <= '0';
 			else
 				pixels_guard <= '0';
 			end if;
 			pixels_guard2 <= pixels_guard;
 			data_island_guard2 <= data_island_guard;
 			
-			if column >= (hsync_porch + hsync_width-10) and column <= (hsync_porch + hsync_width - 3) then
-				pixel_preamble <= '1' and not vblank;
+			if column >= (hsync_porch + hsync_width-8) and column <= (hsync_porch + hsync_width - 1) then
+				pixel_preamble <= not vblank;
 			else
 				pixel_preamble <= '0';
 			end if;
@@ -372,18 +394,13 @@ begin
 			else
 				vblank <= '0';
 			end if;
-			if column > 0 and column < hsync_width + 1 then
-				hsync <= hsync_polarity;
-			else
-				hsync <= not hsync_polarity;
-			end if;
-			if row > 0 and row < vsync_width + 1 then
-				vsync <= vsync_polarity;
-			else
-				vsync <= not vsync_polarity;
-			end if;
-			if column >= (hsync_porch + hsync_width) and column < (hsync_porch + hsync_width + h) then
-				pixels <= '1' and not vblank;
+			hsync2 <= hsync;
+			hsync3 <= hsync2;
+			hsync4 <= hsync3;
+			vsync2 <= vsync;
+			vsync3 <= vsync2;
+			if column >= (hsync_porch + hsync_width - 1) and column < (hsync_porch + hsync_width + h - 1) then
+				pixels <= not vblank;
 			else
 				pixels <= '0';
 			end if;
@@ -400,8 +417,8 @@ begin
 		end if;
 	 end process;
 
-	control0(0) <= hsync;
-	control0(1) <= vsync;
+	control0(0) <= hsync2;
+	control0(1) <= vsync2;
 	control1(0) <= control(0);
 	control1(1) <= control(1);
 	control2(0) <= control(2);
@@ -413,27 +430,14 @@ begin
 		ctrl => control0,
 		aux => aux,
 		sel => selection,
-		dout => tmds_0_pre
+		dout => tmds_0_pre,
+		pguard => "1011001100",
+		dguard => "00000000000"
 	);
 	
-	process (pixel_clock)
-	begin
-        if rising_edge(pixel_clock) then
-            if pixels_guard2 then
-                tmds_0 <= "1011001100";
-                tmds_1 <= "0100110011";
-                tmds_2 <= "1011001100";
-            elsif data_island_guard2 then
-                tmds_0 <= tmds_0_pre;
-                tmds_1 <= "0100110011";
-                tmds_2 <= "0100110011";
-            else
-                tmds_0 <= tmds_0_pre;
-                tmds_1 <= tmds_1_pre;
-                tmds_2 <= tmds_2_pre;
-            end if;
-        end if;
-	end process;
+	tmds_0 <= tmds_0_pre;
+	tmds_1 <= tmds_1_pre;
+	tmds_2 <= tmds_2_pre;
 	
 	d1_encoder: entity work.tmds_encoderb port map(
 		clk => pixel_clock,
@@ -441,7 +445,9 @@ begin
 		ctrl => control1,
 		aux => aux2,
 		sel => selection,
-		dout => tmds_1_pre
+		dout => tmds_1_pre,
+		pguard => "0100110011",
+		dguard => "10100110011"
 	);
 	
 	d2_encoder: entity work.tmds_encoderb port map(
@@ -450,7 +456,9 @@ begin
 		ctrl => control2,
 		aux => aux3,
 		sel => selection,
-		dout => tmds_2_pre
+		dout => tmds_2_pre,
+		pguard => "1011001100",
+		dguard => "10100110011"
 	);
 	
 	ck_p <= pixel_clock;
