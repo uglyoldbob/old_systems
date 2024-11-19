@@ -15,6 +15,9 @@ end nestb;
 
 architecture Behavioral of nestb is
 
+type AUDIO_TYPE is array(1 downto 0) of std_logic_vector(15 downto 0);
+signal audio: AUDIO_TYPE;
+
 type NES_TEST_ENTRY is
 	record
 		pc: std_logic_vector(15 downto 0);
@@ -102,9 +105,20 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal hdmi_i2c_sda: std_logic;
 	signal hdmi_hpd: std_logic;
 	
+	signal hdmi1_tmds: std_logic_vector(2 downto 0);
+	signal hdmi1_clk: std_logic;
+	signal hdmi1_cx: std_logic_vector(10 downto 0);
+	signal hdmi1_cy: std_logic_vector(9 downto 0);
+	signal hdmi1_frame_width: std_logic_vector(10 downto 0);
+	signal hdmi1_frame_height: std_logic_vector(9 downto 0);
+	signal hdmi1_screen_width: std_logic_vector(10 downto 0);
+	signal hdmi1_screen_height: std_logic_vector(9 downto 0);
+	
 	type RAM_ARRAY is array (2**19 downto 0) of std_logic_vector (7 downto 0);
 	signal rom : RAM_ARRAY;
 	FILE romfile : text;
+	
+	signal random_data: std_logic_vector(31 downto 0);
 begin
 	cpu_clock <= NOT cpu_clock after 20ns;
 	hdmi_tmds_clock <= not hdmi_tmds_clock after 4 ns;
@@ -114,7 +128,28 @@ begin
 	hdmi_i2c_scl <= 'H';
 	hdmi_i2c_sda <= 'H';
 	
-	hdmi: entity work.hdmi generic map(
+	random: entity work.lfsr32 port map(
+		clock => cpu_clock,
+		dout => random_data);
+	
+	hdmi: entity work.hdmi generic map (DVI_OUTPUT => '1', VIDEO_ID_CODE => 4)
+		port map(
+			clk_pixel_x5 => hdmi_tmds_clock,
+			clk_pixel => cpu_clock,
+			clk_audio => '0',
+			reset => cpu_reset,
+			rgb => random_data(23 downto 0),
+			audio_sample_word => audio,
+			tmds => hdmi1_tmds,
+			tmds_clock => hdmi1_clk,
+			cx => hdmi1_cx,
+			cy => hdmi1_cy,
+			frame_width => hdmi1_frame_width,
+			frame_height => hdmi1_frame_height,
+			screen_width => hdmi1_screen_width,
+			screen_height => hdmi1_screen_height);
+	
+	hdmi2: entity work.hdmi2 generic map(
 		hsync_polarity => '1',
 		vsync_polarity => '1',
 		h => 1280,
@@ -135,9 +170,9 @@ begin
 		hpd => hdmi_hpd,
 		pixel_clock => cpu_clock,
 		tmds_clock => hdmi_tmds_clock,
-		r => "00000000",
-		g => "10101010",
-		b => "11001100"
+		r => random_data(23 downto 16),
+		g => random_data(15 downto 8),
+		b => random_data(7 downto 0)
 	);
 	
 	nes: entity work.nes port map (
@@ -174,7 +209,7 @@ begin
 		variable i: integer;
 		variable size: integer;
 	begin
-		cpu_reset <= '1';
+		cpu_reset <= '1', '0' after 100ns;
 		
 		if run_benches(0) or run_benches(1) then
 			write_rw <= '1';
@@ -217,8 +252,7 @@ begin
 				wait until rising_edge(cpu_clock);
 			end if;
 		end if;
-		
-		cpu_reset <= '0' after 100ns;
+
 		if run_benches(0) then
 			report "Running basic nestest to check cpu";
 			instruction_check <= '0';

@@ -11,6 +11,16 @@ cp ../../rom_processor.tcl ./
 
 source rom_processor.tcl
 
+vlog -sv -work work {../../hdmi/tmds_channel.sv}
+vlog -sv -work work {../../hdmi/source_product_description_info_frame.sv}
+vlog -sv -work work {../../hdmi/serializer.sv}
+vlog -sv -work work {../../hdmi/packet_picker.sv}
+vlog -sv -work work {../../hdmi/packet_assembler.sv}
+vlog -sv -work work {../../hdmi/auxiliary_video_information_info_frame.sv}
+vlog -sv -work work {../../hdmi/audio_sample_packet.sv}
+vlog -sv -work work {../../hdmi/audio_info_frame.sv}
+vlog -sv -work work {../../hdmi/audio_clock_regeneration_packet.sv}
+vlog -sv -work work {../../hdmi/hdmi.sv}
 vcom -2008 -work work {../../lfsr.vhd}
 vcom -2008 -work work {../../ddr.vhd}
 vcom -2008 -work work {../../hdmi.vhd}
@@ -23,7 +33,7 @@ vcom -2008 -work work {../../nestb.vhd}
 
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
-add wave /nestb/hdmi/*
+add wave /nestb/hdmi2/*
 
 log * -r
 

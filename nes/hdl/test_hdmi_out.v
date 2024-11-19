@@ -1,5 +1,5 @@
 module test_hdmi_out (
-	input clk_pixel,
+	input tmds_clk,
 	input [2:0] tmds,
 	output       tmds_clk_n,
 	output       tmds_clk_p,
@@ -8,7 +8,7 @@ module test_hdmi_out (
 );
 
 	ELVDS_OBUF tmds_bufds [3:0] (
-		.I({clk_pixel, tmds}),
+		.I({tmds_clk, tmds}),
 		.O({tmds_clk_p, tmds_d_p}),
 		.OB({tmds_clk_n, tmds_d_n})
 	);
