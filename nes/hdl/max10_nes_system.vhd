@@ -76,22 +76,23 @@ begin
 		clock => cpu_clock
 		);
 	
-	hdmi_pll_inst : work.hdmi_pll PORT MAP (
+	hdmi_pll_inst : entity work.hdmi_pll PORT MAP (
 		inclk0 => clock,
 		c0 => tmds_clock,
+		c1 => hdmi_pixel_clock,
 		locked => pll_lock);
 
-	hdmi_converter: entity work.hdmi generic map(
+	hdmi_converter: entity work.hdmi2 generic map(
 		hsync_polarity => '1',
 		vsync_polarity => '1',
-		h => 1280,
-		v => 720,
-		hblank_width => 370,
-		hsync_porch => 220,
-		hsync_width => 40,
-		vblank_width => 30,
-		vsync_porch => 20,
-		vsync_width => 5) port map(
+		h => 800,
+		v => 600,
+		hblank_width => 256,
+		hsync_porch => 88,
+		hsync_width => 128,
+		vblank_width => 28,
+		vsync_porch => 23,
+		vsync_width => 4) port map(
 		reset => not pll_lock,
 		pixel_clock => hdmi_pixel_clock,
 		tmds_clock => tmds_clock,

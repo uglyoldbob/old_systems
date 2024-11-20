@@ -17,11 +17,10 @@
         <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_ppu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_tang_nano_20k.vhd" type="file.vhdl" enable="1"/>
-        <File path="slow_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="sram.vhd" type="file.vhdl" enable="0"/>
         <File path="sram_inout.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/large_divider.vhd" type="file.vhdl" enable="1"/>
         <File path="switch_debounce.vhd" type="file.vhdl" enable="1"/>
-        <File path="tiny_hdmi_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_div.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="src/tang_nano_nes.cst" type="file.cst" enable="1"/>

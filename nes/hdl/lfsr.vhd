@@ -32,3 +32,38 @@ begin
 		end if;
 	end process;
 end Behavioral;
+
+library ieee; 
+use ieee.std_logic_1164.all;
+
+entity lfsr8 is 
+	port (
+		clock: in std_logic;
+		dout: out std_logic_vector(7 downto 0)
+		);
+end lfsr8;
+
+architecture Behavioral of lfsr8 is  
+	signal d: std_logic_vector(7 downto 0) := (0 => '1', others => '0');
+	signal reset: std_logic;
+	signal e: std_logic;
+begin
+	dout <= d;
+	e <= d(7) xnor d(5) xnor d(4) xnor d(3);
+
+	process (all)
+	begin
+		if d = x"00" then
+			reset <= '1';
+		else
+			reset <= '0';
+		end if;
+	end process;
+
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			d <= d(6 downto 0) & (reset or e);
+		end if;
+	end process;
+end Behavioral;

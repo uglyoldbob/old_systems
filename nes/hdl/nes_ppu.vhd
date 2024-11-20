@@ -6,6 +6,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes_ppu is
 	Generic (
+		random_noise: in std_logic := '1';
 		ramtype: string := "sram");
    Port (r_out: out std_logic_vector(7 downto 0);
 			g_out: out std_logic_vector(7 downto 0);
@@ -323,6 +324,8 @@ signal patterntable_tile: std_logic_vector(15 downto 0);
 signal vblank_clear_toggle: std_logic := '0';
 signal vblank_clear_done: std_logic := '0';
 
+signal random_data: std_logic_vector(31 downto 0);
+
 begin
 	process (all)
 	begin
@@ -458,7 +461,9 @@ begin
 			palette_pixel <= palette(0);
 		end if;
 		
-		if priority_sprite then
+		if random_noise then
+			pixel <= random_data(5 downto 0);
+		elsif priority_sprite then
 			if sprite_pixel(6) then
 				pixel <= sprite_pixel(5 downto 0);
 			elsif background_pixel(6) then
@@ -623,6 +628,10 @@ begin
 			end if;
 		end if;
 	end process;
+
+	random: entity work.lfsr32 port map(
+		clock => clock,
+		dout => random_data);
 
 	process (cpu_mem_clock, reset)
 	begin

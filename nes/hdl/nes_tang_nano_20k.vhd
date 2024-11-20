@@ -22,10 +22,7 @@ entity nes_tang_nano_20k is
 end nes_tang_nano_20k;
 
 architecture Behavioral of nes_tang_nano_20k is
-	signal button_clock_counter: std_logic_vector(19 downto 0);
 	signal button_clock: std_logic;
-
-    signal random_data: std_logic_vector(31 downto 0);
 
 	signal rgb: std_logic_vector(23 downto 0);
     signal hdmi_pixel_clock: std_logic;
@@ -66,24 +63,26 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal debounce_buttona: std_logic;
 	signal debounce_buttonb: std_logic;
 
+	signal nes_clock: std_logic;
+	signal nes_reset: std_logic;
+	signal nes_oe: std_logic_vector(1 downto 0);
+	signal nes_address: std_logic_vector(15 downto 0);
+
+	signal ppu_r: std_logic_vector(7 downto 0);
+	signal ppu_g: std_logic_vector(7 downto 0);
+	signal ppu_b: std_logic_vector(7 downto 0);
+
+	signal write_signal: std_logic;
+	signal write_address: std_logic_vector(19 downto 0);
+	signal write_value: std_logic_vector(7 downto 0);
+	signal write_trigger: std_logic;
+	signal write_rw: std_logic;
+	signal write_cs: std_logic_vector(1 downto 0);
+
     component tmds_pll
         port (
             clkout: out std_logic;
             lock: out std_logic;
-            clkin: in std_logic
-        );
-    end component;
-
-    component tiny_hdmi_pll
-        port (
-            clkout: out std_logic;
-            clkin: in std_logic
-        );
-    end component;
-
-    component slow_pll
-        port (
-            clkout: out std_logic;
             clkin: in std_logic
         );
     end component;
@@ -132,7 +131,6 @@ begin
 		tmds_d_p => hdmi_d_p,
 		tmds_d_n => hdmi_d_n);
 
---	tmds_clk_post(0) <= hdmi_pixel_clock;
 	hdmi_serclk: Gowin_DDR
         port map (
             din => "1111100000",
@@ -167,18 +165,6 @@ begin
         lock => pll_lock,
         clkout => tmds_clock,
         clkin => clock);
-
---    tiny_hdmi: tiny_hdmi_pll
---        port map (
---            clkout => tmds_clock,
---            clkin => clock
---        );
-
---    slow_pll_i: slow_pll
---        port map (
---            clkout => hdmi_pixel_clock,
---            clkin => clock);
---    tmds_clock <= clock;
     
     tmds_maker: tmds_div port map (
         clkout => hdmi_pixel_clock,
@@ -220,43 +206,11 @@ begin
 	process (hdmi_pixel_clock)
 	begin
 		if rising_edge(hdmi_pixel_clock) then
-			if debounce_buttona then
-				if to_integer(unsigned(crosshair_column)) < 1279 then
-					crosshair_column <= std_logic_vector(unsigned(crosshair_column) + 1);
-				end if;
-			elsif debounce_buttonb then
-				if to_integer(unsigned(crosshair_column)) > 0 then
-					crosshair_column <= std_logic_vector(unsigned(crosshair_column) - 1);
-				end if;
-			end if;
-			
-			if (hdmi_row = crosshair_row) or (hdmi_column = crosshair_column) then
-				rgb <= "111111110000000000000000";
-			elsif hdmi_column = std_logic_vector(to_unsigned(1278, 11)) or hdmi_column = std_logic_vector(to_unsigned(0, 11)) then
-				rgb <= "111111111111111100000000";
-			elsif hdmi_column = std_logic_vector(to_unsigned(1279, 11)) or hdmi_column = std_logic_vector(to_unsigned(1, 11)) then
-				rgb <= "000000001111111111111111";
-			elsif hdmi_column = std_logic_vector(to_unsigned(1280, 11)) or hdmi_column = std_logic_vector(to_unsigned(2, 11)) then
-				rgb <= "111111111111111111111111";
-			elsif hdmi_pvalid then
-				rgb <= random_data(23 downto 0);
-			else
-				rgb <= "111111110000000011111111";
-			end if;
+			rgb <= ppu_r & ppu_g & ppu_b;
 		end if;
 	end process;
 
-	process (hdmi_pixel_clock)
-	begin
-		if rising_edge(hdmi_pixel_clock) then
-			button_clock_counter <= std_logic_vector(unsigned(button_clock_counter) + 1);
-			button_clock <= button_clock_counter(19);
-		end if;
-	end process;
-
-    random: entity work.lfsr32 port map(
-		clock => hdmi_pixel_clock,
-		dout => random_data);
+	bc: entity work.large_divider generic map(bits => 20) port map(clock => hdmi_pixel_clock, ckout => button_clock);
 
 	btn1: entity work.switch_debounce port map(
 		slowclock => button_clock,
@@ -269,5 +223,27 @@ begin
 		clock => hdmi_pixel_clock,
 		din => buttons(1),
 		dout => debounce_buttonb);
+
+	nes_clock <= hdmi_pixel_clock;
+
+	write_signal <= '0';
+	write_trigger <= '0';
+	nes_reset <= '0';
+
+	nes: entity work.nes generic map(
+		random_noise => '1') port map (
+		ppu_r => ppu_r,
+		ppu_g => ppu_g,
+		ppu_b => ppu_b,
+		write_signal => write_signal,
+		write_address => write_address,
+		write_value => write_value,
+		write_trigger => write_trigger,
+		write_rw => write_rw,
+		write_cs => write_cs,
+		reset => nes_reset,
+		cpu_oe => nes_oe,
+		cpu_memory_address => nes_address,
+		clock => nes_clock);
 end Behavioral;
 

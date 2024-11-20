@@ -4,6 +4,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 entity nes is
 	Generic (
 		ramtype: string := "sram";
+		random_noise: in std_logic := '1';
 		unified_ram: std_logic := '0');
    Port (
 		write_signal: in std_logic := '0';
@@ -192,6 +193,7 @@ begin
 		address => cpu_address);
 	
 	ppu: entity work.nes_ppu generic map(
+		random_noise => random_noise,
 		ramtype => ramtype) port map (
 		r_out => ppu_r,
 		g_out => ppu_g,
