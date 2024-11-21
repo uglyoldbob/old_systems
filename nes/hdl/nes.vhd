@@ -1,5 +1,6 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
 entity nes is
 	Generic (
@@ -38,6 +39,24 @@ entity nes is
 end nes;
 
 architecture Behavioral of nes is
+	type PPU_LINE_BUFFER is array (255 downto 0) of std_logic_vector (23 downto 0);
+	
+	signal line0: PPU_LINE_BUFFER;
+	signal line1: PPU_LINE_BUFFER;
+	signal line2: PPU_LINE_BUFFER;
+	
+	signal kernel_a: std_logic_vector(23 downto 0);
+	signal kernel_b: std_logic_vector(23 downto 0);
+	signal kernel_c: std_logic_vector(23 downto 0);
+	signal kernel_d: std_logic_vector(23 downto 0);
+	signal kernel_e: std_logic_vector(23 downto 0);
+	signal kernel_f: std_logic_vector(23 downto 0);
+	signal kernel_g: std_logic_vector(23 downto 0);
+	signal kernel_h: std_logic_vector(23 downto 0);
+	signal kernel_i: std_logic_vector(23 downto 0);
+	
+	signal line_counter: std_logic_vector(1 downto 0) := (others => '0');
+
 	signal cpu_address: std_logic_vector(15 downto 0);
 	signal cpu_dout: std_logic_vector(7 downto 0);
 	signal cpu_din: std_logic_vector(7 downto 0);
@@ -63,6 +82,27 @@ architecture Behavioral of nes is
 	signal ppu_rd: std_logic;
 	signal ppu_wr: std_logic;
 	signal ppu_clock: std_logic;
+	
+	signal ppu_hstart_trigger: std_logic;
+	signal ppu_vstart_trigger: std_logic;
+	signal ppu_pixel_trigger: std_logic;
+	signal ppu_clock_delay: std_logic;
+	signal ppu_pixel_valid: std_logic;
+	signal ppu_hstart: std_logic;
+	signal ppu_vstart: std_logic;
+	signal ppu_hstart_delay: std_logic;
+	signal ppu_vstart_delay: std_logic;
+	signal ppu_row: std_logic_vector(7 downto 0);
+	signal ppu_column: std_logic_vector(7 downto 0);
+	signal ppu_subpixel: std_logic_vector(1 downto 0);
+	signal ppu_subpixel_process: std_logic_vector(1 downto 0);
+	
+	signal ppu_last_column_trigger: std_logic;
+	signal ppu_last_column_count: std_logic_vector(2 downto 0) := (others => '0');
+	signal ppu_last_row_trigger: std_logic;
+	signal ppu_last_row_count: std_logic_vector(9 downto 0) := (others => '0');
+	signal ppu_process_column: std_logic_vector(7 downto 0) := (others => '0');
+	signal ppu_process_row: std_logic_vector(7 downto 0) := (others => '0');
 	
 	signal cpu_apu_cs: std_logic;
 	
@@ -166,6 +206,89 @@ begin
 		);
 	end generate;
 	
+	ppu_pixel_trigger <= ppu_last_column_trigger or (ppu_clock and not ppu_clock_delay and ppu_pixel_valid);
+	ppu_vstart_trigger <= ppu_clock and ppu_vstart_delay;
+	process (all)
+	begin
+		if ppu_last_column_count = "001" then
+			ppu_last_column_trigger <= '1';
+		else
+			ppu_last_column_trigger <= '0';
+		end if;
+		if not ppu_last_row_trigger then
+			ppu_subpixel_process <= ppu_subpixel;
+		else
+			ppu_subpixel_process <= ppu_last_row_count(1 downto 0);
+		end if;
+	end process;
+	
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			ppu_hstart_trigger <= ppu_clock and ppu_hstart_delay;
+			ppu_clock_delay <= ppu_clock;
+			ppu_hstart_delay <= ppu_hstart and ppu_clock;
+			ppu_vstart_delay <= ppu_vstart and ppu_clock;
+			if ppu_hstart_trigger then
+				case line_counter is
+					when "00" => line_counter <= "01";
+					when "01" => line_counter <= "10";
+					when others => line_counter <= "00";
+				end case;
+				ppu_process_row <= std_logic_vector(unsigned(ppu_row) - 1);
+				if ppu_process_row = std_logic_vector(to_unsigned(238, 8)) then
+					ppu_last_row_count <= "1111111100";
+				end if;
+			end if;
+			if ppu_last_row_count(9 downto 2) /= "00000000" then
+				ppu_last_row_trigger <= '1';
+				case ppu_last_row_count(1 downto 0) is
+					when "00" => ppu_last_row_count(1 downto 0) <= "01";
+					when "01" => ppu_last_row_count(1 downto 0) <= "10";
+					when "10" => ppu_last_row_count(1 downto 0) <= "11";
+					when others => 
+						ppu_last_row_count(1 downto 0) <= "00";
+						ppu_last_row_count(9 downto 2) <= std_logic_vector(unsigned(ppu_last_row_count(9 downto 2)) - 1);
+				end case;
+			else
+				ppu_last_row_trigger <= '0';
+			end if;
+			if ppu_pixel_trigger and ppu_pixel_valid then
+					ppu_last_column_count <= "101";
+			else
+				case ppu_last_column_count is
+					when "101" => ppu_last_column_count <= "100";
+					when "100" => ppu_last_column_count <= "011";
+					when "011" => ppu_last_column_count <= "010";
+					when "010" => ppu_last_column_count <= "001";
+					when others => ppu_last_column_count <= "000";
+				end case;
+			end if;
+			if ppu_pixel_trigger then
+				ppu_process_column <= std_logic_vector(unsigned(ppu_column) - 1);
+				ppu_subpixel <= "01";
+				case line_counter is
+					when "00" => line0(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
+					when "01" => line1(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
+					when others => line2(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
+				end case;
+			else
+				case ppu_subpixel is
+					when "01" => ppu_subpixel <= "10";
+					when "10" => ppu_subpixel <= "11";
+					when others => ppu_subpixel <= "00";
+				end case;
+			end if;
+			
+			case ppu_subpixel is
+				when "01" =>
+				when "10" =>
+				when "11" =>
+				when others =>
+			end case;
+		end if;
+	end process;
+	
 	cpu: entity work.nes_cpu generic map(
 		ramtype => ramtype) port map (
 		pause_cpu => pause,
@@ -198,6 +321,11 @@ begin
 		r_out => ppu_r,
 		g_out => ppu_g,
 		b_out => ppu_b,
+		pixel_valid => ppu_pixel_valid,
+		hstart => ppu_hstart,
+		vstart => ppu_vstart,
+		row => ppu_row,
+		column => ppu_column,
 		clock => ppu_clock,
 		reset => reset_sync,
 		cpu_addr => cpu_address(2 downto 0),

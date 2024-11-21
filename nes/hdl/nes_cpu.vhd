@@ -41,7 +41,7 @@ begin
 					clocko <= not clocko;
 					clocko2 <= not clocko2;
 				end if;
-				if counter2 = "011" then
+				if counter2 = "001" then
 					counter2 <= "000";
 					c4 <= not c4;
 				end if;

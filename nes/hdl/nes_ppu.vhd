@@ -1,7 +1,6 @@
 library IEEE;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_misc.all;
-
 use IEEE.NUMERIC_STD.ALL;
 
 entity nes_ppu is
@@ -11,6 +10,11 @@ entity nes_ppu is
    Port (r_out: out std_logic_vector(7 downto 0);
 			g_out: out std_logic_vector(7 downto 0);
 			b_out: out std_logic_vector(7 downto 0);
+			pixel_valid: out std_logic;
+			hstart: out std_logic;
+			vstart: out std_logic;
+			row: out std_logic_vector(7 downto 0);
+			column: out std_logic_vector(7 downto 0);
 			clock : in STD_LOGIC;
          reset : in STD_LOGIC;
 			cpu_addr: in std_logic_vector(2 downto 0);
@@ -334,6 +338,27 @@ begin
 			when "10000" | "10100" | "11000" | "11100" => palette_addr(4) <= '0';
 			when others =>
 		end case;
+	end process;
+	
+	process (all)
+	begin
+		column <= cycle_active(7 downto 0);
+		row <= scanline_number(7 downto 0);
+		if line_visible and column_active then
+			pixel_valid <= '1';
+		else
+			pixel_valid <= '0';
+		end if;
+		if (line_visible or line_post_visible) and column_first then
+			hstart <= '1';
+		else
+			hstart <= '0';
+		end if;
+		if line_pre_visible and column_first then
+			vstart <= '1';
+		else
+			vstart <= '0';
+		end if;
 	end process;
 	
 	process (reset, clock)

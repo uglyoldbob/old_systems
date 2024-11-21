@@ -34,15 +34,20 @@ vcom -2008 -work work {../../nestb.vhd}
 
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
-add wave /nestb/hdmi2/pixel_clock
-add wave /nestb/hdmi2/column
-add wave /nestb/hdmi2/row
-add wave /nestb/hdmi2/vsync
-add wave /nestb/hdmi2/hsync
-add wave /nestb/hdmi2/tmds_0
-add wave /nestb/hdmi2/tmds_1
-add wave /nestb/hdmi2/tmds_2
-add wave /nestb/hdmi2/pixels
+add wave /nestb/nes/ppu_r
+add wave /nestb/nes/ppu_g
+add wave /nestb/nes/ppu_b
+add wave /nestb/nes/ppu_clock
+add wave /nestb/nes/clock
+add wave /nestb/nes/ppu_pixel_trigger
+add wave /nestb/nes/ppu_row
+add wave /nestb/nes/ppu_column
+add wave /nestb/nes/ppu_subpixel
+add wave /nestb/nes/ppu_process_column
+add wave /nestb/nes/ppu_process_row
+add wave /nestb/nes/ppu_last_column_trigger
+add wave /nestb/nes/ppu_last_row_trigger
+add wave /nestb/nes/ppu_last_row_count
 
 
 log * -r

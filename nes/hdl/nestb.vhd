@@ -204,7 +204,8 @@ begin
 		end if;
 	end process;
 	
-	nes: entity work.nes port map (
+	nes: entity work.nes generic map(
+		random_noise => '1') port map (
 		ppu_r => ppu_r,
 		ppu_g => ppu_g,
 		ppu_b => ppu_b,
@@ -239,6 +240,14 @@ begin
 		variable size: integer;
 	begin
 		cpu_reset <= '1', '0' after 100ns;
+		
+		write_rw <= '0';
+		write_signal <= '0';
+		write_trigger <= '0';
+		write_cs <= "00";
+		write_address <= (others => '0');
+		write_value <= (others => '0');
+		wait until rising_edge(cpu_clock);
 		
 		if run_benches(0) or run_benches(1) then
 			write_rw <= '1';
