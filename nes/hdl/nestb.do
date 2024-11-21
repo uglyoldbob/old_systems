@@ -48,6 +48,7 @@ add wave /nestb/nes/ppu_process_row
 add wave /nestb/nes/ppu_last_column_trigger
 add wave /nestb/nes/ppu_last_row_trigger
 add wave /nestb/nes/ppu_last_row_count
+add wave /nestb/nes/kernel_*
 
 
 log * -r
