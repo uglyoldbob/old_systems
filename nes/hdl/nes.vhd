@@ -103,6 +103,7 @@ architecture Behavioral of nes is
 	signal ppu_last_row_count: std_logic_vector(9 downto 0) := (others => '0');
 	signal ppu_process_column: std_logic_vector(7 downto 0) := (others => '0');
 	signal ppu_process_row: std_logic_vector(7 downto 0) := (others => '0');
+	signal ppu_last_row_pixel_trigger: std_logic;
 	
 	signal cpu_apu_cs: std_logic;
 	
@@ -206,7 +207,7 @@ begin
 		);
 	end generate;
 	
-	ppu_pixel_trigger <= ppu_last_column_trigger or (ppu_clock and not ppu_clock_delay and ppu_pixel_valid);
+	ppu_pixel_trigger <= ppu_last_row_pixel_trigger or ppu_last_column_trigger or (ppu_clock and not ppu_clock_delay and ppu_pixel_valid);
 	ppu_vstart_trigger <= ppu_clock and ppu_vstart_delay;
 	process (all)
 	begin
@@ -229,6 +230,15 @@ begin
 			ppu_clock_delay <= ppu_clock;
 			ppu_hstart_delay <= ppu_hstart and ppu_clock;
 			ppu_vstart_delay <= ppu_vstart and ppu_clock;
+			if ppu_last_row_count(9 downto 2) /= "00000000" then
+				if ppu_last_row_count(1 downto 0) = "00" then
+					ppu_last_row_pixel_trigger <= '1';
+				else
+					ppu_last_row_pixel_trigger <= '0';
+				end if;
+			else
+				ppu_last_row_pixel_trigger <= '0';
+			end if;
 			if ppu_hstart_trigger then
 				case line_counter is
 					when "00" => line_counter <= "01";
