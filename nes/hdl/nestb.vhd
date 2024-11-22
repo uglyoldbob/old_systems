@@ -88,6 +88,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal cpu_instruction: std_logic;
 	signal instruction_check: std_logic;
 	
+	signal hdmi_pixel_clock: std_logic := '0';
 	signal hdmi_tmds_clock: std_logic := '0';
 	signal hdmi_tmds_0: std_logic_vector(9 downto 0);
 	signal hdmi_tmds_1: std_logic_vector(9 downto 0);
@@ -127,7 +128,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal random_data: std_logic_vector(31 downto 0);
 	signal rgb: std_logic_vector(23 downto 0);
 begin
-	cpu_clock <= NOT cpu_clock after 20ns;
+	hdmi_pixel_clock <= NOT hdmi_pixel_clock after 20ns;
+	cpu_clock <= not cpu_clock after 60 ns;
 	hdmi_tmds_clock <= not hdmi_tmds_clock after 4 ns;
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
@@ -136,13 +138,13 @@ begin
 	hdmi_i2c_sda <= 'H';
 	
 	random: entity work.lfsr32 port map(
-		clock => cpu_clock,
+		clock => hdmi_pixel_clock,
 		dout => random_data);
 	
 	hdmi: entity work.hdmi generic map (DVI_OUTPUT => '1', VIDEO_ID_CODE => 4)
 		port map(
 			clk_pixel_x5 => hdmi_tmds_clock,
-			clk_pixel => cpu_clock,
+			clk_pixel => hdmi_pixel_clock,
 			clk_audio => '0',
 			reset => cpu_reset,
 			rgb => random_data(23 downto 0),
@@ -175,7 +177,7 @@ begin
 		i2c_scl => hdmi_i2c_scl,
 		i2c_sda => hdmi_i2c_sda,
 		hpd => hdmi_hpd,
-		pixel_clock => cpu_clock,
+		pixel_clock => hdmi_pixel_clock,
 		tmds_clock => hdmi_tmds_clock,
 		row_out => hdmi_row,
 		column_out => hdmi_column,
@@ -187,9 +189,9 @@ begin
 		b => rgb(7 downto 0)
 	);
 	
-	process (cpu_clock)
+	process (hdmi_pixel_clock)
 	begin
-		if rising_edge(cpu_clock) then
+		if rising_edge(hdmi_pixel_clock) then
 			if hdmi_column = std_logic_vector(to_unsigned(1278, 11)) or hdmi_column = std_logic_vector(to_unsigned(0, 11)) then
 				rgb <= "000000000000000000000000";
 			elsif hdmi_column = std_logic_vector(to_unsigned(1279, 11)) or hdmi_column = std_logic_vector(to_unsigned(1, 11)) then
@@ -230,6 +232,7 @@ begin
 		cpu_memory_address => cpu_address,
 		cs_out => cs_out,
 		whocares => whocares,
+		fast_clock => hdmi_pixel_clock,
 		clock => cpu_clock
 		);
 

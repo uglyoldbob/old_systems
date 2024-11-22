@@ -284,7 +284,7 @@ signal write_ignore_counter: std_logic_vector(14 downto 0);
 
 signal should_eval_sprites: std_logic;
 
-signal scanline_number: std_logic_vector(8 downto 0) := (others => '0');
+signal scanline_number: std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(260, 9));
 signal scanline_cycle: std_logic_vector(8 downto 0) := (others => '0');
 signal frame_odd: std_logic := '0';
 
@@ -349,7 +349,7 @@ begin
 		else
 			pixel_valid <= '0';
 		end if;
-		if (line_visible or line_post_visible) and column_first then
+		if (line_visible or line_post_visible or line_vblank) and column_first then
 			hstart <= '1';
 		else
 			hstart <= '0';

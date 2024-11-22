@@ -30,7 +30,8 @@ entity nes is
 		d_cycle: out std_logic_vector(14 downto 0);
 		instruction_toggle_out: out std_logic;
 		reset: in std_logic;
-	   clock: in std_logic;
+	   fast_clock: in std_logic;
+		clock: in std_logic; --fast_clock divided by 3
 		cpu_oe: out std_logic_vector(1 downto 0);
 		cpu_memory_address: out std_logic_vector(15 downto 0);
 	   whocares: out std_logic;
@@ -94,19 +95,24 @@ architecture Behavioral of nes is
 	signal ppu_vstart_delay: std_logic;
 	signal ppu_row: std_logic_vector(7 downto 0);
 	signal ppu_column: std_logic_vector(7 downto 0);
-	signal ppu_subpixel: std_logic_vector(1 downto 0);
-	signal ppu_subpixel_process: std_logic_vector(1 downto 0);
+	signal ppu_subpixel: std_logic_vector(3 downto 0);
+	signal ppu_subpixel_process: std_logic_vector(3 downto 0);
 	
 	signal ppu_last_column_trigger: std_logic;
-	signal ppu_last_column_count: std_logic_vector(2 downto 0) := (others => '0');
+	signal ppu_last_column_count: std_logic_vector(3 downto 0) := (others => '0');
 	signal ppu_last_row_trigger: std_logic;
-	signal ppu_last_row_count: std_logic_vector(10 downto 0) := (others => '0');
+	signal ppu_last_row_count: std_logic_vector(12 downto 0) := (others => '0');
 	signal ppu_process_column: std_logic_vector(7 downto 0) := (others => '0');
 	signal ppu_process_row: std_logic_vector(7 downto 0) := (others => '0');
 	signal ppu_last_row_pixel_trigger: std_logic;
 	signal ppu_first_row_skip: std_logic := '0';
 	signal ppu_first_column_skip: std_logic := '0';
-	signal ppu_border: std_logic_vector(3 downto 0); --LURD (left, up, right, down)
+	signal ppu_border: std_logic_vector(2 downto 0);
+	constant BORDER_LEFT_RIGHT: integer := 0;
+	constant BORDER_UP: integer := 1;
+	constant BORDER_DOWN: integer := 2;
+	signal ppu_rescale_row: std_logic;
+	signal ppu_rescale_column: std_logic;
 	
 	signal cpu_apu_cs: std_logic;
 	
@@ -214,7 +220,8 @@ begin
 	ppu_vstart_trigger <= ppu_clock and ppu_vstart_delay;
 	process (all)
 	begin
-		if ppu_last_column_count = "001" then
+		if ppu_last_column_count = "0010" and ppu_process_column > std_logic_vector(to_unsigned(252, 8)) 
+			and ppu_process_column /= std_logic_vector(to_unsigned(255, 8)) then
 			ppu_last_column_trigger <= '1';
 		else
 			ppu_last_column_trigger <= '0';
@@ -222,33 +229,39 @@ begin
 		if not ppu_last_row_trigger then
 			ppu_subpixel_process <= ppu_subpixel;
 		else
-			ppu_subpixel_process <= ppu_last_row_count(1 downto 0);
+			ppu_subpixel_process <= ppu_last_row_count(3 downto 0);
 		end if;
-		if ppu_process_column > std_logic_vector(to_unsigned(0, 8)) then
-			ppu_border(0) <= '1';
+		if ppu_row > std_logic_vector(to_unsigned(1, 8)) then
+			ppu_rescale_row <= '1';
 		else
-			ppu_border(0) <= '0';
+			ppu_rescale_row <= '0';
 		end if;
-		if ppu_process_column < std_logic_vector(to_unsigned(255, 8)) then
-			ppu_border(2) <= '1';
+		if ppu_column > std_logic_vector(to_unsigned(1, 8)) then
+			ppu_rescale_column <= '1';
 		else
-			ppu_border(2) <= '0';
+			ppu_rescale_column <= '0';
 		end if;
-		if ppu_process_row > std_logic_vector(to_unsigned(0, 8)) then
-			ppu_border(1) <= '1';
+		if ((ppu_last_row_trigger = '1' or ppu_pixel_valid = '1') and ppu_column > std_logic_vector(to_unsigned(0, 8))) or 
+			((ppu_last_row_trigger = '0' and ppu_pixel_valid = '0') and ppu_column /= std_logic_vector(to_unsigned(2, 8))) then
+			ppu_border(BORDER_LEFT_RIGHT) <= '1';
 		else
-			ppu_border(1) <= '0';
+			ppu_border(BORDER_LEFT_RIGHT) <= '0';
 		end if;
-		if ppu_process_row < std_logic_vector(to_unsigned(239, 8)) then
-			ppu_border(3) <= '1';
+		if ppu_row /= std_logic_vector(to_unsigned(1, 8)) then
+			ppu_border(BORDER_UP) <= '1';
 		else
-			ppu_border(3) <= '0';
+			ppu_border(BORDER_UP) <= '0';
+		end if;
+		if ppu_row < std_logic_vector(to_unsigned(240, 8)) then
+			ppu_border(BORDER_DOWN) <= '1';
+		else
+			ppu_border(BORDER_DOWN) <= '0';
 		end if;
 	end process;
 	
-	process (clock)
+	process (fast_clock)
 	begin
-		if rising_edge(clock) then
+		if rising_edge(fast_clock) then
 			if ppu_vstart_trigger then
 				ppu_first_row_skip <= '0';
 			elsif ppu_row = std_logic_vector(to_unsigned(1, 8)) then
@@ -256,15 +269,15 @@ begin
 			end if;
 			if ppu_hstart_trigger then
 				ppu_first_column_skip <= '0';
-			elsif ppu_subpixel = "11" then
+			elsif ppu_subpixel = "1100" then
 				ppu_first_column_skip <= '1';
 			end if;
-			ppu_hstart_trigger <= ppu_clock and ppu_hstart_delay;
+			ppu_hstart_trigger <= ppu_hstart and not ppu_hstart_delay;
 			ppu_clock_delay <= ppu_clock;
-			ppu_hstart_delay <= ppu_hstart and ppu_clock;
+			ppu_hstart_delay <= ppu_hstart;
 			ppu_vstart_delay <= ppu_vstart and ppu_clock;
-			if ppu_last_row_count(10 downto 2) /= "000000000" then
-				if ppu_last_row_count(1 downto 0) = "00" then
+			if ppu_last_row_count(12 downto 4) /= "000000000" then
+				if ppu_last_row_count(3 downto 0) = "0000" then
 					ppu_last_row_pixel_trigger <= '1';
 				else
 					ppu_last_row_pixel_trigger <= '0';
@@ -272,171 +285,139 @@ begin
 			else
 				ppu_last_row_pixel_trigger <= '0';
 			end if;
-			if ppu_hstart_trigger then
+			if ppu_hstart_trigger = '1' or (ppu_last_row_trigger = '1' and ppu_last_row_count = "0000000000000" and ppu_row = std_logic_vector(to_unsigned(241, 8))) then
 				case line_counter is
 					when "00" => line_counter <= "01";
 					when "01" => line_counter <= "10";
 					when others => line_counter <= "00";
 				end case;
 				ppu_process_row <= std_logic_vector(unsigned(ppu_row) - 1);
-				if ppu_process_row = std_logic_vector(to_unsigned(238, 8)) then
-					ppu_last_row_count <= std_logic_vector(to_unsigned(257, 9)) & "00";
-				end if;
 			end if;
-			if ppu_last_row_count(10 downto 2) /= "000000000" then
+			if ppu_hstart_trigger = '1' and 
+				(ppu_process_row = std_logic_vector(to_unsigned(237, 8)) or 
+				ppu_process_row = std_logic_vector(to_unsigned(238, 8))) then
+				ppu_last_row_count <= std_logic_vector(to_unsigned(257, 9)) & "0000";
+			end if;
+			if ppu_last_row_count(12 downto 4) /= "000000000" then
 				ppu_last_row_trigger <= '1';
-				case ppu_last_row_count(1 downto 0) is
-					when "00" => ppu_last_row_count(1 downto 0) <= "01";
-					when "01" => ppu_last_row_count(1 downto 0) <= "10";
-					when "10" => ppu_last_row_count(1 downto 0) <= "11";
+
+				case ppu_last_row_count(3 downto 0) is
+					when "0000" => ppu_last_row_count(3 downto 0) <= "0001";
+					when "0001" => ppu_last_row_count(3 downto 0) <= "0010";
+					when "0010" => ppu_last_row_count(3 downto 0) <= "0011";
+					when "0011" => ppu_last_row_count(3 downto 0) <= "0100";
+					when "0100" => ppu_last_row_count(3 downto 0) <= "0101";
+					when "0101" => ppu_last_row_count(3 downto 0) <= "0110";
+					when "0110" => ppu_last_row_count(3 downto 0) <= "0111";
+					when "0111" => ppu_last_row_count(3 downto 0) <= "1000";
+					when "1000" => ppu_last_row_count(3 downto 0) <= "1001";
+					when "1001" => ppu_last_row_count(3 downto 0) <= "1010";
+					when "1010" => ppu_last_row_count(3 downto 0) <= "1011";
 					when others => 
-						ppu_last_row_count(1 downto 0) <= "00";
-						ppu_last_row_count(10 downto 2) <= std_logic_vector(unsigned(ppu_last_row_count(10 downto 2)) - 1);
+						ppu_last_row_count(3 downto 0) <= "0000";
+						ppu_last_row_count(12 downto 4) <= std_logic_vector(unsigned(ppu_last_row_count(12 downto 4)) - 1);
 				end case;
 			else
 				ppu_last_row_trigger <= '0';
 			end if;
-			if (ppu_last_row_pixel_trigger or ppu_last_column_trigger or ppu_pixel_trigger) and ppu_pixel_valid then
-					ppu_last_column_count <= "101";
+			if ppu_last_column_trigger or 
+				(ppu_pixel_valid or ppu_pixel_trigger) or 
+				(not ppu_pixel_valid and ppu_last_row_pixel_trigger) then
+					ppu_last_column_count <= "1101";
 			else
 				case ppu_last_column_count is
-					when "101" => ppu_last_column_count <= "100";
-					when "100" => ppu_last_column_count <= "011";
-					when "011" => ppu_last_column_count <= "010";
-					when "010" => ppu_last_column_count <= "001";
-					when others => ppu_last_column_count <= "000";
+					when "1101" => ppu_last_column_count <= "1100";
+					when "1100" => ppu_last_column_count <= "1011";
+					when "1011" => ppu_last_column_count <= "1010";
+					when "1010" => ppu_last_column_count <= "1001";
+					when "1001" => ppu_last_column_count <= "1000";
+					when "1000" => ppu_last_column_count <= "0111";
+					when "0111" => ppu_last_column_count <= "0110";
+					when "0110" => ppu_last_column_count <= "0101";
+					when "0101" => ppu_last_column_count <= "0100";
+					when "0100" => ppu_last_column_count <= "0011";
+					when "0011" => ppu_last_column_count <= "0010";
+					when "0010" => ppu_last_column_count <= "0001";
+					when others => ppu_last_column_count <= "0000";
 				end case;
 			end if;
-			if ppu_pixel_trigger or ppu_last_row_trigger then
-				ppu_process_column <= std_logic_vector(unsigned(ppu_column) - 1);
+			if ppu_pixel_trigger or ppu_last_column_trigger or ppu_last_row_trigger then
+				ppu_process_column <= std_logic_vector(unsigned(ppu_column) - 2);
+			end if;
+			if ppu_pixel_trigger or ppu_last_column_trigger then
+				ppu_subpixel <= "0001";
+			else
+				case ppu_subpixel is
+					when "0001" => ppu_subpixel <= "0010";
+					when "0010" => ppu_subpixel <= "0011";
+					when "0011" => ppu_subpixel <= "0100";
+					when "0100" => ppu_subpixel <= "0101";
+					when "0101" => ppu_subpixel <= "0110";
+					when "0110" => ppu_subpixel <= "0111";
+					when "0111" => ppu_subpixel <= "1000";
+					when "1000" => ppu_subpixel <= "1001";
+					when "1001" => ppu_subpixel <= "1010";
+					when "1010" => ppu_subpixel <= "1011";
+					when "1011" => ppu_subpixel <= "1100";
+					when others => ppu_subpixel <= "0000";
+				end case;
 			end if;
 			if ppu_pixel_trigger then
-				ppu_subpixel <= "01";
 				case line_counter is
 					when "00" => line0(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
 					when "01" => line1(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
 					when others => line2(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
 				end case;
-			else
-				case ppu_subpixel is
-					when "01" => ppu_subpixel <= "10";
-					when "10" => ppu_subpixel <= "11";
-					when others => ppu_subpixel <= "00";
-				end case;
 			end if;
 
-			if ppu_first_row_skip and (ppu_first_column_skip or ppu_last_row_trigger) then
-				case ppu_subpixel_process is
-					when "01" =>
-						if ppu_border(0) and ppu_border(1) then
-							case line_counter is
-								when "00" =>
-									kernel_a <= line1(to_integer(unsigned(ppu_process_column)-1));
-								when "01" =>
-									kernel_a <= line2(to_integer(unsigned(ppu_process_column)-1));
-								when others =>
-									kernel_a <= line0(to_integer(unsigned(ppu_process_column)-1));
-							end case;
-						else
-							kernel_a <= (others => '0');
-						end if;
-						if ppu_border(1) then
-							case line_counter is
-								when "00" => 
-									kernel_b <= line1(to_integer(unsigned(ppu_process_column)));
-								when "01" => 
-									kernel_b <= line2(to_integer(unsigned(ppu_process_column)));
-								when others => 
-									kernel_b <= line0(to_integer(unsigned(ppu_process_column)));
-							end case;
-						else
-							kernel_b <= (others => '0');
-						end if;
-						if ppu_border(1) and ppu_border(2) then
-							case line_counter is
-								when "00" => 
-									kernel_c <= line1(to_integer(unsigned(ppu_process_column)+1));
-								when "01" => 
-									kernel_c <= line2(to_integer(unsigned(ppu_process_column)+1));
-								when others => 
-									kernel_c <= line0(to_integer(unsigned(ppu_process_column)+1));
-							end case;
-						else
-							kernel_c <= (others => '0');
-						end if;
-						if ppu_border(0) then
-							case line_counter is
-								when "00" =>
-									kernel_d <= line2(to_integer(unsigned(ppu_process_column)-1));
-								when "01" =>
-									kernel_d <= line0(to_integer(unsigned(ppu_process_column)-1));
-								when others =>
-									kernel_d <= line1(to_integer(unsigned(ppu_process_column)-1));
-							end case;
-						else
-							kernel_d <= (others => '0');
-						end if;
+			case ppu_subpixel_process is
+				when "0001" =>
+					kernel_a <= kernel_b;
+					kernel_b <= kernel_c;
+					if ppu_border(BORDER_UP) and ppu_border(BORDER_LEFT_RIGHT) then
+						case line_counter is
+							when "00" => 
+								kernel_c <= line1(to_integer(unsigned(ppu_process_column)+1));
+							when "01" => 
+								kernel_c <= line2(to_integer(unsigned(ppu_process_column)+1));
+							when others => 
+								kernel_c <= line0(to_integer(unsigned(ppu_process_column)+1));
+						end case;
+					else
+						kernel_c <= (others => '0');
+					end if;
+					kernel_d <= kernel_e;
+					kernel_e <= kernel_f;
+					if ppu_border(BORDER_LEFT_RIGHT) then
 						case line_counter is
 							when "00" =>
-								kernel_e <= line2(to_integer(unsigned(ppu_process_column)));
+								kernel_f <= line2(to_integer(unsigned(ppu_process_column)+1));
 							when "01" =>
-								kernel_e <= line0(to_integer(unsigned(ppu_process_column)));
+								kernel_f <= line0(to_integer(unsigned(ppu_process_column)+1));
 							when others =>
-								kernel_e <= line1(to_integer(unsigned(ppu_process_column)));
+								kernel_f <= line1(to_integer(unsigned(ppu_process_column)+1));
 						end case;
-						if ppu_border(2) then
-							case line_counter is
-								when "00" =>
-									kernel_f <= line2(to_integer(unsigned(ppu_process_column)+1));
-								when "01" =>
-									kernel_f <= line0(to_integer(unsigned(ppu_process_column)+1));
-								when others =>
-									kernel_f <= line1(to_integer(unsigned(ppu_process_column)+1));
-							end case;
-						else
-							kernel_f <= (others => '0');
-						end if;
-						if ppu_border(0) and ppu_border(3) then
-							case line_counter is
-								when "00" =>
-									kernel_g <= line0(to_integer(unsigned(ppu_process_column)-1));
-								when "01" =>
-									kernel_g <= line1(to_integer(unsigned(ppu_process_column)-1));
-								when others =>
-									kernel_g <= line2(to_integer(unsigned(ppu_process_column)-1));
-							end case;
-						else
-							kernel_g <= (others => '0');
-						end if;
-						if ppu_border(3) then
-							case line_counter is
-								when "00" => 
-									kernel_h <= line0(to_integer(unsigned(ppu_process_column)));
-								when "01" => 
-									kernel_h <= line1(to_integer(unsigned(ppu_process_column)));
-								when others => 
-									kernel_h <= line2(to_integer(unsigned(ppu_process_column)));
-							end case;
-						else
-							kernel_h <= (others => '0');
-						end if;
-						if ppu_border(3) and ppu_border(2) then
-							case line_counter is
-								when "00" => 
-									kernel_i <= line0(to_integer(unsigned(ppu_process_column)+1));
-								when "01" => 
-									kernel_i <= line1(to_integer(unsigned(ppu_process_column)+1));
-								when others => 
-									kernel_i <= line2(to_integer(unsigned(ppu_process_column)+1));
-							end case;
-						else
-							kernel_i <= (others => '0');
-						end if;
-					when "10" =>
-					when "11" =>
-					when others =>
-				end case;
-			end if;
+					else
+						kernel_f <= (others => '0');
+					end if;
+					kernel_g <= kernel_h;
+					kernel_h <= kernel_i;
+					if ppu_border(BORDER_DOWN) and ppu_border(BORDER_LEFT_RIGHT) then
+						case line_counter is
+							when "00" => 
+								kernel_i <= line0(to_integer(unsigned(ppu_process_column)+1));
+							when "01" => 
+								kernel_i <= line1(to_integer(unsigned(ppu_process_column)+1));
+							when others => 
+								kernel_i <= line2(to_integer(unsigned(ppu_process_column)+1));
+						end case;
+					else
+						kernel_i <= (others => '0');
+					end if;
+				when "0010" =>
+				when "0011" =>
+				when others =>
+			end case;
 		end if;
 	end process;
 	
