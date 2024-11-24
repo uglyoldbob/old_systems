@@ -41,10 +41,20 @@ end nes;
 
 architecture Behavioral of nes is
 	type PPU_LINE_BUFFER is array (255 downto 0) of std_logic_vector (23 downto 0);
+	type HDMI_LINE_BUFFER is array(767 downto 0) of std_logic_vector (23 downto 0);
 	
 	signal line0: PPU_LINE_BUFFER;
 	signal line1: PPU_LINE_BUFFER;
 	signal line2: PPU_LINE_BUFFER;
+	signal line_counter: std_logic_vector(1 downto 0) := (others => '0');
+	
+	signal line_out_0: HDMI_LINE_BUFFER;
+	signal line_out_1: HDMI_LINE_BUFFER;
+	signal line_out_2: HDMI_LINE_BUFFER;
+	signal line_out_3: HDMI_LINE_BUFFER;
+	signal line_out_4: HDMI_LINE_BUFFER;
+	signal line_out_5: HDMI_LINE_BUFFER;
+	signal line_out_counter: std_logic_vector(2 downto 0) := (others => '0');
 	
 	signal kernel_a: std_logic_vector(23 downto 0);
 	signal kernel_b: std_logic_vector(23 downto 0);
@@ -65,8 +75,6 @@ architecture Behavioral of nes is
 	signal kernel_out_g: std_logic_vector(23 downto 0);
 	signal kernel_out_h: std_logic_vector(23 downto 0);
 	signal kernel_out_i: std_logic_vector(23 downto 0);
-	
-	signal line_counter: std_logic_vector(1 downto 0) := (others => '0');
 
 	signal cpu_address: std_logic_vector(15 downto 0);
 	signal cpu_dout: std_logic_vector(7 downto 0);
@@ -124,6 +132,9 @@ architecture Behavioral of nes is
 	signal ppu_rescale_row: std_logic;
 	signal ppu_rescale_column: std_logic;
 	signal ppu_rescale_trigger: std_logic;
+	signal ppu_rescale_out_column1: integer range 0 to 767;
+	signal ppu_rescale_out_column2: integer range 0 to 767;
+	signal ppu_rescale_out_column3: integer range 0 to 767;
 	
 	signal cpu_apu_cs: std_logic;
 	
@@ -431,6 +442,140 @@ begin
 					end if;
 				when "0010" =>
 				when "0011" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_0(ppu_rescale_out_column1) <= kernel_out_a;
+						when "001" =>
+							line_out_1(ppu_rescale_out_column1) <= kernel_out_a;
+						when "010" =>
+							line_out_2(ppu_rescale_out_column1) <= kernel_out_a;
+						when "011" =>
+							line_out_3(ppu_rescale_out_column1) <= kernel_out_a;
+						when "100" =>
+							line_out_4(ppu_rescale_out_column1) <= kernel_out_a;
+						when others =>
+							line_out_5(ppu_rescale_out_column1) <= kernel_out_a;
+					end case;
+				when "0100" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_0(ppu_rescale_out_column2) <= kernel_out_b;
+						when "001" =>
+							line_out_1(ppu_rescale_out_column2) <= kernel_out_b;
+						when "010" =>
+							line_out_2(ppu_rescale_out_column2) <= kernel_out_b;
+						when "011" =>
+							line_out_3(ppu_rescale_out_column2) <= kernel_out_b;
+						when "100" =>
+							line_out_4(ppu_rescale_out_column2) <= kernel_out_b;
+						when others =>
+							line_out_5(ppu_rescale_out_column2) <= kernel_out_b;
+					end case;
+				when "0101" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_0(ppu_rescale_out_column3) <= kernel_out_c;
+						when "001" =>
+							line_out_1(ppu_rescale_out_column3) <= kernel_out_c;
+						when "010" =>
+							line_out_2(ppu_rescale_out_column3) <= kernel_out_c;
+						when "011" =>
+							line_out_3(ppu_rescale_out_column3) <= kernel_out_c;
+						when "100" =>
+							line_out_4(ppu_rescale_out_column3) <= kernel_out_c;
+						when others =>
+							line_out_5(ppu_rescale_out_column3) <= kernel_out_c;
+					end case;
+				when "0110" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_5(ppu_rescale_out_column1) <= kernel_out_d;
+						when "001" =>
+							line_out_0(ppu_rescale_out_column1) <= kernel_out_d;
+						when "010" =>
+							line_out_1(ppu_rescale_out_column1) <= kernel_out_d;
+						when "011" =>
+							line_out_2(ppu_rescale_out_column1) <= kernel_out_d;
+						when "100" =>
+							line_out_3(ppu_rescale_out_column1) <= kernel_out_d;
+						when others =>
+							line_out_4(ppu_rescale_out_column1) <= kernel_out_d;
+					end case;
+				when "0111" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_5(ppu_rescale_out_column1) <= kernel_out_e;
+						when "001" =>
+							line_out_0(ppu_rescale_out_column1) <= kernel_out_e;
+						when "010" =>
+							line_out_1(ppu_rescale_out_column1) <= kernel_out_e;
+						when "011" =>
+							line_out_2(ppu_rescale_out_column1) <= kernel_out_e;
+						when "100" =>
+							line_out_3(ppu_rescale_out_column1) <= kernel_out_e;
+						when others =>
+							line_out_4(ppu_rescale_out_column1) <= kernel_out_e;
+					end case;
+				when "1000" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_5(ppu_rescale_out_column1) <= kernel_out_f;
+						when "001" =>
+							line_out_0(ppu_rescale_out_column1) <= kernel_out_f;
+						when "010" =>
+							line_out_1(ppu_rescale_out_column1) <= kernel_out_f;
+						when "011" =>
+							line_out_2(ppu_rescale_out_column1) <= kernel_out_f;
+						when "100" =>
+							line_out_3(ppu_rescale_out_column1) <= kernel_out_f;
+						when others =>
+							line_out_4(ppu_rescale_out_column1) <= kernel_out_f;
+					end case;
+				when "1001" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_4(ppu_rescale_out_column1) <= kernel_out_g;
+						when "001" =>
+							line_out_5(ppu_rescale_out_column1) <= kernel_out_g;
+						when "010" =>
+							line_out_0(ppu_rescale_out_column1) <= kernel_out_g;
+						when "011" =>
+							line_out_1(ppu_rescale_out_column1) <= kernel_out_g;
+						when "100" =>
+							line_out_2(ppu_rescale_out_column1) <= kernel_out_g;
+						when others =>
+							line_out_3(ppu_rescale_out_column1) <= kernel_out_g;
+					end case;
+				when "1010" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_4(ppu_rescale_out_column2) <= kernel_out_h;
+						when "001" =>
+							line_out_5(ppu_rescale_out_column2) <= kernel_out_h;
+						when "010" =>
+							line_out_0(ppu_rescale_out_column2) <= kernel_out_h;
+						when "011" =>
+							line_out_1(ppu_rescale_out_column2) <= kernel_out_h;
+						when "100" =>
+							line_out_2(ppu_rescale_out_column2) <= kernel_out_h;
+						when others =>
+							line_out_3(ppu_rescale_out_column2) <= kernel_out_h;
+					end case;
+				when "1011" =>
+					case line_out_counter is
+						when "000" =>
+							line_out_4(ppu_rescale_out_column3) <= kernel_out_i;
+						when "001" =>
+							line_out_5(ppu_rescale_out_column3) <= kernel_out_i;
+						when "010" =>
+							line_out_0(ppu_rescale_out_column3) <= kernel_out_i;
+						when "011" =>
+							line_out_1(ppu_rescale_out_column3) <= kernel_out_i;
+						when "100" =>
+							line_out_2(ppu_rescale_out_column3) <= kernel_out_i;
+						when others =>
+							line_out_3(ppu_rescale_out_column3) <= kernel_out_i;
+					end case;
 				when others =>
 			end case;
 		end if;
