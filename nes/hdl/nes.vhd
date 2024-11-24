@@ -56,6 +56,16 @@ architecture Behavioral of nes is
 	signal kernel_h: std_logic_vector(23 downto 0);
 	signal kernel_i: std_logic_vector(23 downto 0);
 	
+	signal kernel_out_a: std_logic_vector(23 downto 0);
+	signal kernel_out_b: std_logic_vector(23 downto 0);
+	signal kernel_out_c: std_logic_vector(23 downto 0);
+	signal kernel_out_d: std_logic_vector(23 downto 0);
+	signal kernel_out_e: std_logic_vector(23 downto 0);
+	signal kernel_out_f: std_logic_vector(23 downto 0);
+	signal kernel_out_g: std_logic_vector(23 downto 0);
+	signal kernel_out_h: std_logic_vector(23 downto 0);
+	signal kernel_out_i: std_logic_vector(23 downto 0);
+	
 	signal line_counter: std_logic_vector(1 downto 0) := (others => '0');
 
 	signal cpu_address: std_logic_vector(15 downto 0);
@@ -93,8 +103,8 @@ architecture Behavioral of nes is
 	signal ppu_vstart: std_logic;
 	signal ppu_hstart_delay: std_logic;
 	signal ppu_vstart_delay: std_logic;
-	signal ppu_row: std_logic_vector(7 downto 0);
-	signal ppu_column: std_logic_vector(7 downto 0);
+	signal ppu_row: std_logic_vector(8 downto 0);
+	signal ppu_column: std_logic_vector(8 downto 0);
 	signal ppu_subpixel: std_logic_vector(3 downto 0);
 	signal ppu_subpixel_process: std_logic_vector(3 downto 0);
 	
@@ -102,8 +112,8 @@ architecture Behavioral of nes is
 	signal ppu_last_column_count: std_logic_vector(3 downto 0) := (others => '0');
 	signal ppu_last_row_trigger: std_logic;
 	signal ppu_last_row_count: std_logic_vector(12 downto 0) := (others => '0');
-	signal ppu_process_column: std_logic_vector(7 downto 0) := (others => '0');
-	signal ppu_process_row: std_logic_vector(7 downto 0) := (others => '0');
+	signal ppu_process_column: std_logic_vector(8 downto 0) := (others => '0');
+	signal ppu_process_row: std_logic_vector(8 downto 0) := (others => '0');
 	signal ppu_last_row_pixel_trigger: std_logic;
 	signal ppu_first_row_skip: std_logic := '0';
 	signal ppu_first_column_skip: std_logic := '0';
@@ -113,6 +123,7 @@ architecture Behavioral of nes is
 	constant BORDER_DOWN: integer := 2;
 	signal ppu_rescale_row: std_logic;
 	signal ppu_rescale_column: std_logic;
+	signal ppu_rescale_trigger: std_logic;
 	
 	signal cpu_apu_cs: std_logic;
 	
@@ -220,8 +231,8 @@ begin
 	ppu_vstart_trigger <= ppu_clock and ppu_vstart_delay;
 	process (all)
 	begin
-		if ppu_last_column_count = "0010" and ppu_process_column > std_logic_vector(to_unsigned(252, 8)) 
-			and ppu_process_column /= std_logic_vector(to_unsigned(255, 8)) then
+		if ppu_last_column_count = "0010" and ppu_process_column > std_logic_vector(to_unsigned(252, 9)) 
+			and ppu_process_column < std_logic_vector(to_unsigned(255, 9)) then
 			ppu_last_column_trigger <= '1';
 		else
 			ppu_last_column_trigger <= '0';
@@ -231,31 +242,35 @@ begin
 		else
 			ppu_subpixel_process <= ppu_last_row_count(3 downto 0);
 		end if;
-		if ppu_row > std_logic_vector(to_unsigned(1, 8)) then
+		if ppu_row > std_logic_vector(to_unsigned(1, 9)) and ppu_row < std_logic_vector(to_unsigned(241, 9)) then
 			ppu_rescale_row <= '1';
 		else
 			ppu_rescale_row <= '0';
 		end if;
-		if ppu_column > std_logic_vector(to_unsigned(1, 8)) then
+		if ppu_column > std_logic_vector(to_unsigned(1, 9)) and ppu_column < std_logic_vector(to_unsigned(258, 9)) then
 			ppu_rescale_column <= '1';
 		else
 			ppu_rescale_column <= '0';
 		end if;
-		if ((ppu_last_row_trigger = '1' or ppu_pixel_valid = '1') and ppu_column > std_logic_vector(to_unsigned(0, 8))) or 
-			((ppu_last_row_trigger = '0' and ppu_pixel_valid = '0') and ppu_column /= std_logic_vector(to_unsigned(2, 8))) then
+		if ppu_process_column /= std_logic_vector(to_unsigned(0, 9)) and ppu_process_column /= std_logic_vector(to_unsigned(255, 9)) then
 			ppu_border(BORDER_LEFT_RIGHT) <= '1';
 		else
 			ppu_border(BORDER_LEFT_RIGHT) <= '0';
 		end if;
-		if ppu_row /= std_logic_vector(to_unsigned(1, 8)) then
+		if ppu_row /= std_logic_vector(to_unsigned(1, 9)) then
 			ppu_border(BORDER_UP) <= '1';
 		else
 			ppu_border(BORDER_UP) <= '0';
 		end if;
-		if ppu_row < std_logic_vector(to_unsigned(240, 8)) then
+		if ppu_row < std_logic_vector(to_unsigned(240, 9)) then
 			ppu_border(BORDER_DOWN) <= '1';
 		else
 			ppu_border(BORDER_DOWN) <= '0';
+		end if;
+		if ppu_rescale_column = '1' and ppu_rescale_row = '1' and ppu_subpixel_process = "0010" then
+			ppu_rescale_trigger <=  '1';
+		else
+			ppu_rescale_trigger <= '0';
 		end if;
 	end process;
 	
@@ -264,7 +279,7 @@ begin
 		if rising_edge(fast_clock) then
 			if ppu_vstart_trigger then
 				ppu_first_row_skip <= '0';
-			elsif ppu_row = std_logic_vector(to_unsigned(1, 8)) then
+			elsif ppu_row = std_logic_vector(to_unsigned(1, 9)) then
 				ppu_first_row_skip <= '1';
 			end if;
 			if ppu_hstart_trigger then
@@ -285,7 +300,7 @@ begin
 			else
 				ppu_last_row_pixel_trigger <= '0';
 			end if;
-			if ppu_hstart_trigger = '1' or (ppu_last_row_trigger = '1' and ppu_last_row_count = "0000000000000" and ppu_row = std_logic_vector(to_unsigned(241, 8))) then
+			if ppu_hstart_trigger = '1' or (ppu_last_row_trigger = '1' and ppu_last_row_count = "0000000000000" and ppu_row = std_logic_vector(to_unsigned(241, 9))) then
 				case line_counter is
 					when "00" => line_counter <= "01";
 					when "01" => line_counter <= "10";
@@ -294,8 +309,8 @@ begin
 				ppu_process_row <= std_logic_vector(unsigned(ppu_row) - 1);
 			end if;
 			if ppu_hstart_trigger = '1' and 
-				(ppu_process_row = std_logic_vector(to_unsigned(237, 8)) or 
-				ppu_process_row = std_logic_vector(to_unsigned(238, 8))) then
+				(ppu_process_row = std_logic_vector(to_unsigned(237, 9)) or 
+				ppu_process_row = std_logic_vector(to_unsigned(238, 9))) then
 				ppu_last_row_count <= std_logic_vector(to_unsigned(257, 9)) & "0000";
 			end if;
 			if ppu_last_row_count(12 downto 4) /= "000000000" then
@@ -321,7 +336,7 @@ begin
 				ppu_last_row_trigger <= '0';
 			end if;
 			if ppu_last_column_trigger or 
-				(ppu_pixel_valid or ppu_pixel_trigger) or 
+				(ppu_pixel_valid and ppu_pixel_trigger) or 
 				(not ppu_pixel_valid and ppu_last_row_pixel_trigger) then
 					ppu_last_column_count <= "1101";
 			else
@@ -377,11 +392,11 @@ begin
 					if ppu_border(BORDER_UP) and ppu_border(BORDER_LEFT_RIGHT) then
 						case line_counter is
 							when "00" => 
-								kernel_c <= line1(to_integer(unsigned(ppu_process_column)+1));
+								kernel_c <= line1(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 							when "01" => 
-								kernel_c <= line2(to_integer(unsigned(ppu_process_column)+1));
+								kernel_c <= line2(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 							when others => 
-								kernel_c <= line0(to_integer(unsigned(ppu_process_column)+1));
+								kernel_c <= line0(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 						end case;
 					else
 						kernel_c <= (others => '0');
@@ -391,11 +406,11 @@ begin
 					if ppu_border(BORDER_LEFT_RIGHT) then
 						case line_counter is
 							when "00" =>
-								kernel_f <= line2(to_integer(unsigned(ppu_process_column)+1));
+								kernel_f <= line2(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 							when "01" =>
-								kernel_f <= line0(to_integer(unsigned(ppu_process_column)+1));
+								kernel_f <= line0(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 							when others =>
-								kernel_f <= line1(to_integer(unsigned(ppu_process_column)+1));
+								kernel_f <= line1(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 						end case;
 					else
 						kernel_f <= (others => '0');
@@ -405,11 +420,11 @@ begin
 					if ppu_border(BORDER_DOWN) and ppu_border(BORDER_LEFT_RIGHT) then
 						case line_counter is
 							when "00" => 
-								kernel_i <= line0(to_integer(unsigned(ppu_process_column)+1));
+								kernel_i <= line0(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 							when "01" => 
-								kernel_i <= line1(to_integer(unsigned(ppu_process_column)+1));
+								kernel_i <= line1(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 							when others => 
-								kernel_i <= line2(to_integer(unsigned(ppu_process_column)+1));
+								kernel_i <= line2(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
 						end case;
 					else
 						kernel_i <= (others => '0');
@@ -420,6 +435,17 @@ begin
 			end case;
 		end if;
 	end process;
+	
+	rescale_kernel: entity work.resize_kernel3 port map(
+		din_a => kernel_a, din_b => kernel_b, din_c => kernel_c,
+		din_d => kernel_d, din_e => kernel_e, din_f => kernel_f,
+		din_g => kernel_g, din_h => kernel_h, din_i => kernel_i,
+		dout_a => kernel_out_a, dout_b => kernel_out_b, dout_c => kernel_out_c,
+		dout_d => kernel_out_d, dout_e => kernel_out_e, dout_f => kernel_out_f,
+		dout_g => kernel_out_g, dout_h => kernel_out_h, dout_i => kernel_out_i,
+		clock => fast_clock,
+		trigger => ppu_rescale_trigger,
+		mode => "1");
 	
 	cpu: entity work.nes_cpu generic map(
 		ramtype => ramtype) port map (

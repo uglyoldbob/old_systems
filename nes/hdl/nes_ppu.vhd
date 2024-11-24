@@ -13,8 +13,8 @@ entity nes_ppu is
 			pixel_valid: out std_logic;
 			hstart: out std_logic;
 			vstart: out std_logic;
-			row: out std_logic_vector(7 downto 0);
-			column: out std_logic_vector(7 downto 0);
+			row: out std_logic_vector(8 downto 0);
+			column: out std_logic_vector(8 downto 0);
 			clock : in STD_LOGIC;
          reset : in STD_LOGIC;
 			cpu_addr: in std_logic_vector(2 downto 0);
@@ -342,8 +342,8 @@ begin
 	
 	process (all)
 	begin
-		column <= cycle_active(7 downto 0);
-		row <= scanline_number(7 downto 0);
+		column <= cycle_active(8 downto 0);
+		row <= scanline_number(8 downto 0);
 		if line_visible and column_active then
 			pixel_valid <= '1';
 		else

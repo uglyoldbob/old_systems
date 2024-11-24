@@ -22,6 +22,7 @@ vlog -sv -work work {../../hdmi/audio_info_frame.sv}
 vlog -sv -work work {../../hdmi/audio_clock_regeneration_packet.sv}
 vlog -sv -work work {../../hdmi/hdmi.sv}
 vlog +define+den4096Mb +define+sg125 -sv -work work {../../ddr3.v}
+vcom -2008 -work work {../../resize_kernel.vhd}
 vcom -2008 -work work {../../lfsr.vhd}
 vcom -2008 -work work {../../ddr.vhd}
 vcom -2008 -work work {../../hdmi.vhd}
