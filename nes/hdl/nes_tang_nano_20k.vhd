@@ -69,9 +69,7 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal nes_oe: std_logic_vector(1 downto 0);
 	signal nes_address: std_logic_vector(15 downto 0);
 
-	signal ppu_r: std_logic_vector(7 downto 0);
-	signal ppu_g: std_logic_vector(7 downto 0);
-	signal ppu_b: std_logic_vector(7 downto 0);
+	signal ppu_pixel: std_logic_vector(23 downto 0);
 
 	signal write_signal: std_logic;
 	signal write_address: std_logic_vector(19 downto 0);
@@ -225,7 +223,7 @@ begin
 			if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
 				rgb <= (others => '0');
 			else
-				rgb <= ppu_r & ppu_g & ppu_b;
+				rgb <= ppu_pixel;
 			end if;
 		end if;
 	end process;
@@ -250,9 +248,10 @@ begin
 
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
-		ppu_r => ppu_r,
-		ppu_g => ppu_g,
-		ppu_b => ppu_b,
+		hdmi_pixel_out => ppu_pixel,
+		hdmi_row => hdmi_row,
+		hdmi_column => hdmi_column,
+		hdmi_pvalid => hdmi_pvalid,
 		write_signal => write_signal,
 		write_address => write_address,
 		write_value => write_value,

@@ -80,9 +80,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal cpu_cycle: std_logic_vector(14 downto 0);
 	signal cpu_subcycle: std_logic_vector(3 downto 0);
 	
-	signal ppu_r: std_logic_vector(7 downto 0);
-	signal ppu_g: std_logic_vector(7 downto 0);
-	signal ppu_b: std_logic_vector(7 downto 0);
+	signal ppu_pixel: std_logic_vector(23 downto 0);
+	signal ppu_pixel_valid: std_logic;
 	
 	signal cpu_memory_clock: std_logic;
 	signal cpu_instruction: std_logic;
@@ -208,10 +207,11 @@ begin
 	
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
-		ppu_r => ppu_r,
-		ppu_g => ppu_g,
-		ppu_b => ppu_b,
+		hdmi_pixel_out => ppu_pixel,
 		hdmi_vsync => hdmi_vstart,
+		hdmi_row => hdmi_row,
+		hdmi_column => hdmi_column,
+		hdmi_pvalid => hdmi_pvalid,
 		write_signal => write_signal,
 		write_address => write_address,
 		write_value => write_value,

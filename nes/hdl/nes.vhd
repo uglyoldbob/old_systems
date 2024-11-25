@@ -15,10 +15,11 @@ entity nes is
 		write_rw: in std_logic;
 		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
 		asdf: out std_logic;
-		ppu_r: out std_logic_vector(7 downto 0);
-		ppu_g: out std_logic_vector(7 downto 0);
-		ppu_b: out std_logic_vector(7 downto 0);
+		hdmi_pixel_out: out std_logic_vector(23 downto 0);
 		hdmi_vsync: in std_logic;
+		hdmi_row: in std_logic_vector(10 downto 0);
+		hdmi_column: in std_logic_vector(11 downto 0);
+		hdmi_pvalid: in std_logic;
 		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
 		d_x: out std_logic_vector(7 downto 0) := x"00";
@@ -41,21 +42,66 @@ entity nes is
 end nes;
 
 architecture Behavioral of nes is
-	type PPU_LINE_BUFFER is array (255 downto 0) of std_logic_vector (23 downto 0);
-	type HDMI_LINE_BUFFER is array(767 downto 0) of std_logic_vector (23 downto 0);
+
+	signal line0_address: std_logic_vector(7 downto 0);
+	signal line0_rw: std_logic;
+	signal line0_dout: std_logic_vector(23 downto 0);
+	signal line0_dout_valid: std_logic;
+	signal line0_din: std_logic_vector(23 downto 0);
 	
-	signal line0: PPU_LINE_BUFFER;
-	signal line1: PPU_LINE_BUFFER;
-	signal line2: PPU_LINE_BUFFER;
+	signal line1_address: std_logic_vector(7 downto 0);
+	signal line1_rw: std_logic;
+	signal line1_dout: std_logic_vector(23 downto 0);
+	signal line1_dout_valid: std_logic;
+	signal line1_din: std_logic_vector(23 downto 0);
+	
+	signal line2_address: std_logic_vector(7 downto 0);
+	signal line2_rw: std_logic;
+	signal line2_dout: std_logic_vector(23 downto 0);
+	signal line2_dout_valid: std_logic;
+	signal line2_din: std_logic_vector(23 downto 0);
+	
 	signal line_counter: std_logic_vector(1 downto 0) := (others => '0');
 	
-	signal line_out_0: HDMI_LINE_BUFFER;
-	signal line_out_1: HDMI_LINE_BUFFER;
-	signal line_out_2: HDMI_LINE_BUFFER;
-	signal line_out_3: HDMI_LINE_BUFFER;
-	signal line_out_4: HDMI_LINE_BUFFER;
-	signal line_out_5: HDMI_LINE_BUFFER;
+	signal line_out_0_address: std_logic_vector(9 downto 0);
+	signal line_out_0_rw: std_logic;
+	signal line_out_0_dout: std_logic_vector(23 downto 0);
+	signal line_out_0_dout_valid: std_logic;
+	signal line_out_0_din: std_logic_vector(23 downto 0);
+
+	signal line_out_1_address: std_logic_vector(9 downto 0);
+	signal line_out_1_rw: std_logic;
+	signal line_out_1_dout: std_logic_vector(23 downto 0);
+	signal line_out_1_dout_valid: std_logic;
+	signal line_out_1_din: std_logic_vector(23 downto 0);
+
+	signal line_out_2_address: std_logic_vector(9 downto 0);
+	signal line_out_2_rw: std_logic;
+	signal line_out_2_dout: std_logic_vector(23 downto 0);
+	signal line_out_2_dout_valid: std_logic;
+	signal line_out_2_din: std_logic_vector(23 downto 0);
+
+	signal line_out_3_address: std_logic_vector(9 downto 0);
+	signal line_out_3_rw: std_logic;
+	signal line_out_3_dout: std_logic_vector(23 downto 0);
+	signal line_out_3_dout_valid: std_logic;
+	signal line_out_3_din: std_logic_vector(23 downto 0);
+
+	signal line_out_4_address: std_logic_vector(9 downto 0);
+	signal line_out_4_rw: std_logic;
+	signal line_out_4_dout: std_logic_vector(23 downto 0);
+	signal line_out_4_dout_valid: std_logic;
+	signal line_out_4_din: std_logic_vector(23 downto 0);
+	
+	signal line_out_5_address: std_logic_vector(9 downto 0);
+	signal line_out_5_rw: std_logic;
+	signal line_out_5_dout: std_logic_vector(23 downto 0);
+	signal line_out_5_dout_valid: std_logic;
+	signal line_out_5_din: std_logic_vector(23 downto 0);
+
+
 	signal line_out_counter: std_logic_vector(2 downto 0) := (others => '0');
+
 	
 	signal kernel_a: std_logic_vector(23 downto 0);
 	signal kernel_b: std_logic_vector(23 downto 0);
@@ -149,6 +195,13 @@ architecture Behavioral of nes is
 	signal hdmi_vsync_trigger: std_logic;
 	signal ppu_vsync_sync: std_logic;
 	
+	signal pixel_out_valid: std_logic;
+	signal ppu_pixel: std_logic_vector(23 downto 0);
+	signal pixel_out: std_logic_vector(23 downto 0);
+	
+	signal hdmi_column_calc: integer range 0 to 767;
+	signal hdmi_row_calc: integer range 0 to 5;
+	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
 begin
@@ -158,7 +211,7 @@ begin
 	cs_out <= cpu_ram_cs & cpu_ppu_cs & cpu_apu_cs & cpu_cartridge_cs;
 	
 	d_memory_clock <= memory_clock;
-	pause <= write_signal or (cpu_memory_clock and not cpu_din_ready) or fsync_pause;
+	pause <= write_signal or (cpu_memory_clock and not cpu_din_ready);-- or fsync_pause;
 	
 	process (clock)
 	begin
@@ -257,7 +310,7 @@ begin
 		else
 			ppu_subpixel_process <= ppu_last_row_count(3 downto 0);
 		end if;
-		if ppu_row > std_logic_vector(to_unsigned(1, 9)) and ppu_row < std_logic_vector(to_unsigned(241, 9)) then
+		if ppu_row > std_logic_vector(to_unsigned(0, 9)) and ppu_row < std_logic_vector(to_unsigned(241, 9)) then
 			ppu_rescale_row <= '1';
 		else
 			ppu_rescale_row <= '0';
@@ -267,7 +320,7 @@ begin
 		else
 			ppu_rescale_column <= '0';
 		end if;
-		if ppu_process_column /= std_logic_vector(to_unsigned(0, 9)) and ppu_process_column /= std_logic_vector(to_unsigned(255, 9)) then
+		if ppu_process_column /= std_logic_vector(to_unsigned(510, 9)) and ppu_process_column /= std_logic_vector(to_unsigned(255, 9)) then
 			ppu_border(BORDER_LEFT_RIGHT) <= '1';
 		else
 			ppu_border(BORDER_LEFT_RIGHT) <= '0';
@@ -302,11 +355,16 @@ begin
 			hdmi_vsync_delay <= hdmi_vsync;
 			hdmi_vsync_trigger <= hdmi_vsync and not hdmi_vsync_delay;
 			if ppu_vstart_trigger then
+				hdmi_column_calc <= 0;
+				hdmi_row_calc <= 0;
 				ppu_first_row_skip <= '0';
 			elsif ppu_row = std_logic_vector(to_unsigned(1, 9)) then
 				ppu_first_row_skip <= '1';
 			end if;
 			if ppu_hstart_trigger then
+				ppu_rescale_out_column1 <= 0;
+				ppu_rescale_out_column2 <= 1;
+				ppu_rescale_out_column3 <= 2;
 				ppu_first_column_skip <= '0';
 			elsif ppu_subpixel = "1100" then
 				ppu_first_column_skip <= '1';
@@ -402,9 +460,33 @@ begin
 			end if;
 			if ppu_pixel_trigger then
 				case line_counter is
-					when "00" => line0(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
-					when "01" => line1(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
-					when others => line2(to_integer(unsigned(ppu_column))) <= ppu_r & ppu_g & ppu_b;
+					when "00" => 
+						line0_address <= ppu_column(7 downto 0);
+						line0_din <= ppu_pixel;
+						line0_rw <= '0';
+					when "01" => 
+						line1_address <= ppu_column(7 downto 0);
+						line1_din <= ppu_pixel;
+						line1_rw <= '0';
+					when others =>
+						line2_address <= ppu_column(7 downto 0);
+						line2_din <= ppu_pixel;
+						line2_rw <= '0';
+				end case;
+			else
+				line0_rw <= '1';
+				line1_rw <= '1';
+				line2_rw <= '1';
+				case line_counter is
+					when "00" => 
+						line1_address <= ppu_column(7 downto 0);
+						line2_address <= ppu_column(7 downto 0);
+					when "01" => 
+						line0_address <= ppu_column(7 downto 0);
+						line2_address <= ppu_column(7 downto 0);
+					when others =>
+						line0_address <= ppu_column(7 downto 0);
+						line1_address <= ppu_column(7 downto 0);
 				end case;
 			end if;
 			
@@ -418,190 +500,350 @@ begin
 					when others => line_out_counter <= "000";
 				end case;
 			end if;
+			
+			case ppu_subpixel_process is
+				when "0001" =>
+					kernel_a <= kernel_b;
+					kernel_b <= kernel_c;
+					if ppu_border(BORDER_UP) and ppu_border(BORDER_LEFT_RIGHT) then
+						case line_counter is
+							when "00" => 
+								kernel_c <= line1_dout;
+							when "01" => 
+								kernel_c <= line2_dout;
+							when others => 
+								kernel_c <= line0_dout;
+						end case;
+					else
+						kernel_c <= (others => '0');
+					end if;
+					kernel_d <= kernel_e;
+					kernel_e <= kernel_f;
+					if ppu_border(BORDER_LEFT_RIGHT) then
+						case line_counter is
+							when "00" =>
+								kernel_f <= line2_dout;
+							when "01" =>
+								kernel_f <= line0_dout;
+							when others =>
+								kernel_f <= line1_dout;
+						end case;
+					else
+						kernel_f <= (others => '0');
+					end if;
+					kernel_g <= kernel_h;
+					kernel_h <= kernel_i;
+					if ppu_border(BORDER_DOWN) and ppu_border(BORDER_LEFT_RIGHT) then
+						case line_counter is
+							when "00" => 
+								kernel_i <= line0_dout;
+							when "01" => 
+								kernel_i <= line1_dout;
+							when others => 
+								kernel_i <= line2_dout;
+						end case;
+					else
+						kernel_i <= (others => '0');
+					end if;
+				when "0010" =>
+				when others =>
+			end case;
 
 			if ppu_rescale_column = '1' and ppu_rescale_row = '1' then
+				if ppu_subpixel_process > std_logic_vector(to_unsigned(2, 4)) then
+					case hdmi_row_calc is
+						when 0 => line_out_4_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+						when 1 => line_out_5_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+						when 2 => line_out_0_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+						when 3 => line_out_1_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+						when 4 => line_out_2_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+						when others => line_out_3_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+					end case;
+					if ppu_subpixel_process < std_logic_vector(to_unsigned(12, 4)) then
+						if hdmi_column_calc /= 719 then
+							hdmi_column_calc <= hdmi_column_calc + 1;
+						else
+							hdmi_column_calc <= 0;
+							if hdmi_row_calc /= 5 then
+								hdmi_row_calc <= hdmi_row_calc + 1;
+							else
+								hdmi_row_calc <= 0;
+							end if;
+						end if;
+					end if;
+				end if;
+				if ppu_subpixel_process > std_logic_vector(to_unsigned(3, 4)) then
+					case hdmi_row_calc is
+						when 0 => hdmi_pixel_out <= line_out_1_dout;
+						when 1 => hdmi_pixel_out <= line_out_2_dout;
+						when 2 => hdmi_pixel_out <= line_out_3_dout;
+						when 3 => hdmi_pixel_out <= line_out_4_dout;
+						when 4 => hdmi_pixel_out <= line_out_5_dout;
+						when others => hdmi_pixel_out <= line_out_0_dout;
+					end case;
+				else
+					hdmi_pixel_out <= (others => '0');
+				end if;
+				line_out_0_rw <= '1';
+				line_out_1_rw <= '1';
+				line_out_2_rw <= '1';
+				line_out_3_rw <= '1';
+				line_out_4_rw <= '1';
+				line_out_5_rw <= '1';
 				case ppu_subpixel_process is
 					when "0001" =>
-						kernel_a <= kernel_b;
-						kernel_b <= kernel_c;
-						if ppu_border(BORDER_UP) and ppu_border(BORDER_LEFT_RIGHT) then
-							case line_counter is
-								when "00" => 
-									kernel_c <= line1(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-								when "01" => 
-									kernel_c <= line2(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-								when others => 
-									kernel_c <= line0(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-							end case;
-						else
-							kernel_c <= (others => '0');
-						end if;
-						kernel_d <= kernel_e;
-						kernel_e <= kernel_f;
-						if ppu_border(BORDER_LEFT_RIGHT) then
-							case line_counter is
-								when "00" =>
-									kernel_f <= line2(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-								when "01" =>
-									kernel_f <= line0(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-								when others =>
-									kernel_f <= line1(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-							end case;
-						else
-							kernel_f <= (others => '0');
-						end if;
-						kernel_g <= kernel_h;
-						kernel_h <= kernel_i;
-						if ppu_border(BORDER_DOWN) and ppu_border(BORDER_LEFT_RIGHT) then
-							case line_counter is
-								when "00" => 
-									kernel_i <= line0(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-								when "01" => 
-									kernel_i <= line1(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-								when others => 
-									kernel_i <= line2(to_integer(unsigned(ppu_process_column(7 downto 0))+1));
-							end case;
-						else
-							kernel_i <= (others => '0');
+						if ppu_process_column /= std_logic_vector(to_unsigned(0, 9)) then
+							ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
+							ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
+							ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
 						end if;
 					when "0010" =>
+						case line_out_counter is
+							when "000" =>
+								line_out_0_din <= kernel_out_a;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_0_rw <= '0';
+							when "001" =>
+								line_out_1_din <= kernel_out_a;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_1_rw <= '0';
+							when "010" =>
+								line_out_2_din <= kernel_out_a;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_2_rw <= '0';
+							when "011" =>
+								line_out_3_din <= kernel_out_a;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_3_rw <= '0';
+							when "100" =>
+								line_out_4_din <= kernel_out_a;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_4_rw <= '0';
+							when others =>
+								line_out_5_din <= kernel_out_a;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_5_rw <= '0';
+						end case;
 					when "0011" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_0(ppu_rescale_out_column1) <= kernel_out_a;
+								line_out_0_din <= kernel_out_b;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_0_rw <= '0';
 							when "001" =>
-								line_out_1(ppu_rescale_out_column1) <= kernel_out_a;
+								line_out_1_din <= kernel_out_b;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_1_rw <= '0';
 							when "010" =>
-								line_out_2(ppu_rescale_out_column1) <= kernel_out_a;
+								line_out_2_din <= kernel_out_b;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_2_rw <= '0';
 							when "011" =>
-								line_out_3(ppu_rescale_out_column1) <= kernel_out_a;
+								line_out_3_din <= kernel_out_b;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_3_rw <= '0';
 							when "100" =>
-								line_out_4(ppu_rescale_out_column1) <= kernel_out_a;
+								line_out_4_din <= kernel_out_b;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_4_rw <= '0';
 							when others =>
-								line_out_5(ppu_rescale_out_column1) <= kernel_out_a;
+								line_out_5_din <= kernel_out_b;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_5_rw <= '0';
 						end case;
 					when "0100" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_0(ppu_rescale_out_column2) <= kernel_out_b;
+								line_out_0_din <= kernel_out_c;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_0_rw <= '0';
 							when "001" =>
-								line_out_1(ppu_rescale_out_column2) <= kernel_out_b;
+								line_out_1_din <= kernel_out_c;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_1_rw <= '0';
 							when "010" =>
-								line_out_2(ppu_rescale_out_column2) <= kernel_out_b;
+								line_out_2_din <= kernel_out_c;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_2_rw <= '0';
 							when "011" =>
-								line_out_3(ppu_rescale_out_column2) <= kernel_out_b;
+								line_out_3_din <= kernel_out_c;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_3_rw <= '0';
 							when "100" =>
-								line_out_4(ppu_rescale_out_column2) <= kernel_out_b;
+								line_out_4_din <= kernel_out_c;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_4_rw <= '0';
 							when others =>
-								line_out_5(ppu_rescale_out_column2) <= kernel_out_b;
+								line_out_5_din <= kernel_out_c;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_5_rw <= '0';
 						end case;
 					when "0101" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_0(ppu_rescale_out_column3) <= kernel_out_c;
+								line_out_1_din <= kernel_out_d;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_1_rw <= '0';
 							when "001" =>
-								line_out_1(ppu_rescale_out_column3) <= kernel_out_c;
+								line_out_2_din <= kernel_out_d;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_2_rw <= '0';
 							when "010" =>
-								line_out_2(ppu_rescale_out_column3) <= kernel_out_c;
+								line_out_3_din <= kernel_out_d;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_3_rw <= '0';
 							when "011" =>
-								line_out_3(ppu_rescale_out_column3) <= kernel_out_c;
+								line_out_4_din <= kernel_out_d;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_4_rw <= '0';
 							when "100" =>
-								line_out_4(ppu_rescale_out_column3) <= kernel_out_c;
+								line_out_5_din <= kernel_out_d;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_5_rw <= '0';
 							when others =>
-								line_out_5(ppu_rescale_out_column3) <= kernel_out_c;
+								line_out_0_din <= kernel_out_d;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_0_rw <= '0';
 						end case;
 					when "0110" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_5(ppu_rescale_out_column1) <= kernel_out_d;
+								line_out_1_din <= kernel_out_e;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_1_rw <= '0';
 							when "001" =>
-								line_out_0(ppu_rescale_out_column1) <= kernel_out_d;
+								line_out_2_din <= kernel_out_e;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_2_rw <= '0';
 							when "010" =>
-								line_out_1(ppu_rescale_out_column1) <= kernel_out_d;
+								line_out_3_din <= kernel_out_e;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_3_rw <= '0';
 							when "011" =>
-								line_out_2(ppu_rescale_out_column1) <= kernel_out_d;
+								line_out_4_din <= kernel_out_e;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_4_rw <= '0';
 							when "100" =>
-								line_out_3(ppu_rescale_out_column1) <= kernel_out_d;
+								line_out_5_din <= kernel_out_e;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_5_rw <= '0';
 							when others =>
-								line_out_4(ppu_rescale_out_column1) <= kernel_out_d;
+								line_out_0_din <= kernel_out_e;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_0_rw <= '0';
 						end case;
 					when "0111" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_5(ppu_rescale_out_column1) <= kernel_out_e;
+								line_out_1_din <= kernel_out_f;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_1_rw <= '0';
 							when "001" =>
-								line_out_0(ppu_rescale_out_column1) <= kernel_out_e;
+								line_out_2_din <= kernel_out_f;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_2_rw <= '0';
 							when "010" =>
-								line_out_1(ppu_rescale_out_column1) <= kernel_out_e;
+								line_out_3_din <= kernel_out_f;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_3_rw <= '0';
 							when "011" =>
-								line_out_2(ppu_rescale_out_column1) <= kernel_out_e;
+								line_out_4_din <= kernel_out_f;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_4_rw <= '0';
 							when "100" =>
-								line_out_3(ppu_rescale_out_column1) <= kernel_out_e;
+								line_out_5_din <= kernel_out_f;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_5_rw <= '0';
 							when others =>
-								line_out_4(ppu_rescale_out_column1) <= kernel_out_e;
+								line_out_0_din <= kernel_out_f;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_0_rw <= '0';
 						end case;
 					when "1000" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_5(ppu_rescale_out_column1) <= kernel_out_f;
+								line_out_2_din <= kernel_out_g;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_2_rw <= '0';
 							when "001" =>
-								line_out_0(ppu_rescale_out_column1) <= kernel_out_f;
+								line_out_3_din <= kernel_out_g;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_3_rw <= '0';
 							when "010" =>
-								line_out_1(ppu_rescale_out_column1) <= kernel_out_f;
+								line_out_4_din <= kernel_out_g;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_4_rw <= '0';
 							when "011" =>
-								line_out_2(ppu_rescale_out_column1) <= kernel_out_f;
+								line_out_5_din <= kernel_out_g;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_5_rw <= '0';
 							when "100" =>
-								line_out_3(ppu_rescale_out_column1) <= kernel_out_f;
+								line_out_0_din <= kernel_out_g;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_0_rw <= '0';
 							when others =>
-								line_out_4(ppu_rescale_out_column1) <= kernel_out_f;
+								line_out_1_din <= kernel_out_g;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
+								line_out_1_rw <= '0';
 						end case;
 					when "1001" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_4(ppu_rescale_out_column1) <= kernel_out_g;
+								line_out_2_din <= kernel_out_h;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_2_rw <= '0';
 							when "001" =>
-								line_out_5(ppu_rescale_out_column1) <= kernel_out_g;
+								line_out_3_din <= kernel_out_h;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_3_rw <= '0';
 							when "010" =>
-								line_out_0(ppu_rescale_out_column1) <= kernel_out_g;
+								line_out_4_din <= kernel_out_h;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_4_rw <= '0';
 							when "011" =>
-								line_out_1(ppu_rescale_out_column1) <= kernel_out_g;
+								line_out_5_din <= kernel_out_h;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_5_rw <= '0';
 							when "100" =>
-								line_out_2(ppu_rescale_out_column1) <= kernel_out_g;
+								line_out_0_din <= kernel_out_h;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_0_rw <= '0';
 							when others =>
-								line_out_3(ppu_rescale_out_column1) <= kernel_out_g;
+								line_out_1_din <= kernel_out_h;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_1_rw <= '0';
 						end case;
 					when "1010" =>
 						case line_out_counter is
 							when "000" =>
-								line_out_4(ppu_rescale_out_column2) <= kernel_out_h;
+								line_out_2_din <= kernel_out_i;
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_2_rw <= '0';
 							when "001" =>
-								line_out_5(ppu_rescale_out_column2) <= kernel_out_h;
+								line_out_3_din <= kernel_out_i;
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_3_rw <= '0';
 							when "010" =>
-								line_out_0(ppu_rescale_out_column2) <= kernel_out_h;
+								line_out_4_din <= kernel_out_i;
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_4_rw <= '0';
 							when "011" =>
-								line_out_1(ppu_rescale_out_column2) <= kernel_out_h;
+								line_out_5_din <= kernel_out_i;
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_5_rw <= '0';
 							when "100" =>
-								line_out_2(ppu_rescale_out_column2) <= kernel_out_h;
+								line_out_0_din <= kernel_out_i;
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_0_rw <= '0';
 							when others =>
-								line_out_3(ppu_rescale_out_column2) <= kernel_out_h;
-						end case;
-					when "1011" =>
-						case line_out_counter is
-							when "000" =>
-								line_out_4(ppu_rescale_out_column3) <= kernel_out_i;
-							when "001" =>
-								line_out_5(ppu_rescale_out_column3) <= kernel_out_i;
-							when "010" =>
-								line_out_0(ppu_rescale_out_column3) <= kernel_out_i;
-							when "011" =>
-								line_out_1(ppu_rescale_out_column3) <= kernel_out_i;
-							when "100" =>
-								line_out_2(ppu_rescale_out_column3) <= kernel_out_i;
-							when others =>
-								line_out_3(ppu_rescale_out_column3) <= kernel_out_i;
+								line_out_1_din <= kernel_out_i;
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_1_rw <= '0';
 						end case;
 					when others =>
 				end case;
+			else
+				hdmi_pixel_out <= (others => '0');
 			end if;
 		end if;
 	end process;
@@ -622,6 +864,105 @@ begin
 		clock => fast_clock,
 		trigger => ppu_rescale_trigger,
 		mode => "1");
+	
+	line_out_0: entity work.clocked_sram
+		generic map(bits => 10, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line_out_0_address,
+			rw => line_out_0_rw,
+			cs => '1',
+			dout => line_out_0_dout,
+			dout_valid => line_out_0_dout_valid,
+			din => line_out_0_din);
+	
+	line_out_1: entity work.clocked_sram
+		generic map(bits => 10, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line_out_1_address,
+			rw => line_out_1_rw,
+			cs => '1',
+			dout => line_out_1_dout,
+			dout_valid => line_out_1_dout_valid,
+			din => line_out_1_din);
+	
+	line_out_2: entity work.clocked_sram
+		generic map(bits => 10, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line_out_2_address,
+			rw => line_out_2_rw,
+			cs => '1',
+			dout => line_out_2_dout,
+			dout_valid => line_out_2_dout_valid,
+			din => line_out_2_din);
+	
+	line_out_3: entity work.clocked_sram
+		generic map(bits => 10, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line_out_3_address,
+			rw => line_out_3_rw,
+			cs => '1',
+			dout => line_out_3_dout,
+			dout_valid => line_out_3_dout_valid,
+			din => line_out_3_din);
+	
+	line_out_4: entity work.clocked_sram
+		generic map(bits => 10, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line_out_4_address,
+			rw => line_out_4_rw,
+			cs => '1',
+			dout => line_out_4_dout,
+			dout_valid => line_out_4_dout_valid,
+			din => line_out_4_din);
+			
+	line_out_5: entity work.clocked_sram
+		generic map(bits => 10, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line_out_5_address,
+			rw => line_out_5_rw,
+			cs => '1',
+			dout => line_out_5_dout,
+			dout_valid => line_out_5_dout_valid,
+			din => line_out_5_din);
+	
+	line0: entity work.clocked_sram
+		generic map(bits => 8, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line0_address,
+			rw => line0_rw,
+			cs => '1',
+			dout => line0_dout,
+			dout_valid => line0_dout_valid,
+			din => line0_din);
+	
+	line1: entity work.clocked_sram
+		generic map(bits => 8, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line1_address,
+			rw => line1_rw,
+			cs => '1',
+			dout => line1_dout,
+			dout_valid => line1_dout_valid,
+			din => line1_din);
+	
+	line2: entity work.clocked_sram
+		generic map(bits => 8, dbits => 24)
+		port map(clock => fast_clock,
+			fast_clock => fast_clock,
+			address => line2_address,
+			rw => line2_rw,
+			cs => '1',
+			dout => line2_dout,
+			dout_valid => line2_dout_valid,
+			din => line2_din);
 	
 	cpu: entity work.nes_cpu generic map(
 		ramtype => ramtype) port map (
@@ -652,9 +993,9 @@ begin
 	ppu: entity work.nes_ppu generic map(
 		random_noise => random_noise,
 		ramtype => ramtype) port map (
-		r_out => ppu_r,
-		g_out => ppu_g,
-		b_out => ppu_b,
+		r_out => ppu_pixel(23 downto 16),
+		g_out => ppu_pixel(15 downto 8),
+		b_out => ppu_pixel(7 downto 0),
 		pixel_valid => ppu_pixel_valid,
 		hstart => ppu_hstart,
 		vstart => ppu_vstart,

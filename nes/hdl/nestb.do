@@ -36,9 +36,7 @@ vcom -2008 -work work {../../nestb.vhd}
 
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
-add wave /nestb/nes/ppu_r
-add wave /nestb/nes/ppu_g
-add wave /nestb/nes/ppu_b
+add wave /nestb/nes/ppu_pixel
 add wave /nestb/nes/ppu_clock
 add wave /nestb/nes/clock
 add wave /nestb/nes/ppu_pixel_trigger
@@ -50,12 +48,12 @@ add wave /nestb/nes/ppu_process_row
 add wave /nestb/nes/ppu_last_column_trigger
 add wave /nestb/nes/ppu_last_row_trigger
 add wave /nestb/nes/ppu_last_row_count
-add wave /nestb/nes/kernel_*
-add wave /nestb/nes/line_out_counter
+add wave /nestb/nes/kernel_out_*
 add wave /nestb/nes/pause
 add wave /nestb/nes/fsync_pause
 add wave /nestb/nes/hdmi_vsync_trigger
 add wave /nestb/nes/ppu_vstart_trigger
+add wave /nestb/nes/line_out_*
 
 radix signal sim:/nestb/nes/ppu_process_column unsigned
 radix signal sim:/nestb/nes/ppu_process_row unsigned

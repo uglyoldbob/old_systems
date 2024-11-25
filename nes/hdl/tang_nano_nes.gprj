@@ -9,6 +9,7 @@
         <File path="clocked_sram.vhd" type="file.vhdl" enable="1"/>
         <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
         <File path="ddr.vhd" type="file.vhdl" enable="1"/>
+        <File path="frame_sync.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_clkdiv2.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_ddr.vhd" type="file.vhdl" enable="1"/>
         <File path="hdmi.vhd" type="file.vhdl" enable="1"/>
@@ -18,6 +19,7 @@
         <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_ppu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_tang_nano_20k.vhd" type="file.vhdl" enable="1"/>
+        <File path="resize_kernel.vhd" type="file.vhdl" enable="1"/>
         <File path="sram.vhd" type="file.vhdl" enable="0"/>
         <File path="sram_inout.vhd" type="file.vhdl" enable="1"/>
         <File path="src/large_divider.vhd" type="file.vhdl" enable="1"/>
