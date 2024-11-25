@@ -22,6 +22,7 @@ vlog -sv -work work {../../hdmi/audio_info_frame.sv}
 vlog -sv -work work {../../hdmi/audio_clock_regeneration_packet.sv}
 vlog -sv -work work {../../hdmi/hdmi.sv}
 vlog +define+den4096Mb +define+sg125 -sv -work work {../../ddr3.v}
+vcom -2008 -work work {../../frame_sync.vhd}
 vcom -2008 -work work {../../resize_kernel.vhd}
 vcom -2008 -work work {../../lfsr.vhd}
 vcom -2008 -work work {../../ddr.vhd}
@@ -43,13 +44,22 @@ add wave /nestb/nes/clock
 add wave /nestb/nes/ppu_pixel_trigger
 add wave /nestb/nes/ppu_row
 add wave /nestb/nes/ppu_column
-add wave /nestb/nes/ppu_subpixel
+add wave /nestb/nes/ppu_subpixel_process
 add wave /nestb/nes/ppu_process_column
 add wave /nestb/nes/ppu_process_row
 add wave /nestb/nes/ppu_last_column_trigger
 add wave /nestb/nes/ppu_last_row_trigger
 add wave /nestb/nes/ppu_last_row_count
 add wave /nestb/nes/kernel_*
+add wave /nestb/nes/line_out_counter
+add wave /nestb/nes/pause
+add wave /nestb/nes/fsync_pause
+add wave /nestb/nes/hdmi_vsync_trigger
+add wave /nestb/nes/ppu_vstart_trigger
+
+radix signal sim:/nestb/nes/ppu_process_column unsigned
+radix signal sim:/nestb/nes/ppu_process_row unsigned
+
 
 
 log * -r

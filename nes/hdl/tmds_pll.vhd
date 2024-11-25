@@ -1,11 +1,11 @@
 --Copyright (C)2014-2024 Gowin Semiconductor Corporation.
 --All rights reserved.
 --File Title: IP file
---Tool Version: V1.9.10.03
+--Tool Version: V1.9.9.03 Education
 --Part Number: GW2AR-LV18QN88C8/I7
 --Device: GW2AR-18
 --Device Version: C
---Created Time: Fri Nov 15 08:42:58 2024
+--Created Time: Mon Nov 25 10:14:20 2024
 
 library IEEE;
 use IEEE.std_logic_1164.all;
@@ -14,6 +14,7 @@ entity tmds_pll is
     port (
         clkout: out std_logic;
         lock: out std_logic;
+        clkoutd: out std_logic;
         clkin: in std_logic
     );
 end tmds_pll;
@@ -21,7 +22,6 @@ end tmds_pll;
 architecture Behavioral of tmds_pll is
 
     signal clkoutp_o: std_logic;
-    signal clkoutd_o: std_logic;
     signal clkoutd3_o: std_logic;
     signal gw_gnd: std_logic;
     signal FBDSEL_i: std_logic_vector(5 downto 0);
@@ -91,13 +91,13 @@ begin
             FCLKIN => "27",
             DEVICE => "GW2AR-18C",
             DYN_IDIV_SEL => "false",
-            IDIV_SEL => 3,
+            IDIV_SEL => 1,
             DYN_FBDIV_SEL => "false",
-            FBDIV_SEL => 54,
+            FBDIV_SEL => 10,
             DYN_ODIV_SEL => "false",
-            ODIV_SEL => 2,
+            ODIV_SEL => 4,
             PSDA_SEL => "0000",
-            DYN_DA_EN => "false",
+            DYN_DA_EN => "true",
             DUTYDA_SEL => "1000",
             CLKOUT_FT_DIR => '1',
             CLKOUTP_FT_DIR => '1',
@@ -107,7 +107,7 @@ begin
             CLKOUT_BYPASS => "false",
             CLKOUTP_BYPASS => "false",
             CLKOUTD_BYPASS => "false",
-            DYN_SDIV_SEL => 2,
+            DYN_SDIV_SEL => 6,
             CLKOUTD_SRC => "CLKOUT",
             CLKOUTD3_SRC => "CLKOUT"
         )
@@ -115,7 +115,7 @@ begin
             CLKOUT => clkout,
             LOCK => lock,
             CLKOUTP => clkoutp_o,
-            CLKOUTD => clkoutd_o,
+            CLKOUTD => clkoutd,
             CLKOUTD3 => clkoutd3_o,
             RESET => gw_gnd,
             RESET_P => gw_gnd,

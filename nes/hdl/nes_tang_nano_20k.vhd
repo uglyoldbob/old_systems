@@ -29,6 +29,7 @@ architecture Behavioral of nes_tang_nano_20k is
 
     signal pll_lock: std_logic;
 
+	signal double_tmds_clock: std_logic;
     signal tmds_clock: std_logic;
 
     signal tmds10_0: std_logic_vector(9 downto 0);
@@ -51,8 +52,8 @@ architecture Behavioral of nes_tang_nano_20k is
 
 	signal tmds: std_logic_vector(2 downto 0);
 
-	signal hdmi_row: std_logic_vector(9 downto 0);
-	signal hdmi_column: std_logic_vector(10 downto 0);
+	signal hdmi_row: std_logic_vector(10 downto 0);
+	signal hdmi_column: std_logic_vector(11 downto 0);
 	signal hdmi_hstart: std_logic;
 	signal hdmi_vstart: std_logic;
 	signal hdmi_pvalid: std_logic;
@@ -80,12 +81,13 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal write_cs: std_logic_vector(1 downto 0);
 
     component tmds_pll
-        port (
-            clkout: out std_logic;
-            lock: out std_logic;
-            clkin: in std_logic
-        );
-    end component;
+		port (
+			clkout: out std_logic;
+			lock: out std_logic;
+			clkoutd: out std_logic;
+			clkin: in std_logic
+		);
+	end component;
 
     component tmds_div
         port (
@@ -94,6 +96,14 @@ architecture Behavioral of nes_tang_nano_20k is
             resetn: in std_logic
         );
     end component;
+
+	component gowin_clkdiv2
+		port (
+			clkout: out std_logic;
+			hclkin: in std_logic;
+			resetn: in std_logic
+		);
+	end component;
 
     component Gowin_DDR
         port (
@@ -163,8 +173,14 @@ begin
 
     hdmi_pll: tmds_pll port map(
         lock => pll_lock,
-        clkout => tmds_clock,
+        clkout => double_tmds_clock,
+		clkoutd => nes_clock,
         clkin => clock);
+
+	pixel_div: gowin_clkdiv2 port map(
+		hclkin => double_tmds_clock,
+		clkout => tmds_clock,
+		resetn => '1');
     
     tmds_maker: tmds_div port map (
         clkout => hdmi_pixel_clock,
@@ -206,7 +222,11 @@ begin
 	process (hdmi_pixel_clock)
 	begin
 		if rising_edge(hdmi_pixel_clock) then
-			rgb <= ppu_r & ppu_g & ppu_b;
+			if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
+				rgb <= (others => '0');
+			else
+				rgb <= ppu_r & ppu_g & ppu_b;
+			end if;
 		end if;
 	end process;
 
@@ -223,8 +243,6 @@ begin
 		clock => hdmi_pixel_clock,
 		din => buttons(1),
 		dout => debounce_buttonb);
-
-	nes_clock <= hdmi_pixel_clock;
 
 	write_signal <= '0';
 	write_trigger <= '0';
@@ -244,6 +262,8 @@ begin
 		reset => nes_reset,
 		cpu_oe => nes_oe,
 		cpu_memory_address => nes_address,
-		clock => nes_clock);
+		fast_clock => hdmi_pixel_clock,
+		clock => nes_clock,
+		hdmi_vsync => hdmi_vstart);
 end Behavioral;
 

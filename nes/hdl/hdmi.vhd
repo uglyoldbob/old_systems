@@ -216,8 +216,8 @@ entity hdmi2 is
 		hstart: out std_logic;
 		vstart: out std_logic;
 		pvalid: out std_logic;
-		row_out: out std_logic_vector(9 downto 0);
-		column_out: out std_logic_vector(10 downto 0);
+		row_out: out std_logic_vector(10 downto 0);
+		column_out: out std_logic_vector(11 downto 0);
 		r: in std_logic_vector(7 downto 0);
 		g: in std_logic_vector(7 downto 0);
 		b: in std_logic_vector(7 downto 0));
@@ -369,8 +369,8 @@ begin
 			else
 				vstart <= '0';
 			end if;
-			row_out <= std_logic_vector(to_unsigned(row - vsync_width - vsync_porch - 2, 10));
-			column_out <= std_logic_vector(to_unsigned(column - hsync_width - hsync_porch + 1, 11));
+			row_out <= std_logic_vector(to_signed(row - vsync_width - vsync_porch - 1, 11));
+			column_out <= std_logic_vector(to_signed(column - hsync_width - hsync_porch, 12));
 			if column = (hsync_porch + hsync_width - 1) or column = (hsync_porch + hsync_width-2) then
 				pixels_guard <= '0';
 			else

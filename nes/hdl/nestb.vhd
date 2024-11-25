@@ -106,8 +106,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal hdmi_i2c_sda: std_logic;
 	signal hdmi_hpd: std_logic;
 	
-	signal hdmi_row: std_logic_vector(9 downto 0);
-	signal hdmi_column: std_logic_vector(10 downto 0);
+	signal hdmi_row: std_logic_vector(10 downto 0);
+	signal hdmi_column: std_logic_vector(11 downto 0);
 	signal hdmi_hstart: std_logic;
 	signal hdmi_vstart: std_logic;
 	signal hdmi_pvalid: std_logic;
@@ -192,11 +192,11 @@ begin
 	process (hdmi_pixel_clock)
 	begin
 		if rising_edge(hdmi_pixel_clock) then
-			if hdmi_column = std_logic_vector(to_unsigned(1278, 11)) or hdmi_column = std_logic_vector(to_unsigned(0, 11)) then
+			if hdmi_column = std_logic_vector(to_signed(1278, 12)) or hdmi_column = std_logic_vector(to_signed(0, 12)) then
 				rgb <= "000000000000000000000000";
-			elsif hdmi_column = std_logic_vector(to_unsigned(1279, 11)) or hdmi_column = std_logic_vector(to_unsigned(1, 11)) then
+			elsif hdmi_column = std_logic_vector(to_signed(1279, 12)) or hdmi_column = std_logic_vector(to_signed(1, 12)) then
 				rgb <= "000000000000000011111111";
-			elsif hdmi_column = std_logic_vector(to_unsigned(1280, 11)) or hdmi_column = std_logic_vector(to_unsigned(2, 11)) then
+			elsif hdmi_column = std_logic_vector(to_signed(1280, 12)) or hdmi_column = std_logic_vector(to_signed(2, 12)) then
 				rgb <= "111111111111111111111111";
 			elsif hdmi_pvalid then
 				rgb <= random_data(23 downto 0);
@@ -211,6 +211,7 @@ begin
 		ppu_r => ppu_r,
 		ppu_g => ppu_g,
 		ppu_b => ppu_b,
+		hdmi_vsync => hdmi_vstart,
 		write_signal => write_signal,
 		write_address => write_address,
 		write_value => write_value,
