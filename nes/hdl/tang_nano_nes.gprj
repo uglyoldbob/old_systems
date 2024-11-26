@@ -12,6 +12,8 @@
         <File path="frame_sync.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_clkdiv2.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_ddr.vhd" type="file.vhdl" enable="1"/>
+        <File path="gowin_nes_pll.vhd" type="file.vhdl" enable="1"/>
+        <File path="gowin_video_fifo.vhd" type="file.vhdl" enable="1"/>
         <File path="hdmi.vhd" type="file.vhdl" enable="1"/>
         <File path="lfsr.vhd" type="file.vhdl" enable="1"/>
         <File path="nes.vhd" type="file.vhdl" enable="1"/>

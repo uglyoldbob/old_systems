@@ -5,23 +5,23 @@
 --Part Number: GW2AR-LV18QN88C8/I7
 --Device: GW2AR-18
 --Device Version: C
---Created Time: Tue Nov 26 12:19:19 2024
+--Created Time: Tue Nov 26 12:25:40 2024
 
 library IEEE;
 use IEEE.std_logic_1164.all;
 
-entity tmds_pll is
+entity gowin_nes_pll is
     port (
         clkout: out std_logic;
         lock: out std_logic;
+        clkoutd: out std_logic;
         clkin: in std_logic
     );
-end tmds_pll;
+end gowin_nes_pll;
 
-architecture Behavioral of tmds_pll is
+architecture Behavioral of gowin_nes_pll is
 
     signal clkoutp_o: std_logic;
-    signal clkoutd_o: std_logic;
     signal clkoutd3_o: std_logic;
     signal gw_gnd: std_logic;
     signal FBDSEL_i: std_logic_vector(5 downto 0);
@@ -88,14 +88,14 @@ begin
 
     rpll_inst: rPLL
         generic map (
-            FCLKIN => "27",
+            FCLKIN => "371.25",
             DEVICE => "GW2AR-18C",
             DYN_IDIV_SEL => "false",
-            IDIV_SEL => 3,
+            IDIV_SEL => 4,
             DYN_FBDIV_SEL => "false",
-            FBDIV_SEL => 54,
+            FBDIV_SEL => 1,
             DYN_ODIV_SEL => "false",
-            ODIV_SEL => 2,
+            ODIV_SEL => 4,
             PSDA_SEL => "0000",
             DYN_DA_EN => "true",
             DUTYDA_SEL => "1000",
@@ -107,7 +107,7 @@ begin
             CLKOUT_BYPASS => "false",
             CLKOUTP_BYPASS => "false",
             CLKOUTD_BYPASS => "false",
-            DYN_SDIV_SEL => 2,
+            DYN_SDIV_SEL => 6,
             CLKOUTD_SRC => "CLKOUT",
             CLKOUTD3_SRC => "CLKOUT"
         )
@@ -115,7 +115,7 @@ begin
             CLKOUT => clkout,
             LOCK => lock,
             CLKOUTP => clkoutp_o,
-            CLKOUTD => clkoutd_o,
+            CLKOUTD => clkoutd,
             CLKOUTD3 => clkoutd3_o,
             RESET => gw_gnd,
             RESET_P => gw_gnd,
@@ -129,4 +129,4 @@ begin
             FDLY => FDLY_i
         );
 
-end Behavioral; --tmds_pll
+end Behavioral; --gowin_nes_pll

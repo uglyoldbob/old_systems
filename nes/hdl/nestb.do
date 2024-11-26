@@ -66,4 +66,7 @@ restart -force
 
 view structure
 view signals
+run 640us
+wave zoom range 480us 640us
+
 run -all
