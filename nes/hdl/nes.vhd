@@ -565,7 +565,7 @@ begin
 			end case;
 
 			if ppu_rescale_column = '1' and ppu_rescale_row = '1' then
-				if ppu_subpixel_process > std_logic_vector(to_unsigned(2, 4)) then
+				if ppu_subpixel_process > std_logic_vector(to_unsigned(1, 4)) then
 					case hdmi_row_calc is
 						when 0 => line_out_4_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
 						when 1 => line_out_5_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
@@ -574,7 +574,7 @@ begin
 						when 4 => line_out_2_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
 						when others => line_out_3_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
 					end case;
-					if ppu_subpixel_process < std_logic_vector(to_unsigned(12, 4)) then
+					if ppu_subpixel_process < std_logic_vector(to_unsigned(11, 4)) then
 						if hdmi_column_calc /= 767 then
 							hdmi_column_calc <= hdmi_column_calc + 1;
 						else
