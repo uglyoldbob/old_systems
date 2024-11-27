@@ -215,6 +215,7 @@ entity hdmi2 is
 		test: out std_logic_vector(1 downto 0);
 		hstart: out std_logic;
 		vstart: out std_logic;
+		vblank_out: out std_logic;
 		pvalid: out std_logic;
 		row_out: out std_logic_vector(10 downto 0);
 		column_out: out std_logic_vector(11 downto 0);
@@ -272,6 +273,8 @@ begin
     clock_freq <= htotal * vtotal * rate;
 
 	test <= vsync & pixels_guard2;
+	
+	vblank_out <= vblank;
 
 	data_island <= '0'; --todo
 	data_island_guard <= '0';--data_island_mode(1);

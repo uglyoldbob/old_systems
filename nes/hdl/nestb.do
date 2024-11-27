@@ -54,6 +54,7 @@ add wave /nestb/nes/fsync_pause
 add wave /nestb/nes/hdmi_vsync_trigger
 add wave /nestb/nes/ppu_vstart_trigger
 add wave /nestb/nes/line_out_*
+add wave /nestb/nes/frame_sync/*
 
 radix signal sim:/nestb/nes/ppu_process_column unsigned
 radix signal sim:/nestb/nes/ppu_process_row unsigned

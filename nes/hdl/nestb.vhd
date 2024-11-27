@@ -109,6 +109,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal hdmi_column: std_logic_vector(11 downto 0);
 	signal hdmi_hstart: std_logic;
 	signal hdmi_vstart: std_logic;
+	signal hdmi_vblank: std_logic;
 	signal hdmi_pvalid: std_logic;
 	
 	signal hdmi1_tmds: std_logic_vector(2 downto 0);
@@ -182,6 +183,7 @@ begin
 		column_out => hdmi_column,
 		hstart => hdmi_hstart,
 		vstart => hdmi_vstart,
+		vblank_out => hdmi_vblank,
 		pvalid => hdmi_pvalid,
 		r => rgb(23 downto 16),
 		g => rgb(15 downto 8),
@@ -207,11 +209,13 @@ begin
 	
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
+		ignore_sync => '1',
 		hdmi_pixel_out => ppu_pixel,
-		hdmi_vsync => hdmi_vstart,
+		hdmi_vsync => hdmi_vblank,
 		hdmi_row => hdmi_row,
 		hdmi_column => hdmi_column,
 		hdmi_pvalid => hdmi_pvalid,
+		hdmi_line_ready => hdmi_hstart,
 		write_signal => write_signal,
 		write_address => write_address,
 		write_value => write_value,

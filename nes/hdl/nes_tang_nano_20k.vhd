@@ -274,24 +274,29 @@ begin
 	process (hdmi_pixel_clock)
 	begin
 		if rising_edge(hdmi_pixel_clock) then
-			if hdmi_fifo_write then
-				rgb(23 downto 16) <= (others => '1');
+			rgb <= (others => '0');
+			if buttons(0) then
+				if hdmi_fifo_write then
+					rgb(23 downto 16) <= (others => '1');
+				else
+					rgb(23 downto 16) <= (others => '0');
+				end if;
+				if hdmi_fifo_read then
+					rgb(15 downto 8) <= (others => '1');
+				else
+					rgb(15 downto 8) <= (others => '0');
+				end if;
+			elsif buttons(1) then
+				rgb <= ppu_pixel;
 			else
-				rgb(23 downto 16) <= (others => '0');
-			end if;
-			if hdmi_fifo_read then
-				rgb(15 downto 8) <= (others => '1');
-			else
-				rgb(15 downto 8) <= (others => '0');
-			end if;
-			rgb(7 downto 0) <= (others => '0');
-			if hdmi_fifo_full then
-				rgb(7 downto 0) <= (others => '1');
-			end if;
-			if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
-				rgb <= (others => '0');
-			else
-				rgb <= hdmi_pixel;
+				if hdmi_fifo_full then
+					rgb(7 downto 0) <= (others => '1');
+				end if;
+				if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
+					rgb <= (others => '0');
+				else
+					rgb <= hdmi_pixel;
+				end if;
 			end if;
 		end if;
 	end process;
@@ -321,6 +326,7 @@ begin
 		hdmi_column => hdmi_column,
 		hdmi_pvalid => hdmi_pvalid,
 		hdmi_valid_out => hdmi_fifo_write,
+		hdmi_line_ready => hdmi_hstart,
 		write_signal => write_signal,
 		write_address => write_address,
 		write_value => write_value,

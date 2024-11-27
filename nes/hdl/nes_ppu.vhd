@@ -476,6 +476,13 @@ begin
 		g_out <= palette_g(to_integer(unsigned(pixel)));
 		b_out <= palette_b(to_integer(unsigned(pixel)));
 		
+		if scanline_cycle(0) then
+			r_out <= "11111111";
+		end if;
+		if scanline_number(0) then
+			g_out <= "11111111";
+		end if;
+		
 		if vram_address(15 downto 8) = x"3f" then
 			if not regs(1)(REG1_DRAW_BACKGROUND) and not regs(1)(REG1_DRAW_SPRITES) then
 				palette_pixel <= palette(to_integer(unsigned(vram_address(5 downto 0))));
