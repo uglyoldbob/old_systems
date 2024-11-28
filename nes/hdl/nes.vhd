@@ -103,8 +103,7 @@ architecture Behavioral of nes is
 	signal line_out_5_dout_valid: std_logic;
 	signal line_out_5_din: std_logic_vector(23 downto 0);
 
-
-	signal line_out_counter: std_logic_vector(2 downto 0) := (others => '0');
+	signal line_out_counter: integer range 0 to 5 := 0;
 
 	
 	signal kernel_a: std_logic_vector(23 downto 0);
@@ -206,7 +205,6 @@ architecture Behavioral of nes is
 	
 	signal hdmi_valid_calc: std_logic;
 	signal hdmi_valid_calc2: std_logic;
-	signal hdmi_valid_calc3: std_logic;
 	signal hdmi_column_calc: integer range 0 to 767;
 	signal hdmi_row_calc: integer range 0 to 5;
 	signal hdmi_line_done_sig: std_logic;
@@ -381,14 +379,14 @@ begin
 	begin
 		if rising_edge(fast_clock) then
 			hdmi_valid_calc2 <= hdmi_valid_calc;
-			hdmi_valid_calc3 <= hdmi_valid_calc2;
-			hdmi_valid_out <= hdmi_valid_calc3;
+			hdmi_valid_out <= hdmi_valid_calc2;
 			hdmi_ppu_column <= ppu_column;
 			hdmi_output_row <= hdmi_row_calc;
 			if hdmi_ppu_column < std_logic_vector(to_unsigned(256, 9)) and
 				ppu_process_row > std_logic_vector(to_unsigned(0, 9)) and 
 				ppu_process_row < std_logic_vector(to_unsigned(240, 9)) and
-				ppu_subpixel_process > std_logic_vector(to_unsigned(3, 4)) then
+				ppu_subpixel_process > std_logic_vector(to_unsigned(2, 4)) and 
+				ppu_subpixel_process < std_logic_vector(to_unsigned(12, 4)) then
 				hdmi_valid_calc <= '1';
 			else
 				hdmi_valid_calc <= '0';
@@ -536,12 +534,12 @@ begin
 			
 			if ppu_rescale_row and ppu_hstart_trigger then
 				case line_out_counter is
-					when "000" => line_out_counter <= "001";
-					when "001" => line_out_counter <= "010";
-					when "010" => line_out_counter <= "011";
-					when "011" => line_out_counter <= "100";
-					when "100" => line_out_counter <= "101";
-					when others => line_out_counter <= "000";
+					when 0 => line_out_counter <= 1;
+					when 1 => line_out_counter <= 2;
+					when 2 => line_out_counter <= 3;
+					when 3 => line_out_counter <= 4;
+					when 4 => line_out_counter <= 5;
+					when others => line_out_counter <= 0;
 				end case;
 			end if;
 			
@@ -593,7 +591,7 @@ begin
 				when others =>
 			end case;
 			
-			if hdmi_valid_calc2 = '1' and ppu_subpixel_process > std_logic_vector(to_unsigned(3, 4)) then
+			if hdmi_valid_calc = '1' and ppu_subpixel_process > std_logic_vector(to_unsigned(3, 4)) then
 				if hdmi_column_calc /= 767 then
 					hdmi_column_calc <= hdmi_column_calc + 1;
 				else
@@ -634,7 +632,7 @@ begin
 					when "0010" =>
 					when "0011" =>
 						case line_out_counter is
-							when "001" | "011" | "101" =>
+							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_a;
 								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_0_rw <= '0';
@@ -657,7 +655,7 @@ begin
 						end case;
 					when "0100" =>
 						case line_out_counter is
-							when "001" | "011" | "101" =>
+							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_b;
 								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
 								line_out_0_rw <= '0';
@@ -680,7 +678,7 @@ begin
 						end case;
 					when "0101" =>
 						case line_out_counter is
-							when "001" | "011" | "101" =>
+							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_c;
 								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
 								line_out_0_rw <= '0';
@@ -702,50 +700,10 @@ begin
 								line_out_5_rw <= '0';
 						end case;
 					when "0110" =>
-						case line_out_counter is
-							when "000" =>
-							when "001" =>
-							when "010" =>
-							when "011" =>
-							when "100" =>
-							when others =>
-						end case;
 					when "0111" =>
-						case line_out_counter is
-							when "000" =>
-							when "001" =>
-							when "010" =>
-							when "011" =>
-							when "100" =>
-							when others =>
-						end case;
 					when "1000" =>
-						case line_out_counter is
-							when "000" =>
-							when "001" =>
-							when "010" =>
-							when "011" =>
-							when "100" =>
-							when others =>
-						end case;
 					when "1001" =>
-						case line_out_counter is
-							when "000" =>
-							when "001" =>
-							when "010" =>
-							when "011" =>
-							when "100" =>
-							when others =>
-						end case;
 					when "1010" =>
-						case line_out_counter is
-							when "000" =>
-							when "001" =>
-							when "010" =>
-							when "011" =>
-							when "100" =>
-							when others =>
-						end case;
 					when others =>
 				end case;
 			end if;
