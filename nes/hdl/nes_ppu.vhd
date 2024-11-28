@@ -482,6 +482,9 @@ begin
 		if scanline_number(0) then
 			g_out <= "11111111";
 		end if;
+        if scanline_cycle(0) or scanline_number(0) then
+			b_out <= "00000000";
+		end if;
 		
 		if vram_address(15 downto 8) = x"3f" then
 			if not regs(1)(REG1_DRAW_BACKGROUND) and not regs(1)(REG1_DRAW_SPRITES) then

@@ -2,7 +2,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 entity ddr is
-	Generic(t: string := "clock");
+	Generic(t: string := "mux");
 	Port( din: in std_logic_vector(1 downto 0);
 			dout: out std_logic;
 			doutn: out std_logic;
