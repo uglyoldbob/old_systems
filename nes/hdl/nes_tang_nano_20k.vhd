@@ -71,6 +71,20 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal nes_oe: std_logic_vector(1 downto 0);
 	signal nes_address: std_logic_vector(15 downto 0);
 
+    signal cpu_reset: std_logic;
+    signal cpu_interrupts: std_logic_vector(31 downto 0) := (others => '0');
+    signal cpu_wb_i_ack: std_logic;
+    signal cpu_wb_i_d_miso: std_logic_vector(31 downto 0);
+    signal cpu_wb_i_d_mosi: std_logic_vector(31 downto 0);
+    signal cpu_wb_i_err: std_logic;
+    signal cpu_wb_i_addr: std_logic_vector(29 downto 0);
+
+    signal cpu_wb_d_ack: std_logic;
+    signal cpu_wb_d_d_miso: std_logic_vector(31 downto 0);
+    signal cpu_wb_d_d_mosi: std_logic_vector(31 downto 0);
+    signal cpu_wb_d_err: std_logic;
+    signal cpu_wb_d_addr: std_logic_vector(29 downto 0);
+
 	signal ppu_pixel: std_logic_vector(23 downto 0);
 
 	signal write_signal: std_logic;
@@ -85,6 +99,8 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal hdmi_fifo_write: std_logic;
 	signal hdmi_fifo_read: std_logic;
 	signal hdmi_pixel: std_logic_vector(23 downto 0);
+
+    signal video_mode: std_logic_vector(2 downto 0):= (others => '0');
 
     component tmds_pll
 		port (
@@ -153,7 +169,8 @@ architecture Behavioral of nes_tang_nano_20k is
 	end component;
 
 begin
-    leds(5 downto 2) <= "1010";
+    leds(5 downto 3) <= not video_mode;
+    leds(2) <= '1';
     leds(1) <= not pll_lock and not pll_lock2;
     leds(0) <= not hdmi_hpd;
 
@@ -262,42 +279,90 @@ begin
 
 	process (all)
 	begin
-		if hdmi_column >= std_logic_vector(to_signed(256, 12)) and
-			hdmi_column < std_logic_vector(to_signed(1024, 12)) and 
-			hdmi_pvalid = '1' then
-			hdmi_fifo_read <= '1';
-		else
-			hdmi_fifo_read <= '0';
-		end if;
+        case video_mode is
+            when "001" =>
+                if hdmi_column < std_logic_vector(to_signed(512, 12)) and 
+                    hdmi_pvalid = '1' then
+                    hdmi_fifo_read <= '1';
+                else
+                    hdmi_fifo_read <= '0';
+                end if;
+            when others =>
+                if hdmi_column >= std_logic_vector(to_signed(256, 12)) and
+                    hdmi_column < std_logic_vector(to_signed(1024, 12)) and 
+                    hdmi_pvalid = '1' then
+                    hdmi_fifo_read <= '1';
+                else
+                    hdmi_fifo_read <= '0';
+                end if;
+        end case;
 	end process;
 
 	process (hdmi_pixel_clock)
 	begin
 		if rising_edge(hdmi_pixel_clock) then
+            if debounce_buttona then
+                case video_mode is
+                    when "000" => video_mode <= "001";
+                    when "001" => video_mode <= "010";
+                    when "010" => video_mode <= "011";
+                    when "011" => video_mode <= "100";
+                    when "100" => video_mode <= "101";
+                    when "101" => video_mode <= "110";
+                    when "110" => video_mode <= "111";
+                    when others => video_mode <= "000";
+                end case;
+            end if;
 			rgb <= (others => '0');
-			if buttons(0) then
-				if hdmi_fifo_write then
-					rgb(23 downto 16) <= (others => '1');
-				else
-					rgb(23 downto 16) <= (others => '0');
-				end if;
-				if hdmi_fifo_read then
-					rgb(15 downto 8) <= (others => '1');
-				else
-					rgb(15 downto 8) <= (others => '0');
-				end if;
-			elsif buttons(1) then
-				rgb <= ppu_pixel;
-			else
-				if hdmi_fifo_full then
-					rgb(7 downto 0) <= (others => '1');
-				end if;
-				if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
-					rgb <= (others => '0');
-				else
-					rgb <= hdmi_pixel;
-				end if;
-			end if;
+            case video_mode is
+                when "000" => 
+                    if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
+                        rgb <= (others => '0');
+                    else
+                        rgb <= hdmi_pixel;
+                    end if;
+                when "001" =>
+                    if hdmi_column < std_logic_vector(to_signed(512, 12)) then
+                        rgb <= (others => '0');
+                    else
+                        rgb <= hdmi_pixel;
+                    end if;
+                when "010" =>
+                    if hdmi_fifo_write then
+                        rgb(23 downto 16) <= (others => '1');
+                    else
+                        rgb(23 downto 16) <= (others => '0');
+                    end if;
+                    if hdmi_fifo_read then
+                        rgb(15 downto 8) <= (others => '1');
+                    else
+                        rgb(15 downto 8) <= (others => '0');
+                    end if;
+                    rgb(7 downto 0) <= (others => '0');
+                when "011" =>
+                    rgb <= ppu_pixel;
+                when "100" =>
+                    if hdmi_fifo_full then
+                        rgb(23 downto 16) <= (others => '1');
+                    end if;
+                    if hdmi_fifo_empty then
+                        rgb(15 downto 8) <= (others => '1');
+                    end if;
+                    rgb(7 downto 0) <= (others => '0');
+                when "101" =>
+                    rgb(23 downto 16) <= (others => '1');
+                    rgb(15 downto 8) <= (others => '0');
+                    rgb(7 downto 0) <= (others => '0');
+                when "110" =>
+                    rgb(23 downto 16) <= (others => '0');
+                    rgb(15 downto 8) <= (others => '1');
+                    rgb(7 downto 0) <= (others => '0');
+                when "111" =>
+                    rgb(23 downto 16) <= (others => '0');
+                    rgb(15 downto 8) <= (others => '0');
+                    rgb(7 downto 0) <= (others => '1');
+                when others =>
+            end case;
 		end if;
 	end process;
 
@@ -318,6 +383,21 @@ begin
 	write_signal <= '0';
 	write_trigger <= '0';
 	nes_reset <= '0';
+    cpu_reset <= '0';
+
+    softcpu: entity work.VexRiscv port map (
+        externalResetVector => x"00000000",
+        externalInterruptArray => cpu_interrupts,
+        timerInterrupt => '0',
+        softwareInterrupt => '0',
+        iBusWishbone_ACK => cpu_wb_i_ack,
+        iBusWishbone_DAT_MISO => cpu_wb_i_d_miso,
+        iBusWishbone_ERR => cpu_wb_i_err,
+        dBusWishbone_ACK => cpu_wb_d_ack,
+        dBusWishbone_DAT_MISO => cpu_wb_d_d_miso,
+        dBusWishbone_ERR => cpu_wb_d_err,
+        clk => hdmi_pixel_clock,
+        reset => cpu_reset);
 
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
