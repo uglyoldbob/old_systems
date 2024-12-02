@@ -82,7 +82,7 @@ begin
 			when others =>
 				prg_rom_address <= (others => '0');
 				prg_rom_cs <= '0';
-				cpu_data_in => (others => '0');
+				cpu_data_in <= (others => '0');
 		end case;
 	end process;
 	
