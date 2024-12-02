@@ -135,14 +135,6 @@ architecture Behavioral of nes_tang_nano_20k is
         );
     end component;
 
-	component gowin_clkdiv2
-		port (
-			clkout: out std_logic;
-			hclkin: in std_logic;
-			resetn: in std_logic
-		);
-	end component;
-
     component Gowin_DDR
         port (
             din: in std_logic_vector(9 downto 0);
