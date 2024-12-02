@@ -1,6 +1,7 @@
 set_device -name GW2AR-18C GW2AR-LV18QN88C8/I7
 set_option -vhdl_std vhd2008
 add_file VexRiscv-verilog/VexRiscv_Linux.v
+add_file lfsr.vhd
 add_file src/tang_nano_nes.cst
 add_file src/tang_nano_nes.sdc
 add_file src/large_divider.vhd
