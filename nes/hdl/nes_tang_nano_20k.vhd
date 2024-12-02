@@ -5,6 +5,16 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes_tang_nano_20k is
    Port (
 		clock: in std_logic;
+		O_sdram_clk: out std_logic;
+		O_sdram_cke: out std_logic;
+		O_sdram_cs_n: out std_logic;
+		O_sdram_cas_n: out std_logic;
+		O_sdram_ras_n: out std_logic;
+		O_sdram_wen_n: out std_logic;
+		O_sdram_dqm: out std_logic_vector(3 downto 0);
+		O_sdram_addr: out std_logic_vector(10 downto 0);
+		O_sdram_ba: out std_logic_vector(1 downto 0);
+		IO_sdram_dq: inout std_logic_vector(31 downto 0);
         hdmi_d_p: out std_logic_vector(2 downto 0);
         hdmi_d_n: out std_logic_vector(2 downto 0);
         hdmi_ck_p: out std_logic;
@@ -71,32 +81,6 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal nes_oe: std_logic_vector(1 downto 0);
 	signal nes_address: std_logic_vector(15 downto 0);
 
-    signal cpu_reset: std_logic;
-    signal cpu_interrupts: std_logic_vector(31 downto 0) := (others => '0');
-    signal cpu_wb_i_ack: std_logic;
-    signal cpu_wb_i_d_miso: std_logic_vector(31 downto 0);
-    signal cpu_wb_i_d_mosi: std_logic_vector(31 downto 0);
-    signal cpu_wb_i_err: std_logic;
-    signal cpu_wb_i_addr: std_logic_vector(29 downto 0);
-    signal cpu_wb_i_bte: std_logic_vector(1 downto 0);
-    signal cpu_wb_i_cti: std_logic_vector(2 downto 0);
-    signal cpu_wb_i_cyc: std_logic;
-    signal cpu_wb_i_sel: std_logic_vector(3 downto 0);
-    signal cpu_wb_i_stb: std_logic;
-    signal cpu_wb_i_we: std_logic;
-
-    signal cpu_wb_d_ack: std_logic;
-    signal cpu_wb_d_d_miso: std_logic_vector(31 downto 0);
-    signal cpu_wb_d_d_mosi: std_logic_vector(31 downto 0);
-    signal cpu_wb_d_err: std_logic;
-    signal cpu_wb_d_addr: std_logic_vector(29 downto 0);
-    signal cpu_wb_d_bte: std_logic_vector(1 downto 0);
-    signal cpu_wb_d_cti: std_logic_vector(2 downto 0);
-    signal cpu_wb_d_cyc: std_logic;
-    signal cpu_wb_d_sel: std_logic_vector(3 downto 0);
-    signal cpu_wb_d_stb: std_logic;
-    signal cpu_wb_d_we: std_logic;
-
 	signal ppu_pixel: std_logic_vector(23 downto 0);
 
 	signal write_signal: std_logic;
@@ -113,6 +97,18 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal hdmi_pixel: std_logic_vector(23 downto 0);
 
     signal video_mode: std_logic_vector(2 downto 0):= (others => '0');
+
+	signal sdram_wb_ack: std_logic;
+	signal sdram_wb_d_miso: std_logic_vector(31 downto 0);
+	signal sdram_wb_d_mosi: std_logic_vector(31 downto 0);
+	signal sdram_wb_err: std_logic;
+	signal sdram_wb_addr: std_logic_vector(29 downto 0);
+	signal sdram_wb_bte: std_logic_vector(1 downto 0);
+	signal sdram_wb_cti: std_logic_vector(2 downto 0);
+	signal sdram_wb_cyc: std_logic;
+	signal sdram_wb_sel: std_logic_vector(3 downto 0);
+	signal sdram_wb_stb: std_logic;
+	signal sdram_wb_we: std_logic;
 
     component tmds_pll
 		port (
@@ -395,40 +391,43 @@ begin
 	write_signal <= '0';
 	write_trigger <= '0';
 	nes_reset <= '0';
-    cpu_reset <= '0';
 
-    softcpu: entity work.VexRiscv port map (
-        externalResetVector => x"00000000",
-        externalInterruptArray => cpu_interrupts,
-        timerInterrupt => '0',
-        softwareInterrupt => '0',
-        iBusWishbone_ACK => cpu_wb_i_ack,
-        iBusWishbone_DAT_MISO => cpu_wb_i_d_miso,
-        iBusWishbone_DAT_MOSI => cpu_wb_i_d_mosi,
-        iBusWishbone_ERR => cpu_wb_i_err,
-        iBusWishbone_ADR => cpu_wb_i_addr,
-        iBusWishbone_BTE => cpu_wb_i_bte,
-        iBusWishbone_CTI => cpu_wb_i_cti,
-        iBusWishbone_CYC => cpu_wb_i_cyc,
-        iBusWishbone_SEL => cpu_wb_i_sel,
-        iBusWishbone_STB => cpu_wb_i_stb,
-        iBusWishbone_WE => cpu_wb_i_we,
-        dBusWishbone_ACK => cpu_wb_d_ack,
-        dBusWishbone_DAT_MISO => cpu_wb_d_d_miso,
-        dBusWishbone_DAT_MOSI => cpu_wb_d_d_mosi,
-        dBusWishbone_ERR => cpu_wb_d_err,
-        dBusWishbone_ADR => cpu_wb_d_addr,
-        dBusWishbone_BTE => cpu_wb_d_bte,
-        dBusWishbone_CTI => cpu_wb_d_cti,
-        dBusWishbone_CYC => cpu_wb_d_cyc,
-        dBusWishbone_SEL => cpu_wb_d_sel,
-        dBusWishbone_STB => cpu_wb_d_stb,
-        dBusWishbone_WE => cpu_wb_d_we,
-        clk => hdmi_pixel_clock,
-        reset => cpu_reset);
+	ram: entity work.gowin_sdram_interface port map(
+		O_sdram_clk => O_sdram_clk,
+		O_sdram_cke => O_sdram_cke,
+		O_sdram_cs_n => O_sdram_cs_n,
+		O_sdram_cas_n => O_sdram_cas_n,
+		O_sdram_ras_n => O_sdram_ras_n,
+		O_sdram_wen_n => O_sdram_wen_n,
+		O_sdram_dqm => O_sdram_dqm,
+		O_sdram_addr => O_sdram_addr,
+		O_sdram_ba => O_sdram_ba,
+		IO_sdram_dq => IO_sdram_dq,
+		wb_ack => sdram_wb_ack,
+		wb_d_miso => sdram_wb_d_miso,
+		wb_d_mosi => sdram_wb_d_mosi,
+		wb_err => sdram_wb_err,
+		wb_addr => sdram_wb_addr,
+		wb_bte => sdram_wb_bte,
+		wb_cti => sdram_wb_cti,
+		wb_cyc => sdram_wb_cyc,
+		wb_sel => sdram_wb_sel,
+		wb_stb => sdram_wb_stb,
+		wb_we => sdram_wb_we);
 
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
+		sdram_wb_ack => sdram_wb_ack,
+		sdram_wb_d_miso => sdram_wb_d_miso,
+		sdram_wb_d_mosi => sdram_wb_d_mosi,
+		sdram_wb_err => sdram_wb_err,
+		sdram_wb_addr => sdram_wb_addr,
+		sdram_wb_bte => sdram_wb_bte,
+		sdram_wb_cti => sdram_wb_cti,
+		sdram_wb_cyc => sdram_wb_cyc,
+		sdram_wb_sel => sdram_wb_sel,
+		sdram_wb_stb => sdram_wb_stb,
+		sdram_wb_we => sdram_wb_we,
 		hdmi_pixel_out => ppu_pixel,
 		hdmi_row => hdmi_row,
 		hdmi_column => hdmi_column,

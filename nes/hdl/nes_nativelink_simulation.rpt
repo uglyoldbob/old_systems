@@ -1,5 +1,5 @@
 Info: Start Nativelink Simulation process
-executing command line: ip-make-simscript --nativelink-mode --output-directory=nes_iputf_input --spd=/home/thomas/old_systems/nes/hdl/max10_ddr_output.spd 
+executing command line: ip-make-simscript --nativelink-mode --output-directory=nes_iputf_input --spd=/home/thomas/old_systems/nes/hdl/max10_hdmi_output.spd 
 
 ========= EDA Simulation Settings =====================
 

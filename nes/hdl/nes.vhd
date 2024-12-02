@@ -15,7 +15,6 @@ entity nes is
 		write_trigger: in std_logic := '0';
 		write_rw: in std_logic;
 		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
-		asdf: out std_logic;
 		hdmi_pixel_out: out std_logic_vector(23 downto 0);
 		hdmi_vsync: in std_logic;
 		hdmi_row: in std_logic_vector(10 downto 0);
@@ -24,6 +23,18 @@ entity nes is
 		hdmi_pvalid: in std_logic;
 		hdmi_line_done: out std_logic;
 		hdmi_line_ready: in std_logic;
+
+		sdram_wb_ack: in std_logic;
+		sdram_wb_d_miso: in std_logic_vector(31 downto 0);
+		sdram_wb_d_mosi: out std_logic_vector(31 downto 0);
+		sdram_wb_err: in std_logic;
+		sdram_wb_addr: out std_logic_vector(29 downto 0);
+		sdram_wb_bte: out std_logic_vector(1 downto 0);
+		sdram_wb_cti: out std_logic_vector(2 downto 0);
+		sdram_wb_cyc: out std_logic;
+		sdram_wb_sel: out std_logic_vector(3 downto 0);
+		sdram_wb_stb: out std_logic;
+		sdram_wb_we: out std_logic;
 		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
 		d_x: out std_logic_vector(7 downto 0) := x"00";
@@ -213,6 +224,64 @@ architecture Behavioral of nes is
 	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
+	
+	signal bios_data_ready: std_logic;
+	signal scpu_reset: std_logic;
+	signal scpu_interrupts: std_logic_vector(31 downto 0) := (others => '0');
+	signal scpu_wb_i_ack: std_logic;
+	signal scpu_wb_i_d_miso: std_logic_vector(31 downto 0);
+	signal scpu_wb_i_d_mosi: std_logic_vector(31 downto 0);
+	signal scpu_wb_i_err: std_logic;
+	signal scpu_wb_i_addr: std_logic_vector(29 downto 0);
+	signal scpu_wb_i_bte: std_logic_vector(1 downto 0);
+	signal scpu_wb_i_cti: std_logic_vector(2 downto 0);
+	signal scpu_wb_i_cyc: std_logic;
+	signal scpu_wb_i_sel: std_logic_vector(3 downto 0);
+	signal scpu_wb_i_stb: std_logic;
+	signal scpu_wb_i_we: std_logic;
+
+	signal scpu_wb_d_ack: std_logic;
+	signal scpu_wb_d_d_miso: std_logic_vector(31 downto 0);
+	signal scpu_wb_d_d_mosi: std_logic_vector(31 downto 0);
+	signal scpu_wb_d_err: std_logic;
+	signal scpu_wb_d_addr: std_logic_vector(29 downto 0);
+	signal scpu_wb_d_bte: std_logic_vector(1 downto 0);
+	signal scpu_wb_d_cti: std_logic_vector(2 downto 0);
+	signal scpu_wb_d_cyc: std_logic;
+	signal scpu_wb_d_sel: std_logic_vector(3 downto 0);
+	signal scpu_wb_d_stb: std_logic;
+	signal scpu_wb_d_we: std_logic;
+	
+	component VexRiscv is port(
+        externalResetVector: in std_logic_vector(31 downto 0);
+        externalInterruptArray: in std_logic_vector(31 downto 0);
+        timerInterrupt: in std_logic;
+        softwareInterrupt: in std_logic;
+        iBusWishbone_ACK: in std_logic;
+        iBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
+        iBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
+        iBusWishbone_ERR: in std_logic;
+        iBusWishbone_ADR: out std_logic_vector(29 downto 0);
+        iBusWishbone_BTE: out std_logic_vector(1 downto 0);
+        iBusWishbone_CTI: out std_logic_vector(2 downto 0);
+        iBusWishbone_CYC: out std_logic;
+        iBusWishbone_SEL: out std_logic_vector(3 downto 0);
+        iBusWishbone_STB: out std_logic;
+        iBusWishbone_WE: out std_logic;
+        dBusWishbone_ACK: in std_logic;
+        dBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
+        dBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
+        dBusWishbone_ERR: in std_logic;
+        dBusWishbone_ADR: out std_logic_vector(29 downto 0);
+        dBusWishbone_BTE: out std_logic_vector(1 downto 0);
+        dBusWishbone_CTI: out std_logic_vector(2 downto 0);
+        dBusWishbone_CYC: out std_logic;
+        dBusWishbone_SEL: out std_logic_vector(3 downto 0);
+        dBusWishbone_STB: out std_logic;
+        dBusWishbone_WE: out std_logic;
+        clk: in std_logic;
+        reset: in std_logic);
+	end component;
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -222,6 +291,50 @@ begin
 	
 	d_memory_clock <= memory_clock;
 	pause <= write_signal or (cpu_memory_clock and not cpu_din_ready) or (fsync_pause and not ignore_sync);
+	
+	scpu_reset <= reset;
+	
+	scpu_wb_i_ack <= scpu_wb_i_stb and bios_data_ready;
+	softcpu_bios: entity work.clocked_sram_init 
+			generic map (bits => 10, dbits => 32)
+			port map(
+				clock => fast_clock,
+				address => scpu_wb_i_addr(9 downto 0),
+				rw => not scpu_wb_d_we,
+				cs => '1',
+				dout_valid => bios_data_ready,
+				dout => scpu_wb_i_d_miso,
+				din => scpu_wb_i_d_mosi);
+
+	softcpu: VexRiscv port map (
+        externalResetVector => x"00000000",
+        externalInterruptArray => scpu_interrupts,
+        timerInterrupt => '0',
+        softwareInterrupt => '0',
+        iBusWishbone_ACK => scpu_wb_i_ack,
+        iBusWishbone_DAT_MISO => scpu_wb_i_d_miso,
+        iBusWishbone_DAT_MOSI => scpu_wb_i_d_mosi,
+        iBusWishbone_ERR => scpu_wb_i_err,
+        iBusWishbone_ADR => scpu_wb_i_addr,
+        iBusWishbone_BTE => scpu_wb_i_bte,
+        iBusWishbone_CTI => scpu_wb_i_cti,
+        iBusWishbone_CYC => scpu_wb_i_cyc,
+        iBusWishbone_SEL => scpu_wb_i_sel,
+        iBusWishbone_STB => scpu_wb_i_stb,
+        iBusWishbone_WE => scpu_wb_i_we,
+        dBusWishbone_ACK => scpu_wb_d_ack,
+        dBusWishbone_DAT_MISO => scpu_wb_d_d_miso,
+        dBusWishbone_DAT_MOSI => scpu_wb_d_d_mosi,
+        dBusWishbone_ERR => scpu_wb_d_err,
+        dBusWishbone_ADR => scpu_wb_d_addr,
+        dBusWishbone_BTE => scpu_wb_d_bte,
+        dBusWishbone_CTI => scpu_wb_d_cti,
+        dBusWishbone_CYC => scpu_wb_d_cyc,
+        dBusWishbone_SEL => scpu_wb_d_sel,
+        dBusWishbone_STB => scpu_wb_d_stb,
+        dBusWishbone_WE => scpu_wb_d_we,
+        clk => fast_clock,
+        reset => scpu_reset);
 	
 	process (clock)
 	begin
@@ -286,12 +399,6 @@ begin
 			end if;
 		end if;
 	end process;
-	
-	ddrtest: entity work.ddr generic map (t => "mux")
-		port map(
-			din => cpu_address(1 downto 0),
-			dout => asdf,
-			clock => clock);
 	
 	ram_nonunified: if (unified_ram = '0' and ramtype = "sram") generate
 		cpu_ram: entity work.clocked_sram generic map (

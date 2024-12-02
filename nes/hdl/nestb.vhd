@@ -121,6 +121,18 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal hdmi1_screen_width: std_logic_vector(10 downto 0);
 	signal hdmi1_screen_height: std_logic_vector(9 downto 0);
 	
+	signal sdram_wb_ack: std_logic;
+	signal sdram_wb_d_miso: std_logic_vector(31 downto 0);
+	signal sdram_wb_d_mosi: std_logic_vector(31 downto 0);
+	signal sdram_wb_err: std_logic;
+	signal sdram_wb_addr: std_logic_vector(29 downto 0);
+	signal sdram_wb_bte: std_logic_vector(1 downto 0);
+	signal sdram_wb_cti: std_logic_vector(2 downto 0);
+	signal sdram_wb_cyc: std_logic;
+	signal sdram_wb_sel: std_logic_vector(3 downto 0);
+	signal sdram_wb_stb: std_logic;
+	signal sdram_wb_we: std_logic;
+	
 	type RAM_ARRAY is array (2**19 downto 0) of std_logic_vector (7 downto 0);
 	signal rom : RAM_ARRAY;
 	FILE romfile : text;
@@ -210,6 +222,17 @@ begin
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
 		ignore_sync => '1',
+		sdram_wb_ack => sdram_wb_ack,
+		sdram_wb_d_miso => sdram_wb_d_miso,
+		sdram_wb_d_mosi => sdram_wb_d_mosi,
+		sdram_wb_err => sdram_wb_err,
+		sdram_wb_addr => sdram_wb_addr,
+		sdram_wb_bte => sdram_wb_bte,
+		sdram_wb_cti => sdram_wb_cti,
+		sdram_wb_cyc => sdram_wb_cyc,
+		sdram_wb_sel => sdram_wb_sel,
+		sdram_wb_stb => sdram_wb_stb,
+		sdram_wb_we => sdram_wb_we,
 		hdmi_pixel_out => ppu_pixel,
 		hdmi_vsync => hdmi_vblank,
 		hdmi_row => hdmi_row,

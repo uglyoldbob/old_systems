@@ -3,16 +3,17 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity sram is
-	generic (bits: integer := 15);
+	generic (bits: integer := 15;
+				dbits: integer := 8);
 	port ( addr : in  STD_LOGIC_VECTOR (bits-1 downto 0);
-          data : inout  STD_LOGIC_VECTOR (7 downto 0);
+          data : inout  STD_LOGIC_VECTOR (dbits-1 downto 0);
           oe : in  STD_LOGIC;
           we : in  STD_LOGIC;
           cs : in  STD_LOGIC);
 end sram;
 
 architecture Behavioral of sram is
-	type memory is array ((2**bits)-1 downto 0) of std_logic_vector(7 downto 0);
+	type memory is array ((2**bits)-1 downto 0) of std_logic_vector(dbits-1 downto 0);
 	signal storage: memory;
 begin
 
@@ -37,9 +38,10 @@ use ieee.std_logic_textio.all;
 
 entity sram_init is
 	generic (bits: integer := 15;
+				dbits: integer = 8;
 				filename: string := "none");
 	port ( addr : in  STD_LOGIC_VECTOR (bits-1 downto 0);
-          data : inout  STD_LOGIC_VECTOR (7 downto 0);
+          data : inout  STD_LOGIC_VECTOR (dbits-1 downto 0);
           oe : in  STD_LOGIC;
           we : in  STD_LOGIC;
           cs : in  STD_LOGIC;
@@ -47,7 +49,7 @@ entity sram_init is
 end sram_init;
 
 architecture Behavioral of sram_init is
-	type memory is array ((2**bits)-1 downto 0) of std_logic_vector(7 downto 0);
+	type memory is array ((2**bits)-1 downto 0) of std_logic_vector(dbits-1 downto 0);
 
 	impure function InitRomFromFile (RomFileName : in string) return memory is
 		FILE romfile : text is in RomFileName;

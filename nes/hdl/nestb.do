@@ -21,7 +21,9 @@ vlog -sv -work work {../../hdmi/audio_sample_packet.sv}
 vlog -sv -work work {../../hdmi/audio_info_frame.sv}
 vlog -sv -work work {../../hdmi/audio_clock_regeneration_packet.sv}
 vlog -sv -work work {../../hdmi/hdmi.sv}
+vlog -sv -work work {../../VexRiscv-verilog/VexRiscv_Linux.v}
 vlog +define+den4096Mb +define+sg125 -sv -work work {../../ddr3.v}
+vcom -2008 -work work {../../clocked_sram_init.vhd}
 vcom -2008 -work work {../../frame_sync.vhd}
 vcom -2008 -work work {../../resize_kernel.vhd}
 vcom -2008 -work work {../../lfsr.vhd}
