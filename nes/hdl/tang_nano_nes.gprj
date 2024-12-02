@@ -32,5 +32,6 @@
         <File path="tmds_pll.vhd" type="file.vhdl" enable="1"/>
         <File path="src/tang_nano_nes.cst" type="file.cst" enable="1"/>
         <File path="src/tang_nano_nes.sdc" type="file.sdc" enable="1"/>
+        <File path="run.tcl" type="file.other" enable="1"/>
     </FileList>
 </Project>
