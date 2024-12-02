@@ -78,12 +78,24 @@ architecture Behavioral of nes_tang_nano_20k is
     signal cpu_wb_i_d_mosi: std_logic_vector(31 downto 0);
     signal cpu_wb_i_err: std_logic;
     signal cpu_wb_i_addr: std_logic_vector(29 downto 0);
+    signal cpu_wb_i_bte: std_logic_vector(1 downto 0);
+    signal cpu_wb_i_cti: std_logic_vector(2 downto 0);
+    signal cpu_wb_i_cyc: std_logic;
+    signal cpu_wb_i_sel: std_logic_vector(3 downto 0);
+    signal cpu_wb_i_stb: std_logic;
+    signal cpu_wb_i_we: std_logic;
 
     signal cpu_wb_d_ack: std_logic;
     signal cpu_wb_d_d_miso: std_logic_vector(31 downto 0);
     signal cpu_wb_d_d_mosi: std_logic_vector(31 downto 0);
     signal cpu_wb_d_err: std_logic;
     signal cpu_wb_d_addr: std_logic_vector(29 downto 0);
+    signal cpu_wb_d_bte: std_logic_vector(1 downto 0);
+    signal cpu_wb_d_cti: std_logic_vector(2 downto 0);
+    signal cpu_wb_d_cyc: std_logic;
+    signal cpu_wb_d_sel: std_logic_vector(3 downto 0);
+    signal cpu_wb_d_stb: std_logic;
+    signal cpu_wb_d_we: std_logic;
 
 	signal ppu_pixel: std_logic_vector(23 downto 0);
 
@@ -392,10 +404,26 @@ begin
         softwareInterrupt => '0',
         iBusWishbone_ACK => cpu_wb_i_ack,
         iBusWishbone_DAT_MISO => cpu_wb_i_d_miso,
+        iBusWishbone_DAT_MOSI => cpu_wb_i_d_mosi,
         iBusWishbone_ERR => cpu_wb_i_err,
+        iBusWishbone_ADR => cpu_wb_i_addr,
+        iBusWishbone_BTE => cpu_wb_i_bte,
+        iBusWishbone_CTI => cpu_wb_i_cti,
+        iBusWishbone_CYC => cpu_wb_i_cyc,
+        iBusWishbone_SEL => cpu_wb_i_sel,
+        iBusWishbone_STB => cpu_wb_i_stb,
+        iBusWishbone_WE => cpu_wb_i_we,
         dBusWishbone_ACK => cpu_wb_d_ack,
         dBusWishbone_DAT_MISO => cpu_wb_d_d_miso,
+        dBusWishbone_DAT_MOSI => cpu_wb_d_d_mosi,
         dBusWishbone_ERR => cpu_wb_d_err,
+        dBusWishbone_ADR => cpu_wb_d_addr,
+        dBusWishbone_BTE => cpu_wb_d_bte,
+        dBusWishbone_CTI => cpu_wb_d_cti,
+        dBusWishbone_CYC => cpu_wb_d_cyc,
+        dBusWishbone_SEL => cpu_wb_d_sel,
+        dBusWishbone_STB => cpu_wb_d_stb,
+        dBusWishbone_WE => cpu_wb_d_we,
         clk => hdmi_pixel_clock,
         reset => cpu_reset);
 
