@@ -56,5 +56,3 @@ class Nes:
         platform.add_source(os.path.join(data_location, "nes.vhd"))
         platform.add_source(os.path.join(data_location, "resize_kernel.vhd"))
         platform.add_source(os.path.join(data_location, "sram.vhd"))
-        platform.add_source(os.path.join(data_location, "ddr3.v"), library="ddr3sim", language="SystemVerilog", copy=True)
-        platform.add_source(os.path.join(data_location, "4096Mb_ddr3_parameters.vh"), library="ddr3sim", language="SystemVerilog", copy=True)
