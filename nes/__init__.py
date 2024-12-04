@@ -45,6 +45,7 @@ def data_file(f):
 
 class Nes:
     def __init__(self, platform):
+        platform.add_source(os.path.join(data_location, "lfsr.vhd"))
         platform.add_source(os.path.join(data_location, "clocked_sram_init.vhd"))
         platform.add_source(os.path.join(data_location, "clocked_sram.vhd"))
         platform.add_source(os.path.join(data_location, "delay_line.vhd"))
