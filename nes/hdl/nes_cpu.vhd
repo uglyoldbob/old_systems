@@ -18,8 +18,8 @@ end clock_divider;
 architecture Behavioral of clock_divider is
 	signal counter: std_logic_vector(2 downto 0);
 	signal counter2: std_logic_vector(2 downto 0);
-	signal clocko: std_logic;
-	signal clocko2: std_logic;
+	signal clocko: std_logic := '0';
+	signal clocko2: std_logic := '0';
 begin
 	c1 <= clocko;
 	c2 <= clocko2;

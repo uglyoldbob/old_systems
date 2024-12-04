@@ -38,30 +38,11 @@ vcom -2008 -work work {../../nestb.vhd}
 
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
-add wave /nestb/nes/ppu_pixel
-add wave /nestb/nes/ppu_clock
-add wave /nestb/nes/clock
-add wave /nestb/nes/ppu_pixel_trigger
-add wave /nestb/nes/ppu_row
-add wave /nestb/nes/ppu_column
-add wave /nestb/nes/ppu_subpixel_process
-add wave /nestb/nes/ppu_process_column
-add wave /nestb/nes/ppu_process_row
-add wave /nestb/nes/ppu_last_column_trigger
-add wave /nestb/nes/ppu_last_row_trigger
-add wave /nestb/nes/ppu_last_row_count
-add wave /nestb/nes/kernel_out_*
-add wave /nestb/nes/pause
-add wave /nestb/nes/fsync_pause
-add wave /nestb/nes/hdmi_vsync_trigger
-add wave /nestb/nes/ppu_vstart_trigger
-add wave /nestb/nes/line_out_*
-add wave /nestb/nes/frame_sync/*
+add wave /nestb/nes/cpu/*
+add wave /nestb/nes/cartridge/rom_wb*
 
 radix signal sim:/nestb/nes/ppu_process_column unsigned
 radix signal sim:/nestb/nes/ppu_process_row unsigned
-
-
 
 log * -r
 
@@ -69,7 +50,7 @@ restart -force
 
 view structure
 view signals
-run 640us
-wave zoom range 480us 640us
+run 10us
+wave zoom range 0us 1us
 
 run -all

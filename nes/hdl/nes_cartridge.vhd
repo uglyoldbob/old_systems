@@ -6,29 +6,37 @@ entity nes_cartridge is
 	Generic (
 		ramtype: string := "sram";
 		unified_ram: std_logic := '0');
-   Port (ppu_data_in: in std_logic_vector(7 downto 0);
-			ppu_data_out: out std_logic_vector(7 downto 0);
-			ppu_addr: in std_logic_vector(13 downto 0);
-			ppu_addr_a13_n: in std_logic;
-			ppu_wr: in std_logic;
-			ppu_rd: in std_logic;
-			ciram_a10: out std_logic;
-			ciram_ce: out std_logic;
-			irq: out std_logic;
-			cpu_rw: in std_logic;
-			romsel: in std_logic;
-			cpu_data_in: out std_logic_vector(7 downto 0);
-			cpu_data_out: in std_logic_vector(7 downto 0);
-			cpu_data_in_ready: out std_logic;
-			cpu_addr: in std_logic_vector(15 downto 0);
-			m2: in std_logic;
-			clock: in std_logic;
-			write_signal: in std_logic := '0';
-			write_address: in std_logic_vector(19 downto 0) := (others=>'0');
-			write_value: in std_logic_vector(7 downto 0) := (others=>'0');
-			write_trigger: in std_logic := '0';
-			write_rw: in std_logic;
-			write_cs: in std_logic_vector(1 downto 0) := (others=>'0'));
+   Port (
+		rom_wb_ack: in std_logic;
+		rom_wb_d_miso: in std_logic_vector(7 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(7 downto 0);
+		rom_wb_err: in std_logic;
+		rom_wb_addr: out std_logic_vector(21 downto 0);
+		rom_wb_bte: out std_logic_vector(1 downto 0);
+		rom_wb_cti: out std_logic_vector(2 downto 0);
+		rom_wb_cyc: out std_logic;
+		rom_wb_sel: out std_logic_vector(0 downto 0);
+		rom_wb_stb: out std_logic;
+		rom_wb_we: out std_logic;
+		ppu_data_in: in std_logic_vector(7 downto 0);
+		ppu_data_out: out std_logic_vector(7 downto 0);
+		ppu_addr: in std_logic_vector(13 downto 0);
+		ppu_addr_a13_n: in std_logic;
+		ppu_wr: in std_logic;
+		ppu_rd: in std_logic;
+		ciram_a10: out std_logic;
+		ciram_ce: out std_logic;
+		irq: out std_logic;
+		cpu_rw: in std_logic;
+		romsel: in std_logic;
+		cpu_data_in: out std_logic_vector(7 downto 0);
+		cpu_data_out: in std_logic_vector(7 downto 0);
+		cpu_data_in_ready: out std_logic;
+		cpu_addr: in std_logic_vector(15 downto 0);
+		cpu_memory_start: in std_logic;
+		m2: in std_logic;
+		clock: in std_logic;
+		fast_clock: in std_logic);
 end nes_cartridge;
 
 architecture Behavioral of nes_cartridge is
@@ -37,7 +45,7 @@ architecture Behavioral of nes_cartridge is
 	signal mirroring: std_logic;
 
 	signal prg_rom_din: std_logic_vector(7 downto 0);
-	signal prg_rom_address: std_logic_vector(14 downto 0);
+	signal prg_rom_address: std_logic_vector(21 downto 0);
 	signal prg_rom_data: std_logic_vector(7 downto 0);
 	signal prg_rom_data_ready: std_logic;
 	signal prg_rom_cs: std_logic;
@@ -46,44 +54,72 @@ architecture Behavioral of nes_cartridge is
 	signal chr_rom_address: std_logic_vector(12 downto 0);
 	signal chr_rom_data: std_logic_vector(7 downto 0);
 	signal chr_rom_cs: std_logic;
+	
+	signal rom_wb_mode: integer range 0 to 3 := 0;
 begin
 	process (all)
 	begin
+		if ramtype="wishbone" then
+			rom_wb_d_mosi <= cpu_data_out;
+			rom_wb_we <= '1';
+			rom_wb_addr <= prg_rom_address;
+			rom_wb_bte <= "00";
+			rom_wb_cti <= "000";
+			rom_wb_sel <= "1";
+			cpu_data_in <= rom_wb_d_miso;
+		end if;
+	
 		chr_rom_cs <= '0';
 		case mapper is
 			when x"0000" =>
-				if write_signal then
-					prg_rom_address(14 downto 0) <= write_address(14 downto 0);
+				prg_rom_address(21 downto 15) <= (others => '0');
+				prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);
+				if cpu_addr(15) = '1' then
+					prg_rom_cs <= '1';
 				else
-					prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);
-				end if;
-				cpu_data_in <= prg_rom_data;
-				if write_signal then
-					case write_cs is
-						when "00" => 
-							prg_rom_cs <= '1';
-						when others => 
-							prg_rom_cs <= '0';
-					end case;
-					prg_rom_rw <= write_rw;
-					prg_rom_din <= write_value;
-					cpu_data_in_ready <= '1';
-				else
-					prg_rom_din <= (others => '0');
-					prg_rom_rw <= '1';
-					if cpu_addr(15) = '1' then
-						prg_rom_cs <= '1';
-						cpu_data_in_ready <= prg_rom_data_ready;
-					else
-						prg_rom_cs <= '0';
-						cpu_data_in_ready <= '1';
-					end if;
+					prg_rom_cs <= '0';
 				end if;
 			when others =>
 				prg_rom_address <= (others => '0');
 				prg_rom_cs <= '0';
 				cpu_data_in <= (others => '0');
 		end case;
+		case rom_wb_mode is
+			when 0 =>
+				rom_wb_cyc <= '0';
+				rom_wb_stb <= '0';
+				cpu_data_in_ready <= '1';
+			when 1 =>
+				rom_wb_cyc <= '1';
+				rom_wb_stb <= '1';
+				cpu_data_in_ready <= '0';
+			when 2 =>
+				rom_wb_cyc <= '1';
+				rom_wb_stb <= '1';
+				cpu_data_in_ready <= '1';
+			when others => 
+				rom_wb_cyc <= '0';
+				cpu_data_in_ready <= '0';
+		end case;
+	end process;
+	
+	process (fast_clock)
+	begin
+		if rising_edge(fast_clock) then
+			case rom_wb_mode is
+				when 0 =>
+					if cpu_memory_start and prg_rom_cs then
+						rom_wb_mode <= 1;
+					end if;
+				when 1 =>
+					if rom_wb_ack then
+						rom_wb_mode <= 2;
+					end if;
+				when 2 =>
+					rom_wb_mode <= 0;
+				when others => null;
+			end case;
+		end if;
 	end process;
 	
 	memory: if (unified_ram = '0' and ramtype = "sram") generate

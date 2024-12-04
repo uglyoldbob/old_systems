@@ -55,15 +55,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		return results;
 	end function;
 	
-	signal run_benches: std_logic_vector(2 downto 0) := "100";
+	signal run_benches: std_logic_vector(2 downto 0) := "001";
 
-	signal write_signal: std_logic;
-	signal write_address: std_logic_vector(19 downto 0);
-	signal write_value: std_logic_vector(7 downto 0);
-	signal write_trigger: std_logic;
-	signal write_rw: std_logic;
-	signal write_cs: std_logic_vector(1 downto 0);
-	
 	signal test_signals: NES_TEST_ENTRIES(0 to 8990) := GetNestestResults("nestest.txt", 8991);
 	signal cpu_clock: std_logic := '0';
 	signal cpu_reset: std_logic := '0';
@@ -121,24 +114,27 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal hdmi1_screen_width: std_logic_vector(10 downto 0);
 	signal hdmi1_screen_height: std_logic_vector(9 downto 0);
 	
-	signal sdram_wb_ack: std_logic;
-	signal sdram_wb_d_miso: std_logic_vector(31 downto 0);
-	signal sdram_wb_d_mosi: std_logic_vector(31 downto 0);
-	signal sdram_wb_err: std_logic;
-	signal sdram_wb_addr: std_logic_vector(29 downto 0);
-	signal sdram_wb_bte: std_logic_vector(1 downto 0);
-	signal sdram_wb_cti: std_logic_vector(2 downto 0);
-	signal sdram_wb_cyc: std_logic;
-	signal sdram_wb_sel: std_logic_vector(3 downto 0);
-	signal sdram_wb_stb: std_logic;
-	signal sdram_wb_we: std_logic;
+	signal rom_addr_mask: std_logic_vector(21 downto 0);
+	signal rom_wb_ack: std_logic;
+	signal rom_wb_d_miso: std_logic_vector(7 downto 0);
+	signal rom_wb_d_mosi: std_logic_vector(7 downto 0);
+	signal rom_wb_err: std_logic;
+	signal rom_wb_addr: std_logic_vector(21 downto 0);
+	signal rom_wb_bte: std_logic_vector(1 downto 0);
+	signal rom_wb_cti: std_logic_vector(2 downto 0);
+	signal rom_wb_cyc: std_logic;
+	signal rom_wb_sel: std_logic_vector(0 downto 0);
+	signal rom_wb_stb: std_logic;
+	signal rom_wb_we: std_logic;
 	
-	type RAM_ARRAY is array (2**19 downto 0) of std_logic_vector (7 downto 0);
+	type RAM_ARRAY is array (2**21 downto 0) of std_logic_vector (7 downto 0);
 	signal rom : RAM_ARRAY;
 	FILE romfile : text;
 	
 	signal random_data: std_logic_vector(31 downto 0);
 	signal rgb: std_logic_vector(23 downto 0);
+	
+	constant NESTEST_ADDRESS   : integer := 16#3ffc#;
 begin
 	hdmi_pixel_clock <= NOT hdmi_pixel_clock after 20ns;
 	cpu_clock <= not cpu_clock after 60 ns;
@@ -220,31 +216,26 @@ begin
 	end process;
 	
 	nes: entity work.nes generic map(
+		ramtype => "wishbone",
 		random_noise => '1') port map (
 		ignore_sync => '1',
-		sdram_wb_ack => sdram_wb_ack,
-		sdram_wb_d_miso => sdram_wb_d_miso,
-		sdram_wb_d_mosi => sdram_wb_d_mosi,
-		sdram_wb_err => sdram_wb_err,
-		sdram_wb_addr => sdram_wb_addr,
-		sdram_wb_bte => sdram_wb_bte,
-		sdram_wb_cti => sdram_wb_cti,
-		sdram_wb_cyc => sdram_wb_cyc,
-		sdram_wb_sel => sdram_wb_sel,
-		sdram_wb_stb => sdram_wb_stb,
-		sdram_wb_we => sdram_wb_we,
+		rom_wb_ack => rom_wb_ack,
+		rom_wb_d_miso => rom_wb_d_miso,
+		rom_wb_d_mosi => rom_wb_d_mosi,
+		rom_wb_err => rom_wb_err,
+		rom_wb_addr => rom_wb_addr,
+		rom_wb_bte => rom_wb_bte,
+		rom_wb_cti => rom_wb_cti,
+		rom_wb_cyc => rom_wb_cyc,
+		rom_wb_sel => rom_wb_sel,
+		rom_wb_stb => rom_wb_stb,
+		rom_wb_we => rom_wb_we,
 		hdmi_pixel_out => ppu_pixel,
 		hdmi_vsync => hdmi_vblank,
 		hdmi_row => hdmi_row,
 		hdmi_column => hdmi_column,
 		hdmi_pvalid => hdmi_pvalid,
 		hdmi_line_ready => hdmi_hstart,
-		write_signal => write_signal,
-		write_address => write_address,
-		write_value => write_value,
-		write_trigger => write_trigger,
-		write_rw => write_rw,
-		write_cs => write_cs,
 		d_memory_clock => cpu_memory_clock,
 		d_a => cpu_a,
 		d_x => cpu_x,
@@ -263,6 +254,18 @@ begin
 		fast_clock => hdmi_pixel_clock,
 		clock => cpu_clock
 		);
+		
+	process (hdmi_pixel_clock)
+	begin
+		if rising_edge(hdmi_pixel_clock) then
+			if rom_wb_cyc and rom_wb_stb then
+				rom_wb_d_miso <= rom(to_integer(unsigned(rom_wb_addr and rom_addr_mask)));
+			end if;
+		end if;
+	end process;
+	
+	rom_wb_ack <= rom_wb_cyc and rom_wb_stb;
+	rom_wb_err <= '0';
 
 	process
 		variable RomFileLine : line;
@@ -272,18 +275,9 @@ begin
 	begin
 		cpu_reset <= '1', '0' after 100ns;
 		
-		write_rw <= '0';
-		write_signal <= '0';
-		write_trigger <= '0';
-		write_cs <= "00";
-		write_address <= (others => '0');
-		write_value <= (others => '0');
 		wait until rising_edge(cpu_clock);
 		
 		if run_benches(0) or run_benches(1) then
-			write_rw <= '1';
-			write_signal <= '0';
-			write_trigger <= '0';
 			file_open(romfile, "nestest_prg_rom.txt", read_mode);
 			i := 0;
 			while not endfile(romfile) loop
@@ -293,31 +287,12 @@ begin
 				i := i + 1;
 			end loop;
 			report("Read " & to_string(i) & " bytes");
-			write_signal <= '1';
 			size := i;
 			i := 0;
-			write_cs <= "00";
-			wait until rising_edge(cpu_clock);
-			write_rw <= '0';
-			for i in 0 to size-1 loop
-				write_address <= std_logic_vector(to_unsigned(i, 20));
-				write_value <= rom(i);
-				write_trigger <= '1';
-				wait until rising_edge(cpu_clock);
-				write_trigger <= '0';
-				wait until rising_edge(cpu_clock);
-			end loop;
+			rom_addr_mask <= std_logic_vector(to_unsigned(size - 1, 22));
 			--provide a start address mod for nestest rom
 			if run_benches(0) then
-				write_address <= x"03ffc";
-				write_value <= x"00";
-				write_trigger <= '1';
-				wait until rising_edge(cpu_clock);
-				write_trigger <= '0';
-				wait until rising_edge(cpu_clock);
-				
-				write_signal <= '0';
-				write_rw <= '1';
+				rom(NESTEST_ADDRESS) <= x"00";
 				wait until rising_edge(cpu_clock);
 			end if;
 		end if;
@@ -325,7 +300,7 @@ begin
 		if run_benches(0) then
 			report "Running basic nestest to check cpu";
 			instruction_check <= '0';
-			wait until cpu_reset = '0';
+			wait until rising_edge(cpu_clock);
 			for i in 0 to 8990 loop
 				wait until cpu_instruction /= instruction_check or cpu_subcycle = "1111";
 				assert cpu_a = test_signals(i).a
@@ -354,20 +329,8 @@ begin
 		end if;
 		
 		if run_benches(1) then
-			write_cs <= "00";
-			wait until rising_edge(cpu_clock);
-			write_rw <= '0';
-			wait until rising_edge(cpu_clock);
 			--restore original value for nestest rom
-			write_address <= x"03ffc";
-			write_value <= x"04";
-			write_trigger <= '1';
-			wait until rising_edge(cpu_clock);
-			write_trigger <= '0';
-			wait until rising_edge(cpu_clock);
-			write_signal <= '0';
-			write_rw <= '1';
-			wait until rising_edge(cpu_clock);
+			rom(NESTEST_ADDRESS) <= x"04";
 			cpu_reset <= '1';
 			report "Running normal nestest to check cpu";
 			wait for 100ns;

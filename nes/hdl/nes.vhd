@@ -4,17 +4,11 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes is
 	Generic (
-		ramtype: string := "sram";
+		ramtype: string := "wishbone";
 		random_noise: in std_logic := '1';
 		unified_ram: std_logic := '0');
    Port (
 		ignore_sync: in std_logic := '0';
-		write_signal: in std_logic := '0';
-		write_address: in std_logic_vector(19 downto 0) := (others=>'0');
-		write_value: in std_logic_vector(7 downto 0) := (others=>'0');
-		write_trigger: in std_logic := '0';
-		write_rw: in std_logic;
-		write_cs: in std_logic_vector(1 downto 0) := (others=>'0');
 		hdmi_pixel_out: out std_logic_vector(23 downto 0);
 		hdmi_vsync: in std_logic;
 		hdmi_row: in std_logic_vector(10 downto 0);
@@ -24,17 +18,17 @@ entity nes is
 		hdmi_line_done: out std_logic;
 		hdmi_line_ready: in std_logic;
 
-		sdram_wb_ack: in std_logic;
-		sdram_wb_d_miso: in std_logic_vector(31 downto 0);
-		sdram_wb_d_mosi: out std_logic_vector(31 downto 0);
-		sdram_wb_err: in std_logic;
-		sdram_wb_addr: out std_logic_vector(29 downto 0);
-		sdram_wb_bte: out std_logic_vector(1 downto 0);
-		sdram_wb_cti: out std_logic_vector(2 downto 0);
-		sdram_wb_cyc: out std_logic;
-		sdram_wb_sel: out std_logic_vector(3 downto 0);
-		sdram_wb_stb: out std_logic;
-		sdram_wb_we: out std_logic;
+		rom_wb_ack: in std_logic;
+		rom_wb_d_miso: in std_logic_vector(7 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(7 downto 0);
+		rom_wb_err: in std_logic;
+		rom_wb_addr: out std_logic_vector(21 downto 0);
+		rom_wb_bte: out std_logic_vector(1 downto 0);
+		rom_wb_cti: out std_logic_vector(2 downto 0);
+		rom_wb_cyc: out std_logic;
+		rom_wb_sel: out std_logic_vector(0 downto 0);
+		rom_wb_stb: out std_logic;
+		rom_wb_we: out std_logic;
 		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
 		d_x: out std_logic_vector(7 downto 0) := x"00";
@@ -144,6 +138,7 @@ architecture Behavioral of nes is
 	signal cpu_dready: std_logic;
 	signal cpu_rw: std_logic;
 	signal cpu_memory_clock: std_logic;
+	signal cpu_memory_start: std_logic;
 	signal memory_clock: std_logic;
 	
 	signal cpu_sram_din: std_logic_vector(7 downto 0);
@@ -224,64 +219,6 @@ architecture Behavioral of nes is
 	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
-	
-	signal bios_data_ready: std_logic;
-	signal scpu_reset: std_logic;
-	signal scpu_interrupts: std_logic_vector(31 downto 0) := (others => '0');
-	signal scpu_wb_i_ack: std_logic;
-	signal scpu_wb_i_d_miso: std_logic_vector(31 downto 0);
-	signal scpu_wb_i_d_mosi: std_logic_vector(31 downto 0);
-	signal scpu_wb_i_err: std_logic;
-	signal scpu_wb_i_addr: std_logic_vector(29 downto 0);
-	signal scpu_wb_i_bte: std_logic_vector(1 downto 0);
-	signal scpu_wb_i_cti: std_logic_vector(2 downto 0);
-	signal scpu_wb_i_cyc: std_logic;
-	signal scpu_wb_i_sel: std_logic_vector(3 downto 0);
-	signal scpu_wb_i_stb: std_logic;
-	signal scpu_wb_i_we: std_logic;
-
-	signal scpu_wb_d_ack: std_logic;
-	signal scpu_wb_d_d_miso: std_logic_vector(31 downto 0);
-	signal scpu_wb_d_d_mosi: std_logic_vector(31 downto 0);
-	signal scpu_wb_d_err: std_logic;
-	signal scpu_wb_d_addr: std_logic_vector(29 downto 0);
-	signal scpu_wb_d_bte: std_logic_vector(1 downto 0);
-	signal scpu_wb_d_cti: std_logic_vector(2 downto 0);
-	signal scpu_wb_d_cyc: std_logic;
-	signal scpu_wb_d_sel: std_logic_vector(3 downto 0);
-	signal scpu_wb_d_stb: std_logic;
-	signal scpu_wb_d_we: std_logic;
-	
-	component VexRiscv is port(
-        externalResetVector: in std_logic_vector(31 downto 0);
-        externalInterruptArray: in std_logic_vector(31 downto 0);
-        timerInterrupt: in std_logic;
-        softwareInterrupt: in std_logic;
-        iBusWishbone_ACK: in std_logic;
-        iBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
-        iBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
-        iBusWishbone_ERR: in std_logic;
-        iBusWishbone_ADR: out std_logic_vector(29 downto 0);
-        iBusWishbone_BTE: out std_logic_vector(1 downto 0);
-        iBusWishbone_CTI: out std_logic_vector(2 downto 0);
-        iBusWishbone_CYC: out std_logic;
-        iBusWishbone_SEL: out std_logic_vector(3 downto 0);
-        iBusWishbone_STB: out std_logic;
-        iBusWishbone_WE: out std_logic;
-        dBusWishbone_ACK: in std_logic;
-        dBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
-        dBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
-        dBusWishbone_ERR: in std_logic;
-        dBusWishbone_ADR: out std_logic_vector(29 downto 0);
-        dBusWishbone_BTE: out std_logic_vector(1 downto 0);
-        dBusWishbone_CTI: out std_logic_vector(2 downto 0);
-        dBusWishbone_CYC: out std_logic;
-        dBusWishbone_SEL: out std_logic_vector(3 downto 0);
-        dBusWishbone_STB: out std_logic;
-        dBusWishbone_WE: out std_logic;
-        clk: in std_logic;
-        reset: in std_logic);
-	end component;
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -290,52 +227,8 @@ begin
 	hdmi_line_done <= hdmi_line_done_sig;
 	
 	d_memory_clock <= memory_clock;
-	pause <= write_signal or (cpu_memory_clock and not cpu_din_ready) or (fsync_pause and not ignore_sync);
-	
-	scpu_reset <= reset;
-	
-	scpu_wb_i_ack <= scpu_wb_i_stb and bios_data_ready;
-	softcpu_bios: entity work.clocked_sram_init 
-			generic map (bits => 17, dbits => 32)
-			port map(
-				clock => fast_clock,
-				address => scpu_wb_i_addr(16 downto 0),
-				rw => not scpu_wb_d_we,
-				cs => '1',
-				dout_valid => bios_data_ready,
-				dout => scpu_wb_i_d_miso,
-				din => scpu_wb_i_d_mosi);
+	pause <= (cpu_memory_clock and not cpu_din_ready) or (fsync_pause and not ignore_sync);
 
-	softcpu: VexRiscv port map (
-        externalResetVector => x"00000000",
-        externalInterruptArray => scpu_interrupts,
-        timerInterrupt => '0',
-        softwareInterrupt => '0',
-        iBusWishbone_ACK => scpu_wb_i_ack,
-        iBusWishbone_DAT_MISO => scpu_wb_i_d_miso,
-        iBusWishbone_DAT_MOSI => scpu_wb_i_d_mosi,
-        iBusWishbone_ERR => scpu_wb_i_err,
-        iBusWishbone_ADR => scpu_wb_i_addr,
-        iBusWishbone_BTE => scpu_wb_i_bte,
-        iBusWishbone_CTI => scpu_wb_i_cti,
-        iBusWishbone_CYC => scpu_wb_i_cyc,
-        iBusWishbone_SEL => scpu_wb_i_sel,
-        iBusWishbone_STB => scpu_wb_i_stb,
-        iBusWishbone_WE => scpu_wb_i_we,
-        dBusWishbone_ACK => scpu_wb_d_ack,
-        dBusWishbone_DAT_MISO => scpu_wb_d_d_miso,
-        dBusWishbone_DAT_MOSI => scpu_wb_d_d_mosi,
-        dBusWishbone_ERR => scpu_wb_d_err,
-        dBusWishbone_ADR => scpu_wb_d_addr,
-        dBusWishbone_BTE => scpu_wb_d_bte,
-        dBusWishbone_CTI => scpu_wb_d_cti,
-        dBusWishbone_CYC => scpu_wb_d_cyc,
-        dBusWishbone_SEL => scpu_wb_d_sel,
-        dBusWishbone_STB => scpu_wb_d_stb,
-        dBusWishbone_WE => scpu_wb_d_we,
-        clk => fast_clock,
-        reset => scpu_reset);
-	
 	process (clock)
 	begin
 		if rising_edge(clock) then
@@ -381,11 +274,7 @@ begin
 	process (clock)
 	begin
 		if rising_edge(clock) then
-			if write_signal then
-				memory_clock <= write_trigger;
-			else
-				memory_clock <= cpu_memory_clock;
-			end if;
+			memory_clock <= cpu_memory_clock;
 		end if;
 	end process;
 	
@@ -400,18 +289,16 @@ begin
 		end if;
 	end process;
 	
-	ram_nonunified: if (unified_ram = '0' and ramtype = "sram") generate
-		cpu_ram: entity work.clocked_sram generic map (
-			bits => 11
-		) port map (
-			clock => memory_clock,
-			cs => cpu_ram_cs,
-			address => cpu_address(10 downto 0),
-			rw => cpu_rw,
-			din => cpu_dout,
-			dout => cpu_sram_dout
-		);
-	end generate;
+	cpu_ram: entity work.clocked_sram generic map (
+		bits => 11
+	) port map (
+		clock => memory_clock,
+		cs => cpu_ram_cs,
+		address => cpu_address(10 downto 0),
+		rw => cpu_rw,
+		din => cpu_dout,
+		dout => cpu_sram_dout
+	);
 	
 	ppu_pixel_trigger <= ppu_clock and not ppu_clock_delay and ppu_pixel_valid;
 	process (all)
@@ -950,6 +837,7 @@ begin
 		clock => clock,
 		ppu_clock => ppu_clock,
 		memory_clock => cpu_memory_clock,
+		memory_start => cpu_memory_start,
 		memory_cycle_done => cpu_dready,
 		rw => cpu_rw,
 		oe => cpu_oe,
@@ -991,10 +879,22 @@ begin
 	cartridge: entity work.nes_cartridge generic map(
 		ramtype => ramtype,
 		unified_ram => unified_ram) port map (
+		rom_wb_ack => rom_wb_ack,
+		rom_wb_d_miso => rom_wb_d_miso,
+		rom_wb_d_mosi => rom_wb_d_mosi,
+		rom_wb_err => rom_wb_err,
+		rom_wb_addr => rom_wb_addr,
+		rom_wb_bte => rom_wb_bte,
+		rom_wb_cti => rom_wb_cti,
+		rom_wb_cyc => rom_wb_cyc,
+		rom_wb_sel => rom_wb_sel,
+		rom_wb_stb => rom_wb_stb,
+		rom_wb_we => rom_wb_we,
 		cpu_data_out => cpu_dout,
 		cpu_data_in => cpu_cartridge_din,
 		cpu_data_in_ready => cpu_cartridge_din_ready,
 		cpu_addr => cpu_address,
+		cpu_memory_start => cpu_memory_start,
 		ppu_data_in => "00000000",
 		ppu_addr => "00000000000000",
 		ppu_addr_a13_n => '1',
@@ -1004,13 +904,7 @@ begin
 		romsel => cpu_address(15),
 		m2 => memory_clock,
 		clock => clock,
-		write_signal => write_signal,
-		write_address => write_address,
-		write_value => write_value,
-		write_trigger => write_trigger,
-		write_rw => write_rw,
-		write_cs => write_cs
-	);
+		fast_clock => fast_clock);
 
 end Behavioral;
 
