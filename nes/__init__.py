@@ -1,6 +1,6 @@
 import os.path
 __dir__ = os.path.split(os.path.abspath(os.path.realpath(__file__)))[0]
-data_location = __dir__.join("/hdl")
+data_location = os.path.join(__dir__, "hdl")
 src = "https://github.com/uglyoldbob/old_systems.git"
 
 # Module version
