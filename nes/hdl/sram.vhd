@@ -52,14 +52,21 @@ architecture Behavioral of sram_init is
 	type memory is array ((2**bits)-1 downto 0) of std_logic_vector(dbits-1 downto 0);
 
 	impure function InitRomFromFile (RomFileName : in string) return memory is
-		FILE romfile : text is in RomFileName;
-		variable RomFileLine : line;
-		variable rom : memory;
-		begin
-		for i in memory'low to memory'high loop
-		readline(romfile, RomFileLine);
-		hread(RomFileLine, rom(i));
-		end loop;
+	variable rom : memory := (others => (others => '0'));
+	FILE romfile : text is in RomFileName;
+	variable open_status :FILE_OPEN_STATUS;
+	file     infile      :text;
+	variable RomFileLine : line;
+	begin
+		if RomFileName /= "none" then
+			file_open(open_status, infile, filename, read_mode);
+         if open_status = open_ok then
+				for i in memory'low to memory'high loop
+					readline(romfile, RomFileLine);
+					hread(RomFileLine, rom(i));
+				end loop;
+			end if;
+		end if;
 		return rom;
 	end function;
 
