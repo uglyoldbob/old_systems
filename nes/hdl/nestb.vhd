@@ -116,14 +116,14 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	
 	signal rom_addr_mask: std_logic_vector(21 downto 0);
 	signal rom_wb_ack: std_logic;
-	signal rom_wb_d_miso: std_logic_vector(7 downto 0);
-	signal rom_wb_d_mosi: std_logic_vector(7 downto 0);
+	signal rom_wb_d_miso: std_logic_vector(15 downto 0);
+	signal rom_wb_d_mosi: std_logic_vector(15 downto 0);
 	signal rom_wb_err: std_logic;
-	signal rom_wb_addr: std_logic_vector(21 downto 0);
+	signal rom_wb_addr: std_logic_vector(20 downto 0);
 	signal rom_wb_bte: std_logic_vector(1 downto 0);
 	signal rom_wb_cti: std_logic_vector(2 downto 0);
 	signal rom_wb_cyc: std_logic;
-	signal rom_wb_sel: std_logic_vector(0 downto 0);
+	signal rom_wb_sel: std_logic_vector(1 downto 0);
 	signal rom_wb_stb: std_logic;
 	signal rom_wb_we: std_logic;
 	
@@ -259,7 +259,8 @@ begin
 	begin
 		if rising_edge(hdmi_pixel_clock) then
 			if rom_wb_cyc and rom_wb_stb then
-				rom_wb_d_miso <= rom(to_integer(unsigned(rom_wb_addr and rom_addr_mask)));
+				rom_wb_d_miso(7 downto 0) <= rom(to_integer(unsigned((rom_wb_addr and rom_addr_mask(21 downto 1)) & '0')));
+				rom_wb_d_miso(15 downto 8) <= rom(to_integer(unsigned((rom_wb_addr and rom_addr_mask(21 downto 1)) & '1')));
 			end if;
 		end if;
 	end process;

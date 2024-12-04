@@ -19,14 +19,14 @@ entity nes is
 		hdmi_line_ready: in std_logic;
 
 		rom_wb_ack: in std_logic;
-		rom_wb_d_miso: in std_logic_vector(7 downto 0);
-		rom_wb_d_mosi: out std_logic_vector(7 downto 0);
+		rom_wb_d_miso: in std_logic_vector(15 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(15 downto 0);
 		rom_wb_err: in std_logic;
-		rom_wb_addr: out std_logic_vector(21 downto 0);
+		rom_wb_addr: out std_logic_vector(20 downto 0);
 		rom_wb_bte: out std_logic_vector(1 downto 0);
 		rom_wb_cti: out std_logic_vector(2 downto 0);
 		rom_wb_cyc: out std_logic;
-		rom_wb_sel: out std_logic_vector(0 downto 0);
+		rom_wb_sel: out std_logic_vector(1 downto 0);
 		rom_wb_stb: out std_logic;
 		rom_wb_we: out std_logic;
 		
