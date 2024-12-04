@@ -38,7 +38,7 @@ use ieee.std_logic_textio.all;
 
 entity sram_init is
 	generic (bits: integer := 15;
-				dbits: integer = 8;
+				dbits: integer := 8;
 				filename: string := "none");
 	port ( addr : in  STD_LOGIC_VECTOR (bits-1 downto 0);
           data : inout  STD_LOGIC_VECTOR (dbits-1 downto 0);

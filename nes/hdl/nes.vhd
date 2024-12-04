@@ -296,10 +296,10 @@ begin
 	
 	scpu_wb_i_ack <= scpu_wb_i_stb and bios_data_ready;
 	softcpu_bios: entity work.clocked_sram_init 
-			generic map (bits => 10, dbits => 32)
+			generic map (bits => 17, dbits => 32)
 			port map(
 				clock => fast_clock,
-				address => scpu_wb_i_addr(9 downto 0),
+				address => scpu_wb_i_addr(16 downto 0),
 				rw => not scpu_wb_d_we,
 				cs => '1',
 				dout_valid => bios_data_ready,
