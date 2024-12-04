@@ -43,7 +43,7 @@ def data_file(f):
         raise IOError("File {f} doesn't exist in old_systems".format(f))
     return fn
 
-class OldSystems:
+class Nes:
     def __init__(self, platform):
         platform.add_source(os.path.join(data_location, "clocked_sram_init.vhd"))
         platform.add_source(os.path.join(data_location, "clcoked_sram.vhd"))
