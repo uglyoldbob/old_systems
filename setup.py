@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-from old_systems import version_str
+from nes.hdl import version_str
 
 setuptools.setup(
     name="pythondata-old-systems",
