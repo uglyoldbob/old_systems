@@ -24,7 +24,7 @@ Python module containing hdl files for emulating old consoles.""",
     zip_safe=False,
     packages=setuptools.find_packages(),
     package_data={
-    	'nes': ['nes/hdl/**'],
+    	'nes': ['hdl/**'],
     },
     include_package_data=True,
     project_urls={
