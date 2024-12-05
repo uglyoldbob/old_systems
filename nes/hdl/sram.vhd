@@ -17,7 +17,7 @@ architecture Behavioral of sram is
 	signal storage: memory;
 begin
 
-	process (cs, oe, we, addr, data)
+	process (cs, oe, we, addr, data, storage)
 	begin
 		if cs='0' and oe='0' then
 			data <= storage(to_integer(unsigned(addr)));

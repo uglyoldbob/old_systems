@@ -103,6 +103,7 @@ begin
 				cpu_data_in_ready <= '1';
 			when others => 
 				rom_wb_cyc <= '0';
+				rom_wb_stb <= '0';
 				cpu_data_in_ready <= '0';
 		end case;
 	end process;

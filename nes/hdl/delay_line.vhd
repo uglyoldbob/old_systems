@@ -14,7 +14,7 @@ end delay_line;
 architecture Behavioral of delay_line is
 signal r1: std_logic;
 begin
-	process (clock)
+	process (clock, r1)
 	begin
 		ready <= r1;
 		if rising_edge(clock) then
