@@ -50,7 +50,15 @@ architecture Behavioral of gowin_sdram_interface is
 	signal O_sdrc_cmd_ack: std_logic;
 
     signal mode: integer range 0 to 3 := 0;
-    signal sdram_mode: integer range 0 to 7 := 0;
+
+    constant SDRAM_UNINIT: integer range 0 to 7 := 0;
+    constant SDRAM_IDLE: integer range 0 to 7 := 1;
+    constant SDRAM_ACTIVE: integer range 0 to 7 := 2;
+    signal sdram_mode: integer range 0 to 7 := SDRAM_UNINIT;
+
+    signal sdram_active_bank: std_logic_vector(1 downto 0);
+    signal sdram_active_row: std_logic_vector(10 downto 0);
+    signal sdram_active_column: std_logic_vector(7 downto 0);
 
 	component gowin_sdram
 		port (
@@ -85,9 +93,8 @@ begin
     I_sdrc_rst_n <= not reset;
     I_sdrc_clk <= clock;
     I_sdram_clk <= clock;
-    I_sdram_selfrefresh <= '1';
+    I_sdram_selfrefresh <= '0';
     I_sdram_power_down <= '0';
-    I_sdrc_precharge_ctrl <= '1';
     I_sdrc_data_len <= x"00"; --one
 
     process (all)
@@ -116,23 +123,11 @@ begin
             end if;
             I_sdrc_data <= wb_d_mosi & wb_d_mosi;
         end if;
-        if mode = 2 then
-            I_sdrc_cmd_en <= '1';
-        else
-            I_sdrc_cmd_en <= '0';
-        end if;
     end process;
 
     process (clock)
     begin
         if rising_edge(clock) then
-            case sdram_mode is
-                when 0 =>
-                    if O_sdrc_init_done then
-                        sdram_mode <= 1;
-                    end if;
-                when others => null;
-            end case;
             case mode is
                 when 0 =>
                     if O_sdrc_init_done then
@@ -153,16 +148,34 @@ begin
         end if;
     end process;
 
+    process (clock)
+    begin
+        if rising_edge(clock) then
+            case sdram_mode is
+                when SDRAM_UNINIT =>
+                    if O_sdrc_init_done then
+                        sdram_mode <= SDRAM_IDLE;
+                    end if;
+                when SDRAM_IDLE =>
+                    null;
+                when others => null;
+            end case;
+        end if;
+    end process;
+
     process (all)
     begin
         case sdram_mode is
-            when 0 | 1 => I_sdrc_cmd <= "111"; --nop
+            when SDRAM_UNINIT | SDRAM_IDLE => I_sdrc_cmd <= "111"; --nop
             when others => null;
         end case;
     end process;
 
     --TODO
     --I_sdrc_addr
+    --I_sdrc_cmd_en
+    --I_sdrc_precharge_ctrl
+    --O_sdrc_cmd_ack
 
 	sdram: gowin_sdram port map (
 		O_sdram_clk => O_sdram_clk,
