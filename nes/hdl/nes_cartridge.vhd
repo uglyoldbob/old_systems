@@ -5,17 +5,18 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes_cartridge is
 	Generic (
 		ramtype: string := "sram";
+        rambits: integer := 8;
 		unified_ram: std_logic := '0');
    Port (
 		rom_wb_ack: in std_logic;
-		rom_wb_d_miso: in std_logic_vector(15 downto 0);
-		rom_wb_d_mosi: out std_logic_vector(15 downto 0);
+		rom_wb_d_miso: in std_logic_vector(rambits-1 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(rambits-1 downto 0);
 		rom_wb_err: in std_logic;
-		rom_wb_addr: out std_logic_vector(20 downto 0);
+		rom_wb_addr: out std_logic_vector((rambits/8)+20 downto 0);
 		rom_wb_bte: out std_logic_vector(1 downto 0);
 		rom_wb_cti: out std_logic_vector(2 downto 0);
 		rom_wb_cyc: out std_logic;
-		rom_wb_sel: out std_logic_vector(1 downto 0);
+		rom_wb_sel: out std_logic_vector((rambits/8)-1 downto 0);
 		rom_wb_stb: out std_logic;
 		rom_wb_we: out std_logic;
 		ppu_data_in: in std_logic_vector(7 downto 0);
@@ -45,7 +46,7 @@ architecture Behavioral of nes_cartridge is
 	signal mirroring: std_logic;
 
 	signal prg_rom_din: std_logic_vector(7 downto 0);
-	signal prg_rom_address: std_logic_vector(20 downto 0);
+	signal prg_rom_address: std_logic_vector(21 downto 0);
 	signal prg_rom_data: std_logic_vector(7 downto 0);
 	signal prg_rom_data_ready: std_logic;
 	signal prg_rom_cs: std_logic;
@@ -60,24 +61,32 @@ begin
 	process (all)
 	begin
 		if ramtype="wishbone" then
-			rom_wb_d_mosi <= cpu_data_out & cpu_data_out;
+            if rambits = 16 then
+                rom_wb_sel <= cpu_addr(0) & not cpu_addr(0);
+                rom_wb_d_mosi <= cpu_data_out & cpu_data_out;
+                if cpu_addr(0) then
+                    cpu_data_in <= rom_wb_d_miso(15 downto 8);
+                else
+                    cpu_data_in <= rom_wb_d_miso(7 downto 0);
+                end if;
+                rom_wb_addr <= prg_rom_address(21 downto 1);
+            else
+                rom_wb_sel <= "1";
+                rom_wb_d_mosi <= cpu_data_out;
+                cpu_data_in <= rom_wb_d_miso;
+                rom_wb_addr <= prg_rom_address(21 downto 0);
+            end if;
 			rom_wb_we <= '1';
-			rom_wb_addr <= prg_rom_address;
+			
 			rom_wb_bte <= "00";
 			rom_wb_cti <= "000";
-			rom_wb_sel <= cpu_addr(0) & not cpu_addr(0);
-			if cpu_addr(0) then
-				cpu_data_in <= rom_wb_d_miso(15 downto 8);
-			else
-				cpu_data_in <= rom_wb_d_miso(7 downto 0);
-			end if;
 		end if;
 	
 		chr_rom_cs <= '0';
 		case mapper is
 			when x"0000" =>
-				prg_rom_address(20 downto 14) <= (others => '0');
-				prg_rom_address(13 downto 0) <= cpu_addr(14 downto 1);
+				prg_rom_address(21 downto 15) <= (others => '0');
+				prg_rom_address(14 downto 0) <= cpu_addr(14 downto 0);
 				if cpu_addr(15) = '1' then
 					prg_rom_cs <= '1';
 				else

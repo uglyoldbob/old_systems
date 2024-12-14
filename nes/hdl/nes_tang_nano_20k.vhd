@@ -3,6 +3,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity nes_tang_nano_20k is
+   Generic(
+        rambits: integer := 8);
    Port (
 		clock: in std_logic;
 		O_sdram_clk: out std_logic;
@@ -99,14 +101,14 @@ architecture Behavioral of nes_tang_nano_20k is
     signal video_mode: std_logic_vector(2 downto 0):= (others => '0');
 
 	signal sdram_wb_ack: std_logic;
-	signal sdram_wb_d_miso: std_logic_vector(31 downto 0);
-	signal sdram_wb_d_mosi: std_logic_vector(31 downto 0);
+	signal sdram_wb_d_miso: std_logic_vector(7 downto 0);
+	signal sdram_wb_d_mosi: std_logic_vector(7 downto 0);
 	signal sdram_wb_err: std_logic;
-	signal sdram_wb_addr: std_logic_vector(29 downto 0);
+	signal sdram_wb_addr: std_logic_vector((rambits/8)+20 downto 0);
 	signal sdram_wb_bte: std_logic_vector(1 downto 0);
 	signal sdram_wb_cti: std_logic_vector(2 downto 0);
 	signal sdram_wb_cyc: std_logic;
-	signal sdram_wb_sel: std_logic_vector(3 downto 0);
+	signal sdram_wb_sel: std_logic_vector(0 downto 0);
 	signal sdram_wb_stb: std_logic;
 	signal sdram_wb_we: std_logic;
 
@@ -409,29 +411,23 @@ begin
 
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
-		sdram_wb_ack => sdram_wb_ack,
-		sdram_wb_d_miso => sdram_wb_d_miso,
-		sdram_wb_d_mosi => sdram_wb_d_mosi,
-		sdram_wb_err => sdram_wb_err,
-		sdram_wb_addr => sdram_wb_addr,
-		sdram_wb_bte => sdram_wb_bte,
-		sdram_wb_cti => sdram_wb_cti,
-		sdram_wb_cyc => sdram_wb_cyc,
-		sdram_wb_sel => sdram_wb_sel,
-		sdram_wb_stb => sdram_wb_stb,
-		sdram_wb_we => sdram_wb_we,
+		rom_wb_ack => sdram_wb_ack,
+		rom_wb_d_miso => sdram_wb_d_miso,
+		rom_wb_d_mosi => sdram_wb_d_mosi,
+		rom_wb_err => sdram_wb_err,
+		rom_wb_addr => sdram_wb_addr((rambits/8)+20 downto 0),
+		rom_wb_bte => sdram_wb_bte,
+		rom_wb_cti => sdram_wb_cti,
+		rom_wb_cyc => sdram_wb_cyc,
+		rom_wb_sel => sdram_wb_sel,
+		rom_wb_stb => sdram_wb_stb,
+		rom_wb_we => sdram_wb_we,
 		hdmi_pixel_out => ppu_pixel,
 		hdmi_row => hdmi_row,
 		hdmi_column => hdmi_column,
 		hdmi_pvalid => hdmi_pvalid,
 		hdmi_valid_out => hdmi_fifo_write,
 		hdmi_line_ready => hdmi_hstart,
-		write_signal => write_signal,
-		write_address => write_address,
-		write_value => write_value,
-		write_trigger => write_trigger,
-		write_rw => write_rw,
-		write_cs => write_cs,
 		reset => nes_reset,
 		cpu_oe => nes_oe,
 		cpu_memory_address => nes_address,

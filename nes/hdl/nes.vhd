@@ -5,6 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes is
 	Generic (
 		ramtype: string := "wishbone";
+        rambits: integer := 8;
 		random_noise: in std_logic := '1';
 		unified_ram: std_logic := '0');
    Port (
@@ -19,14 +20,14 @@ entity nes is
 		hdmi_line_ready: in std_logic;
 
 		rom_wb_ack: in std_logic;
-		rom_wb_d_miso: in std_logic_vector(15 downto 0);
-		rom_wb_d_mosi: out std_logic_vector(15 downto 0);
+		rom_wb_d_miso: in std_logic_vector(rambits-1 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(rambits-1 downto 0);
 		rom_wb_err: in std_logic;
-		rom_wb_addr: out std_logic_vector(20 downto 0);
+		rom_wb_addr: out std_logic_vector((rambits/8)+20 downto 0);
 		rom_wb_bte: out std_logic_vector(1 downto 0);
 		rom_wb_cti: out std_logic_vector(2 downto 0);
 		rom_wb_cyc: out std_logic;
-		rom_wb_sel: out std_logic_vector(1 downto 0);
+		rom_wb_sel: out std_logic_vector((rambits/8)-1 downto 0);
 		rom_wb_stb: out std_logic;
 		rom_wb_we: out std_logic;
 		
@@ -878,6 +879,7 @@ begin
 	
 	cartridge: entity work.nes_cartridge generic map(
 		ramtype => ramtype,
+        rambits => rambits,
 		unified_ram => unified_ram) port map (
 		rom_wb_ack => rom_wb_ack,
 		rom_wb_d_miso => rom_wb_d_miso,
