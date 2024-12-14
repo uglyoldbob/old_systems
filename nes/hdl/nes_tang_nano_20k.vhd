@@ -386,7 +386,10 @@ begin
 	write_trigger <= '0';
 	nes_reset <= '0';
 
-	ram: entity work.gowin_sdram_interface port map(
+	ram: entity work.gowin_sdram_interface generic map(
+        rambits => rambits) port map(
+        reset => nes_reset,
+        clock => hdmi_pixel_clock,
 		O_sdram_clk => O_sdram_clk,
 		O_sdram_cke => O_sdram_cke,
 		O_sdram_cs_n => O_sdram_cs_n,
