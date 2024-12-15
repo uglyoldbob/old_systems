@@ -5,7 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes is
 	Generic (
 		ramtype: string := "wishbone";
-        rambits: integer := 8;
+        rambits: integer := 3;
 		random_noise: in std_logic := '1';
 		unified_ram: std_logic := '0');
    Port (
@@ -20,14 +20,14 @@ entity nes is
 		hdmi_line_ready: in std_logic;
 
 		rom_wb_ack: in std_logic;
-		rom_wb_d_miso: in std_logic_vector(rambits-1 downto 0);
-		rom_wb_d_mosi: out std_logic_vector(rambits-1 downto 0);
+		rom_wb_d_miso: in std_logic_vector(2**rambits-1 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(2**rambits-1 downto 0);
 		rom_wb_err: in std_logic;
-		rom_wb_addr: out std_logic_vector((rambits/8)+20 downto 0);
+		rom_wb_addr: out std_logic_vector(25-rambits downto 0);
 		rom_wb_bte: out std_logic_vector(1 downto 0);
 		rom_wb_cti: out std_logic_vector(2 downto 0);
 		rom_wb_cyc: out std_logic;
-		rom_wb_sel: out std_logic_vector((rambits/8)-1 downto 0);
+		rom_wb_sel: out std_logic_vector(rambits-3 downto 0);
 		rom_wb_stb: out std_logic;
 		rom_wb_we: out std_logic;
 		

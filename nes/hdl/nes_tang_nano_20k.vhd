@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes_tang_nano_20k is
    Generic(
-        rambits: integer := 8);
+        rambits: integer := 3);
    Port (
 		clock: in std_logic;
 		O_sdram_clk: out std_logic;
@@ -104,7 +104,7 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal sdram_wb_d_miso: std_logic_vector(7 downto 0);
 	signal sdram_wb_d_mosi: std_logic_vector(7 downto 0);
 	signal sdram_wb_err: std_logic;
-	signal sdram_wb_addr: std_logic_vector((rambits/8)+20 downto 0);
+	signal sdram_wb_addr: std_logic_vector(25-rambits downto 0);
 	signal sdram_wb_bte: std_logic_vector(1 downto 0);
 	signal sdram_wb_cti: std_logic_vector(2 downto 0);
 	signal sdram_wb_cyc: std_logic;
@@ -387,6 +387,7 @@ begin
 	nes_reset <= '0';
 
 	ram: entity work.gowin_sdram_interface generic map(
+        clock_freq => 74250000,
         rambits => rambits) port map(
         reset => nes_reset,
         clock => hdmi_pixel_clock,
@@ -418,7 +419,7 @@ begin
 		rom_wb_d_miso => sdram_wb_d_miso,
 		rom_wb_d_mosi => sdram_wb_d_mosi,
 		rom_wb_err => sdram_wb_err,
-		rom_wb_addr => sdram_wb_addr((rambits/8)+20 downto 0),
+		rom_wb_addr => sdram_wb_addr(25-rambits downto 0),
 		rom_wb_bte => sdram_wb_bte,
 		rom_wb_cti => sdram_wb_cti,
 		rom_wb_cyc => sdram_wb_cyc,

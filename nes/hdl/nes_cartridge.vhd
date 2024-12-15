@@ -5,18 +5,18 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes_cartridge is
 	Generic (
 		ramtype: string := "sram";
-        rambits: integer := 8;
+        rambits: integer := 3;
 		unified_ram: std_logic := '0');
    Port (
 		rom_wb_ack: in std_logic;
-		rom_wb_d_miso: in std_logic_vector(rambits-1 downto 0);
-		rom_wb_d_mosi: out std_logic_vector(rambits-1 downto 0);
+		rom_wb_d_miso: in std_logic_vector(2**rambits-1 downto 0);
+		rom_wb_d_mosi: out std_logic_vector(2**rambits-1 downto 0);
 		rom_wb_err: in std_logic;
-		rom_wb_addr: out std_logic_vector((rambits/8)+20 downto 0);
+		rom_wb_addr: out std_logic_vector(25-rambits downto 0);
 		rom_wb_bte: out std_logic_vector(1 downto 0);
 		rom_wb_cti: out std_logic_vector(2 downto 0);
 		rom_wb_cyc: out std_logic;
-		rom_wb_sel: out std_logic_vector((rambits/8)-1 downto 0);
+		rom_wb_sel: out std_logic_vector(rambits-3 downto 0);
 		rom_wb_stb: out std_logic;
 		rom_wb_we: out std_logic;
 		ppu_data_in: in std_logic_vector(7 downto 0);
@@ -61,7 +61,7 @@ begin
 	process (all)
 	begin
 		if ramtype="wishbone" then
-            if rambits = 16 then
+            if rambits = 4 then
                 rom_wb_sel <= cpu_addr(0) & not cpu_addr(0);
                 rom_wb_d_mosi <= cpu_data_out & cpu_data_out;
                 if cpu_addr(0) then
@@ -74,7 +74,7 @@ begin
                 rom_wb_sel <= "1";
                 rom_wb_d_mosi <= cpu_data_out;
                 cpu_data_in <= rom_wb_d_miso;
-                rom_wb_addr <= prg_rom_address(21 downto 0);
+                rom_wb_addr <= "0" & prg_rom_address(21 downto 0);
             end if;
 			rom_wb_we <= '1';
 			
