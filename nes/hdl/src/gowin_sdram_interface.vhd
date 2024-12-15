@@ -200,7 +200,6 @@ begin
                             sdram_mode <= SDRAM_ACTIVATING;
                             if rambits=3 then
                                 I_sdrc_addr <= "00000000" & wb_addr(22 downto 10);
-                            else
                             elsif rambits=4 then
                                 I_sdrc_addr <= "00000000" & wb_addr(21 downto 9);
                             end if;
