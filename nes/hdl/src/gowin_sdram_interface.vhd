@@ -47,6 +47,8 @@ architecture Behavioral of gowin_sdram_interface is
 
     signal delay_counter: integer range 0 to 15 := 0;
 
+	signal data_from_sdram: std_logic_vector(2**rambits-1 downto 0);
+
 	signal I_sdrc_rst_n: std_logic;
 	signal I_sdrc_clk: std_logic;
 	signal I_sdram_clk: std_logic;
@@ -132,16 +134,16 @@ begin
             I_sdrc_data <= wb_d_mosi & wb_d_mosi & wb_d_mosi & wb_d_mosi;
             case wb_addr(1 downto 0) is
                 when "00" =>
-                    wb_d_miso <= O_sdrc_data(7 downto 0);
+                    data_from_sdram <= O_sdrc_data(7 downto 0);
                     I_sdrc_dqm <= "0001";
                 when "01" => 
-                    wb_d_miso <= O_sdrc_data(15 downto 8);
+                    data_from_sdram <= O_sdrc_data(15 downto 8);
                     I_sdrc_dqm <= "0010";
                 when "10" => 
-                    wb_d_miso <= O_sdrc_data(23 downto 16);
+                    data_from_sdram <= O_sdrc_data(23 downto 16);
                     I_sdrc_dqm <= "0100";
                 when others => 
-                    wb_d_miso <= O_sdrc_data(31 downto 24);
+                    data_from_sdram <= O_sdrc_data(31 downto 24);
                     I_sdrc_dqm <= "1000";
             end case;
         else
@@ -157,6 +159,7 @@ begin
     process (clock)
     begin
         if rising_edge(clock) then
+			wb_d_miso <= data_from_sdram;
             if refresh_counter = 1 then
                 refresh_needed <= '1';
             end if;
