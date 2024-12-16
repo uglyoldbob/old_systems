@@ -1,8 +1,6 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
-use std.textio.all;
-use ieee.std_logic_textio.all;
 
 entity clocked_sram is
 	Generic (

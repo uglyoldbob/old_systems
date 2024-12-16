@@ -6,6 +6,7 @@ entity nes_tang_nano_20k is
    Generic(
         rambits: integer := 3);
    Port (
+		reset: in std_logic := '0';
 		clock: in std_logic;
 		O_sdram_clk: out std_logic;
 		O_sdram_cke: out std_logic;

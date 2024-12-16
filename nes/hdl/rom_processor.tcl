@@ -75,4 +75,4 @@ proc proc_rom { romname romout } {
 	close $fp
 }
 
-proc_rom "../../../test_roms/other/nestest.nes" "nestest"
+proc_rom "./nestest.nes" "nestest"

@@ -1,6 +1,5 @@
 library IEEE;
 use ieee.std_logic_1164.all;
-use ieee.std_logic_misc.all;
 use IEEE.NUMERIC_STD.ALL;
 
 entity resize_kernel3 is

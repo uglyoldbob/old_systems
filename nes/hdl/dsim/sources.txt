@@ -1,0 +1,15 @@
+../gowin_sdram.vhd
+../hdmi.vhd
+../clocked_sram.vhd
+../nes_cartridge.vhd
+../lfsr.vhd
+../nes_ppu.vhd
+../nes_cpu.vhd
+../resize_kernel.vhd
+../frame_sync.vhd
+../nes.vhd
+../src/gowin_sdram_interface.vhd
+../switch_debounce.vhd
+../src/large_divider.vhd
+../nes_tang_nano_20k.vhd
+../nes_tang_nano_20k_tb.vhd
