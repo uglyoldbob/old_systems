@@ -69,7 +69,7 @@ begin
                 else
                     cpu_data_in <= rom_wb_d_miso(7 downto 0);
                 end if;
-                rom_wb_addr <= prg_rom_address(21 downto 1);
+                rom_wb_addr <= "0" & prg_rom_address(21 downto 1);
             else
                 rom_wb_sel <= "1";
                 rom_wb_d_mosi <= cpu_data_out;

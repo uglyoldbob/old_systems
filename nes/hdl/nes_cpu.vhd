@@ -11,16 +11,19 @@ entity clock_divider is
 		c1: out std_logic;
 		c2: out std_logic;
 		c3: out std_logic;
-		c4: out std_logic);
+		c4: out std_logic;
+		c5: out std_logic);
 end clock_divider;
 
 architecture Behavioral of clock_divider is
 	signal counter: std_logic_vector(2 downto 0);
 	signal counter2: std_logic_vector(2 downto 0);
 	signal clocko: std_logic := '0';
+	signal clocko_n: std_logic := '1';
 	signal clocko2: std_logic := '0';
 begin
 	c1 <= clocko;
+	c5 <= clocko_n;
 	c2 <= clocko2;
 	process (reset, clock)
 	begin
@@ -29,6 +32,7 @@ begin
 			counter2 <= "000";
 			c4 <= '0';
 			clocko <= '0';
+			clocko_n <= '1';
 			clocko2 <= '1';
 		elsif rising_edge(clock) then
 			if pause_cpu = '0' then
@@ -38,6 +42,7 @@ begin
 				if counter = "101" then
 					counter <= "000";
 					clocko <= not clocko;
+					clocko_n <= not clocko_n;
 					clocko2 <= not clocko2;
 				end if;
 				if counter2 = "001" then
@@ -90,6 +95,7 @@ architecture Behavioral of nes_cpu is
 	signal cycle_counter: std_logic_vector(14 downto 0);
 
 	signal clocka: std_logic;
+	signal clockb: std_logic;
 	signal clockm: std_logic;
 
 	signal instruction_toggle: std_logic;
@@ -197,8 +203,8 @@ begin
 		clock => clock,
 		c1 => clocka,
 		c3 => clockm,
-		c4 => ppu_clock
-		);
+		c4 => ppu_clock,
+		c5 => clockb);
 
 	memory_clock <= clockm;
 	
@@ -730,7 +736,7 @@ begin
 		end if;
 	end process;
 	
-	process(reset, clockm)
+	process(reset, clockb)
 	begin
 		if reset='1' then
 			pc <= x"FFFC";
@@ -739,7 +745,7 @@ begin
 			reset_active <= '1';
 			subcycle <= "0000";
 			instruction_toggle_pre <= '0';
-		elsif falling_edge(clockm) then
+		elsif rising_edge(clockb) then
 			if reset_active then
 				subcycle <= std_logic_vector(unsigned(subcycle(3 downto 0)) + "0001");
 				pc <= next_pc;

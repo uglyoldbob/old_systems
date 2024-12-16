@@ -119,7 +119,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal rom_wb_d_miso: std_logic_vector(15 downto 0);
 	signal rom_wb_d_mosi: std_logic_vector(15 downto 0);
 	signal rom_wb_err: std_logic;
-	signal rom_wb_addr: std_logic_vector(20 downto 0);
+	signal rom_wb_addr: std_logic_vector(21 downto 0);
 	signal rom_wb_bte: std_logic_vector(1 downto 0);
 	signal rom_wb_cti: std_logic_vector(2 downto 0);
 	signal rom_wb_cyc: std_logic;
@@ -217,6 +217,7 @@ begin
 	
 	nes: entity work.nes generic map(
 		ramtype => "wishbone",
+		rambits => 4,
 		random_noise => '1') port map (
 		ignore_sync => '1',
 		rom_wb_ack => rom_wb_ack,
@@ -259,8 +260,8 @@ begin
 	begin
 		if rising_edge(hdmi_pixel_clock) then
 			if rom_wb_cyc and rom_wb_stb then
-				rom_wb_d_miso(7 downto 0) <= rom(to_integer(unsigned((rom_wb_addr and rom_addr_mask(21 downto 1)) & '0')));
-				rom_wb_d_miso(15 downto 8) <= rom(to_integer(unsigned((rom_wb_addr and rom_addr_mask(21 downto 1)) & '1')));
+				rom_wb_d_miso(7 downto 0) <= rom(to_integer(unsigned((rom_wb_addr and ("0" & rom_addr_mask(21 downto 1))) & '0')));
+				rom_wb_d_miso(15 downto 8) <= rom(to_integer(unsigned((rom_wb_addr and ("0" & rom_addr_mask(21 downto 1))) & '1')));
 			end if;
 		end if;
 	end process;
