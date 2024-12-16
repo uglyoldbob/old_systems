@@ -10,6 +10,8 @@ entity gowin_sdram_interface is
         clock_freq: positive;
         rambits: integer := 3);
     Port (
+		test: out std_logic_vector(1 downto 0);
+		mode_out: out integer range 0 to 15;
         reset: in std_logic;
         clock: in std_logic;
 		O_sdram_clk: out std_logic;
@@ -76,10 +78,11 @@ architecture Behavioral of gowin_sdram_interface is
     constant SDRAM_WRITE_WAIT: integer range 0 to SDRAM_MAX := 5;
     constant SDRAM_READING: integer range 0 to SDRAM_MAX := 6;
     constant SDRAM_READ_WAIT: integer range 0 to SDRAM_MAX := 7;
-    constant SDRAM_REFRESH: integer range 0 to SDRAM_MAX := 8;
-    constant SDRAM_REFRESH_WAIT: integer range 0 to SDRAM_MAX := 9;
-    constant SDRAM_PRECHARGE: integer range 0 to SDRAM_MAX := 10;
-    constant SDRAM_PRECHARGE_WAIT: integer range 0 to SDRAM_MAX := 11;
+	constant SDRAM_READ_WAIT2: integer range 0 to SDRAM_MAX := 8;
+    constant SDRAM_REFRESH: integer range 0 to SDRAM_MAX := 9;
+    constant SDRAM_REFRESH_WAIT: integer range 0 to SDRAM_MAX := 10;
+    constant SDRAM_PRECHARGE: integer range 0 to SDRAM_MAX := 11;
+    constant SDRAM_PRECHARGE_WAIT: integer range 0 to SDRAM_MAX := 12;
     signal sdram_mode: integer range 0 to SDRAM_MAX := SDRAM_UNINIT;
 
     signal sdram_active_bank: std_logic_vector(1 downto 0);
@@ -121,7 +124,6 @@ begin
     I_sdram_clk <= clock;
     I_sdram_selfrefresh <= '0';
     I_sdram_power_down <= '0';
-    I_sdrc_precharge_ctrl <= '0'; --don't do precharge command always after reads and writes
     I_sdrc_data_len <= x"00"; --one byte
 
     process (all)
@@ -185,6 +187,10 @@ begin
                     when SDRAM_IDLE => sdram_mode <= SDRAM_REFRESH;
                     when SDRAM_BANK_ACTIVE => sdram_mode <= SDRAM_PRECHARGE;
                     when SDRAM_REFRESH => sdram_mode <= SDRAM_REFRESH_WAIT;
+					when SDRAM_ACTIVATING =>
+						if O_sdrc_cmd_ack then
+							sdram_mode <= SDRAM_BANK_ACTIVE;
+						end if;
                     when SDRAM_REFRESH_WAIT =>
                         if O_sdrc_cmd_ack then
                             sdram_mode <= SDRAM_IDLE;
@@ -200,32 +206,120 @@ begin
                             sdram_mode <= SDRAM_ACTIVATING;
                             if rambits=3 then
                                 I_sdrc_addr <= "00000000" & wb_addr(22 downto 10);
+								sdram_active_bank <= wb_addr(22 downto 21);
+								sdram_active_row <= wb_addr(20 downto 10);
                             elsif rambits=4 then
                                 I_sdrc_addr <= "00000000" & wb_addr(21 downto 9);
+								sdram_active_bank <= wb_addr(21 downto 20);
+								sdram_active_row <= wb_addr(19 downto 9);
                             end if;
                         end if;
+					when SDRAM_ACTIVATING =>
+						if O_sdrc_cmd_ack then
+							sdram_mode <= SDRAM_BANK_ACTIVE;
+						end if;
+					when SDRAM_BANK_ACTIVE =>
+						if rambits=3 then
+							if sdram_active_bank = wb_addr(22 downto 21) and sdram_active_row = wb_addr(20 downto 10) then
+								sdram_mode <= SDRAM_PRECHARGE;
+							else
+								if wb_we then
+									sdram_mode <= SDRAM_WRITING;
+								else
+									sdram_mode <= SDRAM_READING;
+								end if;
+							end if;
+						elsif rambits=4 then
+							if sdram_active_bank = wb_addr(21 downto 20) and sdram_active_row = wb_addr(19 downto 9) then
+								sdram_mode <= SDRAM_PRECHARGE;
+							else
+								if wb_we then
+									sdram_mode <= SDRAM_WRITING;
+								else
+									sdram_mode <= SDRAM_READING;
+								end if;
+							end if;
+						end if;
                     when others => null;
                 end case;
             end if;
+			case sdram_mode is
+				when SDRAM_PRECHARGE => 
+					sdram_mode <= SDRAM_IDLE;
+				when SDRAM_PRECHARGE_WAIT =>
+					if O_sdrc_cmd_ack then
+						sdram_mode <= SDRAM_IDLE;
+					end if;
+				when SDRAM_READING =>
+					sdram_mode <= SDRAM_READ_WAIT;
+				when SDRAM_READ_WAIT =>
+					if O_sdrc_cmd_ack then
+						sdram_mode <= SDRAM_READ_WAIT2;
+						delay_counter <= timing_cl-1;
+					end if;
+				when SDRAM_READ_WAIT2 =>
+					delay_counter <= delay_counter-1;
+					if delay_counter = 0 then
+						sdram_mode <= SDRAM_IDLE;
+					end if;
+				when SDRAM_WRITING =>
+					if O_sdrc_cmd_ack then
+						sdram_mode <= SDRAM_IDLE;
+					end if;
+				when others => null;
+			end case;
         end if;
     end process;
 
+	test <= wb_ack & O_sdrc_cmd_ack;
+	mode_out <= sdram_mode;
+
     process (all)
     begin
+		case sdram_mode is
+			when SDRAM_IDLE =>
+				wb_ack <= '1';
+			when others =>
+				wb_ack <= '0';
+		end case;
         case sdram_mode is
-            when SDRAM_UNINIT | SDRAM_IDLE => I_sdrc_cmd <= "111"; --nop
-            when SDRAM_REFRESH => I_sdrc_cmd <= "001";
-            when SDRAM_REFRESH_WAIT => I_sdrc_cmd <= "111";
-            when SDRAM_ACTIVATING => I_sdrc_cmd <= "011";
-            when others => I_sdrc_cmd <= "111";
+            when SDRAM_UNINIT | SDRAM_IDLE => 
+				I_sdrc_cmd <= "111"; --nop
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '0';
+			when SDRAM_PRECHARGE =>
+				I_sdrc_cmd <= "010";
+				I_sdrc_precharge_ctrl <= '0';
+				I_sdrc_cmd_en <= '1';
+            when SDRAM_REFRESH => 
+				I_sdrc_cmd <= "001";
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '1';
+            when SDRAM_REFRESH_WAIT => 
+				I_sdrc_cmd <= "111";
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '0';
+            when SDRAM_ACTIVATING => 
+				I_sdrc_cmd <= "011";
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '1';
+			when SDRAM_READING => 
+				I_sdrc_cmd <= "101";
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '1';
+			when SDRAM_WRITING =>
+				I_sdrc_cmd <= "100";
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '1';
+            when others => 
+				I_sdrc_cmd <= "111";
+				I_sdrc_precharge_ctrl <= '1';
+				I_sdrc_cmd_en <= '0';
         end case;
     end process;
 
     --TODO
-    --I_sdrc_addr
     --I_sdrc_cmd_en
-    --I_sdrc_precharge_ctrl
-    --O_sdrc_cmd_ack
 
 	sdram: gowin_sdram port map (
 		O_sdram_clk => O_sdram_clk,

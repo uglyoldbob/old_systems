@@ -22,7 +22,7 @@
         <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_ppu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_tang_nano_20k.vhd" type="file.vhdl" enable="1"/>
-        <File path="nes_tang_nano_20k_tb.vhd" type="file.vhdl" enable="1"/>
+        <File path="nes_tang_nano_20k_tb.vhd" type="file.vhdl" enable="0"/>
         <File path="resize_kernel.vhd" type="file.vhdl" enable="1"/>
         <File path="sram.vhd" type="file.vhdl" enable="0"/>
         <File path="sram_inout.vhd" type="file.vhdl" enable="1"/>
@@ -31,6 +31,7 @@
         <File path="switch_debounce.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_div.vhd" type="file.vhdl" enable="1"/>
         <File path="tmds_pll.vhd" type="file.vhdl" enable="1"/>
+        <File path="uart.vhd" type="file.vhdl" enable="1"/>
         <File path="src/tang_nano_nes.cst" type="file.cst" enable="1"/>
         <File path="src/tang_nano_nes.sdc" type="file.sdc" enable="1"/>
         <File path="run.tcl" type="file.other" enable="1"/>

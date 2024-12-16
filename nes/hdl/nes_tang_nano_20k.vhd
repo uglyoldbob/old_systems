@@ -6,7 +6,6 @@ entity nes_tang_nano_20k is
    Generic(
         rambits: integer := 3);
    Port (
-		reset: in std_logic := '0';
 		clock: in std_logic;
 		O_sdram_clk: out std_logic;
 		O_sdram_cke: out std_logic;
@@ -29,6 +28,8 @@ entity nes_tang_nano_20k is
         sd_d: inout std_logic_vector(3 downto 0);
         sd_ck: out std_logic;
         sd_cmd: out std_logic;
+		uart_tx: out std_logic;
+		uart_rx: in std_logic;
         buttons: in std_logic_vector(1 downto 0);
         test: out std_logic_vector(1 downto 0);
 		test2: out std_logic_vector(1 downto 0);
@@ -113,6 +114,11 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal sdram_wb_stb: std_logic;
 	signal sdram_wb_we: std_logic;
 
+	signal uart_tx_s: std_logic;
+
+	signal sdram_mode: integer range 0 to 15;
+	signal sdram_vector: std_logic_vector(3 downto 0);
+
     component tmds_pll
 		port (
 			clkout: out std_logic;
@@ -172,13 +178,11 @@ architecture Behavioral of nes_tang_nano_20k is
 	end component;
 
 begin
-    leds(5 downto 3) <= not video_mode;
-    leds(2) <= '1';
-    leds(1) <= not pll_lock and not pll_lock2;
-    leds(0) <= not hdmi_hpd;
 
-	test2(0) <= hdmi_fifo_write;
-	test2(1) <= hdmi_fifo_read;
+	sdram_vector <= std_logic_vector(to_unsigned(sdram_mode, 4));
+    leds(3 downto 0) <= not sdram_vector;
+
+	uart_tx <= uart_tx_s;
 
 	tmds <= tmds_2 & tmds_1 & tmds_0;
 	tmds_clk_signal <= tmds_clk_post(0);
@@ -368,7 +372,6 @@ begin
             end case;
 		end if;
 	end process;
-
 	bc: entity work.large_divider generic map(bits => 20) port map(clock => hdmi_pixel_clock, ckout => button_clock);
 
 	btn1: entity work.switch_debounce port map(
@@ -390,6 +393,8 @@ begin
 	ram: entity work.gowin_sdram_interface generic map(
         clock_freq => 74250000,
         rambits => rambits) port map(
+		test => test2,
+		mode_out => sdram_mode,
         reset => nes_reset,
         clock => hdmi_pixel_clock,
 		O_sdram_clk => O_sdram_clk,
@@ -439,5 +444,11 @@ begin
 		fast_clock => hdmi_pixel_clock,
 		clock => nes_clock,
 		hdmi_vsync => hdmi_vstart);
+
+	serial: entity work.uart generic map(
+		FREQ => 74250000) port map(
+		clock => hdmi_pixel_clock,
+		tx => uart_tx_s,
+		rx => uart_rx);
 end Behavioral;
 
