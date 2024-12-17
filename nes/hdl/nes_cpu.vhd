@@ -16,8 +16,8 @@ entity clock_divider is
 end clock_divider;
 
 architecture Behavioral of clock_divider is
-	signal counter: std_logic_vector(2 downto 0);
-	signal counter2: std_logic_vector(2 downto 0);
+	signal counter: integer range 0 to 7 := 0;
+	signal counter2: integer range 0 to 7 := 0;
 	signal clocko: std_logic := '0';
 	signal clocko_n: std_logic := '1';
 	signal clocko2: std_logic := '0';
@@ -25,28 +25,29 @@ begin
 	c1 <= clocko;
 	c5 <= clocko_n;
 	c2 <= clocko2;
+
 	process (reset, clock)
 	begin
-		if reset='1' then
-			counter <= "000";
-			counter2 <= "000";
-			c4 <= '0';
-			clocko <= '0';
-			clocko_n <= '1';
-			clocko2 <= '1';
-		elsif rising_edge(clock) then
-			if pause_cpu = '0' then
+		if rising_edge(clock) then
+			if reset='1' then
+				counter <= 0;
+				counter2 <= 0;
+				c4 <= '0';
+				clocko <= '0';
+				clocko_n <= '1';
+				clocko2 <= '1';
+			elsif pause_cpu = '0' then
 				c3 <= clocko;
-				counter <= std_logic_vector(unsigned(counter) + "001");
-				counter2 <= std_logic_vector(unsigned(counter2) + "001");
-				if counter = "101" then
-					counter <= "000";
+				counter <= counter + 1;
+				counter2 <= counter2 + 1;
+				if counter = 5 then
+					counter <= 0;
 					clocko <= not clocko;
 					clocko_n <= not clocko_n;
 					clocko2 <= not clocko2;
 				end if;
-				if counter2 = "001" then
-					counter2 <= "000";
+				if counter2 = 1 then
+					counter2 <= 0;
 					c4 <= not c4;
 				end if;
 			end if;

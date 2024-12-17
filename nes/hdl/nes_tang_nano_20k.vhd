@@ -279,7 +279,6 @@ begin
 			hstart => hdmi_hstart,
 			vstart => hdmi_vstart,
 			pvalid => hdmi_pvalid,
-			test => test,
 			r => rgb(23 downto 16),
 			g => rgb(15 downto 8),
 			b => rgb(7 downto 0));
@@ -393,7 +392,6 @@ begin
 	ram: entity work.gowin_sdram_interface generic map(
         clock_freq => 74250000,
         rambits => rambits) port map(
-		test => test2,
 		mode_out => sdram_mode,
         reset => nes_reset,
         clock => hdmi_pixel_clock,
@@ -443,6 +441,7 @@ begin
 		cpu_memory_address => nes_address,
 		fast_clock => hdmi_pixel_clock,
 		clock => nes_clock,
+		testo => test2(1),
 		hdmi_vsync => hdmi_vstart);
 
 	serial: entity work.uart generic map(

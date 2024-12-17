@@ -19,6 +19,8 @@ entity nes is
 		hdmi_line_done: out std_logic;
 		hdmi_line_ready: in std_logic;
 
+		testo: out std_logic;
+
 		rom_wb_ack: in std_logic;
 		rom_wb_d_miso: in std_logic_vector(2**rambits-1 downto 0);
 		rom_wb_d_mosi: out std_logic_vector(2**rambits-1 downto 0);
@@ -229,6 +231,8 @@ begin
 	
 	d_memory_clock <= memory_clock;
 	pause <= (cpu_memory_clock and not cpu_din_ready) or (fsync_pause and not ignore_sync);
+
+	testo <= pause;
 
 	process (clock)
 	begin
@@ -707,8 +711,8 @@ begin
 	
 	frame_sync: entity work.frame_sync port map(
 		clock => fast_clock,
-		sync1 => ppu_vsync_sync,
-		sync2 => hdmi_vsync_trigger,
+		vsync1 => ppu_vsync_sync,
+		vsync2 => hdmi_vsync_trigger,
 		hsync1 => hdmi_line_done_sig,
 		hsync2 => hdmi_line_ready,
 		pause => fsync_pause);

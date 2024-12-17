@@ -55,7 +55,7 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 		return results;
 	end function;
 	
-	signal run_benches: std_logic_vector(2 downto 0) := "001";
+	signal run_benches: std_logic_vector(2 downto 0) := "100";
 
 	signal test_signals: NES_TEST_ENTRIES(0 to 8990) := GetNestestResults("nestest.txt", 8991);
 	signal cpu_clock: std_logic := '0';
@@ -219,7 +219,7 @@ begin
 		ramtype => "wishbone",
 		rambits => 4,
 		random_noise => '1') port map (
-		ignore_sync => '1',
+		ignore_sync => '0',
 		rom_wb_ack => rom_wb_ack,
 		rom_wb_d_miso => rom_wb_d_miso,
 		rom_wb_d_mosi => rom_wb_d_mosi,

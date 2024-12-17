@@ -215,6 +215,7 @@ entity hdmi2 is
 		test: out std_logic_vector(1 downto 0);
 		hstart: out std_logic;
 		vstart: out std_logic;
+		ovsync: out std_logic;
 		vblank_out: out std_logic;
 		pvalid: out std_logic;
 		row_out: out std_logic_vector(10 downto 0);
@@ -420,6 +421,7 @@ begin
 		end if;
 	 end process;
 
+	ovsync <= vsync2;
 	control0(0) <= hsync2;
 	control0(1) <= vsync2;
 	control1(0) <= control(0);

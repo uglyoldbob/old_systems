@@ -7,44 +7,55 @@ use IEEE.NUMERIC_STD.ALL;
 entity frame_sync is
 	Port (
 		clock: in std_logic;
-		sync1: in std_logic;
-		sync2: in std_logic;
+		vsync1: in std_logic;
+		vsync2: in std_logic;
 		hsync1: in std_logic;
 		hsync2: in std_logic;
 		pause: out std_logic);
 end frame_sync;
 
 architecture Behavioral of frame_sync is
-	signal mode: std_logic := '1';
+	constant MODE_WAIT_FOR_HDMI_LINE: integer := 0;
+	constant MODE_WAIT_FOR_PPU_LINE: integer := 1;
+
+	signal row_count: integer range 0 to 719 := 0;
+
+	signal mode: integer range 0 to 3 := MODE_WAIT_FOR_HDMI_LINE;
 	signal mode2: std_logic;
 	signal hsync2_count: integer range 0 to 3;
-	signal frame_bit1: std_logic := '0';
-	signal frame_bit2: std_logic := '0';
 begin
-	pause <= mode or mode2;
+	pause <= mode2;
 	process (clock)
 	begin
 		if rising_edge(clock) then
-			if hsync2_count = 3 then
-				mode2 <= '1';
-			else
-				mode2 <= '0';
+			case mode is
+				when MODE_WAIT_FOR_HDMI_LINE =>
+					mode2 <= '1';
+				when others =>
+					mode2 <= '0';
+			end case;
+			if vsync1 then
+				row_count <= 0;
+			elsif hsync1 then
+				row_count <= row_count + 1;
 			end if;
-			if ((frame_bit1 = '1') xor (frame_bit2 = '1')) then
-				mode <= '1';
-			else
-				mode <= '0';
+			if row_count = 239 then
+				mode <= MODE_WAIT_FOR_PPU_LINE;
+				row_count <= 0;
 			end if;
-			if sync1 then
-				frame_bit1 <= not frame_bit1;
-			end if;
-			if sync2 then
-				frame_bit2 <= not frame_bit2;
-			end if;
-			if hsync1 ='1' then
-				hsync2_count <= 3;
-			elsif hsync2 ='1' and hsync2_count > 0 then
-				hsync2_count <= hsync2_count - 1;
+			case mode is
+				when MODE_WAIT_FOR_PPU_LINE =>
+					if hsync1 then
+						mode <= MODE_WAIT_FOR_HDMI_LINE;
+					end if;
+				when MODE_WAIT_FOR_HDMI_LINE =>
+					if vsync2 or hsync2 then
+						mode <= MODE_WAIT_FOR_PPU_LINE;
+					end if;
+				when others => null;
+			end case;
+			if hsync2 ='1' and hsync2_count < 3 then
+				hsync2_count <= hsync2_count + 1;
 			end if;
 		end if;
 	end process;
