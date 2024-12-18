@@ -111,6 +111,7 @@ architecture Behavioral of nes_tripler is
 	signal ppu_vstart_rising: std_logic;
 	signal ppu_subpixel: std_logic_vector(3 downto 0);
 	signal ppu_subpixel_process: std_logic_vector(3 downto 0);
+	signal delayed_ppu_subpixel_process: std_logic_vector(3 downto 0);
 	
 	signal ppu_column_delay: std_logic_vector(8 downto 0);
 	signal ppu_column_change: std_logic;
@@ -191,7 +192,7 @@ begin
 		else
 			ppu_rescale_row <= '0';
 		end if;
-		if ppu_column > std_logic_vector(to_unsigned(1, 9)) and ppu_column < std_logic_vector(to_unsigned(258, 9)) then
+		if ppu_column > std_logic_vector(to_unsigned(0, 9)) and ppu_column < std_logic_vector(to_unsigned(257, 9)) then
 			ppu_rescale_column <= '1';
 		else
 			ppu_rescale_column <= '0';
@@ -244,6 +245,7 @@ begin
 	process (clock)
 	begin
 		if rising_edge(clock) then
+			delayed_ppu_subpixel_process <= ppu_subpixel_process;
 			hdmi_valid_calc2 <= hdmi_valid_calc;
 			hdmi_valid_out <= hdmi_valid_calc2;
 			hdmi_ppu_column <= ppu_column;
