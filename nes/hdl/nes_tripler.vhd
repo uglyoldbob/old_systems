@@ -105,12 +105,10 @@ architecture Behavioral of nes_tripler is
 	signal kernel_out_h: std_logic_vector(23 downto 0);
 	signal kernel_out_i: std_logic_vector(23 downto 0);
 
-	signal ppu_hstart_trigger: std_logic;
-	signal ppu_vstart_trigger: std_logic;
 	signal ppu_pixel_trigger: std_logic;
-	signal ppu_clock_delay: std_logic;
-	signal ppu_hstart_delay: std_logic;
-	signal ppu_vstart_delay: std_logic;
+	signal ppu_clock_rising: std_logic;
+	signal ppu_hstart_rising: std_logic;
+	signal ppu_vstart_rising: std_logic;
 	signal ppu_subpixel: std_logic_vector(3 downto 0);
 	signal ppu_subpixel_process: std_logic_vector(3 downto 0);
 	
@@ -136,8 +134,7 @@ architecture Behavioral of nes_tripler is
 	signal ppu_rescale_out_column2: integer range 0 to 767;
 	signal ppu_rescale_out_column3: integer range 0 to 767;
 	
-	signal hdmi_vsync_delay: std_logic;
-	signal hdmi_vsync_trigger: std_logic;
+	signal hdmi_vsync_rising: std_logic;
 	signal ppu_vsync_sync: std_logic;
 	
 	signal pixel_out: std_logic_vector(23 downto 0);
@@ -154,8 +151,28 @@ architecture Behavioral of nes_tripler is
 	signal reset_chain: std_logic;
 begin
 	hdmi_line_done <= hdmi_line_done_sig;
-	
-	ppu_pixel_trigger <= ppu_clock and not ppu_clock_delay and ppu_pixel_valid;
+
+	ppu_clock_rising_e: entity work.edge_detect port map(
+		clock => clock,
+		sig => ppu_clock,
+		rising => ppu_clock_rising);
+
+	ppu_hstart_rising_e: entity work.edge_detect port map(
+		clock => clock,
+		sig => ppu_hstart,
+		rising => ppu_hstart_rising);
+
+	ppu_vstart_rising_e: entity work.edge_detect port map(
+		clock => clock,
+		sig => ppu_vstart,
+		rising => ppu_vstart_rising);
+
+	hdmi_vsync_rising_e: entity work.edge_detect port map(
+		clock => clock,
+		sig => hdmi_vsync,
+		rising => hdmi_vsync_rising);
+
+	ppu_pixel_trigger <= ppu_clock_rising and ppu_pixel_valid;
 	process (all)
 	begin
 		if ppu_last_column_count = "0010" and ppu_process_column > std_logic_vector(to_unsigned(252, 9)) 
@@ -179,7 +196,7 @@ begin
 		else
 			ppu_rescale_column <= '0';
 		end if;
-		if ppu_process_column /= std_logic_vector(to_unsigned(510, 9)) and ppu_process_column /= std_logic_vector(to_unsigned(255, 9)) then
+		if ppu_process_column /= std_logic_vector(to_unsigned(509, 9)) and ppu_process_column /= std_logic_vector(to_unsigned(255, 9)) then
 			ppu_border(BORDER_LEFT_RIGHT) <= '1';
 		else
 			ppu_border(BORDER_LEFT_RIGHT) <= '0';
@@ -249,23 +266,19 @@ begin
 				hdmi_line_done_sig <= '0';
 			end if;
 			ppu_column_delay <= ppu_column;
-			if ppu_vstart_trigger = '1' then-- and ppu_process_row = std_logic_vector(to_unsigned(3, 9)) then
+			if ppu_vstart_rising = '1' then-- and ppu_process_row = std_logic_vector(to_unsigned(3, 9)) then
 				ppu_vsync_sync <= '1';
 			else
 				ppu_vsync_sync <= '0';
 			end if;
-			ppu_vstart_trigger <= ppu_vstart and not ppu_vstart_delay;
-			ppu_vstart_delay <= ppu_vstart;
-			hdmi_vsync_delay <= hdmi_vsync;
-			hdmi_vsync_trigger <= hdmi_vsync and not hdmi_vsync_delay;
-			if ppu_vstart_trigger then
+			if ppu_vstart_rising then
 				hdmi_column_calc <= 0;
 				hdmi_row_calc <= 0;
 				ppu_first_row_skip <= '0';
 			elsif ppu_row = std_logic_vector(to_unsigned(1, 9)) then
 				ppu_first_row_skip <= '1';
 			end if;
-			if ppu_hstart_trigger then
+			if ppu_hstart_rising then
 				ppu_rescale_out_column1 <= 0;
 				ppu_rescale_out_column2 <= 1;
 				ppu_rescale_out_column3 <= 2;
@@ -273,10 +286,7 @@ begin
 			elsif ppu_subpixel = "1100" then
 				ppu_first_column_skip <= '1';
 			end if;
-			ppu_hstart_trigger <= ppu_hstart and not ppu_hstart_delay;
-			ppu_clock_delay <= ppu_clock;
-			ppu_hstart_delay <= ppu_hstart;
-			if ppu_hstart_trigger = '1' or (ppu_last_row_trigger = '1' and ppu_last_row_count = "0000000000000" and ppu_row = std_logic_vector(to_unsigned(241, 9))) then
+			if ppu_hstart_rising = '1' or (ppu_last_row_trigger = '1' and ppu_last_row_count = "0000000000000" and ppu_row = std_logic_vector(to_unsigned(241, 9))) then
 				case line_counter is
 					when "00" => line_counter <= "01";
 					when "01" => line_counter <= "10";
@@ -284,7 +294,7 @@ begin
 				end case;
 				ppu_process_row <= std_logic_vector(unsigned(ppu_row) - 1);
 			end if;
-			if ppu_hstart_trigger = '1' and 
+			if ppu_hstart_rising = '1' and 
 				(ppu_process_row = std_logic_vector(to_unsigned(237, 9)) or 
 				ppu_process_row = std_logic_vector(to_unsigned(238, 9))) then
 				ppu_last_row_count <= std_logic_vector(to_unsigned(258, 9)) & "0011";
@@ -381,7 +391,7 @@ begin
 				end case;
 			end if;
 			
-			if ppu_rescale_row and ppu_hstart_trigger then
+			if ppu_rescale_row and ppu_hstart_rising then
 				case line_out_counter is
 					when 0 => line_out_counter <= 1;
 					when 1 => line_out_counter <= 2;
@@ -393,6 +403,16 @@ begin
 			end if;
 			
 			case ppu_subpixel_process is
+				when "0000" =>
+					kernel_a <= (others => '0');
+					kernel_b <= (others => '0');
+					kernel_c <= (others => '0');
+					kernel_d <= (others => '0');
+					kernel_e <= (others => '0');
+					kernel_f <= (others => '0');
+					kernel_g <= (others => '0');
+					kernel_h <= (others => '0');
+					kernel_i <= (others => '0');
 				when "0001" =>
 					kernel_a <= kernel_b;
 					kernel_b <= kernel_c;
@@ -424,18 +444,7 @@ begin
 					end if;
 					kernel_g <= kernel_h;
 					kernel_h <= kernel_i;
-					if ppu_border(BORDER_DOWN) and ppu_border(BORDER_LEFT_RIGHT) then
-						case line_counter is
-							when "00" => 
-								kernel_i <= line0_dout;
-							when "01" => 
-								kernel_i <= line1_dout;
-							when others => 
-								kernel_i <= line2_dout;
-						end case;
-					else
-						kernel_i <= (others => '0');
-					end if;
+					kernel_i <= ppu_pixel;
 				when "0010" =>
 				when others =>
 			end case;
@@ -568,7 +577,7 @@ begin
 	frame_sync: entity work.frame_sync port map(
 		clock => clock,
 		vsync1 => ppu_vsync_sync,
-		vsync2 => hdmi_vsync_trigger,
+		vsync2 => hdmi_vsync_rising,
 		hsync1 => hdmi_line_done_sig,
 		hsync2 => hdmi_line_ready,
 		pause => fsync_pause);

@@ -10,6 +10,7 @@
         <File path="clocked_sram.vhd" type="file.vhdl" enable="1"/>
         <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
         <File path="ddr.vhd" type="file.vhdl" enable="1"/>
+        <File path="edge_detect.vhd" type="file.vhdl" enable="1"/>
         <File path="frame_sync.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_ddr.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_nes_pll.vhd" type="file.vhdl" enable="1"/>

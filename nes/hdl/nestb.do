@@ -35,6 +35,7 @@ vcom -2008 -work work {../../nes_cpu.vhd}
 vcom -2008 -work work {../../nes_ppu.vhd}
 vcom -2008 -work work {../../clocked_sram.vhd}
 vcom -2008 -work work {../../nes_cartridge.vhd}
+vcom -2008 -work work {../../edge_detect.vhd}
 vcom -2008 -work work {../../nes_tripler.vhd}
 vcom -2008 -work work {../../nes.vhd}
 vcom -2008 -work work {../../nestb.vhd}
