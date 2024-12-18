@@ -18,9 +18,10 @@ architecture Behavioral of frame_sync is
 	constant MODE_WAIT_FOR_HDMI_LINE: integer := 0;
 	constant MODE_WAIT_FOR_PPU_LINE: integer := 1;
 
-	signal row_count: integer range 0 to 719 := 0;
+	signal row_count: integer range 0 to 241 := 0;
+	signal hdmi_row: integer range 0 to 720 := 0;
 
-	signal mode: integer range 0 to 3 := MODE_WAIT_FOR_HDMI_LINE;
+	signal mode: integer range 0 to 3 := MODE_WAIT_FOR_PPU_LINE;
 	signal mode2: std_logic;
 	signal hsync2_count: integer range 0 to 3;
 begin
@@ -39,7 +40,12 @@ begin
 			elsif hsync1 then
 				row_count <= row_count + 1;
 			end if;
-			if row_count = 239 then
+			if vsync2 then
+				hdmi_row <= 0;
+			elsif hsync2 then
+				hdmi_row <= hdmi_row + 1;
+			end if;
+			if row_count = 241 then
 				mode <= MODE_WAIT_FOR_PPU_LINE;
 				row_count <= 0;
 			end if;

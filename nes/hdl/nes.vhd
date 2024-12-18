@@ -390,8 +390,8 @@ begin
 			else
 				hdmi_valid_calc <= '0';
 			end if;
-			if ppu_row > std_logic_vector(to_unsigned(3, 9)) and
-				ppu_row < std_logic_vector(to_unsigned(243, 9)) and
+			if ppu_row > std_logic_vector(to_unsigned(0, 9)) and
+				ppu_row < std_logic_vector(to_unsigned(241, 9)) and
 				ppu_column = std_logic_vector(to_unsigned(258,9)) and 
 				ppu_subpixel_process = std_logic_vector(to_unsigned(12,4)) then
 				hdmi_line_done_sig <= '1';
@@ -454,7 +454,7 @@ begin
 					when "1010" => ppu_last_row_count(3 downto 0) <= "1011";
 					when "1011" => ppu_last_row_count(3 downto 0) <= "1100";
 					when others => 
-						ppu_last_row_count(3 downto 0) <= "0000";
+						ppu_last_row_count(3 downto 0) <= "0001";
 						ppu_last_row_count(12 downto 4) <= std_logic_vector(unsigned(ppu_last_row_count(12 downto 4)) - 1);
 				end case;
 			end if;
@@ -624,9 +624,15 @@ begin
 				case ppu_subpixel_process is
 					when "0001" =>
 						if ppu_process_column /= std_logic_vector(to_unsigned(0, 9)) then
-							ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
-							ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
-							ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
+							if ppu_rescale_out_column1 < 765 then
+								ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
+								ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
+								ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
+							else
+								ppu_rescale_out_column1 <= 0;
+								ppu_rescale_out_column2 <= 1;
+								ppu_rescale_out_column3 <= 2;
+							end if;
 						end if;
 					when "0010" =>
 					when "0011" =>

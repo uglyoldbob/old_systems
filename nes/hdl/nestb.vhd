@@ -134,11 +134,31 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal random_data: std_logic_vector(31 downto 0);
 	signal rgb: std_logic_vector(23 downto 0);
 	
+	signal clk27: std_logic := '0';
+	signal fast_cpu_clock: std_logic := '0';
+	signal double_fast_cpu_clock: std_logic := '0';
+	signal cpu_clock_counter: integer range 0 to 3 := 0;
+	
 	constant NESTEST_ADDRESS   : integer := 16#3ffc#;
 begin
-	hdmi_pixel_clock <= NOT hdmi_pixel_clock after 20ns;
-	cpu_clock <= not cpu_clock after 60 ns;
-	hdmi_tmds_clock <= not hdmi_tmds_clock after 4 ns;
+	hdmi_pixel_clock <= fast_cpu_clock;
+	hdmi_tmds_clock <= not hdmi_tmds_clock after 1.347 ns;
+	double_fast_cpu_clock <= not double_fast_cpu_clock after 3.367 ns;
+	
+	process (double_fast_cpu_clock)
+	begin
+		if rising_edge(double_fast_cpu_clock) then
+			fast_cpu_clock <= not fast_cpu_clock;
+			cpu_clock_counter <= cpu_clock_counter + 1;
+			if cpu_clock_counter = 2 then
+				cpu_clock_counter <= 0;
+				cpu_clock <= not cpu_clock;
+			end if;
+		end if;
+	end process;
+	
+	
+	clk27 <= not clk27 after 18.519 ns;
 	otherstuff <= cpu_address;
 	cpu_memory_address <= cpu_address;
 	
@@ -252,7 +272,7 @@ begin
 		cpu_memory_address => cpu_address,
 		cs_out => cs_out,
 		whocares => whocares,
-		fast_clock => hdmi_pixel_clock,
+		fast_clock => fast_cpu_clock,
 		clock => cpu_clock
 		);
 		
