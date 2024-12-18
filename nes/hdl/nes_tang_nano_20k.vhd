@@ -40,7 +40,6 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal button_clock: std_logic;
 
 	signal rgb: std_logic_vector(23 downto 0);
-	signal double_hdmi_pixel_clock: std_logic;
     signal hdmi_pixel_clock: std_logic;
 
     signal pll_lock: std_logic;
@@ -230,18 +229,10 @@ begin
         clkout => tmds_clock,
         clkin => clock);
 
-	nes_pll: gowin_nes_pll port map (
-		clkout => double_hdmi_pixel_clock,
-		lock => pll_lock2,
-		clkoutd => nes_clock,
-		clkin => tmds_clock);
-
-	process (double_hdmi_pixel_clock)
-	begin
-		if rising_edge(double_hdmi_pixel_clock) then
-			hdmi_pixel_clock <= not hdmi_pixel_clock;
-		end if;
-	end process;
+	nes_pll: tmds_div port map (
+		clkout => hdmi_pixel_clock,
+		resetn => '1',
+		hclkin => tmds_clock);
 
 	hdmi_fifo: gowin_video_fifo port map (
 		Data => ppu_pixel,
@@ -440,7 +431,7 @@ begin
 		cpu_oe => nes_oe,
 		cpu_memory_address => nes_address,
 		fast_clock => hdmi_pixel_clock,
-		clock => nes_clock,
+		clock => hdmi_pixel_clock,
 		testo => test2(1),
 		hdmi_vsync => hdmi_vstart);
 

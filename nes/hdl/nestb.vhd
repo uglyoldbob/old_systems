@@ -273,7 +273,7 @@ begin
 		cs_out => cs_out,
 		whocares => whocares,
 		fast_clock => fast_cpu_clock,
-		clock => cpu_clock
+		clock => fast_cpu_clock
 		);
 		
 	process (hdmi_pixel_clock)
