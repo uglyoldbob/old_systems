@@ -276,8 +276,8 @@ begin
 			end if;
 			if ppu_row > std_logic_vector(to_unsigned(1, 9)) and
 				ppu_row < std_logic_vector(to_unsigned(242, 9)) and
-				ppu_column = std_logic_vector(to_unsigned(258,9)) and 
-				ppu_subpixel_process = std_logic_vector(to_unsigned(12,4)) then
+				ppu_column = std_logic_vector(to_unsigned(256,9)) and 
+				ppu_subpixel_process = std_logic_vector(to_unsigned(4,4)) then
 				hdmi_line_done_sig <= '1';
 			else
 				hdmi_line_done_sig <= '0';
@@ -365,14 +365,6 @@ begin
 					when "0001" => ppu_subpixel <= "0010";
 					when "0010" => ppu_subpixel <= "0011";
 					when "0011" => ppu_subpixel <= "0100";
-					when "0100" => ppu_subpixel <= "0101";
-					when "0101" => ppu_subpixel <= "0110";
-					when "0110" => ppu_subpixel <= "0111";
-					when "0111" => ppu_subpixel <= "1000";
-					when "1000" => ppu_subpixel <= "1001";
-					when "1001" => ppu_subpixel <= "1010";
-					when "1010" => ppu_subpixel <= "1011";
-					when "1011" => ppu_subpixel <= "1100";
 					when others => ppu_subpixel <= "0000";
 				end case;
 			end if;
@@ -466,7 +458,7 @@ begin
 				when others =>
 			end case;
 			
-			if hdmi_valid_calc = '1' and ppu_subpixel_process > std_logic_vector(to_unsigned(3, 4)) then
+			if hdmi_valid_calc = '1' and delayed_ppu_subpixel_process < std_logic_vector(to_unsigned(4, 4)) then
 				if hdmi_column_calc /= 767 then
 					hdmi_column_calc <= hdmi_column_calc + 1;
 				else
@@ -500,6 +492,9 @@ begin
 				case delayed6_ppu_subpixel_process is
 					when "0001" =>
 					when "0010" =>
+						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 1;
+						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 1;
+						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 1;
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_a;
@@ -523,52 +518,55 @@ begin
 								line_out_5_rw <= '0';
 						end case;
 					when "0011" =>
+						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 1;
+						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 1;
+						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 1;
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_b;
-								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_0_rw <= '0';
 								line_out_1_din <= kernel_out_e;
-								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_1_rw <= '0';
 								line_out_2_din <= kernel_out_h;
-								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_2_rw <= '0';
 							when others =>
 								line_out_3_din <= kernel_out_b;
-								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_3_rw <= '0';
 								line_out_4_din <= kernel_out_e;
-								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_4_rw <= '0';
 								line_out_5_din <= kernel_out_h;
-								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_5_rw <= '0';
 						end case;
 					when "0100" =>
-						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
-						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
-						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
+						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 1;
+						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 1;
+						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 1;
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_c;
-								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_0_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_0_rw <= '0';
 								line_out_1_din <= kernel_out_f;
-								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_1_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_1_rw <= '0';
 								line_out_2_din <= kernel_out_i;
-								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_2_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_2_rw <= '0';
 							when others =>
 								line_out_3_din <= kernel_out_c;
-								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_3_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_3_rw <= '0';
 								line_out_4_din <= kernel_out_f;
-								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_4_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_4_rw <= '0';
 								line_out_5_din <= kernel_out_i;
-								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
+								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_5_rw <= '0';
 						end case;
 					when others =>
