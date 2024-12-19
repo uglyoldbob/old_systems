@@ -240,7 +240,8 @@ begin
 		ppu_rd => ppu_rd,
 		ppu_wr => ppu_wr);
 
-	ppu3: entity work.nes_tripler port map(
+	ppu3: entity work.nes_tripler generic map(
+		sim => sim) port map(
 		hdmi_line_ready => hdmi_line_ready,
 		hdmi_pvalid => hdmi_pvalid,
 		hdmi_column => hdmi_column,

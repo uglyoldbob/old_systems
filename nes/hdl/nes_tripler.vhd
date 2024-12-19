@@ -3,6 +3,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 entity nes_tripler is
+	 Generic (
+		sim: std_logic);
 	 Port (
 		clock: in std_logic;
 		ppu_clock: in std_logic;
@@ -112,6 +114,11 @@ architecture Behavioral of nes_tripler is
 	signal ppu_subpixel: std_logic_vector(3 downto 0);
 	signal ppu_subpixel_process: std_logic_vector(3 downto 0);
 	signal delayed_ppu_subpixel_process: std_logic_vector(3 downto 0);
+	signal delayed2_ppu_subpixel_process: std_logic_vector(3 downto 0);
+	signal delayed3_ppu_subpixel_process: std_logic_vector(3 downto 0);
+	signal delayed4_ppu_subpixel_process: std_logic_vector(3 downto 0);
+	signal delayed5_ppu_subpixel_process: std_logic_vector(3 downto 0);
+	signal delayed6_ppu_subpixel_process: std_logic_vector(3 downto 0);
 	
 	signal ppu_column_delay: std_logic_vector(8 downto 0);
 	signal ppu_column_change: std_logic;
@@ -131,9 +138,9 @@ architecture Behavioral of nes_tripler is
 	signal ppu_rescale_row: std_logic;
 	signal ppu_rescale_column: std_logic;
 	signal ppu_rescale_trigger: std_logic;
-	signal ppu_rescale_out_column1: integer range 0 to 767;
-	signal ppu_rescale_out_column2: integer range 0 to 767;
-	signal ppu_rescale_out_column3: integer range 0 to 767;
+	signal ppu_rescale_out_column1: integer range 0 to 770;
+	signal ppu_rescale_out_column2: integer range 0 to 770;
+	signal ppu_rescale_out_column3: integer range 0 to 770;
 	
 	signal hdmi_vsync_rising: std_logic;
 	signal ppu_vsync_sync: std_logic;
@@ -192,7 +199,7 @@ begin
 		else
 			ppu_rescale_row <= '0';
 		end if;
-		if ppu_column > std_logic_vector(to_unsigned(0, 9)) and ppu_column < std_logic_vector(to_unsigned(258, 9)) then
+		if delayed3_ppu_subpixel_process /= "0000" then
 			ppu_rescale_column <= '1';
 		else
 			ppu_rescale_column <= '0';
@@ -240,26 +247,35 @@ begin
 			when 4 => hdmi_pixel_out <= line_out_4_dout;
 			when others => hdmi_pixel_out <= line_out_5_dout;
 		end case;
+
+		if sim = '1' and hdmi_valid_out = '0' then
+			hdmi_pixel_out <= x"XXXXXX";
+		end if;
 	end process;
 	
 	process (clock)
 	begin
 		if rising_edge(clock) then
 			delayed_ppu_subpixel_process <= ppu_subpixel_process;
+			delayed2_ppu_subpixel_process <= delayed_ppu_subpixel_process;
+			delayed3_ppu_subpixel_process <= delayed2_ppu_subpixel_process;
+			delayed4_ppu_subpixel_process <= delayed3_ppu_subpixel_process;
+			delayed5_ppu_subpixel_process <= delayed4_ppu_subpixel_process;
+			delayed6_ppu_subpixel_process <= delayed5_ppu_subpixel_process;
 			hdmi_valid_calc2 <= hdmi_valid_calc;
 			hdmi_valid_out <= hdmi_valid_calc2;
 			hdmi_ppu_column <= ppu_column;
 			hdmi_output_row <= hdmi_row_calc;
-			if hdmi_ppu_column < std_logic_vector(to_unsigned(256, 9)) and
-				ppu_process_row < std_logic_vector(to_unsigned(240, 9)) and
-				ppu_subpixel_process > std_logic_vector(to_unsigned(2, 4)) and 
-				ppu_subpixel_process < std_logic_vector(to_unsigned(12, 4)) then
+			if hdmi_ppu_column < std_logic_vector(to_unsigned(259, 9)) and
+				ppu_process_row > std_logic_vector(to_unsigned(0, 9)) and
+				ppu_process_row < std_logic_vector(to_unsigned(241, 9)) and
+				delayed3_ppu_subpixel_process > std_logic_vector(to_unsigned(1, 4)) then
 				hdmi_valid_calc <= '1';
 			else
 				hdmi_valid_calc <= '0';
 			end if;
-			if ppu_row > std_logic_vector(to_unsigned(0, 9)) and
-				ppu_row < std_logic_vector(to_unsigned(241, 9)) and
+			if ppu_row > std_logic_vector(to_unsigned(1, 9)) and
+				ppu_row < std_logic_vector(to_unsigned(242, 9)) and
 				ppu_column = std_logic_vector(to_unsigned(258,9)) and 
 				ppu_subpixel_process = std_logic_vector(to_unsigned(12,4)) then
 				hdmi_line_done_sig <= '1';
@@ -463,7 +479,7 @@ begin
 				end if;
 			end if;
 
-			if ppu_subpixel_process > std_logic_vector(to_unsigned(1, 4)) then
+			if delayed6_ppu_subpixel_process > std_logic_vector(to_unsigned(1, 4)) then
 				case hdmi_row_calc is
 					when 0 => line_out_0_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
 					when 1 => line_out_1_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
@@ -481,11 +497,8 @@ begin
 				line_out_3_rw <= '1';
 				line_out_4_rw <= '1';
 				line_out_5_rw <= '1';
-				case delayed_ppu_subpixel_process is
+				case delayed6_ppu_subpixel_process is
 					when "0001" =>
-						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
-						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
-						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
 					when "0010" =>
 						case line_out_counter is
 							when 1 | 3 | 5 =>
@@ -533,6 +546,9 @@ begin
 								line_out_5_rw <= '0';
 						end case;
 					when "0100" =>
+						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
+						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
+						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_c;
