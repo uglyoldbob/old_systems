@@ -192,7 +192,7 @@ begin
 		else
 			ppu_rescale_row <= '0';
 		end if;
-		if ppu_column > std_logic_vector(to_unsigned(0, 9)) and ppu_column < std_logic_vector(to_unsigned(257, 9)) then
+		if ppu_column > std_logic_vector(to_unsigned(0, 9)) and ppu_column < std_logic_vector(to_unsigned(258, 9)) then
 			ppu_rescale_column <= '1';
 		else
 			ppu_rescale_column <= '0';
@@ -251,7 +251,6 @@ begin
 			hdmi_ppu_column <= ppu_column;
 			hdmi_output_row <= hdmi_row_calc;
 			if hdmi_ppu_column < std_logic_vector(to_unsigned(256, 9)) and
-				ppu_process_row > std_logic_vector(to_unsigned(0, 9)) and 
 				ppu_process_row < std_logic_vector(to_unsigned(240, 9)) and
 				ppu_subpixel_process > std_logic_vector(to_unsigned(2, 4)) and 
 				ppu_subpixel_process < std_logic_vector(to_unsigned(12, 4)) then
@@ -482,21 +481,12 @@ begin
 				line_out_3_rw <= '1';
 				line_out_4_rw <= '1';
 				line_out_5_rw <= '1';
-				case ppu_subpixel_process is
+				case delayed_ppu_subpixel_process is
 					when "0001" =>
-						if ppu_process_column /= std_logic_vector(to_unsigned(0, 9)) then
-							if ppu_rescale_out_column1 < 765 then
-								ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
-								ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
-								ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
-							else
-								ppu_rescale_out_column1 <= 0;
-								ppu_rescale_out_column2 <= 1;
-								ppu_rescale_out_column3 <= 2;
-							end if;
-						end if;
+						ppu_rescale_out_column1 <= ppu_rescale_out_column1 + 3;
+						ppu_rescale_out_column2 <= ppu_rescale_out_column2 + 3;
+						ppu_rescale_out_column3 <= ppu_rescale_out_column3 + 3;
 					when "0010" =>
-					when "0011" =>
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_a;
@@ -519,7 +509,7 @@ begin
 								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column1, 10));
 								line_out_5_rw <= '0';
 						end case;
-					when "0100" =>
+					when "0011" =>
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_b;
@@ -542,7 +532,7 @@ begin
 								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column2, 10));
 								line_out_5_rw <= '0';
 						end case;
-					when "0101" =>
+					when "0100" =>
 						case line_out_counter is
 							when 1 | 3 | 5 =>
 								line_out_0_din <= kernel_out_c;
@@ -565,11 +555,6 @@ begin
 								line_out_5_address <= std_logic_vector(to_unsigned(ppu_rescale_out_column3, 10));
 								line_out_5_rw <= '0';
 						end case;
-					when "0110" =>
-					when "0111" =>
-					when "1000" =>
-					when "1001" =>
-					when "1010" =>
 					when others =>
 				end case;
 			end if;
