@@ -55,7 +55,8 @@ begin
 						mode <= MODE_WAIT_FOR_HDMI_LINE;
 					end if;
 				when MODE_WAIT_FOR_HDMI_LINE =>
-					if vsync2 or hsync2 then
+					if vsync2 = '1' or hsync2_count = 3 then
+						hsync2_count <= 0;
 						mode <= MODE_WAIT_FOR_PPU_LINE;
 					end if;
 				when others => null;
