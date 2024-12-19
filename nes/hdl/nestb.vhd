@@ -236,6 +236,7 @@ begin
 	end process;
 	
 	nes: entity work.nes generic map(
+		sim => '1',
 		ramtype => "wishbone",
 		rambits => 4,
 		random_noise => '1') port map (
@@ -272,7 +273,6 @@ begin
 		cpu_memory_address => cpu_address,
 		cs_out => cs_out,
 		whocares => whocares,
-		fast_clock => fast_cpu_clock,
 		clock => fast_cpu_clock
 		);
 		

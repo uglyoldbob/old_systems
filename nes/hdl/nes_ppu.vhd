@@ -4,6 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes_ppu is
 	Generic (
+		sim: in std_logic;
 		random_noise: in std_logic := '1';
 		ramtype: string := "sram");
    Port (r_out: out std_logic_vector(7 downto 0);
@@ -474,6 +475,12 @@ begin
 		r_out <= palette_r(to_integer(unsigned(pixel)));
 		g_out <= palette_g(to_integer(unsigned(pixel)));
 		b_out <= palette_b(to_integer(unsigned(pixel)));
+
+		if sim = '1' and pixel_valid = '0' then
+			r_out <= x"XX";
+			g_out <= x"XX";
+			b_out <= x"XX";
+		end if;
 		
 		if vram_address(15 downto 8) = x"3f" then
 			if not regs(1)(REG1_DRAW_BACKGROUND) and not regs(1)(REG1_DRAW_SPRITES) then

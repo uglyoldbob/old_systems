@@ -84,3 +84,9 @@ nes/hdl/incremental_db/*
 nes/hdl/output_files/*
 nes/hdl/impl/*
 nes/hdl/*.user
+
+nes/hdl/dsim/*.env
+nes/hdl/dsim/*.log
+nes/hdl/dsim/dsim_work/*
+nes/hdl/rtl_work/*
+nes/hdl/transcript

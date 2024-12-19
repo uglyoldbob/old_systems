@@ -4,6 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes is
 	Generic (
+		sim: in std_logic := '0';
 		ramtype: string := "wishbone";
         rambits: integer := 3;
 		random_noise: in std_logic := '1';
@@ -44,8 +45,7 @@ entity nes is
 		d_cycle: out std_logic_vector(14 downto 0);
 		instruction_toggle_out: out std_logic;
 		reset: in std_logic;
-	   fast_clock: in std_logic;
-		clock: in std_logic; --fast_clock divided by 3
+		clock: in std_logic;
 		cpu_oe: out std_logic_vector(1 downto 0);
 		cpu_memory_address: out std_logic_vector(15 downto 0);
 	   whocares: out std_logic;
@@ -54,86 +54,6 @@ entity nes is
 end nes;
 
 architecture Behavioral of nes is
-
-	signal line0_address: std_logic_vector(7 downto 0);
-	signal line0_rw: std_logic;
-	signal line0_dout: std_logic_vector(23 downto 0);
-	signal line0_dout_valid: std_logic;
-	signal line0_din: std_logic_vector(23 downto 0);
-	
-	signal line1_address: std_logic_vector(7 downto 0);
-	signal line1_rw: std_logic;
-	signal line1_dout: std_logic_vector(23 downto 0);
-	signal line1_dout_valid: std_logic;
-	signal line1_din: std_logic_vector(23 downto 0);
-	
-	signal line2_address: std_logic_vector(7 downto 0);
-	signal line2_rw: std_logic;
-	signal line2_dout: std_logic_vector(23 downto 0);
-	signal line2_dout_valid: std_logic;
-	signal line2_din: std_logic_vector(23 downto 0);
-	
-	signal line_counter: std_logic_vector(1 downto 0) := (others => '0');
-	
-	signal line_out_0_address: std_logic_vector(9 downto 0);
-	signal line_out_0_rw: std_logic;
-	signal line_out_0_dout: std_logic_vector(23 downto 0);
-	signal line_out_0_dout_valid: std_logic;
-	signal line_out_0_din: std_logic_vector(23 downto 0);
-
-	signal line_out_1_address: std_logic_vector(9 downto 0);
-	signal line_out_1_rw: std_logic;
-	signal line_out_1_dout: std_logic_vector(23 downto 0);
-	signal line_out_1_dout_valid: std_logic;
-	signal line_out_1_din: std_logic_vector(23 downto 0);
-
-	signal line_out_2_address: std_logic_vector(9 downto 0);
-	signal line_out_2_rw: std_logic;
-	signal line_out_2_dout: std_logic_vector(23 downto 0);
-	signal line_out_2_dout_valid: std_logic;
-	signal line_out_2_din: std_logic_vector(23 downto 0);
-
-	signal line_out_3_address: std_logic_vector(9 downto 0);
-	signal line_out_3_rw: std_logic;
-	signal line_out_3_dout: std_logic_vector(23 downto 0);
-	signal line_out_3_dout_valid: std_logic;
-	signal line_out_3_din: std_logic_vector(23 downto 0);
-
-	signal line_out_4_address: std_logic_vector(9 downto 0);
-	signal line_out_4_rw: std_logic;
-	signal line_out_4_dout: std_logic_vector(23 downto 0);
-	signal line_out_4_dout_valid: std_logic;
-	signal line_out_4_din: std_logic_vector(23 downto 0);
-	
-	signal line_out_5_address: std_logic_vector(9 downto 0);
-	signal line_out_5_rw: std_logic;
-	signal line_out_5_dout: std_logic_vector(23 downto 0);
-	signal line_out_5_dout_valid: std_logic;
-	signal line_out_5_din: std_logic_vector(23 downto 0);
-
-	signal line_out_counter: integer range 0 to 5 := 0;
-
-	
-	signal kernel_a: std_logic_vector(23 downto 0);
-	signal kernel_b: std_logic_vector(23 downto 0);
-	signal kernel_c: std_logic_vector(23 downto 0);
-	signal kernel_d: std_logic_vector(23 downto 0);
-	signal kernel_e: std_logic_vector(23 downto 0);
-	signal kernel_f: std_logic_vector(23 downto 0);
-	signal kernel_g: std_logic_vector(23 downto 0);
-	signal kernel_h: std_logic_vector(23 downto 0);
-	signal kernel_i: std_logic_vector(23 downto 0);
-	
-	signal kernel_out_a: std_logic_vector(23 downto 0);
-	signal kernel_out_b: std_logic_vector(23 downto 0);
-	signal kernel_out_c: std_logic_vector(23 downto 0);
-	signal kernel_out_d: std_logic_vector(23 downto 0);
-	signal kernel_out_e: std_logic_vector(23 downto 0);
-	signal kernel_out_f: std_logic_vector(23 downto 0);
-	signal kernel_out_g: std_logic_vector(23 downto 0);
-	signal kernel_out_h: std_logic_vector(23 downto 0);
-	signal kernel_out_i: std_logic_vector(23 downto 0);
-
 	signal cpu_address: std_logic_vector(15 downto 0);
 	signal cpu_dout: std_logic_vector(7 downto 0);
 	signal cpu_din: std_logic_vector(7 downto 0);
@@ -161,41 +81,11 @@ architecture Behavioral of nes is
 	signal ppu_wr: std_logic;
 	signal ppu_clock: std_logic;
 	
-	signal ppu_hstart_trigger: std_logic;
-	signal ppu_vstart_trigger: std_logic;
-	signal ppu_pixel_trigger: std_logic;
-	signal ppu_clock_delay: std_logic;
 	signal ppu_pixel_valid: std_logic;
 	signal ppu_hstart: std_logic;
 	signal ppu_vstart: std_logic;
-	signal ppu_hstart_delay: std_logic;
-	signal ppu_vstart_delay: std_logic;
 	signal ppu_row: std_logic_vector(8 downto 0);
 	signal ppu_column: std_logic_vector(8 downto 0);
-	signal ppu_subpixel: std_logic_vector(3 downto 0);
-	signal ppu_subpixel_process: std_logic_vector(3 downto 0);
-	
-	signal ppu_column_delay: std_logic_vector(8 downto 0);
-	signal ppu_column_change: std_logic;
-	signal ppu_last_column_trigger: std_logic;
-	signal ppu_last_column_count: std_logic_vector(3 downto 0) := (others => '0');
-	signal ppu_last_row_trigger: std_logic;
-	signal ppu_last_row_count: std_logic_vector(12 downto 0) := (others => '0');
-	signal ppu_process_column: std_logic_vector(8 downto 0) := (others => '0');
-	signal ppu_process_row: std_logic_vector(8 downto 0) := (others => '0');
-	signal ppu_last_row_pixel_trigger: std_logic;
-	signal ppu_first_row_skip: std_logic := '0';
-	signal ppu_first_column_skip: std_logic := '0';
-	signal ppu_border: std_logic_vector(2 downto 0);
-	constant BORDER_LEFT_RIGHT: integer := 0;
-	constant BORDER_UP: integer := 1;
-	constant BORDER_DOWN: integer := 2;
-	signal ppu_rescale_row: std_logic;
-	signal ppu_rescale_column: std_logic;
-	signal ppu_rescale_trigger: std_logic;
-	signal ppu_rescale_out_column1: integer range 0 to 767;
-	signal ppu_rescale_out_column2: integer range 0 to 767;
-	signal ppu_rescale_out_column3: integer range 0 to 767;
 	
 	signal cpu_apu_cs: std_logic;
 	
@@ -323,6 +213,7 @@ begin
 		address => cpu_address);
 	
 	ppu: entity work.nes_ppu generic map(
+		sim => sim,
 		random_noise => random_noise,
 		ramtype => ramtype) port map (
 		r_out => ppu_pixel(23 downto 16),
@@ -396,8 +287,7 @@ begin
 		cpu_rw => cpu_rw,
 		romsel => cpu_address(15),
 		m2 => memory_clock,
-		clock => clock,
-		fast_clock => fast_clock);
+		clock => clock);
 
 end Behavioral;
 

@@ -430,7 +430,6 @@ begin
 		reset => nes_reset,
 		cpu_oe => nes_oe,
 		cpu_memory_address => nes_address,
-		fast_clock => hdmi_pixel_clock,
 		clock => hdmi_pixel_clock,
 		testo => test2(1),
 		hdmi_vsync => hdmi_vstart);

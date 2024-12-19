@@ -36,8 +36,7 @@ entity nes_cartridge is
 		cpu_addr: in std_logic_vector(15 downto 0);
 		cpu_memory_start: in std_logic;
 		m2: in std_logic;
-		clock: in std_logic;
-		fast_clock: in std_logic);
+		clock: in std_logic);
 end nes_cartridge;
 
 architecture Behavioral of nes_cartridge is
@@ -117,9 +116,9 @@ begin
 		end case;
 	end process;
 	
-	process (fast_clock)
+	process (clock)
 	begin
-		if rising_edge(fast_clock) then
+		if rising_edge(clock) then
 			case rom_wb_mode is
 				when 0 =>
 					if cpu_memory_start and prg_rom_cs then
