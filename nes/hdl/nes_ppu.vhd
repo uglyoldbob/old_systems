@@ -487,7 +487,7 @@ begin
 				b_out <= column(7 downto 0);
 			elsif random_noise then
 				if frame_odd then
-					if row(0) then
+					if row(1) then
 						b_out <= x"ff";
 					end if;
 				else

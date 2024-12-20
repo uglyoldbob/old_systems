@@ -353,9 +353,9 @@ begin
 				end case;
 				ppu_process_row <= std_logic_vector(unsigned(ppu_row) - 1);
 			end if;
-			if ppu_hstart_rising = '1' and 
-				(ppu_process_row = std_logic_vector(to_unsigned(237, 9)) or 
-				ppu_process_row = std_logic_vector(to_unsigned(238, 9))) then
+			if ppu_last_column_trigger = '1' and 
+				(ppu_process_row = std_logic_vector(to_unsigned(238, 9)) or 
+				ppu_process_row = std_logic_vector(to_unsigned(239, 9))) then
 				ppu_last_row_count <= std_logic_vector(to_unsigned(258, 9)) & "0011";
 			end if;
 			if ppu_last_row_count(12 downto 4) /= "000000000" then
