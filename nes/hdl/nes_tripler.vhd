@@ -164,6 +164,10 @@ architecture Behavioral of nes_tripler is
 	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
+
+	signal fsync_pause_basic: std_logic;
+	signal fsync_pause_advanced: std_logic := '0';
+	signal hdmi_state: integer range 0 to 3 := 0;
 begin
 	hdmi_line_done <= hdmi_line_done_sig;
 	hdmi_valid_out <= hdmi_valid_calc2;
@@ -204,6 +208,16 @@ begin
 
 	process (all)
 	begin
+		if hdmi_state = 2 then
+			fsync_pause_advanced <= '1';
+		else
+			fsync_pause_advanced <= '0';
+		end if;
+		if fsync_pause_basic or fsync_pause_advanced then
+			fsync_pause <= '1';
+		else
+			fsync_pause <= '0';
+		end if;
 		if ppu_subpixel = "0100" and
 			ppu_process_column = std_logic_vector(to_unsigned(256, 9)) then
 			ppu_last_column_trigger <= '1';
@@ -277,6 +291,22 @@ begin
 	process (clock)
 	begin
 		if rising_edge(clock) then
+			case hdmi_state is
+				when 0 =>
+					if hdmi_valid_calc2 then
+						hdmi_state <= 1;
+					end if;
+				when 1 =>
+					if not ppu_rescale_column then
+						hdmi_state <= 2;
+					end if;
+				when 2 =>
+					if not hdmi_valid_calc2 then
+						hdmi_state <= 0;
+					end if;
+				when others => null;
+			end case;
+
 			if ppu_column = std_logic_vector(to_unsigned(0, 9)) and
 				ppu_row >= std_logic_vector(to_unsigned(2, 9)) and 
 				ppu_row < std_logic_vector(to_unsigned(258, 9)) then
@@ -477,7 +507,11 @@ begin
 				elsif hdmi_column_calc /= 768 then
 					hdmi_column_calc <= 0;
 					hdmi_three_lines_counter <= hdmi_three_lines_counter + 1;
-					hdmi_row_calc <= hdmi_row_calc + 1;
+					if hdmi_row_calc < 719 then
+						hdmi_row_calc <= hdmi_row_calc + 1;
+					else
+						hdmi_row_calc <= 0;
+					end if;
 					if hdmi_three_lines_counter = 2 then
 						hdmi_column_calc <= 768;
 					end if;
@@ -598,7 +632,7 @@ begin
 		vsync2 => hdmi_vsync_rising,
 		hsync1 => hdmi_line_done_rising,
 		hsync2 => hdmi_line_ready,
-		pause => fsync_pause);
+		pause => fsync_pause_basic);
 	
 	rescale_kernel: entity work.resize_kernel3 port map(
 		din_a => kernel_a, din_b => kernel_b, din_c => kernel_c,
