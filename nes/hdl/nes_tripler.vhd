@@ -122,6 +122,8 @@ architecture Behavioral of nes_tripler is
 	signal delayed6_ppu_subpixel_process: std_logic_vector(3 downto 0);
 	
 	signal ppu_column_delay: std_logic_vector(8 downto 0);
+	signal ppu_column_delay2: std_logic_vector(8 downto 0);
+	signal ppu_column_delay3: std_logic_vector(8 downto 0);
 	signal ppu_column_change: std_logic;
 	signal ppu_last_column_trigger: std_logic;
 	signal ppu_last_column_count: std_logic_vector(3 downto 0) := (others => '0');
@@ -153,6 +155,7 @@ architecture Behavioral of nes_tripler is
 	signal hdmi_line_done_sig: std_logic;
 	signal hdmi_line_done_rising: std_logic;
 	signal hdmi_ppu_column: std_logic_vector(8 downto 0);
+	signal hdmi_output_row_pre: integer range 0 to 5;
 	signal hdmi_output_row: integer range 0 to 5;
 	
 	signal reset_sync: std_logic;
@@ -212,7 +215,7 @@ begin
 		else
 			ppu_rescale_column <= '0';
 		end if;
-		if ppu_process_column /= std_logic_vector(to_unsigned(509, 9)) and ppu_process_column /= std_logic_vector(to_unsigned(255, 9)) then
+		if ppu_column_delay3 /= std_logic_vector(to_unsigned(509, 9)) and ppu_column_delay3 /= std_logic_vector(to_unsigned(255, 9)) then
 			ppu_border(BORDER_LEFT_RIGHT) <= '1';
 		else
 			ppu_border(BORDER_LEFT_RIGHT) <= '0';
@@ -248,12 +251,12 @@ begin
 			ppu_last_row_pixel_trigger <= '0';
 		end if;
 		case hdmi_output_row is
-			when 0 => hdmi_pixel_out <= line_out_0_dout;
-			when 1 => hdmi_pixel_out <= line_out_1_dout;
-			when 2 => hdmi_pixel_out <= line_out_2_dout;
-			when 3 => hdmi_pixel_out <= line_out_3_dout;
-			when 4 => hdmi_pixel_out <= line_out_4_dout;
-			when others => hdmi_pixel_out <= line_out_5_dout;
+			when 0 => hdmi_pixel_out <= line_out_1_dout;
+			when 1 => hdmi_pixel_out <= line_out_2_dout;
+			when 2 => hdmi_pixel_out <= line_out_3_dout;
+			when 3 => hdmi_pixel_out <= line_out_4_dout;
+			when 4 => hdmi_pixel_out <= line_out_5_dout;
+			when others => hdmi_pixel_out <= line_out_0_dout;
 		end case;
 
 		if sim = '1' and hdmi_valid_out = '0' then
@@ -273,7 +276,8 @@ begin
 			hdmi_valid_calc2 <= hdmi_valid_calc;
 			hdmi_valid_out <= hdmi_valid_calc2;
 			hdmi_ppu_column <= ppu_column;
-			hdmi_output_row <= hdmi_row_calc;
+			hdmi_output_row_pre <= hdmi_row_calc;
+			hdmi_output_row <= hdmi_output_row_pre;
 			if hdmi_ppu_column < std_logic_vector(to_unsigned(259, 9)) and
 				ppu_process_row > std_logic_vector(to_unsigned(0, 9)) and
 				ppu_process_row < std_logic_vector(to_unsigned(241, 9)) and
@@ -290,6 +294,8 @@ begin
 				hdmi_line_done_sig <= '0';
 			end if;
 			ppu_column_delay <= ppu_column;
+			ppu_column_delay2 <= ppu_column_delay;
+			ppu_column_delay3 <= ppu_column_delay2;
 			if ppu_vstart_rising = '1' then-- and ppu_process_row = std_logic_vector(to_unsigned(3, 9)) then
 				ppu_vsync_sync <= '1';
 			else
@@ -442,7 +448,11 @@ begin
 					end if;
 					kernel_g <= kernel_h;
 					kernel_h <= kernel_i;
-					kernel_i <= ppu_pixel;
+					if ppu_border(BORDER_LEFT_RIGHT) then
+						kernel_i <= ppu_pixel;
+					else
+						kernel_i <= (others => '0');
+					end if;
 				when "0010" =>
 				when others =>
 			end case;
@@ -460,14 +470,14 @@ begin
 				end if;
 			end if;
 
-			if delayed6_ppu_subpixel_process > std_logic_vector(to_unsigned(1, 4)) then
-				case hdmi_row_calc is
-					when 0 => line_out_0_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
-					when 1 => line_out_1_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
-					when 2 => line_out_2_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
-					when 3 => line_out_3_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
-					when 4 => line_out_4_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
-					when others => line_out_5_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+			if delayed5_ppu_subpixel_process > std_logic_vector(to_unsigned(0, 4)) then
+				case hdmi_output_row is
+					when 0 => line_out_1_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+					when 1 => line_out_2_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+					when 2 => line_out_3_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+					when 3 => line_out_4_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+					when 4 => line_out_5_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
+					when others => line_out_0_address <= std_logic_vector(to_unsigned(hdmi_column_calc, 10));
 				end case;
 			end if;
 
