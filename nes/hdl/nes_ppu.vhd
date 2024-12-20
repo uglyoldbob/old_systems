@@ -481,6 +481,19 @@ begin
 			g_out <= x"XX";
 			b_out <= x"XX";
 		end if;
+		if pixel_valid = '1' then
+			if sim then
+				g_out <= row(7 downto 0);
+				b_out <= column(7 downto 0);
+			elsif random_noise then
+				if row(0) then
+					b_out <= x"ff";
+				end if;
+				if column(0) then
+					g_out <= x"ff";
+				end if;
+			end if;
+		end if;
 		
 		if vram_address(15 downto 8) = x"3f" then
 			if not regs(1)(REG1_DRAW_BACKGROUND) and not regs(1)(REG1_DRAW_SPRITES) then
