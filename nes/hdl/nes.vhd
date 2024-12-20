@@ -243,9 +243,6 @@ begin
 	ppu3: entity work.nes_tripler generic map(
 		sim => sim) port map(
 		hdmi_line_ready => hdmi_line_ready,
-		hdmi_pvalid => hdmi_pvalid,
-		hdmi_column => hdmi_column,
-		hdmi_row => hdmi_row,
 		hdmi_vsync => hdmi_vsync,
 		hdmi_pixel_out => hdmi_pixel_out,
 		hdmi_valid_out => hdmi_valid_out,

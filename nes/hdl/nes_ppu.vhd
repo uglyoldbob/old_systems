@@ -486,11 +486,14 @@ begin
 				g_out <= row(7 downto 0);
 				b_out <= column(7 downto 0);
 			elsif random_noise then
-				if row(0) then
-					b_out <= x"ff";
-				end if;
-				if column(0) then
-					g_out <= x"ff";
+				if frame_odd then
+					if row(0) then
+						b_out <= x"ff";
+					end if;
+				else
+					if column(0) then
+						g_out <= x"ff";
+					end if;
 				end if;
 			end if;
 		end if;

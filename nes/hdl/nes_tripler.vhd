@@ -18,10 +18,7 @@ entity nes_tripler is
 		ppu_column: in std_logic_vector(8 downto 0);
 		hdmi_pixel_out: out std_logic_vector(23 downto 0);
 		hdmi_vsync: in std_logic;
-		hdmi_row: in std_logic_vector(10 downto 0);
-		hdmi_column: in std_logic_vector(11 downto 0);
 		hdmi_valid_out: out std_logic;
-		hdmi_pvalid: in std_logic;
 		hdmi_line_done: out std_logic;
 		hdmi_line_ready: in std_logic);
 end nes_tripler;
@@ -152,7 +149,6 @@ architecture Behavioral of nes_tripler is
 	signal hdmi_valid_calc2: std_logic;
 	signal hdmi_column_calc: integer range 0 to 768 := 768;
 	signal hdmi_row_calc: integer range 0 to 720 := 0;
-	signal hdmi_line_done_sig: std_logic;
 	signal hdmi_line_done_rising: std_logic;
 	signal hdmi_output_row_pre: integer range 0 to 5;
 	signal hdmi_output_row: integer range 0 to 5;
@@ -169,18 +165,18 @@ architecture Behavioral of nes_tripler is
 	signal fsync_pause_advanced: std_logic := '0';
 	signal hdmi_state: integer range 0 to 3 := 0;
 begin
-	hdmi_line_done <= hdmi_line_done_sig;
 	hdmi_valid_out <= hdmi_valid_calc2;
+
+	hdmi_trigger: entity work.edge_detect port map(
+		clock => clock,
+		sig => hdmi_valid_calc,
+		rising => hdmi_line_done_rising,
+		falling => hdmi_line_done);
 
 	hdmi_rising: entity work.edge_detect port map(
 		clock => clock,
 		sig => hdmi_start_output,
 		rising => hdmi_start_output_rising);
-
-	line_done_e: entity work.edge_detect port map(
-		clock => clock,
-		sig => hdmi_line_done_sig,
-		rising => hdmi_line_done_rising);
 
 	ppu_clock_rising_e: entity work.edge_detect port map(
 		clock => clock,
@@ -309,7 +305,7 @@ begin
 
 			if ppu_column = std_logic_vector(to_unsigned(0, 9)) and
 				ppu_row >= std_logic_vector(to_unsigned(2, 9)) and 
-				ppu_row < std_logic_vector(to_unsigned(258, 9)) then
+				ppu_row < std_logic_vector(to_unsigned(242, 9)) then
 				hdmi_start_output <= '1';
 			else
 				hdmi_start_output <= '0';
@@ -329,13 +325,6 @@ begin
 				hdmi_valid_calc <= '1';
 			else
 				hdmi_valid_calc <= '0';
-			end if;
-			if hdmi_valid_out = '1' and
-				delayed5_ppu_subpixel_process = "0011" and
-				ppu_column = std_logic_vector(to_unsigned(257,9)) then
-				hdmi_line_done_sig <= '1';
-			else
-				hdmi_line_done_sig <= '0';
 			end if;
 			ppu_column_delay <= ppu_column;
 			ppu_column_delay2 <= ppu_column_delay;
