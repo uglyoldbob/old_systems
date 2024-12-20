@@ -367,6 +367,8 @@ begin
 		end if;
 		
 		if run_benches(2) then
+			wait for 90us;
+			report "Pause for examination" severity failure;
 			wait for 160000000ns;
 			report "Just checking" severity failure;
 		end if;
