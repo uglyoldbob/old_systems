@@ -37,6 +37,13 @@ entity nes_tang_nano_20k is
 end nes_tang_nano_20k;
 
 architecture Behavioral of nes_tang_nano_20k is
+    --1280x720, 160 x 90
+    --256 x 128 - 8, 7 bits, 15 bits total
+    type TEXT_FRAME is array (2**15-1 downto 0) of std_logic_vector (6 downto 0);
+    signal text_buffer: TEXT_FRAME := (others => (others => '0'));
+    signal text_index: std_logic_vector(14 downto 0);
+    signal text_entry: std_logic_vector(6 downto 0);
+
 	signal button_clock: std_logic;
 
 	signal rgb: std_logic_vector(23 downto 0);
@@ -99,7 +106,7 @@ architecture Behavioral of nes_tang_nano_20k is
 	signal hdmi_fifo_read: std_logic;
 	signal hdmi_pixel: std_logic_vector(23 downto 0);
 
-    signal video_mode: std_logic_vector(2 downto 0):= (others => '0');
+    signal video_mode: std_logic_vector(3 downto 0):= (others => '0');
 
 	signal sdram_wb_ack: std_logic;
 	signal sdram_wb_d_miso: std_logic_vector(7 downto 0);
@@ -117,6 +124,10 @@ architecture Behavioral of nes_tang_nano_20k is
 
 	signal sdram_mode: integer range 0 to 15;
 	signal sdram_vector: std_logic_vector(3 downto 0);
+
+    signal use_overlay: std_logic;
+    signal overlay_rgb: std_logic_vector(23 downto 0) := x"FFFFFF";
+    signal overlay_bit: std_logic;
 
     component tmds_pll
 		port (
@@ -244,6 +255,16 @@ begin
 		Empty => hdmi_fifo_empty,
 		Full => hdmi_fifo_full);
 
+    text_index <= hdmi_row(9 downto 3) & hdmi_column(10 downto 3);
+    text_entry <= text_buffer(to_integer(unsigned(text_index)));
+
+    font: entity work.font_lookup_8x8 port map(
+        clock => hdmi_pixel_clock,
+        row => hdmi_row(2 downto 0),
+        column => hdmi_column(2 downto 0),
+        lookup_val => text_entry,
+        visible => overlay_bit);
+
     hdmi_converter: entity work.hdmi2 generic map(
 			hsync_polarity => '1',
 			vsync_polarity => '1',
@@ -277,7 +298,7 @@ begin
 	process (all)
 	begin
         case video_mode is
-            when "001" =>
+            when "0001" =>
                 if hdmi_column < std_logic_vector(to_signed(512, 12)) and 
                     hdmi_pvalid = '1' then
                     hdmi_fifo_read <= '1';
@@ -300,31 +321,32 @@ begin
 		if rising_edge(hdmi_pixel_clock) then
             if debounce_buttona then
                 case video_mode is
-                    when "000" => video_mode <= "001";
-                    when "001" => video_mode <= "010";
-                    when "010" => video_mode <= "011";
-                    when "011" => video_mode <= "100";
-                    when "100" => video_mode <= "101";
-                    when "101" => video_mode <= "110";
-                    when "110" => video_mode <= "111";
-                    when others => video_mode <= "000";
+                    when "0000" => video_mode <= "0001";
+                    when "0001" => video_mode <= "0010";
+                    when "0010" => video_mode <= "0011";
+                    when "0011" => video_mode <= "0100";
+                    when "0100" => video_mode <= "0101";
+                    when "0101" => video_mode <= "0110";
+                    when "0110" => video_mode <= "0111";
+                    when "0111" => video_mode <= "1000";
+                    when others => video_mode <= "0000";
                 end case;
             end if;
 			rgb <= (others => '0');
             case video_mode is
-                when "000" => 
+                when "0000" => 
                     if hdmi_column < std_logic_vector(to_signed(256, 12)) or hdmi_column > std_logic_vector(to_signed(1024, 12)) then
                         rgb <= (others => '0');
                     else
                         rgb <= hdmi_pixel;
                     end if;
-                when "001" =>
+                when "0001" =>
                     if hdmi_column < std_logic_vector(to_signed(512, 12)) then
                         rgb <= (others => '0');
                     else
                         rgb <= hdmi_pixel;
                     end if;
-                when "010" =>
+                when "0010" =>
                     if hdmi_fifo_write then
                         rgb(23 downto 16) <= (others => '1');
                     else
@@ -336,9 +358,9 @@ begin
                         rgb(15 downto 8) <= (others => '0');
                     end if;
                     rgb(7 downto 0) <= (others => '0');
-                when "011" =>
+                when "0011" =>
                     rgb <= ppu_pixel;
-                when "100" =>
+                when "0100" =>
                     if hdmi_fifo_full then
                         rgb(23 downto 16) <= (others => '1');
                     end if;
@@ -346,18 +368,24 @@ begin
                         rgb(15 downto 8) <= (others => '1');
                     end if;
                     rgb(7 downto 0) <= (others => '0');
-                when "101" =>
+                when "0101" =>
                     rgb(23 downto 16) <= (others => '1');
                     rgb(15 downto 8) <= (others => '0');
                     rgb(7 downto 0) <= (others => '0');
-                when "110" =>
+                when "0110" =>
                     rgb(23 downto 16) <= (others => '0');
                     rgb(15 downto 8) <= (others => '1');
                     rgb(7 downto 0) <= (others => '0');
-                when "111" =>
+                when "0111" =>
                     rgb(23 downto 16) <= (others => '0');
                     rgb(15 downto 8) <= (others => '0');
                     rgb(7 downto 0) <= (others => '1');
+                when "1000" =>
+                    if overlay_bit then
+                        rgb <= overlay_rgb;
+                    else
+                        rgb <= (others => '0');
+                    end if;
                 when others =>
             end case;
 		end if;

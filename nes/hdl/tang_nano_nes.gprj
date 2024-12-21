@@ -10,7 +10,7 @@
         <File path="clocked_sram.vhd" type="file.vhdl" enable="1"/>
         <File path="clocked_sram_init.vhd" type="file.vhdl" enable="1"/>
         <File path="ddr.vhd" type="file.vhdl" enable="1"/>
-        <File path="edge_detect.vhd" type="file.vhdl" enable="1"/>
+        <File path="font_lookup.vhd" type="file.vhdl" enable="1"/>
         <File path="frame_sync.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_ddr.vhd" type="file.vhdl" enable="1"/>
         <File path="gowin_nes_pll.vhd" type="file.vhdl" enable="1"/>
@@ -23,7 +23,6 @@
         <File path="nes_cpu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_ppu.vhd" type="file.vhdl" enable="1"/>
         <File path="nes_tang_nano_20k.vhd" type="file.vhdl" enable="1"/>
-        <File path="nes_tang_nano_20k_tb.vhd" type="file.vhdl" enable="0"/>
         <File path="nes_tripler.vhd" type="file.vhdl" enable="1"/>
         <File path="resize_kernel.vhd" type="file.vhdl" enable="1"/>
         <File path="sram.vhd" type="file.vhdl" enable="0"/>
