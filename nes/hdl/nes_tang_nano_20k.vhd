@@ -187,7 +187,97 @@ architecture Behavioral of nes_tang_nano_20k is
 		);
 	end component;
 
+    component VexRiscv 
+        port (
+          externalResetVector: in std_logic_vector(31 downto 0);
+          timerInterrupt: in std_logic;
+          softwareInterrupt: in std_logic;
+          externalInterruptArray: in std_logic_vector(31 downto 0);
+          iBusWishbone_CYC: out std_logic;
+          iBusWishbone_STB: out std_logic;
+          iBusWishbone_ACK: in std_logic;
+          iBusWishbone_WE: out std_logic;
+          iBusWishbone_ADR: out std_logic_vector(29 downto 0);
+          iBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
+          iBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
+          iBusWishbone_SEL: out std_logic_vector(3 downto 0);
+          iBusWishbone_ERR: in std_logic;
+          iBusWishbone_BTE: out std_logic_vector(1 downto 0);
+          iBusWishbone_CTI: out std_logic_vector(2 downto 0);
+          dBusWishbone_CYC: out std_logic;
+          dBusWishbone_STB: out std_logic;
+          dBusWishbone_ACK: in std_logic;
+          dBusWishbone_WE: out std_logic;
+          dBusWishbone_ADR: out std_logic_vector(29 downto 0);
+          dBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
+          dBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
+          dBusWishbone_SEL: out std_logic_vector(3 downto 0);
+          dBusWishbone_ERR: in std_logic;
+          dBusWishbone_BTE: out std_logic_vector(1 downto 0);
+          dBusWishbone_CTI: out std_logic_vector(2 downto 0);
+          clk: in std_logic;
+          reset: in std_logic);
+      end component;
+
+    signal externalResetVector: std_logic_vector(31 downto 0);
+    signal timerInterrupt: std_logic;
+    signal softwareInterrupt: std_logic;
+    signal externalInterruptArray: std_logic_vector(31 downto 0);
+    signal iBusWishbone_CYC: std_logic;
+    signal iBusWishbone_STB: std_logic;
+    signal iBusWishbone_ACK: std_logic;
+    signal iBusWishbone_WE: std_logic;
+    signal iBusWishbone_ADR: std_logic_vector(29 downto 0);
+    signal iBusWishbone_DAT_MISO: std_logic_vector(31 downto 0);
+    signal iBusWishbone_DAT_MOSI: std_logic_vector(31 downto 0);
+    signal iBusWishbone_SEL: std_logic_vector(3 downto 0);
+    signal iBusWishbone_ERR: std_logic;
+    signal iBusWishbone_BTE: std_logic_vector(1 downto 0);
+    signal iBusWishbone_CTI: std_logic_vector(2 downto 0);
+    signal dBusWishbone_CYC: std_logic;
+    signal dBusWishbone_STB: std_logic;
+    signal dBusWishbone_ACK: std_logic;
+    signal dBusWishbone_WE: std_logic;
+    signal dBusWishbone_ADR: std_logic_vector(29 downto 0);
+    signal dBusWishbone_DAT_MISO: std_logic_vector(31 downto 0);
+    signal dBusWishbone_DAT_MOSI: std_logic_vector(31 downto 0);
+    signal dBusWishbone_SEL: std_logic_vector(3 downto 0);
+    signal dBusWishbone_ERR: std_logic;
+    signal dBusWishbone_BTE: std_logic_vector(1 downto 0);
+    signal dBusWishbone_CTI: std_logic_vector(2 downto 0);
+    signal cpu_reset: std_logic := '0';
+
 begin
+
+    softcpu: VexRiscv port map(
+        externalResetVector => externalResetVector,
+        timerInterrupt => timerInterrupt,
+        softwareInterrupt => softwareInterrupt,
+        externalInterruptArray => externalInterruptArray,
+        iBusWishbone_CYC => iBusWishbone_CYC,
+        iBusWishbone_STB => iBusWishbone_STB,
+        iBusWishbone_ACK => iBusWishbone_ACK,
+        iBusWishbone_WE => iBusWishbone_WE,
+        iBusWishbone_ADR => iBusWishbone_ADR,
+        iBusWishbone_DAT_MISO => iBusWishbone_DAT_MISO,
+        iBusWishbone_DAT_MOSI => iBusWishbone_DAT_MOSI,
+        iBusWishbone_SEL => iBusWishbone_SEL,
+        iBusWishbone_ERR => iBusWishbone_ERR,
+        iBusWishbone_BTE => iBusWishbone_BTE,
+        iBusWishbone_CTI => iBusWishbone_CTI,
+        dBusWishbone_CYC => dBusWishbone_CYC,
+        dBusWishbone_STB => dBusWishbone_STB,
+        dBusWishbone_ACK => dBusWishbone_ACK,
+        dBusWishbone_WE => dBusWishbone_WE,
+        dBusWishbone_ADR => dBusWishbone_ADR,
+        dBusWishbone_DAT_MISO => dBusWishbone_DAT_MISO,
+        dBusWishbone_DAT_MOSI => dBusWishbone_DAT_MOSI,
+        dBusWishbone_SEL => dBusWishbone_SEL,
+        dBusWishbone_ERR => dBusWishbone_ERR,
+        dBusWishbone_BTE => dBusWishbone_BTE,
+        dBusWishbone_CTI => dBusWishbone_CTI,
+        clk => hdmi_pixel_clock,
+        reset => cpu_reset);
 
 	sdram_vector <= std_logic_vector(to_unsigned(sdram_mode, 4));
     leds(3 downto 0) <= not sdram_vector;
