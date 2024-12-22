@@ -26,6 +26,7 @@ impure function InitRomFromFile (RomFileName : in string) return RAM_ARRAY is
 	variable rom : RAM_ARRAY := (others => (others => '0'));
 	FILE romfile : text is in RomFileName;
 	variable open_status :FILE_OPEN_STATUS;
+    variable rom_value: std_logic_vector(dbits-1 downto 0);
 	variable i: integer;
 	file     infile      :text;
 	variable RomFileLine : line;
@@ -36,7 +37,12 @@ impure function InitRomFromFile (RomFileName : in string) return RAM_ARRAY is
 				i := 0;
 				while not endfile(romfile) and i < RAM_ARRAY'high loop
 					readline(romfile, RomFileLine);
-					hread(RomFileLine, rom(i));
+					hread(RomFileLine, rom_value);
+                    if dbits=32 then
+                        rom(i) := rom_value(7 downto 0) & rom_value(15 downto 8) & rom_value(23 downto 16) & rom_value(31 downto 24);
+                    else
+                        rom(i) := rom_value;
+                    end if;
 					i := i + 1;
 				end loop;
 			else

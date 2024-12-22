@@ -31,18 +31,18 @@ architecture Behavioral of uart is
 	signal clock_divider: integer range 0 to FREQ / BAUD -1 := FREQ / BAUD -1;
 
 	signal uart_bit_num: integer range 0 to 9 := 0;
-	signal dout: std_logic_vector(9 downto 0);
+	signal dout: std_logic_vector(9 downto 0) := "1" & x"55" & "0";
 	signal dout_ready: std_logic := '1';
 
 	signal tx_out: std_logic;
 
-    constant MODE_UNINIT : integer range 0 to 3 := 0;
-    constant MODE_IDLE : integer range 0 to 3 := 1;
-    constant MODE_RW : integer range 0 to 3 := 2;
-    constant MODE_RW_WAIT : integer range 0 to 3 := 3;
-    signal mode: integer range 0 to 3 := MODE_UNINIT;
+    constant MODE_UNINIT : integer range 0 to 7 := 0;
+    constant MODE_IDLE : integer range 0 to 7 := 1;
+    constant MODE_RW : integer range 0 to 7 := 2;
+    constant MODE_RW_WAIT : integer range 0 to 7 := 3;
+    constant MODE_RW_DONE: integer range 0 to 7 := 4;
+    signal mode: integer range 0 to 7 := MODE_UNINIT;
 begin
-	dout <= "1" & x"55" & "0";
 
 	process (clock)
 	begin
@@ -74,8 +74,22 @@ begin
                     end if;
                 when MODE_RW =>
                     mode <= MODE_RW_WAIT;
+                    if wb_we then
+                        case wb_addr is
+                            when "0000" =>
+                                dout <= "1" & wb_d_mosi(7 downto 0) & "0";
+                                mode <= MODE_RW_DONE;
+                            when others => null;
+                        end case;
+                    end if;
                 when MODE_RW_WAIT =>
-                    null;
+                    case wb_addr is
+                        when "0000" =>
+                            mode <= MODE_RW_DONE;
+                        when others => null;
+                    end case;
+                when MODE_RW_DONE =>
+                    mode <= MODE_IDLE;
                 when others => null;
             end case;
         end if;
@@ -86,6 +100,11 @@ begin
 
 	process (all)
 	begin
+        if mode = MODE_RW_DONE then
+            wb_ack <= '1';
+        else
+            wb_ack <= '0';
+        end if;
 		if dout_ready then
 			tx_out <= dout(uart_bit_num);
 		else
