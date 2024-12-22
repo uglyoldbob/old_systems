@@ -54,6 +54,7 @@ begin
                 wbb_ack <= '0';
                 wba_d_miso <= wbo_d_miso;
                 wbo_d_mosi <= wba_d_mosi;
+                wbo_addr <= wba_addr;
                 if sim then
                     wbb_d_miso <= (others => 'X');
                 else
@@ -72,6 +73,7 @@ begin
                 wbb_ack <= wbo_ack;
                 wbb_d_miso <= wbo_d_miso;
                 wbo_d_mosi <= wbb_d_mosi;
+                wbo_addr <= wbb_addr;
                 if sim then
                     wba_d_miso <= (others => 'X');
                 else

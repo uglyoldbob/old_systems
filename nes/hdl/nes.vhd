@@ -141,7 +141,6 @@ architecture Behavioral of nes is
           reset: in std_logic);
     end component;
 
-    signal externalResetVector: std_logic_vector(31 downto 0);
     signal timerInterrupt: std_logic;
     signal softwareInterrupt: std_logic;
     signal externalInterruptArray: std_logic_vector(31 downto 0);
@@ -189,6 +188,7 @@ architecture Behavioral of nes is
     signal bios_sel: std_logic;
     signal bios_data: std_logic_vector(31 downto 0);
     signal bios_data_valid: std_logic;
+    signal bios_wb_ack: std_logic;
 
     signal cpu_only_reset: std_logic := '0';
     signal cpu_reset: std_logic := '0';
@@ -218,13 +218,13 @@ begin
             clock => clock, 
             cs => bios_sel, 
             address => Wishbone_ADR(8 downto 0),
-            rw => '0',
+            rw => '1',
             din => (others => '0'),
             dout => bios_data,
-            dout_valid => bios_data_valid);
+            dout_valid => bios_wb_ack);
 
         softcpu: VexRiscv port map(
-            externalResetVector => externalResetVector,
+            externalResetVector => x"00010000",
             timerInterrupt => timerInterrupt,
             softwareInterrupt => softwareInterrupt,
             externalInterruptArray => externalInterruptArray,
@@ -297,7 +297,7 @@ begin
                 uart_sel <= '0';
             end if;
 
-            if Wishbone_ADR(29 downto 13) = (x"0000" & "01") then
+            if Wishbone_ADR(29 downto 14) = (x"0001") then
                 bios_sel <= '1';
             else
                 bios_sel <= '0';
@@ -310,10 +310,12 @@ begin
             end if;
 
             Wishbone_ERR <= '1';
+            Wishbone_ACK <= '0';
 
             if uart_sel then
                 uart_wb_we <= Wishbone_WE;
                 Wishbone_DAT_MISO <= uart_wb_d_miso;
+                Wishbone_ACK <= uart_wb_ack;
                 Wishbone_ERR <= uart_wb_err;
             else
                 uart_wb_we <= '0';
@@ -321,6 +323,7 @@ begin
 
             if bios_sel then
                 Wishbone_DAT_MISO <= bios_data;
+                Wishbone_ACK <= bios_wb_ack;
                 Wishbone_ERR <= '0';
             end if;
         end process;

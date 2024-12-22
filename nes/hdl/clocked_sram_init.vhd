@@ -26,16 +26,21 @@ impure function InitRomFromFile (RomFileName : in string) return RAM_ARRAY is
 	variable rom : RAM_ARRAY := (others => (others => '0'));
 	FILE romfile : text is in RomFileName;
 	variable open_status :FILE_OPEN_STATUS;
+	variable i: integer;
 	file     infile      :text;
 	variable RomFileLine : line;
 	begin
 		if RomFileName /= "none" then
 			file_open(open_status, infile, filename, read_mode);
          if open_status = open_ok then
-				for i in RAM_ARRAY'low to RAM_ARRAY'high loop
+				i := 0;
+				while not endfile(romfile) and i < RAM_ARRAY'high loop
 					readline(romfile, RomFileLine);
 					hread(RomFileLine, rom(i));
+					i := i + 1;
 				end loop;
+			else
+				report "Unable to open " & RomFileName severity error;
 			end if;
 		end if;
 		return rom;
