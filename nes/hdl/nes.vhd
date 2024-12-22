@@ -291,7 +291,7 @@ begin
 
         process (all)
         begin
-            if Wishbone_ADR(29 downto 4) = (x"000004" & "00") then
+            if Wishbone_ADR(29 downto 14) = (x"0003") then
                 uart_sel <= '1';
             else
                 uart_sel <= '0';
