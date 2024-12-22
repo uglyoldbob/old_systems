@@ -7,6 +7,17 @@ entity uart is
 		FREQ : integer;
 		BAUD : integer := 115200);
    Port (
+        wb_ack: out std_logic;
+		wb_d_miso: out std_logic_vector(31 downto 0);
+		wb_d_mosi: in std_logic_vector(31 downto 0);
+		wb_err: out std_logic;
+		wb_addr: in std_logic_vector(3 downto 0);
+		wb_bte: in std_logic_vector(1 downto 0);
+		wb_cti: in std_logic_vector(2 downto 0);
+		wb_cyc: in std_logic;
+		wb_sel: in std_logic_vector(3 downto 0);
+		wb_stb: in std_logic;
+		wb_we: in std_logic;
 		test: out std_logic;
 		clock: in std_logic;
 		tx: out std_logic;
@@ -14,16 +25,22 @@ entity uart is
 end uart;
 
 architecture Behavioral of uart is
-	constant CYCLE_AMOUNT : integer := (FREQ / BAUD);
+	signal CYCLE_AMOUNT : integer range 0 to FREQ / BAUD := (FREQ / BAUD);
 
 	signal uart_clock: std_logic := '0';
-	signal clock_divider: integer range 0 to CYCLE_AMOUNT-1 := CYCLE_AMOUNT-1;
+	signal clock_divider: integer range 0 to FREQ / BAUD -1 := FREQ / BAUD -1;
 
 	signal uart_bit_num: integer range 0 to 9 := 0;
 	signal dout: std_logic_vector(9 downto 0);
 	signal dout_ready: std_logic := '1';
 
 	signal tx_out: std_logic;
+
+    constant MODE_UNINIT : integer range 0 to 3 := 0;
+    constant MODE_IDLE : integer range 0 to 3 := 1;
+    constant MODE_RW : integer range 0 to 3 := 2;
+    constant MODE_RW_WAIT : integer range 0 to 3 := 3;
+    signal mode: integer range 0 to 3 := MODE_UNINIT;
 begin
 	dout <= "1" & x"55" & "0";
 
@@ -44,6 +61,25 @@ begin
 			end if;
 		end if;
 	end process;
+
+    process (clock)
+    begin
+        if rising_edge(clock) then
+            case mode is
+                when MODE_UNINIT =>
+                    mode <= MODE_IDLE;
+                when MODE_IDLE =>
+                    if wb_cyc then
+                        mode <= MODE_RW;
+                    end if;
+                when MODE_RW =>
+                    mode <= MODE_RW_WAIT;
+                when MODE_RW_WAIT =>
+                    null;
+                when others => null;
+            end case;
+        end if;
+    end process;
 
 	test <= tx_out;
 	tx <= tx_out;

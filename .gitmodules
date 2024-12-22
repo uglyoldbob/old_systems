@@ -8,3 +8,6 @@
 [submodule "nes/hdl/VexRiscv-verilog"]
 	path = nes/hdl/VexRiscv-verilog
 	url = https://github.com/m-labs/VexRiscv-verilog.git
+[submodule "nes/hdl/riscv-bios-rust"]
+	path = nes/hdl/riscv-bios-rust
+	url = git@github.com:uglyoldbob/riscv-bios-rust.git

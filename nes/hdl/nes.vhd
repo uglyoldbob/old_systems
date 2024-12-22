@@ -4,7 +4,9 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes is
 	Generic (
+        FREQ: integer := 74250000;
 		sim: in std_logic := '0';
+        softcpu: std_logic := '1';
 		ramtype: string := "wishbone";
         rambits: integer := 3;
 		random_noise: in std_logic := '1';
@@ -33,6 +35,9 @@ entity nes is
 		rom_wb_sel: out std_logic_vector(rambits-3 downto 0);
 		rom_wb_stb: out std_logic;
 		rom_wb_we: out std_logic;
+
+        uart_tx: out std_logic;
+        uart_rx: in std_logic := '1';
 		
 		d_a: out std_logic_vector(7 downto 0) := x"00";
 		d_x: out std_logic_vector(7 downto 0) := x"00";
@@ -103,6 +108,90 @@ architecture Behavioral of nes is
 	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
+
+    component VexRiscv 
+        port (
+          externalResetVector: in std_logic_vector(31 downto 0);
+          timerInterrupt: in std_logic;
+          softwareInterrupt: in std_logic;
+          externalInterruptArray: in std_logic_vector(31 downto 0);
+          iBusWishbone_CYC: out std_logic;
+          iBusWishbone_STB: out std_logic;
+          iBusWishbone_ACK: in std_logic;
+          iBusWishbone_WE: out std_logic;
+          iBusWishbone_ADR: out std_logic_vector(29 downto 0);
+          iBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
+          iBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
+          iBusWishbone_SEL: out std_logic_vector(3 downto 0);
+          iBusWishbone_ERR: in std_logic;
+          iBusWishbone_BTE: out std_logic_vector(1 downto 0);
+          iBusWishbone_CTI: out std_logic_vector(2 downto 0);
+          dBusWishbone_CYC: out std_logic;
+          dBusWishbone_STB: out std_logic;
+          dBusWishbone_ACK: in std_logic;
+          dBusWishbone_WE: out std_logic;
+          dBusWishbone_ADR: out std_logic_vector(29 downto 0);
+          dBusWishbone_DAT_MISO: in std_logic_vector(31 downto 0);
+          dBusWishbone_DAT_MOSI: out std_logic_vector(31 downto 0);
+          dBusWishbone_SEL: out std_logic_vector(3 downto 0);
+          dBusWishbone_ERR: in std_logic;
+          dBusWishbone_BTE: out std_logic_vector(1 downto 0);
+          dBusWishbone_CTI: out std_logic_vector(2 downto 0);
+          clk: in std_logic;
+          reset: in std_logic);
+    end component;
+
+    signal externalResetVector: std_logic_vector(31 downto 0);
+    signal timerInterrupt: std_logic;
+    signal softwareInterrupt: std_logic;
+    signal externalInterruptArray: std_logic_vector(31 downto 0);
+    signal iBusWishbone_CYC: std_logic;
+    signal iBusWishbone_STB: std_logic;
+    signal iBusWishbone_ACK: std_logic;
+    signal iBusWishbone_WE: std_logic;
+    signal iBusWishbone_ADR: std_logic_vector(29 downto 0);
+    signal iBusWishbone_DAT_MISO: std_logic_vector(31 downto 0);
+    signal iBusWishbone_DAT_MOSI: std_logic_vector(31 downto 0);
+    signal iBusWishbone_SEL: std_logic_vector(3 downto 0);
+    signal iBusWishbone_ERR: std_logic;
+    signal iBusWishbone_BTE: std_logic_vector(1 downto 0);
+    signal iBusWishbone_CTI: std_logic_vector(2 downto 0);
+    signal dBusWishbone_CYC: std_logic;
+    signal dBusWishbone_STB: std_logic;
+    signal dBusWishbone_ACK: std_logic;
+    signal dBusWishbone_WE: std_logic;
+    signal dBusWishbone_ADR: std_logic_vector(29 downto 0);
+    signal dBusWishbone_DAT_MISO: std_logic_vector(31 downto 0);
+    signal dBusWishbone_DAT_MOSI: std_logic_vector(31 downto 0);
+    signal dBusWishbone_SEL: std_logic_vector(3 downto 0);
+    signal dBusWishbone_ERR: std_logic;
+    signal dBusWishbone_BTE: std_logic_vector(1 downto 0);
+    signal dBusWishbone_CTI: std_logic_vector(2 downto 0);
+
+    signal Wishbone_CYC: std_logic;
+    signal Wishbone_STB: std_logic;
+    signal Wishbone_ACK: std_logic;
+    signal Wishbone_WE: std_logic;
+    signal Wishbone_ADR: std_logic_vector(29 downto 0);
+    signal Wishbone_DAT_MISO: std_logic_vector(31 downto 0);
+    signal Wishbone_DAT_MOSI: std_logic_vector(31 downto 0);
+    signal Wishbone_SEL: std_logic_vector(3 downto 0);
+    signal Wishbone_ERR: std_logic;
+    signal Wishbone_BTE: std_logic_vector(1 downto 0);
+    signal Wishbone_CTI: std_logic_vector(2 downto 0);
+
+    signal uart_sel: std_logic;
+    signal uart_wb_ack: std_logic;
+    signal uart_wb_d_miso: std_logic_vector(31 downto 0);
+    signal uart_wb_err: std_logic;
+    signal uart_wb_we: std_logic;
+
+    signal bios_sel: std_logic;
+    signal bios_data: std_logic_vector(31 downto 0);
+    signal bios_data_valid: std_logic;
+
+    signal cpu_only_reset: std_logic := '0';
+    signal cpu_reset: std_logic := '0';
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -111,6 +200,8 @@ begin
 	
 	d_memory_clock <= memory_clock;
 	pause <= (cpu_memory_clock and not cpu_din_ready) or (fsync_pause and not ignore_sync);
+
+    cpu_reset <= cpu_only_reset or reset_sync;
 
 	testo <= pause;
 
@@ -121,7 +212,137 @@ begin
 			reset_chain <= reset;
 		end if;
 	end process;
-	
+
+    cpugen: if softcpu = '1' generate
+        bios: entity work.clocked_sram_init generic map(dbits => 32, bits => 9, filename => "riscv-bios-rust/combios.dat") port map (
+            clock => clock, 
+            cs => bios_sel, 
+            address => Wishbone_ADR(8 downto 0),
+            rw => '0',
+            din => (others => '0'),
+            dout => bios_data,
+            dout_valid => bios_data_valid);
+
+        softcpu: VexRiscv port map(
+            externalResetVector => externalResetVector,
+            timerInterrupt => timerInterrupt,
+            softwareInterrupt => softwareInterrupt,
+            externalInterruptArray => externalInterruptArray,
+            iBusWishbone_CYC => iBusWishbone_CYC,
+            iBusWishbone_STB => iBusWishbone_STB,
+            iBusWishbone_ACK => iBusWishbone_ACK,
+            iBusWishbone_WE => iBusWishbone_WE,
+            iBusWishbone_ADR => iBusWishbone_ADR,
+            iBusWishbone_DAT_MISO => iBusWishbone_DAT_MISO,
+            iBusWishbone_DAT_MOSI => iBusWishbone_DAT_MOSI,
+            iBusWishbone_SEL => iBusWishbone_SEL,
+            iBusWishbone_ERR => iBusWishbone_ERR,
+            iBusWishbone_BTE => iBusWishbone_BTE,
+            iBusWishbone_CTI => iBusWishbone_CTI,
+            dBusWishbone_CYC => dBusWishbone_CYC,
+            dBusWishbone_STB => dBusWishbone_STB,
+            dBusWishbone_ACK => dBusWishbone_ACK,
+            dBusWishbone_WE => dBusWishbone_WE,
+            dBusWishbone_ADR => dBusWishbone_ADR,
+            dBusWishbone_DAT_MISO => dBusWishbone_DAT_MISO,
+            dBusWishbone_DAT_MOSI => dBusWishbone_DAT_MOSI,
+            dBusWishbone_SEL => dBusWishbone_SEL,
+            dBusWishbone_ERR => dBusWishbone_ERR,
+            dBusWishbone_BTE => dBusWishbone_BTE,
+            dBusWishbone_CTI => dBusWishbone_CTI,
+            clk => clock,
+            reset => cpu_reset);
+
+        wbc: entity work.wishbone_host_combiner generic map(sim => sim) port map(
+            wba_cyc => iBusWishbone_CYC,
+            wba_stb => iBusWishbone_STB,
+            wba_ack => iBusWishbone_ACK,
+            wba_we => iBusWishbone_WE,
+            wba_addr => iBusWishbone_ADR,
+            wba_d_miso => iBusWishbone_DAT_MISO,
+            wba_d_mosi => iBusWishbone_DAT_MOSI,
+            wba_sel => iBusWishbone_SEL,
+            wba_err => iBusWishbone_ERR,
+            wba_bte => iBusWishbone_BTE,
+            wba_cti => iBusWishbone_CTI,
+            wbb_cyc => dBusWishbone_CYC,
+            wbb_stb => dBusWishbone_STB,
+            wbb_ack => dBusWishbone_ACK,
+            wbb_we => dBusWishbone_WE,
+            wbb_addr => dBusWishbone_ADR,
+            wbb_d_miso => dBusWishbone_DAT_MISO,
+            wbb_d_mosi => dBusWishbone_DAT_MOSI,
+            wbb_sel => dBusWishbone_SEL,
+            wbb_err => dBusWishbone_ERR,
+            wbb_bte => dBusWishbone_BTE,
+            wbb_cti => dBusWishbone_CTI,
+            wbo_cyc => Wishbone_CYC,
+            wbo_stb => Wishbone_STB,
+            wbo_ack => Wishbone_ACK,
+            wbo_we => Wishbone_WE,
+            wbo_addr => Wishbone_ADR,
+            wbo_d_miso => Wishbone_DAT_MISO,
+            wbo_d_mosi => Wishbone_DAT_MOSI,
+            wbo_sel => Wishbone_SEL,
+            wbo_err => Wishbone_ERR,
+            wbo_bte => Wishbone_BTE,
+            wbo_cti => Wishbone_CTI,
+            clock => clock);
+
+        process (all)
+        begin
+            if Wishbone_ADR(29 downto 4) = (x"000004" & "00") then
+                uart_sel <= '1';
+            else
+                uart_sel <= '0';
+            end if;
+
+            if Wishbone_ADR(29 downto 13) = (x"0000" & "01") then
+                bios_sel <= '1';
+            else
+                bios_sel <= '0';
+            end if;
+
+            if sim then
+                Wishbone_DAT_MISO <= (others => 'X');
+            else
+                Wishbone_DAT_MISO <= (others => '0');
+            end if;
+
+            Wishbone_ERR <= '1';
+
+            if uart_sel then
+                uart_wb_we <= Wishbone_WE;
+                Wishbone_DAT_MISO <= uart_wb_d_miso;
+                Wishbone_ERR <= uart_wb_err;
+            else
+                uart_wb_we <= '0';
+            end if;
+
+            if bios_sel then
+                Wishbone_DAT_MISO <= bios_data;
+                Wishbone_ERR <= '0';
+            end if;
+        end process;
+
+        serial: entity work.uart generic map(
+            FREQ => FREQ) port map(
+            wb_ack => uart_wb_ack,
+            wb_d_miso => uart_wb_d_miso,
+            wb_d_mosi => dBusWishbone_DAT_MOSI,
+            wb_err => uart_wb_err,
+            wb_addr => dBusWishbone_ADR(3 downto 0),
+            wb_bte => dBusWishbone_BTE,
+            wb_cti => dBusWishbone_CTI,
+            wb_cyc => dBusWishbone_CYC,
+            wb_sel => dBusWishbone_SEL,
+            wb_stb => dBusWishbone_STB,
+            wb_we => uart_wb_we,
+            clock => clock,
+            tx => uart_tx,
+            rx => uart_rx);
+    end generate;
+
 	process (all)
 	begin
 		if cpu_address(15 downto 13) = "000" then

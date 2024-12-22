@@ -27,7 +27,7 @@ begin
 
     trigger: entity work.edge_detect port map(
 		clock => clock,
-		sig => slow_clock,
+		sig => slowclock,
 		rising => slow_rising);
 
 	process (clock)

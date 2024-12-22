@@ -1,5 +1,6 @@
 [workspace]
 
+exclude = ["nes/hdl/riscv-bios-rust"]
 members = [
     "nes/rust",
     "snes/rust",
