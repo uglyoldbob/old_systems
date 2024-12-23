@@ -91,10 +91,12 @@ begin
                 wba_ack <= '0';
                 wbb_ack <= '0';
                 if sim then
+					wbo_addr <= (others => 'X');
                     wba_d_miso <= (others => 'X');
                     wbb_d_miso <= (others => 'X');
                     wbo_d_mosi <= (others => 'X');
                 else
+					wbo_addr <= (others => '0');
                     wba_d_miso <= (others => '0');
                     wbb_d_miso <= (others => '0');
                     wbo_d_mosi <= (others => '0');

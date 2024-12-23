@@ -37,7 +37,7 @@ architecture Behavioral of uart is
 	signal clock_divider: integer range 0 to FREQ / BAUD -1 := FREQ / BAUD -1;
 
 	signal uart_bit_num: integer range 0 to 9 := 0;
-	signal dout: std_logic_vector(9 downto 0) := "1" & x"55" & "0";
+	signal dout: std_logic_vector(9 downto 0) := (others => '1');
 	signal dout_ready: std_logic := '1';
 
 	signal tx_out: std_logic;
@@ -60,33 +60,32 @@ architecture Behavioral of uart is
     constant MODE_RW_DONE: integer range 0 to 7 := 4;
     signal mode: integer range 0 to 7 := MODE_UNINIT;
 
-    signal need_data: std_logic;
+	signal need_data: std_logic;
 begin
-	process (clock)
+
+	process (all)
 	begin
-		if rising_edge(clock) then
-			if clock_divider /= 0 then
-				clock_divider <= clock_divider - 1;
-			else
-				clock_divider <= CYCLE_AMOUNT-1;
-				uart_clock <= not uart_clock;
-                if uart_bit_num = 8 then
-                    need_data <= '1';
-                else
-                    need_data <= '0';
-                end if;
-				if uart_bit_num /= 9 then
-					uart_bit_num <= uart_bit_num + 1;
-				else
-					uart_bit_num <= 0;
-				end if;
-			end if;
+		if uart_bit_num = 9 and clock_divider = 0 then
+			need_data <= '1';
+		else
+			need_data <= '0';
 		end if;
 	end process;
 
     process (clock)
     begin
         if rising_edge(clock) then
+			if clock_divider /= 0 then
+				clock_divider <= clock_divider - 1;
+			else
+				clock_divider <= CYCLE_AMOUNT-1;
+				uart_clock <= not uart_clock;
+				if uart_bit_num /= 9 then
+					uart_bit_num <= uart_bit_num + 1;
+				else
+					uart_bit_num <= 0;
+				end if;
+			end if;
             if need_data then
                 if fifo_tx(0)(10) then
                     dout <= fifo_tx(0)(9 downto 0);
@@ -97,63 +96,64 @@ begin
                 else
                     dout <= (others => '1');
                 end if;
-            end if;
-            case mode is
-                when MODE_UNINIT =>
-                    mode <= MODE_IDLE;
-                when MODE_IDLE =>
-                    if wb_cyc then
-                        mode <= MODE_RW;
-                    end if;
-                when MODE_RW =>
-                    mode <= MODE_RW_WAIT;
-                    if wb_we then
-                        case wb_addr is
-                            when ADDR_SETTINGS1 =>
-                                settings1 <= wb_d_mosi;
-                                mode <= MODE_RW_DONE;
-                            when ADDR_SETTINGS2 =>
-                                settings2 <= wb_d_mosi;
-                                mode <= MODE_RW_DONE;
-                            when ADDR_SETTINGS3 =>
-                                settings3 <= wb_d_mosi;
-                                mode <= MODE_RW_DONE;
-                            when ADDR_SETTINGS4 =>
-                                settings4 <= wb_d_mosi;
-                                mode <= MODE_RW_DONE;
-                            when ADDR_TX =>
-                                mode <= MODE_RW_WAIT;
-                            when others => null;
-                        end case;
-                    end if;
-                when MODE_RW_WAIT =>
-                    case wb_addr is
-                        when ADDR_TX =>
-                            case TX_DEPTH is
-                                when 4 =>
-                                    if fifo_tx(0)(10) = '0' then
-                                        fifo_tx(0) <= "11" & wb_d_mosi(7 downto 0) & "0";
-                                        mode <= MODE_RW_DONE;
-                                    elsif fifo_tx(1)(10) = '0' then
-                                        fifo_tx(1) <= "11" & wb_d_mosi(7 downto 0) & "0";
-                                        mode <= MODE_RW_DONE;
-                                    elsif fifo_tx(2)(10) = '0' then
-                                        fifo_tx(2) <= "11" & wb_d_mosi(7 downto 0) & "0";
-                                        mode <= MODE_RW_DONE;
-                                    elsif fifo_tx(3)(10) = '0' then
-                                        fifo_tx(3) <= "11" & wb_d_mosi(7 downto 0) & "0";
-                                        mode <= MODE_RW_DONE;
-                                    end if;
-                                when others => null;
-                            end case;
-                        when ADDR_SETTINGS1 | ADDR_SETTINGS2 | ADDR_SETTINGS3 | ADDR_SETTINGS4 =>
-                            mode <= MODE_RW_DONE;
-                        when others => null;
-                    end case;
-                when MODE_RW_DONE =>
-                    mode <= MODE_IDLE;
-                when others => null;
-            end case;
+			else
+				case mode is
+					when MODE_UNINIT =>
+						mode <= MODE_IDLE;
+					when MODE_IDLE =>
+						if wb_cyc then
+							mode <= MODE_RW;
+						end if;
+					when MODE_RW =>
+						mode <= MODE_RW_WAIT;
+						if wb_we then
+							case wb_addr is
+								when ADDR_SETTINGS1 =>
+									settings1 <= wb_d_mosi;
+									mode <= MODE_RW_DONE;
+								when ADDR_SETTINGS2 =>
+									settings2 <= wb_d_mosi;
+									mode <= MODE_RW_DONE;
+								when ADDR_SETTINGS3 =>
+									settings3 <= wb_d_mosi;
+									mode <= MODE_RW_DONE;
+								when ADDR_SETTINGS4 =>
+									settings4 <= wb_d_mosi;
+									mode <= MODE_RW_DONE;
+								when ADDR_TX =>
+									mode <= MODE_RW_WAIT;
+								when others => null;
+							end case;
+						end if;
+					when MODE_RW_WAIT =>
+						case wb_addr is
+							when ADDR_TX =>
+								case TX_DEPTH is
+									when 4 =>
+										if fifo_tx(0)(10) = '0' then
+											fifo_tx(0) <= "11" & wb_d_mosi(7 downto 0) & "0";
+											mode <= MODE_RW_DONE;
+										elsif fifo_tx(1)(10) = '0' then
+											fifo_tx(1) <= "11" & wb_d_mosi(7 downto 0) & "0";
+											mode <= MODE_RW_DONE;
+										elsif fifo_tx(2)(10) = '0' then
+											fifo_tx(2) <= "11" & wb_d_mosi(7 downto 0) & "0";
+											mode <= MODE_RW_DONE;
+										elsif fifo_tx(3)(10) = '0' then
+											fifo_tx(3) <= "11" & wb_d_mosi(7 downto 0) & "0";
+											mode <= MODE_RW_DONE;
+										end if;
+									when others => null;
+								end case;
+							when ADDR_SETTINGS1 | ADDR_SETTINGS2 | ADDR_SETTINGS3 | ADDR_SETTINGS4 =>
+								mode <= MODE_RW_DONE;
+							when others => null;
+						end case;
+					when MODE_RW_DONE =>
+						mode <= MODE_IDLE;
+					when others => null;
+				end case;
+			end if;
         end if;
     end process;
 
