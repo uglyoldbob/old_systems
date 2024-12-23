@@ -5,6 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes is
 	Generic (
         FREQ: integer := 74250000;
+		clockbuf: string;
 		sim: in std_logic := '0';
         softcpu: std_logic := '1';
 		ramtype: string := "wishbone";
@@ -53,7 +54,7 @@ entity nes is
 		clock: in std_logic;
 		cpu_oe: out std_logic_vector(1 downto 0);
 		cpu_memory_address: out std_logic_vector(15 downto 0);
-	   whocares: out std_logic;
+	    whocares: out std_logic;
 		cs_out: out std_logic_vector(3 downto 0);
 		otherstuff: out std_logic_vector(15 downto 0));
 end nes;
@@ -435,6 +436,7 @@ begin
 	);
 	
 	cpu: entity work.nes_cpu generic map(
+		clockbuf => clockbuf,
 		ramtype => ramtype) port map (
 		pause_cpu => pause,
 		d_a => d_a,

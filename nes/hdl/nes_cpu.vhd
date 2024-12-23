@@ -62,6 +62,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes_cpu is
 	Generic (
+		clockbuf: string;
 		ramtype: string := "sram");
    Port (pause_cpu: in std_logic;
 			clock : in STD_LOGIC;
@@ -95,6 +96,10 @@ end nes_cpu;
 architecture Behavioral of nes_cpu is
 	signal cycle_counter: std_logic_vector(14 downto 0);
 
+	signal tclocka: std_logic;
+	signal tclockb: std_logic;
+	signal tclockm: std_logic;
+	signal tppu_clock: std_logic;
 	signal clocka: std_logic;
 	signal clockb: std_logic;
 	signal clockm: std_logic;
@@ -187,6 +192,12 @@ architecture Behavioral of nes_cpu is
 	signal op_byte_2_plus_one: std_logic_vector(7 downto 0);
 	
 	signal extra_cycle: std_logic_vector(3 downto 0) := (others => '0');
+
+	component IBUF
+		port (
+			I: in std_logic;
+			O: out std_logic);
+	end component;
 begin
 
 	d_a <= a;
@@ -202,10 +213,30 @@ begin
 		pause_cpu => pause_cpu,
 		reset => reset,
 		clock => clock,
-		c1 => clocka,
-		c3 => clockm,
-		c4 => ppu_clock,
-		c5 => clockb);
+		c1 => tclocka,
+		c3 => tclockm,
+		c4 => tppu_clock,
+		c5 => tclockb);
+
+	clock_buffering: if clockbuf = "none" generate
+		clocka <= tclocka;
+		clockb <= tclockb;
+		clockm <= tclockm;
+		ppu_clock <= tppu_clock;
+	elsif clockbuf = "ibuf" generate
+		c1: IBUF port map (
+			I => tclocka,
+			O => clocka);
+		c2: IBUF port map (
+			I => tclockb,
+			O => clockb);
+		c3: IBUF port map (
+			I => tclockm,
+			O => clockm);
+		c4: IBUF port map (
+			I => tppu_clock,
+			O => ppu_clock);
+	end generate;
 
 	memory_clock <= clockm;
 	

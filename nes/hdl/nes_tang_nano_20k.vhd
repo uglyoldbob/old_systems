@@ -440,6 +440,7 @@ begin
 	
 
 	nes: entity work.nes generic map(
+		clockbuf => "ibuf",
 		random_noise => '1') port map (
 		rom_wb_ack => sdram_wb_ack,
 		rom_wb_d_miso => sdram_wb_d_miso,
