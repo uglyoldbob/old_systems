@@ -139,6 +139,8 @@ impure function GetNestestResults (FileName : in string; entries: integer) retur
 	signal double_fast_cpu_clock: std_logic := '0';
 	signal cpu_clock_counter: integer range 0 to 3 := 0;
 	
+	signal soft_cpu_clock: std_logic := '0';
+	
 	constant NESTEST_ADDRESS   : integer := 16#3ffc#;
 begin
 	hdmi_pixel_clock <= fast_cpu_clock;
@@ -157,6 +159,12 @@ begin
 		end if;
 	end process;
 	
+	process (fast_cpu_clock)
+	begin
+		if rising_edge(fast_cpu_clock) then
+			soft_cpu_clock <= not soft_cpu_clock;
+		end if;
+	end process;
 	
 	clk27 <= not clk27 after 18.519 ns;
 	otherstuff <= cpu_address;
@@ -236,6 +244,7 @@ begin
 	end process;
 	
 	nes: entity work.nes generic map(
+		clockbuf => "none",
 		sim => '1',
 		ramtype => "wishbone",
 		rambits => 4,
@@ -273,6 +282,7 @@ begin
 		cpu_memory_address => cpu_address,
 		cs_out => cs_out,
 		whocares => whocares,
+		soft_cpu_clock => soft_cpu_clock,
 		clock => fast_cpu_clock
 		);
 		

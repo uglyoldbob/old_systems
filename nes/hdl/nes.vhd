@@ -52,6 +52,7 @@ entity nes is
 		instruction_toggle_out: out std_logic;
 		reset: in std_logic;
 		clock: in std_logic;
+		soft_cpu_clock: in std_logic;
 		cpu_oe: out std_logic_vector(1 downto 0);
 		cpu_memory_address: out std_logic_vector(15 downto 0);
 	    whocares: out std_logic;
@@ -272,7 +273,7 @@ begin
             dBusWishbone_ERR => dBusWishbone_ERR,
             dBusWishbone_BTE => dBusWishbone_BTE,
             dBusWishbone_CTI => dBusWishbone_CTI,
-            clk => clock,
+            clk => soft_cpu_clock,
             reset => cpu_reset);
 
         wbc: entity work.wishbone_host_combiner generic map(sim => sim) port map(
@@ -309,7 +310,7 @@ begin
             wbo_err => Wishbone_ERR,
             wbo_bte => Wishbone_BTE,
             wbo_cti => Wishbone_CTI,
-            clock => clock);
+            clock => soft_cpu_clock);
 
         process (all)
         begin
@@ -367,7 +368,7 @@ begin
             wb_sel => dBusWishbone_SEL,
             wb_stb => uart_wb_stb,
             wb_we => uart_wb_we,
-            clock => clock,
+            clock => soft_cpu_clock,
             tx => uart_tx,
             rx => uart_rx);
     end generate;

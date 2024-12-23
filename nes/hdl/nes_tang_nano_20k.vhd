@@ -188,9 +188,28 @@ architecture Behavioral of nes_tang_nano_20k is
 			I: in std_logic;
 			O: out std_logic);
 	end component;
+
+	component CLKDIV2
+        port (
+            CLKOUT: out std_logic;
+            HCLKIN: in std_logic;
+            RESETN: in std_logic
+        );
+    end component;
+
+	signal soft_cpu_clock_intermed: std_logic := '0';
+	signal soft_cpu_clock: std_logic;
 begin
 
 	cbuf: IBUF port map (I => clock, O => clock_buffed);
+
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			soft_cpu_clock_intermed <= not soft_cpu_clock_intermed;
+		end if;
+	end process;
+	soft_cpu_cgenbuf: IBUF port map (I => soft_cpu_clock_intermed, O => soft_cpu_clock);
 
 	sdram_vector <= std_logic_vector(to_unsigned(sdram_mode, 4));
     leds(3 downto 0) <= not sdram_vector;
@@ -463,6 +482,7 @@ begin
 		cpu_oe => nes_oe,
 		cpu_memory_address => nes_address,
 		clock => hdmi_pixel_clock,
+		soft_cpu_clock => soft_cpu_clock,
 		testo => test2(1),
         uart_tx => uart_tx_s,
         uart_rx => uart_rx,
