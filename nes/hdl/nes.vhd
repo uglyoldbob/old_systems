@@ -109,7 +109,7 @@ architecture Behavioral of nes is
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
 
-    component VexRiscv 
+    component VexRiscv
         port (
           externalResetVector: in std_logic_vector(31 downto 0);
           timerInterrupt: in std_logic;
@@ -184,6 +184,8 @@ architecture Behavioral of nes is
     signal uart_wb_d_miso: std_logic_vector(31 downto 0);
     signal uart_wb_err: std_logic;
     signal uart_wb_we: std_logic;
+	signal uart_wb_cyc: std_logic;
+	signal uart_wb_stb: std_logic;
 
     signal bios_sel: std_logic;
     signal bios_data: std_logic_vector(31 downto 0);
@@ -192,6 +194,9 @@ architecture Behavioral of nes is
 
     signal cpu_only_reset: std_logic := '0';
     signal cpu_reset: std_logic := '0';
+
+	signal por: std_logic := '1';
+	signal por_calc: integer range 0 to 1023 := 0;
 begin
 	whocares <= clock;
 	otherstuff <= cpu_address;
@@ -205,23 +210,39 @@ begin
 
 	testo <= pause;
 
+	process (all)
+	begin
+		if por_calc = 1023 then
+			por <= '0';
+		else
+			por <= '1';
+		end if;
+	end process;
+
 	process (clock)
 	begin
 		if rising_edge(clock) then
-			reset_sync <= reset_chain;
+			if por_calc < 1023 then
+				por_calc <= por_calc + 1;
+			end if;
+			reset_sync <= reset_chain or por;
 			reset_chain <= reset;
 		end if;
 	end process;
 
     cpugen: if softcpu = '1' generate
-        bios: entity work.clocked_sram_init generic map(dbits => 32, bits => 9, filename => "riscv-bios-rust/combios.dat") port map (
+        bios: entity work.clocked_sram_init generic map(dbits => 32, bits => 5, filename => "riscv-bios-rust/combios.dat") port map (
             clock => clock, 
             cs => bios_sel, 
-            address => Wishbone_ADR(8 downto 0),
+            address => Wishbone_ADR(4 downto 0),
             rw => '1',
             din => (others => '0'),
             dout => bios_data,
             dout_valid => bios_wb_ack);
+
+		timerInterrupt <= '0';
+		softwareInterrupt <= '0';
+		externalInterruptArray <= (others => '0');
 
         softcpu: VexRiscv port map(
             externalResetVector => x"00010000",
@@ -317,8 +338,12 @@ begin
                 Wishbone_DAT_MISO <= uart_wb_d_miso;
                 Wishbone_ACK <= uart_wb_ack;
                 Wishbone_ERR <= uart_wb_err;
+				uart_wb_cyc <= Wishbone_CYC;
+				uart_wb_stb <= Wishbone_STB;
             else
                 uart_wb_we <= '0';
+				uart_wb_cyc <= '0';
+				uart_wb_stb <= '0';
             end if;
 
             if bios_sel then
@@ -337,9 +362,9 @@ begin
             wb_addr => dBusWishbone_ADR(3 downto 0),
             wb_bte => dBusWishbone_BTE,
             wb_cti => dBusWishbone_CTI,
-            wb_cyc => dBusWishbone_CYC,
+            wb_cyc => uart_wb_cyc,
             wb_sel => dBusWishbone_SEL,
-            wb_stb => dBusWishbone_STB,
+            wb_stb => uart_wb_stb,
             wb_we => uart_wb_we,
             clock => clock,
             tx => uart_tx,

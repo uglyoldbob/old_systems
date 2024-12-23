@@ -46,6 +46,7 @@ vcom -2008 -work work {../../nestb.vhd}
 vsim -t 1ps -L altera -L lpm -L sgate -L altera_mf -L altera_lnsim -L fiftyfivenm -L rtl_work -L work -voptargs="+acc"  nestb
 
 add wave /nestb/nes/cpugen/wbc/*
+add wave /nestb/nes/cpugen/serial/*
 
 #radix signal sim:/nestb/nes/ppu_process_column unsigned
 #radix signal sim:/nestb/nes/ppu_process_row unsigned

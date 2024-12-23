@@ -37,7 +37,7 @@ architecture Behavioral of uart is
 	signal clock_divider: integer range 0 to FREQ / BAUD -1 := FREQ / BAUD -1;
 
 	signal uart_bit_num: integer range 0 to 9 := 0;
-	signal dout: std_logic_vector(9 downto 0) := (others => '1');
+	signal dout: std_logic_vector(9 downto 0) := "1" & "01000001" & "0";
 	signal dout_ready: std_logic := '1';
 
 	signal tx_out: std_logic;
@@ -61,7 +61,10 @@ architecture Behavioral of uart is
     signal mode: integer range 0 to 7 := MODE_UNINIT;
 
 	signal need_data: std_logic;
+
+	signal address: std_logic_vector(6 downto 0);
 begin
+	address <= wb_addr & "000";
 
 	process (all)
 	begin

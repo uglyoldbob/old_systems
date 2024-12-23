@@ -66,7 +66,7 @@ begin
                 wbo_sel <= wba_sel;
                 wbo_stb <= wba_stb;
                 wbo_we <= wba_we;
-                wba_err <= wba_err;
+                wba_err <= wbo_err;
                 wbb_err <= '0';
             when 2 =>
                 wba_ack <= '0';
@@ -85,7 +85,7 @@ begin
                 wbo_sel <= wbb_sel;
                 wbo_stb <= wbb_stb;
                 wbo_we <= wbb_we;
-                wbb_err <= wbb_err;
+                wbb_err <= wbo_err;
                 wba_err <= '0';
             when others => 
                 wba_ack <= '0';

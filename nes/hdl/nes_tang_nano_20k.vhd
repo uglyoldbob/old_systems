@@ -178,7 +178,19 @@ architecture Behavioral of nes_tang_nano_20k is
 			Full: out std_logic
 		);
 	end component;
+
+	signal uart_tx_s: std_logic;
+
+	signal clock_buffed: std_logic;
+
+	component IBUF
+		port (
+			I: in std_logic;
+			O: out std_logic);
+	end component;
 begin
+
+	cbuf: IBUF port map (I => clock, O => clock_buffed);
 
 	sdram_vector <= std_logic_vector(to_unsigned(sdram_mode, 4));
     leds(3 downto 0) <= not sdram_vector;
@@ -227,7 +239,7 @@ begin
     hdmi_pll: tmds_pll port map(
         lock => pll_lock,
         clkout => tmds_clock,
-        clkin => clock);
+        clkin => clock_buffed);
 
 	nes_pll: tmds_div port map (
 		clkout => hdmi_pixel_clock,
@@ -423,6 +435,10 @@ begin
 		wb_stb => sdram_wb_stb,
 		wb_we => sdram_wb_we);
 
+	uart_tx <= uart_tx_s;
+	test2(0) <= uart_tx_s;
+	
+
 	nes: entity work.nes generic map(
 		random_noise => '1') port map (
 		rom_wb_ack => sdram_wb_ack,
@@ -447,7 +463,7 @@ begin
 		cpu_memory_address => nes_address,
 		clock => hdmi_pixel_clock,
 		testo => test2(1),
-        uart_tx => uart_tx,
+        uart_tx => uart_tx_s,
         uart_rx => uart_rx,
 		hdmi_vsync => hdmi_vstart);
 end Behavioral;
