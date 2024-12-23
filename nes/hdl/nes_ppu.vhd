@@ -330,6 +330,15 @@ signal vblank_clear_done: std_logic := '0';
 
 signal random_data: std_logic_vector(31 downto 0);
 
+signal r_out_calc: std_logic_vector(7 downto 0);
+signal g_out_calc: std_logic_vector(7 downto 0);
+signal b_out_calc: std_logic_vector(7 downto 0);
+signal pixel_valid_buf: std_logic;
+signal hstart_buf: std_logic;
+signal vstart_buf: std_logic;
+signal row_buf: std_logic_vector(8 downto 0);
+signal column_buf: std_logic_vector(8 downto 0);
+
 begin
 	process (all)
 	begin
@@ -342,22 +351,22 @@ begin
 	
 	process (all)
 	begin
-		column <= cycle_active(8 downto 0);
-		row <= scanline_number(8 downto 0);
+		column_buf <= cycle_active(8 downto 0);
+		row_buf <= scanline_number(8 downto 0);
 		if line_visible and column_active then
-			pixel_valid <= '1';
+			pixel_valid_buf <= '1';
 		else
-			pixel_valid <= '0';
+			pixel_valid_buf <= '0';
 		end if;
 		if (line_visible or line_post_visible or line_vblank) and column_first then
-			hstart <= '1';
+			hstart_buf <= '1';
 		else
-			hstart <= '0';
+			hstart_buf <= '0';
 		end if;
 		if line_pre_visible and column_first then
-			vstart <= '1';
+			vstart_buf <= '1';
 		else
-			vstart <= '0';
+			vstart_buf <= '0';
 		end if;
 	end process;
 	
@@ -468,31 +477,45 @@ begin
 		fetch_dummy <= (line_visible or line_pre_visible) and column_dummy;
 		fetch_idle <= (line_post_visible or line_vblank) and not column_first;
 	end process;
+
+	process (clock)
+	begin
+		if rising_edge(clock) then
+			r_out <= r_out_calc;
+			g_out <= g_out_calc;
+			b_out <= b_out_calc;
+			pixel_valid <= pixel_valid_buf;
+			hstart <= hstart_buf;
+			vstart <= vstart_buf;
+			row <= row_buf;
+			column <= column_buf;
+		end if;
+	end process;
 	
 	process (all)
 	begin
 		--TODO color emphasis not yet implemented
-		r_out <= palette_r(to_integer(unsigned(pixel)));
-		g_out <= palette_g(to_integer(unsigned(pixel)));
-		b_out <= palette_b(to_integer(unsigned(pixel)));
+		r_out_calc <= palette_r(to_integer(unsigned(pixel)));
+		g_out_calc <= palette_g(to_integer(unsigned(pixel)));
+		b_out_calc <= palette_b(to_integer(unsigned(pixel)));
 
-		if sim = '1' and pixel_valid = '0' then
-			r_out <= x"XX";
-			g_out <= x"XX";
-			b_out <= x"XX";
+		if sim = '1' and pixel_valid_buf = '0' then
+			r_out_calc <= x"XX";
+			g_out_calc <= x"XX";
+			b_out_calc <= x"XX";
 		end if;
-		if pixel_valid = '1' then
+		if pixel_valid_buf = '1' then
 			if sim then
-				g_out <= row(7 downto 0);
-				b_out <= column(7 downto 0);
+				g_out_calc <= row_buf(7 downto 0);
+				b_out_calc <= column_buf(7 downto 0);
 			elsif random_noise then
 				if frame_odd then
-					if row(1) then
-						b_out <= x"ff";
+					if row_buf(1) then
+						b_out_calc <= x"ff";
 					end if;
 				else
-					if column(0) then
-						g_out <= x"ff";
+					if column_buf(0) then
+						g_out_calc <= x"ff";
 					end if;
 				end if;
 			end if;
