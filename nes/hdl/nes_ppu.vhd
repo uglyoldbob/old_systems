@@ -372,10 +372,10 @@ begin
 	
 	process (reset, clock)
 	begin
-		if reset then
-			write_ignore_counter <= std_logic_vector(to_unsigned(29658, 15));
-		elsif rising_edge(clock) then
-			if write_ignore_counter /= "000000000000000" then
+		if rising_edge(clock) then
+			if reset then
+				write_ignore_counter <= std_logic_vector(to_unsigned(29658, 15));
+			elsif write_ignore_counter /= "000000000000000" then
 				write_ignore_counter <= std_logic_vector(unsigned(write_ignore_counter) - 1);
 			end if;
 		end if;
@@ -390,12 +390,12 @@ begin
 		cycle_dummy <= std_logic_vector(unsigned(scanline_cycle) - 337);
 	end process;
 	
-	process (reset, clock)
+	process (clock)
 	begin
-		if reset then
-			--TODO?
-		elsif rising_edge(clock) then
-			if should_eval_sprites then
+		if rising_edge(clock) then
+			if reset then
+				--TODO?
+			elsif should_eval_sprites then
 				--TODO
 			end if;
 		end if;
@@ -558,20 +558,20 @@ begin
 		bg_tile_index <= std_logic_vector("111" - unsigned(cycle_active(2 downto 0)) - unsigned(scrollx(2 downto 0)));
 	end process;
 	
-	process (reset, clock)
+	process (clock)
 	begin
-		if reset then
-		elsif rising_edge(clock) then
-			if line_visible then
+		if rising_edge(clock) then
+			if reset then
+			elsif line_visible then
 			end if;
 		end if;
 	end process;
 	
-	process (reset, clock)
+	process (clock)
 	begin
-		if reset then
-		elsif rising_edge(clock) then
-			if fetch_bg then
+		if rising_edge(clock) then
+			if reset then
+			elsif fetch_bg then
 				ppu_ale <= not bg_fetch_cycle(0);
 				case bg_fetch_cycle(2 downto 1) is
 					when "00" =>
@@ -633,66 +633,68 @@ begin
 		end if;
 	end process;
 	
-	process (reset, clock)
+	process (clock)
 	begin
-		if reset then
+		if rising_edge(clock) then
+			if reset then
 			--TODO?
-		elsif rising_edge(clock) then
-			if regs(1)(REG1_DRAW_BACKGROUND) or regs(1)(REG1_DRAW_SPRITES) then
-				if line_visible or line_pre_visible then
-					if (scanline_cycle >= std_logic_vector(to_unsigned(328, 9)) or scanline_cycle < std_logic_vector(to_unsigned(256, 9)))
-						and scanline_cycle(8 downto 3) /= "000000"
-						and scanline_cycle(2 downto 0) = "000" then
-						--increment horizontal position
-						if vram_address(4 downto 0) = "11111" then
-							vram_address(10) <= not vram_address(10);
-							vram_address(4 downto 0) <= "00000";
-						else
-							vram_address(4 downto 0) <= std_logic_vector(unsigned(vram_address(4 downto 0)) + 1);
+			else
+				if regs(1)(REG1_DRAW_BACKGROUND) or regs(1)(REG1_DRAW_SPRITES) then
+					if line_visible or line_pre_visible then
+						if (scanline_cycle >= std_logic_vector(to_unsigned(328, 9)) or scanline_cycle < std_logic_vector(to_unsigned(256, 9)))
+							and scanline_cycle(8 downto 3) /= "000000"
+							and scanline_cycle(2 downto 0) = "000" then
+							--increment horizontal position
+							if vram_address(4 downto 0) = "11111" then
+								vram_address(10) <= not vram_address(10);
+								vram_address(4 downto 0) <= "00000";
+							else
+								vram_address(4 downto 0) <= std_logic_vector(unsigned(vram_address(4 downto 0)) + 1);
+							end if;
+						end if;
+						case scanline_cycle is
+							when std_logic_vector(to_unsigned(256, 9)) =>
+								--increment vertical position
+								if vram_address(15 downto 13) = "111" then
+									vram_address(15 downto 13) <= "000";
+									if vram_address(9 downto 5) = std_logic_vector(to_unsigned(29, 5)) then
+										vram_address(11) <= not vram_address(11);
+									end if;
+									case vram_address(9 downto 5) is
+										when std_logic_vector(to_unsigned(29, 5)) | std_logic_vector(to_unsigned(31, 5)) =>
+											vram_address(9 downto 5) <= "00000";
+										when others =>
+											vram_address(9 downto 5) <= std_logic_vector(unsigned(vram_address(9 downto 5)) + 1);
+									end case;
+								else
+									vram_address(15 downto 12) <= std_logic_vector(unsigned(vram_address(15 downto 12)) + 1);
+								end if;
+							when std_logic_vector(to_unsigned(257, 9)) =>
+								--transfer horizontal position
+								vram_address(10) <= temporary_vram_address(10);
+								vram_address(4 downto 0) <= temporary_vram_address(4 downto 0);
+							when others =>
+						end case;
+					end if;
+					if line_pre_visible then
+						if scanline_cycle >= std_logic_vector(to_unsigned(280, 9))
+							and scanline_cycle <= std_logic_vector(to_unsigned(304, 9)) then
+							--transfer vertical position
+							vram_address(14 downto 11) <= temporary_vram_address(14 downto 11);
+							vram_address(9 downto 5) <= temporary_vram_address(9 downto 5);
 						end if;
 					end if;
-					case scanline_cycle is
-						when std_logic_vector(to_unsigned(256, 9)) =>
-							--increment vertical position
-							if vram_address(15 downto 13) = "111" then
-								vram_address(15 downto 13) <= "000";
-								if vram_address(9 downto 5) = std_logic_vector(to_unsigned(29, 5)) then
-									vram_address(11) <= not vram_address(11);
-								end if;
-								case vram_address(9 downto 5) is
-									when std_logic_vector(to_unsigned(29, 5)) | std_logic_vector(to_unsigned(31, 5)) =>
-										vram_address(9 downto 5) <= "00000";
-									when others =>
-										vram_address(9 downto 5) <= std_logic_vector(unsigned(vram_address(9 downto 5)) + 1);
-								end case;
-							else
-								vram_address(15 downto 12) <= std_logic_vector(unsigned(vram_address(15 downto 12)) + 1);
-							end if;
-						when std_logic_vector(to_unsigned(257, 9)) =>
-							--transfer horizontal position
-							vram_address(10) <= temporary_vram_address(10);
-							vram_address(4 downto 0) <= temporary_vram_address(4 downto 0);
-						when others =>
-					end case;
 				end if;
-				if line_pre_visible then
-					if scanline_cycle >= std_logic_vector(to_unsigned(280, 9))
-						and scanline_cycle <= std_logic_vector(to_unsigned(304, 9)) then
-						--transfer vertical position
-						vram_address(14 downto 11) <= temporary_vram_address(14 downto 11);
-						vram_address(9 downto 5) <= temporary_vram_address(9 downto 5);
-					end if;
-				end if;
-			end if;
-			scanline_cycle <= std_logic_vector(unsigned(scanline_cycle) + 1);
-			if scanline_cycle = std_logic_vector(to_unsigned(340, 9)) then
-				scanline_cycle <= (others => '0');
-				scanline_number <= std_logic_vector(unsigned(scanline_number) + 1);
-				if line_pre_visible then
-					frame_odd <= not frame_odd;
-					scanline_number <= (others => '0');
-					if frame_odd and regs(1)(REG1_DRAW_BACKGROUND) then
-						scanline_cycle <= std_logic_vector(to_unsigned(1, 9));
+				scanline_cycle <= std_logic_vector(unsigned(scanline_cycle) + 1);
+				if scanline_cycle = std_logic_vector(to_unsigned(340, 9)) then
+					scanline_cycle <= (others => '0');
+					scanline_number <= std_logic_vector(unsigned(scanline_number) + 1);
+					if line_pre_visible then
+						frame_odd <= not frame_odd;
+						scanline_number <= (others => '0');
+						if frame_odd and regs(1)(REG1_DRAW_BACKGROUND) then
+							scanline_cycle <= std_logic_vector(to_unsigned(1, 9));
+						end if;
 					end if;
 				end if;
 			end if;
@@ -703,107 +705,109 @@ begin
 		clock => clock,
 		dout => random_data);
 
-	process (cpu_mem_clock, reset)
+	process (cpu_mem_clock)
 	begin
-		if reset then
-			regs(0) <= x"00";
-			regs(1) <= x"00";
-		elsif rising_edge(cpu_mem_clock) then
-			if read_counter1 /= x"00000" then
-				read_counter1 <= std_logic_vector(unsigned(read_counter1) - 1);
+		if rising_edge(cpu_mem_clock) then
+			if reset then
+				regs(0) <= x"00";
+				regs(1) <= x"00";
 			else
-				cpu_din(7 downto 5) <= "000";
-			end if;
-			if read_counter2 /= x"00000" then
-				read_counter2 <= std_logic_vector(unsigned(read_counter2) - 1);
-			else
-				cpu_din(4 downto 0) <= "00000";
-			end if;
-			if cpu_cs then
-				if cpu_rw then --read
-					case cpu_addr is
-						when "010" =>
-							cpu_din(7 downto 6) <= regs(2)(7 downto 6);
-							address_bit <= '0';
-							vblank_clear_toggle <= not vblank_clear_toggle;
-							read_counter2 <= READ_COUNTER_RESET;
-						when "100" =>
-							cpu_din <= oam(to_integer(unsigned(oam_address)));
-							if oam_address(1 downto 0) = "10" then
-								cpu_din(2) <= '0';
-								cpu_din(3) <= '0';
-								cpu_din(4) <= '0';
-								read_counter1 <= READ_COUNTER_RESET;
+				if read_counter1 /= x"00000" then
+					read_counter1 <= std_logic_vector(unsigned(read_counter1) - 1);
+				else
+					cpu_din(7 downto 5) <= "000";
+				end if;
+				if read_counter2 /= x"00000" then
+					read_counter2 <= std_logic_vector(unsigned(read_counter2) - 1);
+				else
+					cpu_din(4 downto 0) <= "00000";
+				end if;
+				if cpu_cs then
+					if cpu_rw then --read
+						case cpu_addr is
+							when "010" =>
+								cpu_din(7 downto 6) <= regs(2)(7 downto 6);
+								address_bit <= '0';
+								vblank_clear_toggle <= not vblank_clear_toggle;
 								read_counter2 <= READ_COUNTER_RESET;
-							end if;
-						when "111" =>
-							pending_vram_read <= vram_address;
-							if vram_address < x"3f00" then
-								cpu_din <= data_buffer;
-								read_counter1 <= READ_COUNTER_RESET;
-								read_counter2 <= READ_COUNTER_RESET;
-							else
-								pending_vram_read(15) <= '0';
-								pending_vram_read(14) <= '0';
-								pending_vram_read(12) <= '0';
-								cpu_din(5 downto 0) <= palette(to_integer(unsigned(palette_addr)));
-							end if;
-							if regs(0)(REG0_VRAM_ADDRESS_INCREMENT) then
-								--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 1);
-							else
-								--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 32);
-							end if;
-						when others =>
-					end case;
-				else	--write
-					cpu_din <= cpu_dout;
-					read_counter1 <= READ_COUNTER_RESET;
-					read_counter2 <= READ_COUNTER_RESET;
-					case cpu_addr is
-						when "011" =>
-							oam_address <= cpu_dout;
-						when "100" =>
-							oam(to_integer(unsigned(oam_address))) <= cpu_dout;
-							oam_address <= std_logic_vector(unsigned(oam_address) + 1);
-						when "111" =>
-							if vram_address < x"3f00" then
-								pending_vram_write <= cpu_dout;
-							else
-								palette(to_integer(unsigned(palette_addr))) <= cpu_dout(5 downto 0);
-								--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 1);
-							end if;
-						when others =>
-							--TODO check write ignore counter
-							case cpu_addr is
-								when "001" =>
-									regs(1) <= cpu_dout;
-								when "000" =>
-									regs(0) <= cpu_dout;
-									temporary_vram_address(11 downto 10) <= cpu_dout(1 downto 0);
-									temporary_vram_address(15) <= '0';
-								when "101" =>
-									if not address_bit then
-										temporary_vram_address(4 downto 0) <= cpu_dout(7 downto 3);
-										scrollx <= "00000" & cpu_dout(2 downto 0);
-									else
-										temporary_vram_address(14 downto 12) <= cpu_dout(2 downto 0);
-										temporary_vram_address(6 downto 2) <= cpu_dout(7 downto 3);
+							when "100" =>
+								cpu_din <= oam(to_integer(unsigned(oam_address)));
+								if oam_address(1 downto 0) = "10" then
+									cpu_din(2) <= '0';
+									cpu_din(3) <= '0';
+									cpu_din(4) <= '0';
+									read_counter1 <= READ_COUNTER_RESET;
+									read_counter2 <= READ_COUNTER_RESET;
+								end if;
+							when "111" =>
+								pending_vram_read <= vram_address;
+								if vram_address < x"3f00" then
+									cpu_din <= data_buffer;
+									read_counter1 <= READ_COUNTER_RESET;
+									read_counter2 <= READ_COUNTER_RESET;
+								else
+									pending_vram_read(15) <= '0';
+									pending_vram_read(14) <= '0';
+									pending_vram_read(12) <= '0';
+									cpu_din(5 downto 0) <= palette(to_integer(unsigned(palette_addr)));
+								end if;
+								if regs(0)(REG0_VRAM_ADDRESS_INCREMENT) then
+									--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 1);
+								else
+									--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 32);
+								end if;
+							when others =>
+						end case;
+					else	--write
+						cpu_din <= cpu_dout;
+						read_counter1 <= READ_COUNTER_RESET;
+						read_counter2 <= READ_COUNTER_RESET;
+						case cpu_addr is
+							when "011" =>
+								oam_address <= cpu_dout;
+							when "100" =>
+								oam(to_integer(unsigned(oam_address))) <= cpu_dout;
+								oam_address <= std_logic_vector(unsigned(oam_address) + 1);
+							when "111" =>
+								if vram_address < x"3f00" then
+									pending_vram_write <= cpu_dout;
+								else
+									palette(to_integer(unsigned(palette_addr))) <= cpu_dout(5 downto 0);
+									--vram_address <= "00" & std_logic_vector(unsigned(vram_address(13 downto 0)) + 1);
+								end if;
+							when others =>
+								--TODO check write ignore counter
+								case cpu_addr is
+									when "001" =>
+										regs(1) <= cpu_dout;
+									when "000" =>
+										regs(0) <= cpu_dout;
+										temporary_vram_address(11 downto 10) <= cpu_dout(1 downto 0);
 										temporary_vram_address(15) <= '0';
-									end if;
-									address_bit <= not address_bit;
-								when "110" =>
-									if not address_bit then
-										regs(6) <= cpu_dout;
-										temporary_vram_address(13 downto 8) <= cpu_dout(5 downto 0);
-										temporary_vram_address(15 downto 14) <= "00";
-									else
-										temporary_vram_address(15 downto 0) <= x"00" & cpu_dout;
-										--vram_address <= x"00" & cpu_dout;
-									end if;
-									address_bit <= not address_bit;
-								when others =>
-							end case;
-					end case;
+									when "101" =>
+										if not address_bit then
+											temporary_vram_address(4 downto 0) <= cpu_dout(7 downto 3);
+											scrollx <= "00000" & cpu_dout(2 downto 0);
+										else
+											temporary_vram_address(14 downto 12) <= cpu_dout(2 downto 0);
+											temporary_vram_address(6 downto 2) <= cpu_dout(7 downto 3);
+											temporary_vram_address(15) <= '0';
+										end if;
+										address_bit <= not address_bit;
+									when "110" =>
+										if not address_bit then
+											regs(6) <= cpu_dout;
+											temporary_vram_address(13 downto 8) <= cpu_dout(5 downto 0);
+											temporary_vram_address(15 downto 14) <= "00";
+										else
+											temporary_vram_address(15 downto 0) <= x"00" & cpu_dout;
+											--vram_address <= x"00" & cpu_dout;
+										end if;
+										address_bit <= not address_bit;
+									when others =>
+								end case;
+						end case;
+					end if;
 				end if;
 			end if;
 		end if;
