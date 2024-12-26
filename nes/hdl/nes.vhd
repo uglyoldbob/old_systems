@@ -23,7 +23,7 @@ entity nes is
 		hdmi_line_done: out std_logic;
 		hdmi_line_ready: in std_logic;
 
-		testo: out std_logic;
+		testo: out std_logic_vector(1 downto 0);
 
 		rom_wb_ack: in std_logic;
 		rom_wb_d_miso: in std_logic_vector(2**rambits-1 downto 0);
@@ -210,7 +210,7 @@ begin
 
     cpu_reset <= cpu_only_reset or reset_sync;
 
-	testo <= pause;
+	testo <= pause & clock;
 
 	process (all)
 	begin
