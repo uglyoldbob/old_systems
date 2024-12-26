@@ -60,4 +60,5 @@ class Nes:
         platform.add_source(os.path.join(data_location, "uart.vhd"))
         platform.add_source(os.path.join(data_location, "wishbone_host_combiner.vhd"))
         platform.add_source(os.path.join(data_location, "nes_tripler.vhd"))
+        platform.add_source(os.path.join(data_location, "edge_detect.vhd"))
 
