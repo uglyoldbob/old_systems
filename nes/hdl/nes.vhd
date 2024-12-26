@@ -16,8 +16,6 @@ entity nes is
 		ignore_sync: in std_logic := '0';
 		hdmi_pixel_out: out std_logic_vector(23 downto 0);
 		hdmi_vsync: in std_logic;
-		hdmi_row: in std_logic_vector(10 downto 0);
-		hdmi_column: in std_logic_vector(11 downto 0);
 		hdmi_valid_out: out std_logic;
 		hdmi_pvalid: in std_logic;
 		hdmi_line_done: out std_logic;
