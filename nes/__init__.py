@@ -57,3 +57,7 @@ class Nes:
         platform.add_source(os.path.join(data_location, "nes.vhd"))
         platform.add_source(os.path.join(data_location, "resize_kernel.vhd"))
         platform.add_source(os.path.join(data_location, "sram.vhd"))
+        platform.add_source(os.path.join(data_location, "uart.vhd"))
+        platform.add_source(os.path.join(data_location, "wishbone_host_combiner.vhd"))
+        platform.add_source(os.path.join(data_location, "nes_tripler.vhd"))
+
