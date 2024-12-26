@@ -7,7 +7,7 @@ entity nes is
         FREQ: integer := 74250000;
 		clockbuf: string;
 		sim: in std_logic := '0';
-        softcpu: std_logic := '1';
+        softcpu: std_logic := '0';
 		ramtype: string := "wishbone";
         rambits: integer := 3;
 		random_noise: in std_logic := '1';
