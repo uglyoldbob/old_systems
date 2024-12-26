@@ -204,7 +204,8 @@ begin
 	cs_out <= cpu_ram_cs & cpu_ppu_cs & cpu_apu_cs & cpu_cartridge_cs;
 	
 	d_memory_clock <= memory_clock;
-	pause <= (cpu_memory_clock and not cpu_din_ready) or (fsync_pause and not ignore_sync);
+	--(cpu_memory_clock and not cpu_din_ready) or 
+	pause <= (fsync_pause and not ignore_sync);
 
     cpu_reset <= cpu_only_reset or reset_sync;
 
