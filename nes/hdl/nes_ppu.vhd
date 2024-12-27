@@ -4,9 +4,8 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes_ppu is
 	Generic (
-		sim: in std_logic;
-		random_noise: in std_logic := '1';
-		ramtype: string := "sram");
+		sim: integer;
+		random_noise: integer);
    Port (r_out: out std_logic_vector(7 downto 0);
 			g_out: out std_logic_vector(7 downto 0);
 			b_out: out std_logic_vector(7 downto 0);
@@ -499,16 +498,16 @@ begin
 		g_out_calc <= palette_g(to_integer(unsigned(pixel)));
 		b_out_calc <= palette_b(to_integer(unsigned(pixel)));
 
-		if sim = '1' and pixel_valid_buf = '0' then
+		if sim = 1 and pixel_valid_buf = '0' then
 			r_out_calc <= x"XX";
 			g_out_calc <= x"XX";
 			b_out_calc <= x"XX";
 		end if;
 		if pixel_valid_buf = '1' then
-			if sim then
+			if sim = 1 then
 				g_out_calc <= row_buf(7 downto 0);
 				b_out_calc <= column_buf(7 downto 0);
-			elsif random_noise then
+			elsif random_noise = 1 then
 				if frame_odd then
 					if row_buf(1) then
 						b_out_calc <= x"ff";
@@ -531,7 +530,7 @@ begin
 			palette_pixel <= palette(0);
 		end if;
 		
-		if random_noise then
+		if random_noise = 1 then
 			pixel <= random_data(5 downto 0);
 		elsif priority_sprite then
 			if sprite_pixel(6) then

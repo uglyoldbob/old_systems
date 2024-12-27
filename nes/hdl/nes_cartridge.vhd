@@ -5,8 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity nes_cartridge is
 	Generic (
 		ramtype: string := "sram";
-        rambits: integer := 3;
-		unified_ram: std_logic := '0');
+        rambits: integer := 3);
    Port (
 		rom_wb_ack: in std_logic;
 		rom_wb_d_miso: in std_logic_vector(2**rambits-1 downto 0);
@@ -135,7 +134,7 @@ begin
 		end if;
 	end process;
 	
-	memory: if (unified_ram = '0' and ramtype = "sram") generate
+	memory: if ramtype = "sram" generate
 		prg_rom: entity work.clocked_sram 
 			generic map (bits => 14)
 			port map(

@@ -4,14 +4,13 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes is
 	Generic (
-        FREQ: integer := 74250000;
-		clockbuf: string;
-		sim: in std_logic := '0';
-        softcpu: std_logic := '0';
-		ramtype: string := "wishbone";
-        rambits: integer := 3;
-		random_noise: in std_logic := '1';
-		unified_ram: std_logic := '0');
+        FREQ: integer;
+	clockbuf: string;
+	sim: integer;
+        softcpu: integer;
+	ramtype: string;
+        rambits: integer;
+	random_noise: integer);
    Port (
 		ignore_sync: in std_logic := '0';
 		hdmi_pixel_out: out std_logic_vector(23 downto 0);
@@ -231,7 +230,7 @@ begin
 		end if;
 	end process;
 
-    cpugen: if softcpu = '1' generate
+    cpugen: if softcpu = 1 generate
         bios: entity work.clocked_sram_init generic map(dbits => 32, bits => 5, filename => "riscv-bios-rust/combios.dat") port map (
             clock => clock, 
             cs => bios_sel, 
@@ -325,7 +324,7 @@ begin
                 bios_sel <= '0';
             end if;
 
-            if sim then
+            if sim = 1 then
                 Wishbone_DAT_MISO <= (others => 'X');
             else
                 Wishbone_DAT_MISO <= (others => '0');
@@ -465,8 +464,7 @@ begin
 	
 	ppu: entity work.nes_ppu generic map(
 		sim => sim,
-		random_noise => random_noise,
-		ramtype => ramtype) port map (
+		random_noise => random_noise) port map (
 		r_out => ppu_pixel(23 downto 16),
 		g_out => ppu_pixel(15 downto 8),
 		b_out => ppu_pixel(7 downto 0),
@@ -510,8 +508,7 @@ begin
 	
 	cartridge: entity work.nes_cartridge generic map(
 		ramtype => ramtype,
-        rambits => rambits,
-		unified_ram => unified_ram) port map (
+                rambits => rambits) port map (
 		rom_wb_ack => rom_wb_ack,
 		rom_wb_d_miso => rom_wb_d_miso,
 		rom_wb_d_mosi => rom_wb_d_mosi,

@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity nes_tripler is
 	 Generic (
-		sim: std_logic);
+		sim: integer);
 	 Port (
 		clock: in std_logic;
 		ppu_clock: in std_logic;
@@ -279,7 +279,7 @@ begin
 			when others => hdmi_pixel_out <= line_out_5_dout;
 		end case;
 
-		if sim = '1' and hdmi_valid_out = '0' then
+		if sim = 1 and hdmi_valid_out = '0' then
 			hdmi_pixel_out <= x"XXXXXX";
 		end if;
 	end process;

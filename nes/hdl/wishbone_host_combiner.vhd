@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity wishbone_host_combiner is
     generic (
-        sim: in std_logic := '0');
+        sim: integer);
     port (
         wba_ack: out std_logic;
 		wba_d_miso: out std_logic_vector(31 downto 0);
@@ -55,7 +55,7 @@ begin
                 wba_d_miso <= wbo_d_miso;
                 wbo_d_mosi <= wba_d_mosi;
                 wbo_addr <= wba_addr;
-                if sim then
+                if sim = 1 then
                     wbb_d_miso <= (others => 'X');
                 else
                     wbb_d_miso <= (others => '0');
@@ -74,7 +74,7 @@ begin
                 wbb_d_miso <= wbo_d_miso;
                 wbo_d_mosi <= wbb_d_mosi;
                 wbo_addr <= wbb_addr;
-                if sim then
+                if sim = 1 then
                     wba_d_miso <= (others => 'X');
                 else
                     wba_d_miso <= (others => '0');
@@ -90,7 +90,7 @@ begin
             when others => 
                 wba_ack <= '0';
                 wbb_ack <= '0';
-                if sim then
+                if sim = 1 then
 					wbo_addr <= (others => 'X');
                     wba_d_miso <= (others => 'X');
                     wbb_d_miso <= (others => 'X');
