@@ -6,7 +6,7 @@ entity nes_tripler is
 	 Generic (
 		sim: integer);
 	 Port (
-		clock: in std_logic;
+		clock: in std_logic;    
 		ppu_clock: in std_logic;
 		ignore_sync: in std_logic := '0';
 		fsync_pause: out std_logic;
@@ -168,38 +168,38 @@ architecture Behavioral of nes_tripler is
 begin
 	hdmi_valid_out <= hdmi_valid_calc2;
 	
-	hdmi_line_ready_detector: entity work.edge_detect port map(
+	hdmi_line_ready_detector: entity work.uob_edge_detect port map(
 	        clock => clock,
 	        sig => hdmi_line_ready,
 	        rising => hdmi_line_ready_rising);
 
-	hdmi_trigger: entity work.edge_detect port map(
+	hdmi_trigger: entity work.uob_edge_detect port map(
 		clock => clock,
 		sig => hdmi_valid_calc,
 		rising => hdmi_line_done_rising,
 		falling => hdmi_line_done);
 
-	hdmi_rising: entity work.edge_detect port map(
+	hdmi_rising: entity work.uob_edge_detect port map(
 		clock => clock,
 		sig => hdmi_start_output,
 		rising => hdmi_start_output_rising);
 
-	ppu_clock_rising_e: entity work.edge_detect port map(
+	ppu_clock_rising_e: entity work.uob_edge_detect port map(
 		clock => clock,
 		sig => ppu_clock,
 		rising => ppu_clock_rising);
 
-	ppu_hstart_rising_e: entity work.edge_detect port map(
+	ppu_hstart_rising_e: entity work.uob_edge_detect port map(
 		clock => clock,
 		sig => ppu_hstart,
 		rising => ppu_hstart_rising);
 
-	ppu_vstart_rising_e: entity work.edge_detect port map(
+	ppu_vstart_rising_e: entity work.uob_edge_detect port map(
 		clock => clock,
 		sig => ppu_vstart,
 		rising => ppu_vstart_rising);
 
-	hdmi_vsync_rising_e: entity work.edge_detect port map(
+	hdmi_vsync_rising_e: entity work.uob_edge_detect port map(
 		clock => clock,
 		sig => hdmi_vsync,
 		rising => hdmi_vsync_rising);

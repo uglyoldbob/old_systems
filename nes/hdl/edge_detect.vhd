@@ -2,15 +2,15 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity edge_detect is
+entity uob_edge_detect is
 	port (
 		clock: in std_logic;
 		sig: in std_logic;
 		rising: out std_logic;
 		falling: out std_logic);
-end edge_detect;
+end uob_edge_detect;
 
-architecture Behavioral of edge_detect is
+architecture Behavioral of uob_edge_detect is
 	signal delay_sig: std_logic;
 begin
 
