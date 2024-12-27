@@ -157,6 +157,7 @@ architecture Behavioral of nes_tripler is
 	signal hdmi_three_lines_counter: integer range 0 to 3 := 0;
 	signal hdmi_start_output: std_logic;
 	signal hdmi_start_output_rising: std_logic;
+	signal hdmi_line_ready_rising: std_logic;
 	
 	signal reset_sync: std_logic;
 	signal reset_chain: std_logic;
@@ -166,6 +167,11 @@ architecture Behavioral of nes_tripler is
 	signal hdmi_state: integer range 0 to 3 := 0;
 begin
 	hdmi_valid_out <= hdmi_valid_calc2;
+	
+	hdmi_line_ready_detector: entity work.edge_detect port map(
+	        clock => clock,
+	        sig => hdmi_line_ready,
+	        rising => hdmi_line_ready_rising);
 
 	hdmi_trigger: entity work.edge_detect port map(
 		clock => clock,
@@ -620,7 +626,7 @@ begin
 		vsync1 => ppu_vsync_sync,
 		vsync2 => hdmi_vsync_rising,
 		hsync1 => hdmi_line_done_rising,
-		hsync2 => hdmi_line_ready,
+		hsync2 => hdmi_line_ready_rising,
 		pause => fsync_pause_basic);
 	
 	rescale_kernel: entity work.resize_kernel3 port map(
