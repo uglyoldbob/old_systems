@@ -11,8 +11,9 @@ class HdmiGenerator(LiteXModule):
         self.vtg_sink = stream.Endpoint(video_timing_layout)
         self.source   = stream.Endpoint(video_data_layout)
         self.data = Signal(32)
-        self.specials += Instance("lfsr32",
+        self.specials += Instance("lfsr32_hpf",
             i_clock     = ClockSignal("hdmi"),
+            i_hp_enable = 1,
             o_dout    = self.data,
         )
         self.comb += self.vtg_sink.ready.eq(1)
