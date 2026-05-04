@@ -90,3 +90,5 @@ nes/hdl/dsim/*.log
 nes/hdl/dsim/dsim_work/*
 nes/hdl/rtl_work/*
 nes/hdl/transcript
+
+*.pyc
