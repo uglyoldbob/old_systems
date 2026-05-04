@@ -17,6 +17,7 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
+from litex.soc.cores.video import VideoS7HDMIPHY
 
 from litedram.modules import MT41J128M16
 from litedram.phy import s7ddrphy
@@ -32,17 +33,27 @@ class _CRG(LiteXModule):
         self.cd_sys4x     = ClockDomain()
         self.cd_sys4x_dqs = ClockDomain()
         self.cd_idelay    = ClockDomain()
-
+        self.cd_hdmi = ClockDomain();
+        self.cd_hdmi5 = ClockDomain();
+        self.reset = platform.request("cpu_reset") | self.rst
+        self.clock_in = platform.request("clk100")
         # # #
 
         self.pll = pll = S7PLL(speedgrade=-1)
-        self.comb += pll.reset.eq(platform.request("cpu_reset") | self.rst)
-        pll.register_clkin(platform.request("clk100"), 100e6)
+        self.comb += pll.reset.eq(self.reset)
+        pll.register_clkin(self.clock_in, 100e6)
         pll.create_clkout(self.cd_sys,       sys_clk_freq)
         pll.create_clkout(self.cd_sys4x,     4*sys_clk_freq)
         pll.create_clkout(self.cd_sys4x_dqs, 4*sys_clk_freq, phase=90)
         pll.create_clkout(self.cd_idelay,    200e6)
-        platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
+        platform.add_false_path_constraints(self.cd_sys.clk, pll.clkin) # Ignor
+        
+        self.pll2 = pll2 = S7PLL(speedgrade=-1)
+        self.comb += pll2.reset.eq(self.reset)
+        pll2.register_clkin(self.clock_in, 100e6)
+        pll2.create_clkout(self.cd_hdmi, 148.5e6)
+        pll2.create_clkout(self.cd_hdmi5, 742.5e6)
+        platform.add_false_path_constraints(self.cd_sys.clk, pll2.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
 
         self.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
@@ -88,6 +99,10 @@ class BaseSoC(SoCCore):
             self.leds = LedChaser(
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
+        
+        hdmi_phy = VideoS7HDMIPHY(self.platform.request("hdmi_out"))
+        self.submodules.hdmi_phy = ClockDomainsRenamer({"sys": "hdmi", "sys5x": "hdmi5"})(hdmi_phy)
+        self.add_video_colorbars("hdmi_out", self.hdmi_phy, timings="1920x1080@60Hz", clock_domain="hdmi")
 
 # Build --------------------------------------------------------------------------------------------
 
