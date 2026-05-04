@@ -51,8 +51,8 @@ class _CRG(LiteXModule):
         self.pll2 = pll2 = S7PLL(speedgrade=-1)
         self.comb += pll2.reset.eq(self.reset)
         pll2.register_clkin(self.clock_in, 100e6)
-        pll2.create_clkout(self.cd_hdmi, 148.5e6)
-        pll2.create_clkout(self.cd_hdmi5, 742.5e6)
+        pll2.create_clkout(self.cd_hdmi, 74.25e6)
+        pll2.create_clkout(self.cd_hdmi5, 371.25e6)
         platform.add_false_path_constraints(self.cd_sys.clk, pll2.clkin) # Ignore sys_clk to pll.clkin path created by SoC's rst.
 
         self.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
@@ -102,7 +102,7 @@ class BaseSoC(SoCCore):
         
         hdmi_phy = VideoS7HDMIPHY(self.platform.request("hdmi_out"))
         self.submodules.hdmi_phy = ClockDomainsRenamer({"sys": "hdmi", "sys5x": "hdmi5"})(hdmi_phy)
-        self.add_video_colorbars("hdmi_out", self.hdmi_phy, timings="1920x1080@60Hz", clock_domain="hdmi")
+        self.add_video_colorbars("hdmi_out", self.hdmi_phy, timings="1280x720@60Hz", clock_domain="hdmi")
 
 # Build --------------------------------------------------------------------------------------------
 
