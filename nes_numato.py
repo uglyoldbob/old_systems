@@ -18,11 +18,14 @@ from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
 from litex.soc.cores.led import LedChaser
 from litex.soc.cores.video import VideoS7HDMIPHY
+from litex.soc.interconnect import stream
 
 from litedram.modules import MT41J128M16
 from litedram.phy import s7ddrphy
 
 from liteeth.phy.s7rgmii import LiteEthPHYRGMII
+from .hdmi_gen import HdmiGenerator
+from .nes import Nes
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -60,6 +63,28 @@ class _CRG(LiteXModule):
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
+    def add_video_generator(self, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
+        # Imports.
+        from litex.soc.cores.video import VideoTimingGenerator, ColorBarsPattern
+
+        generator = HdmiGenerator()
+
+        # Video Timing Generator.
+        self.check_if_exists(f"{name}_vtg")
+        vtg = VideoTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1])
+        vtg = ClockDomainsRenamer(clock_domain)(vtg)
+        self.add_module(name=f"{name}_vtg", module=vtg)
+
+        # ColorsBars Pattern.
+        self.check_if_exists(name)
+        self.add_module(name=name, module=generator)
+
+        # Connect Video Timing Generator to ColorsBars Pattern.
+        self.comb += [
+            vtg.source.connect(generator.vtg_sink),
+            generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
+        ]
+
     def __init__(self, sys_clk_freq=100e6,
         with_led_chaser = True,
         with_ethernet   = False,
@@ -68,6 +93,8 @@ class BaseSoC(SoCCore):
         eth_dynamic_ip  = False,
         **kwargs):
         platform = numato_mimas_a7.Platform()
+
+        nes = Nes(platform)
 
         # CRG --------------------------------------------------------------------------------------
         self.crg = _CRG(platform, sys_clk_freq)
@@ -102,7 +129,8 @@ class BaseSoC(SoCCore):
         
         hdmi_phy = VideoS7HDMIPHY(self.platform.request("hdmi_out"))
         self.submodules.hdmi_phy = ClockDomainsRenamer({"sys": "hdmi", "sys5x": "hdmi5"})(hdmi_phy)
-        self.add_video_colorbars("hdmi_out", self.hdmi_phy, timings="1280x720@60Hz", clock_domain="hdmi")
+        
+        self.add_video_generator("hdmi_out", self.hdmi_phy, clock_domain="hdmi")
 
 # Build --------------------------------------------------------------------------------------------
 
