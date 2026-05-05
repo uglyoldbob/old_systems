@@ -24,7 +24,7 @@ from litedram.modules import MT41J128M16
 from litedram.phy import s7ddrphy
 
 from liteeth.phy.s7rgmii import LiteEthPHYRGMII
-from .hdmi_gen import HdmiGenerator
+from .hdmi_gen import HdmiGenerator, VideoTimingGenerator
 from .nes import Nes
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -64,9 +64,6 @@ class _CRG(LiteXModule):
 
 class BaseSoC(SoCCore):
     def add_video_generator(self, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
-        # Imports.
-        from litex.soc.cores.video import VideoTimingGenerator, ColorBarsPattern
-
         generator = HdmiGenerator()
 
         # Video Timing Generator.
@@ -82,6 +79,7 @@ class BaseSoC(SoCCore):
         # Connect Video Timing Generator to ColorsBars Pattern.
         self.comb += [
             vtg.source.connect(generator.vtg_sink),
+            vtg.extra_source.connect(generator.extra_sink),
             generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
         ]
 
@@ -137,6 +135,7 @@ class BaseSoC(SoCCore):
 def main():
     from litex.build.parser import LiteXArgumentParser
     parser = LiteXArgumentParser(platform=numato_mimas_a7.Platform, description="LiteX SoC on Mimas A7.")
+    parser.add_argument("--sim", action="store_true", help="Simulate the design")
     parser.add_target_argument("--sys-clk-freq",   default=100e6, type=float, help="System clock frequency.")
     parser.add_target_argument("--with-ethernet",  action="store_true",       help="Enable Ethernet support.")
     parser.add_target_argument("--eth-ip",         default="192.168.1.50",    help="Ethernet/Etherbone IP address.")
