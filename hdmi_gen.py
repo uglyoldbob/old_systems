@@ -138,17 +138,66 @@ class HdmiGenerator(LiteXModule):
         self.source   = stream.Endpoint(video_data_layout)
         self.data = Signal(32)
         self.random = Signal(32)
+        active = Signal()
         self.specials += Instance("lfsr32_hpf",
             i_clock     = ClockSignal("hdmi"),
             i_hp_enable = 1,
             o_dout    = self.random,
         )
-        self.sync.hdmi += [
-            If(self.vtg_sink.hcount == 0,
-                self.data.eq(255)
+        self.comb += [
+            If((self.vtg_sink.hcount > 255) & (self.vtg_sink.hcount < 1023),
+                active.eq(1)
             ).Else(
-                self.data.eq(self.random)
+                active.eq(0)
             ),
+        ]
+
+        enable = Signal()
+        enable_line = Signal()
+        counter = Signal(max=3)
+        active_r = Signal()
+        line_start = Signal()
+        line_counter = Signal(max=3)
+        self.sync.hdmi += active_r.eq(active)
+        self.comb += line_start.eq(active & ~active_r)
+        self.comb += enable.eq(line_counter == 0)
+
+        self.sync.hdmi += [
+            If(self.vtg_sink.vsync,
+                line_counter.eq(0),
+            ).Elif(line_start,
+                If(line_counter == 2,
+                    line_counter.eq(0),
+                ).Else(
+                    line_counter.eq(line_counter + 1),
+                ),
+            ),
+        ]
+
+        self.comb += enable_line.eq(active & (line_counter == 0))
+        self.comb += enable.eq(active & (counter == 0))
+
+        self.sync.hdmi += [
+            If(active,
+                If(counter == 2,
+                    counter.eq(0),
+                ).Else(
+                    counter.eq(counter + 1),
+                ),
+            ).Else(
+                counter.eq(0),
+            ),
+        ]
+        self.sync.hdmi += [
+            If(active, 
+               If(enable & enable_line,
+                    self.data.eq(self.random)
+                ).Else(
+                    self.data.eq(0)
+                ),
+            ).Else(
+                self.data.eq(255 * 256)
+            )
         ]
         self.comb += self.vtg_sink.ready.eq(1)
         self.comb += self.source.r.eq(self.data[0:8])
