@@ -45,6 +45,7 @@ class VideoTimingGenerator(LiteXModule):
             description="Vertical sync end.")
         self._vscan       = CSRStorage(vbits, vt["v_active"] + vt["v_blanking"] - 1,
             description="Vertical scan period.")
+        self._delay_lines = CSRStorage(vbits, 3, description="Number of vertical lines of signal for delay")
 
         # Video Timing Source
         self.source = source = stream.Endpoint(video_timing_layout)
@@ -60,10 +61,12 @@ class VideoTimingGenerator(LiteXModule):
         self.hsync_start = hsync_start = Signal(hbits)
         self.hsync_end   = hsync_end   = Signal(hbits)
         self.hscan       = hscan       = Signal(hbits)
+        self.delay_lines = delay_lines = Signal(vbits)
         self.specials += MultiReg(self._hres.storage,        hres)
         self.specials += MultiReg(self._hsync_start.storage, hsync_start)
         self.specials += MultiReg(self._hsync_end.storage,   hsync_end)
         self.specials += MultiReg(self._hscan.storage,       hscan)
+        self.specials += MultiReg(self._delay_lines.storage, delay_lines)
 
         # Resynchronize Vertical Timings to Video clock domain.
         self.vres        = vres        = Signal(vbits)
@@ -74,6 +77,11 @@ class VideoTimingGenerator(LiteXModule):
         self.specials += MultiReg(self._vsync_start.storage, vsync_start)
         self.specials += MultiReg(self._vsync_end.storage,   vsync_end)
         self.specials += MultiReg(self._vscan.storage,       vscan)
+
+        pre_vstart = Signal(vbits)
+        self.comb += pre_vstart.eq(vscan - delay_lines)
+        pre_active = Signal()
+        self.comb += pre_active.eq(source.vcount >= pre_vstart)
 
         # Generate timings.
         pre_active = Signal()
@@ -120,7 +128,7 @@ class VideoTimingGenerator(LiteXModule):
             )
         )
         self.extra_source = stream.Endpoint(video_extra_data_layout)
-        self.sync += self.extra_source.start.eq(source.hcount == 42)
+        self.sync += self.extra_source.start.eq(pre_active)
 
 class HdmiGenerator(LiteXModule):
     def __init__(self, default_video_timings="800x600@60Hz"):
@@ -135,11 +143,13 @@ class HdmiGenerator(LiteXModule):
             i_hp_enable = 1,
             o_dout    = self.random,
         )
-        self.comb += If(self.extra_sink.start,
-            self.data.eq(0)
-        ).Else(
-            self.data.eq(self.random)
-        )
+        self.sync.hdmi += [
+            If(self.vtg_sink.hcount == 0,
+                self.data.eq(255)
+            ).Else(
+                self.data.eq(self.random)
+            ),
+        ]
         self.comb += self.vtg_sink.ready.eq(1)
         self.comb += self.source.r.eq(self.data[0:8])
         self.comb += self.source.g.eq(self.data[8:16])
