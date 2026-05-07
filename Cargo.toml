@@ -1,7 +1,7 @@
 [workspace]
 
 exclude = ["nes/hdl/riscv-bios-rust"]
-members = [
+members = ["nes/hdmi",
     "nes/rust",
     "snes/rust",
 ]

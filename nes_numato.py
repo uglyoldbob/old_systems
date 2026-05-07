@@ -7,6 +7,8 @@
 # Copyright (c) 2020 Feliks Montez <feliks.montez@gmail.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
+# python3 -m old_systems.nes_numato --build
+
 from migen import *
 
 from litex.gen import *
@@ -79,7 +81,7 @@ class BaseSoC(SoCCore):
         # Connect Video Timing Generator to ColorsBars Pattern.
         self.comb += [
             vtg.source.connect(generator.vtg_sink),
-            vtg.extra_source.connect(generator.extra_sink),
+            vtg.esource.connect(generator.extra_sink),
             generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
         ]
 

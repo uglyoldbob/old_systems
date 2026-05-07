@@ -8,7 +8,9 @@ from litex.soc.cores.video import video_timing_layout
 from litex.soc.cores.video import hbits, vbits, video_timings
 
 video_extra_data_layout = [
-    ("start", 1),
+    ("row_process", 1),
+    ("col_process", 1),
+    ("process", 1),
 ]
 
 class VideoTimingGenerator(LiteXModule):
@@ -28,27 +30,30 @@ class VideoTimingGenerator(LiteXModule):
         # MMAP Control/Status Registers.
         self._enable      = CSRStorage(reset=1, description="Video Timing Generator enable.")
 
-        self._hres        = CSRStorage(hbits, vt["h_active"],
+        self._hres        = CSRStorage(hbits, 6 + vt["h_active"],
             description="Horizontal active resolution.")
-        self._hsync_start = CSRStorage(hbits, vt["h_active"] + vt["h_sync_offset"],
+        self._hsync_start = CSRStorage(hbits, 6 + vt["h_active"] + vt["h_sync_offset"],
             description="Horizontal sync start.")
-        self._hsync_end   = CSRStorage(hbits, vt["h_active"] + vt["h_sync_offset"] + vt["h_sync_width"],
+        self._hsync_end   = CSRStorage(hbits, 6 + vt["h_active"] + vt["h_sync_offset"] + vt["h_sync_width"],
             description="Horizontal sync end.")
         self._hscan       = CSRStorage(hbits, vt["h_active"] + vt["h_blanking"] - 1,
             description="Horizontal scan period.")
 
-        self._vres        = CSRStorage(vbits, vt["v_active"],
+        self._vres        = CSRStorage(vbits, 3 + vt["v_active"],
             description="Vertical active resolution.")
-        self._vsync_start = CSRStorage(vbits, vt["v_active"] + vt["v_sync_offset"],
+        self._vsync_start = CSRStorage(vbits, 3 + vt["v_active"] + vt["v_sync_offset"],
             description="Vertical sync start.")
-        self._vsync_end   = CSRStorage(vbits, vt["v_active"] + vt["v_sync_offset"] + vt["v_sync_width"],
+        self._vsync_end   = CSRStorage(vbits, 3 + vt["v_active"] + vt["v_sync_offset"] + vt["v_sync_width"],
             description="Vertical sync end.")
         self._vscan       = CSRStorage(vbits, vt["v_active"] + vt["v_blanking"] - 1,
             description="Vertical scan period.")
-        self._delay_lines = CSRStorage(vbits, 3, description="Number of vertical lines of signal for delay")
+        
+        self._pre_h_start = CSRStorage(hbits, 256, description="Start of processing for smaller image")
+        self._pre_h_stop = CSRStorage(hbits, 3 + 256 + 768, description="End of processing for smaller image")
 
         # Video Timing Source
         self.source = source = stream.Endpoint(video_timing_layout)
+        self.esource = esource = stream.Endpoint(video_extra_data_layout)
 
         # # #
 
@@ -61,12 +66,14 @@ class VideoTimingGenerator(LiteXModule):
         self.hsync_start = hsync_start = Signal(hbits)
         self.hsync_end   = hsync_end   = Signal(hbits)
         self.hscan       = hscan       = Signal(hbits)
-        self.delay_lines = delay_lines = Signal(vbits)
+        self.pre_h_start = pre_h_start = Signal(hbits)
+        self.pre_h_stop = pre_h_stop = Signal(hbits)
         self.specials += MultiReg(self._hres.storage,        hres)
         self.specials += MultiReg(self._hsync_start.storage, hsync_start)
         self.specials += MultiReg(self._hsync_end.storage,   hsync_end)
         self.specials += MultiReg(self._hscan.storage,       hscan)
-        self.specials += MultiReg(self._delay_lines.storage, delay_lines)
+        self.specials += MultiReg(self._pre_h_start.storage, pre_h_start)
+        self.specials += MultiReg(self._pre_h_stop.storage,  pre_h_stop)
 
         # Resynchronize Vertical Timings to Video clock domain.
         self.vres        = vres        = Signal(vbits)
@@ -78,13 +85,9 @@ class VideoTimingGenerator(LiteXModule):
         self.specials += MultiReg(self._vsync_end.storage,   vsync_end)
         self.specials += MultiReg(self._vscan.storage,       vscan)
 
-        pre_vstart = Signal(vbits)
-        self.comb += pre_vstart.eq(vscan - delay_lines)
-        pre_active = Signal()
-        self.comb += pre_active.eq(source.vcount >= pre_vstart)
-
         # Generate timings.
-        pre_active = Signal()
+        phactive = Signal()
+        pvactive = Signal()
         hactive = Signal()
         vactive = Signal()
         fsm = FSM(reset_state="IDLE")
@@ -109,7 +112,9 @@ class VideoTimingGenerator(LiteXModule):
                 # Increment HCount.
                 NextValue(source.hcount, source.hcount + 1),
                 # Generate HActive / HSync.
-                If(source.hcount == 0,           NextValue(hactive,       1)), # Start of HActive.
+                If(source.hcount == pre_h_start,           NextValue(phactive, 1)),
+                If(source.hcount == pre_h_stop,        NextValue(phactive,       0)),
+                If(source.hcount == 6,           NextValue(hactive,       1)), # Start of HActive.
                 If(source.hcount == hres,        NextValue(hactive,       0)), # End of HActive.
                 If(source.hcount == hsync_start, NextValue(source.hsync,  1)),
                 If(source.hcount == hsync_end,   NextValue(source.hsync,  0)), # End of HSync.
@@ -119,16 +124,21 @@ class VideoTimingGenerator(LiteXModule):
                     # Increment VCount.
                     NextValue(source.vcount, source.vcount + 1),
                     # Generate VActive / VSync.
-                    If(source.vcount == 0,           NextValue(vactive,       1)), # Start of VActive.
+                    If(source.vcount == 0,           NextValue(pvactive,       1)),
+                    If(source.vcount == 3,           NextValue(vactive,       1)), # Start of VActive.
                     If(source.vcount == vres,        NextValue(vactive,       0)), # End of VActive.
+                    If(source.vcount == vres,        NextValue(pvactive,       0)),
                     If(source.vcount == vsync_start, NextValue(source.vsync,  1)),
                     If(source.vcount == vsync_end,   NextValue(source.vsync,  0)), # End of VSync.
                     If(source.vcount == vscan,       NextValue(source.vcount, 0))  # End of VScan.
                 )
             )
         )
-        self.extra_source = stream.Endpoint(video_extra_data_layout)
-        self.sync += self.extra_source.start.eq(pre_active)
+        self.sync += [
+            self.esource.row_process.eq(phactive),
+            self.esource.col_process.eq(pvactive),
+        ]
+        self.comb += self.esource.process.eq(phactive & pvactive)
 
 class HdmiGenerator(LiteXModule):
     def __init__(self, default_video_timings="800x600@60Hz"):
@@ -138,63 +148,18 @@ class HdmiGenerator(LiteXModule):
         self.source   = stream.Endpoint(video_data_layout)
         self.data = Signal(32)
         self.random = Signal(32)
-        active = Signal()
         self.specials += Instance("lfsr32_hpf",
             i_clock     = ClockSignal("hdmi"),
             i_hp_enable = 1,
             o_dout    = self.random,
         )
-        self.comb += [
-            If((self.vtg_sink.hcount > 255) & (self.vtg_sink.hcount < 1023),
-                active.eq(1)
-            ).Else(
-                active.eq(0)
-            ),
-        ]
 
-        enable = Signal()
-        enable_line = Signal()
-        counter = Signal(max=3)
-        active_r = Signal()
-        line_start = Signal()
-        line_counter = Signal(max=3)
-        self.sync.hdmi += active_r.eq(active)
-        self.comb += line_start.eq(active & ~active_r)
-        self.comb += enable.eq(line_counter == 0)
+        self.submodules.nes_clock = ClockDomainsRenamer({"sys": "hdmi"})(NESClockScheduler())
+        self.comb += self.vtg_sink.connect(self.nes_clock.source)
 
         self.sync.hdmi += [
-            If(self.vtg_sink.vsync,
-                line_counter.eq(0),
-            ).Elif(line_start,
-                If(line_counter == 2,
-                    line_counter.eq(0),
-                ).Else(
-                    line_counter.eq(line_counter + 1),
-                ),
-            ),
-        ]
-
-        self.comb += enable_line.eq(active & (line_counter == 0))
-        self.comb += enable.eq(active & (counter == 0))
-
-        self.sync.hdmi += [
-            If(active,
-                If(counter == 2,
-                    counter.eq(0),
-                ).Else(
-                    counter.eq(counter + 1),
-                ),
-            ).Else(
-                counter.eq(0),
-            ),
-        ]
-        self.sync.hdmi += [
-            If(active, 
-               If(enable & enable_line,
-                    self.data.eq(self.random)
-                ).Else(
-                    self.data.eq(0)
-                ),
+            If(self.nes_clock.ppu_enable, 
+               self.data.eq(self.random)
             ).Else(
                 self.data.eq(255 * 256)
             )
@@ -206,3 +171,172 @@ class HdmiGenerator(LiteXModule):
         self.comb += self.source.hsync.eq(self.vtg_sink.hsync)
         self.comb += self.source.vsync.eq(self.vtg_sink.vsync)
         self.comb += self.source.de.eq(self.vtg_sink.de)
+
+# ---------------------------------------------------------------------
+# NES Clock Scheduler
+# ---------------------------------------------------------------------
+
+class NESClockScheduler(Module):
+    """
+    Generates NES PPU/CPU enable pulses synchronized to HDMI raster timing.
+
+    Features:
+    - Fully synchronous to HDMI pixel clock
+    - No generated clocks (enable pulses only)
+    - Spreads 341 NES PPU cycles across 3 HDMI lines
+    - Deterministic phase alignment
+    - Configurable horizontal start column
+    - CPU enable generated every 3 PPU enables
+    """
+
+    def __init__(self,
+        h_total      = 1650,
+        phase_offset = 256
+    ):
+
+        # -------------------------------------------------------------
+        # Video timing stream input
+        # -------------------------------------------------------------
+
+        self.source = source = stream.Endpoint(video_timing_layout)
+
+        # -------------------------------------------------------------
+        # Outputs
+        # -------------------------------------------------------------
+
+        self.ppu_enable = Signal()
+        self.cpu_enable = Signal()
+
+        # Debug/status
+        self.nes_dot    = Signal(9)  # 0..340
+        self.nes_line   = Signal(9)
+        self.third_line = Signal()
+
+        # -------------------------------------------------------------
+        # Constants
+        # -------------------------------------------------------------
+
+        NES_DOTS_PER_LINE = 341
+
+        # One NES scanline spans 3 HDMI lines
+        HDMI_CLKS_PER_NES_LINE = h_total * 3
+
+        # -------------------------------------------------------------
+        # Internal state
+        # -------------------------------------------------------------
+
+        v_mod3 = Signal(2)
+
+        # DDS/Bresenham accumulator
+        accum = Signal(max=HDMI_CLKS_PER_NES_LINE)
+
+        # CPU divider
+        cpu_div = Signal(2)
+
+        # NES scanline start pulse
+        line_start = Signal()
+
+        # Active rendering region
+        active = Signal()
+
+        # -------------------------------------------------------------
+        # Combinational logic
+        # -------------------------------------------------------------
+
+        self.comb += [
+
+            # Active HDMI region
+            active.eq(source.de),
+
+            # Every third HDMI line
+            self.third_line.eq(v_mod3 == 0),
+
+            # Start NES scanline at programmable column
+            line_start.eq(
+                active &
+                (source.hcount == phase_offset) &
+                (v_mod3 == 0)
+            )
+        ]
+
+        # -------------------------------------------------------------
+        # Main timing engine
+        # -------------------------------------------------------------
+
+        self.sync += [
+
+            # default outputs
+            self.ppu_enable.eq(0),
+            self.cpu_enable.eq(0),
+
+            # ---------------------------------------------------------
+            # Track HDMI lines modulo 3
+            # ---------------------------------------------------------
+            If(source.hcount == 0,
+
+                If(v_mod3 == 2,
+
+                    v_mod3.eq(0),
+
+                    # advance NES scanline counter
+                    If(self.nes_line == 261,
+                        self.nes_line.eq(0)
+                    ).Else(
+                        self.nes_line.eq(self.nes_line + 1)
+                    )
+
+                ).Else(
+                    v_mod3.eq(v_mod3 + 1)
+                )
+            ),
+
+            # ---------------------------------------------------------
+            # Start of NES scanline
+            # ---------------------------------------------------------
+            If(line_start,
+
+                accum.eq(0),
+                self.nes_dot.eq(0)
+            ).
+
+            # ---------------------------------------------------------
+            # Spread 341 PPU cycles evenly across 3 HDMI lines
+            # ---------------------------------------------------------
+            Elif(active,
+
+                accum.eq(accum + NES_DOTS_PER_LINE),
+
+                If(accum >= (HDMI_CLKS_PER_NES_LINE - NES_DOTS_PER_LINE),
+
+                    accum.eq(
+                        accum
+                        + NES_DOTS_PER_LINE
+                        - HDMI_CLKS_PER_NES_LINE
+                    ),
+
+                    # -------------------------------------------------
+                    # Generate PPU enable
+                    # -------------------------------------------------
+                    self.ppu_enable.eq(1),
+
+                    # NES dot counter
+                    If(self.nes_dot == 340,
+                        self.nes_dot.eq(0)
+                    ).Else(
+                        self.nes_dot.eq(self.nes_dot + 1)
+                    ),
+
+                    # -------------------------------------------------
+                    # Generate CPU enable every 3 PPU cycles
+                    # -------------------------------------------------
+                    If(cpu_div == 2,
+
+                        cpu_div.eq(0),
+                        self.cpu_enable.eq(1)
+
+                    ).Else(
+                        cpu_div.eq(cpu_div + 1)
+                    )
+                )
+            )
+        ]
