@@ -1,12 +1,15 @@
 #[derive(Clone, Copy, Default, Debug)]
 struct HdmiOutput {
+    phactive: bool,
     hactive: bool,
     hsync: bool,
     hcount: u16,
+    pvactive: bool,
     vactive: bool,
     vsync: bool,
     vcount: u16,
     de: bool,  // combinatorial: hactive & vactive
+    pde: bool,
 }
 
 // 1280x720@60Hz timings (matching LiteX video_timings)
@@ -59,6 +62,8 @@ fn main() {
     let mut vcount:  u16  = 0;
     let mut hactive: bool = false;
     let mut vactive: bool = false;
+    let mut phactive: bool = false;
+    let mut pvactive: bool = false;
     let mut hsync:   bool = false;
     let mut vsync:   bool = false;
 
@@ -71,7 +76,10 @@ fn main() {
             vactive,
             hsync,
             vsync,
+            phactive,
+            pvactive,
             de: hactive && vactive,
+            pde: phactive && pvactive,
         });
 
         // Now compute NextValue updates (all happen simultaneously, like hardware)
@@ -81,12 +89,15 @@ fn main() {
         let mut next_vactive = vactive;
         let mut next_hsync   = hsync;
         let mut next_vsync   = vsync;
+        let mut next_phactive = phactive;
+        let mut next_pvactive = pvactive;
 
         // Horizontal counters/flags
         next_hcount = hcount + 1;
-
+        if hcount == 0           { next_phactive = true;  }
         if hcount == 6           { next_hactive = true;  }
         if hcount == H_ACTIVE    { next_hactive = false; }
+        if hcount == H_ACTIVE    { next_phactive = false; }
         if hcount == HSYNC_START { next_hsync   = true;  }
         if hcount == HSYNC_END   { next_hsync   = false; }
         if hcount == HSCAN       { next_hcount  = 0;     }
@@ -95,8 +106,10 @@ fn main() {
         if hcount == HSYNC_START {
             next_vcount = vcount + 1;
 
+            if vcount == 0           { next_pvactive = true;  }
             if vcount == 3           { next_vactive = true;  }
             if vcount == V_ACTIVE    { next_vactive = false; }
+            if vcount == V_ACTIVE    { next_pvactive = false; }
             if vcount == VSYNC_START { next_vsync   = true;  }
             if vcount == VSYNC_END   { next_vsync   = false; }
             if vcount == VSCAN       { next_vcount  = 0;     }
@@ -107,13 +120,18 @@ fn main() {
         vcount  = next_vcount;
         hactive = next_hactive;
         vactive = next_vactive;
+        phactive = next_phactive;
+        pvactive = next_pvactive;
         hsync   = next_hsync;
         vsync   = next_vsync;
     }
 
     emit_image(&frame, "hactive.bmp", |p| p.hactive);
+    emit_image(&frame, "phactive.bmp", |p| p.phactive);
     emit_image(&frame, "hsync.bmp", |p| p.hsync);
     emit_image(&frame, "vactive.bmp", |p| p.vactive);
+    emit_image(&frame, "pvactive.bmp", |p| p.pvactive);
     emit_image(&frame, "vsync.bmp", |p| p.vsync);
     emit_image(&frame, "de.bmp", |p| p.de);
+    emit_image(&frame, "pde.bmp", |p| p.pde);
 }
