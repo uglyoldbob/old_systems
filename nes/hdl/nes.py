@@ -17,7 +17,7 @@ nes_system_outputs = [
     ("b", 8),
     ("row", 9),
     ("col", 9),
-    ("blob_test", 1),
+    ("last_frame_cycle", 1),
 ]
 
 class NesSystem(LiteXModule):
@@ -51,14 +51,21 @@ class NesSystem(LiteXModule):
                      NextValue(odd_frame, ~odd_frame),
                      )
                ),
+               If(nes_ppu_hcount == 338, 
+                  If(ppu_vcount == 261,
+                     If(odd_frame,
+                            NextValue(nes_ppu_hcount, nes_ppu_hcount + 2),
+                        )
+                     )
+                  ),
                outputs.r.eq(42),
                outputs.g.eq(42),
                outputs.b.eq(42),
             )       
         )
         self.comb += [
+            If((ppu_vcount == 261) & (nes_ppu_hcount == 340), outputs.last_frame_cycle.eq(1)).Else(outputs.last_frame_cycle.eq(0)),
             outputs.col.eq(nes_ppu_hcount),
             outputs.row.eq(ppu_vcount),
-            outputs.blob_test.eq(inputs.enable),
         ]
 

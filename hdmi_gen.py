@@ -7,6 +7,8 @@ from litex.soc.cores.video import video_data_layout
 from litex.soc.cores.video import video_timing_layout
 from litex.soc.cores.video import hbits, vbits, video_timings
 
+from .nes.hdl.nes import NesSystem, nes_system_inputs, nes_system_outputs
+
 video_extra_data_layout = [
     ("row_process", 1),
     ("col_process", 1),
@@ -312,13 +314,16 @@ class HdmiGenerator(LiteXModule):
         self.extra_sink = stream.Endpoint(video_extra_data_layout)
         self.vtg_sink = stream.Endpoint(video_timing_layout)
         self.source   = stream.Endpoint(video_data_layout)
-        self.data = Signal(32)
-        self.random = Signal(32)
-        #self.specials += Instance("lfsr32_hpf",
-        #    i_clock     = ClockSignal("sys"),
-        #    i_hp_enable = 1,
-        #    o_dout    = self.random,
-        #)
+
+        self.nes_inputs = stream.Endpoint(nes_system_inputs)
+        self.nes_outputs = stream.Endpoint(nes_system_outputs)
+
+        self.comb += self.nes_inputs.enable.eq(self.extra_sink.ppu_enable)
+        self.submodules.nes_system = NesSystem()
+        self.comb += self.nes_inputs.connect(self.nes_system.inputs)
+        self.comb += self.nes_system.outputs.connect(self.nes_outputs)
+        self.comb += self.nes_inputs.valid.eq(1)
+        self.comb += self.nes_outputs.ready.eq(1)
 
         self.submodules.display = SevenSegment(display_pads)
         self.comb += self.display.value.eq(self.extra_sink.last_ppu_enable_count[0:16])
@@ -327,31 +332,22 @@ class HdmiGenerator(LiteXModule):
         #self.submodules.nes_clock = ClockDomainsRenamer({"sys": "hdmi"})(NESClockScheduler())
         #self.comb += self.vtg_sink.connect(self.nes_clock.source)
 
-        self.sync += [
-            If(self.extra_sink.ppu_enable, 
-               self.data.eq(self.random)
-            ).Else(
-                self.data.eq(self.extra_sink.last_ppu_enable_count)
-                #If(self.extra_sink.count_good, self.data.eq(255 * 256)).Else(self.data.eq(255))
-            )
-        ]
         self.comb += self.vtg_sink.ready.eq(1)
-        self.comb += self.source.r.eq(self.data[0:8])
-        self.comb += self.source.g.eq(self.data[8:16])
-        self.comb += self.source.b.eq(self.data[16:24])
+        self.comb += self.source.r.eq(self.nes_outputs.r)
+        self.comb += self.source.g.eq(self.nes_outputs.g)
+        self.comb += self.source.b.eq(self.nes_outputs.b)
         self.comb += self.source.hsync.eq(self.vtg_sink.hsync)
         self.comb += self.source.vsync.eq(self.vtg_sink.vsync)
         self.comb += self.source.de.eq(self.vtg_sink.de)
 
         if debug is not None:
-            print(vars(debug))
             self.comb += [
                 debug.row.eq(self.vtg_sink.hcount),
                 debug.col.eq(self.vtg_sink.vcount),
-                debug.ppu_hcount.eq(self.extra_sink.ppu_count),
-                debug.ppu_vcount.eq(self.extra_sink.ppu_vcount),
-                debug.ppu_enable.eq(self.extra_sink.fast),
+                debug.ppu_hcount.eq(self.nes_outputs.row),
+                debug.ppu_vcount.eq(self.nes_outputs.col),
+                debug.ppu_enable.eq(self.extra_sink.ppu_enable),
                 debug.ppu_count.eq(self.extra_sink.last_ppu_enable_count),
                 debug.ppu_count2.eq(self.extra_sink.ppu_enable_count),
-                debug.pvactive.eq(self.extra_sink.col_process),
+                debug.pvactive.eq(self.nes_outputs.last_frame_cycle),
             ]
