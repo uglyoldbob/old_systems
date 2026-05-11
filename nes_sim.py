@@ -197,9 +197,15 @@ class SimSoC(SoCCore):
         self.check_if_exists(name)
         self.add_module(name=name, module=generator)
 
+        if debug is not None:
+            self.comb += [
+                debug.pvactive.eq(vtg.nes_frame_done),
+            ]
+
         # Connect Video Timing Generator to ColorsBars Pattern.
         self.comb += [
             vtg.source.connect(generator.vtg_sink),
+            vtg.nes_ppu_end.eq(generator.nes_outputs.last_frame_cycle),
             vtg.esource.connect(generator.extra_sink),
             generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
         ]

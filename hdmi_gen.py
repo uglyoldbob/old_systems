@@ -37,6 +37,8 @@ class VideoTimingGenerator(LiteXModule):
         else:
             self.video_timings = vt = default_video_timings
 
+        self.nes_ppu_end = Signal()
+
         # MMAP Control/Status Registers.
         self._enable      = CSRStorage(reset=1, description="Video Timing Generator enable.")
 
@@ -109,6 +111,8 @@ class VideoTimingGenerator(LiteXModule):
         pvactive_fast = Signal()
         hactive = Signal()
         vactive = Signal()
+        self.nes_frame_done = nes_frame_done = Signal()
+        self.last_cycle_done = last_cycle_done = Signal()
         fsm = FSM(reset_state="IDLE")
         fsm = ResetInserter()(fsm)
         self.fsm = fsm
@@ -125,6 +129,8 @@ class VideoTimingGenerator(LiteXModule):
             NextValue(esource.ppu_count,  0),
             NextValue(esource.ppu_vcount,  0),
             NextValue(esource.ppu_enable_count, 0),
+            NextValue(nes_frame_done, 0),
+            NextValue(last_cycle_done, 0),
             NextState("RUN")
         )
         self.comb += source.de.eq(hactive & vactive) # DE when both HActive and VActive.
@@ -132,6 +138,7 @@ class VideoTimingGenerator(LiteXModule):
         self.sync += source.last.eq( (source.hcount == hscan) & (source.vcount == vscan)),
         fsm.act("RUN",
             source.valid.eq(1),
+            If(self.nes_ppu_end,        NextValue(nes_frame_done,       1)),
             If(source.ready,
                 # Increment HCount.
                 NextValue(source.hcount, source.hcount + 1),
@@ -161,6 +168,7 @@ class VideoTimingGenerator(LiteXModule):
                      .Else(
                         NextValue(esource.ppu_vcount, 0),
                     ),
+                    If(nes_frame_done, NextValue(esource.ppu_vcount, 0)),
                     If(esource.ppu_vcount == 2,
                        NextValue(esource.ppu_vcount, 0),
                        NextValue(esource.ppu_col, 0),
@@ -172,16 +180,22 @@ class VideoTimingGenerator(LiteXModule):
                     If(source.vcount == vres,        NextValue(vactive,       0)), # End of VActive.
                     If(source.vcount == ppu_vres,        NextValue(pvactive_fast,       1)),
                     If(source.vcount == ppu_vres,        NextValue(pvactive,       0)),
-                    If(source.vcount == ppu_vres2,        NextValue(pvactive_fast,       0)),
                     If(source.vcount == vsync_start, NextValue(source.vsync,  1)),
                     If(source.vcount == vsync_end,   NextValue(source.vsync,  0)), # End of VSync.
                     If(source.vcount == vscan,
                        NextValue(esource.last_ppu_enable_count, esource.ppu_enable_count),
                         NextValue(source.vcount, 0),
+                        NextValue(nes_frame_done, 0),
                         NextValue(esource.ppu_enable_count, 0),
                     ),
                 )
-            )
+            ),
+            If(esource.ppu_enable & nes_frame_done, NextValue(last_cycle_done, 1)).Else(NextValue(last_cycle_done, 0)),
+            If(last_cycle_done, 
+               NextValue(phactive, 0),
+               NextValue(esource.ppu_count, 0),
+               NextValue(esource.ppu_vcount, 0),
+               ),
         )
         self.sync += [
             self.esource.row_process.eq(phactive),
@@ -342,12 +356,11 @@ class HdmiGenerator(LiteXModule):
 
         if debug is not None:
             self.comb += [
-                debug.row.eq(self.vtg_sink.hcount),
-                debug.col.eq(self.vtg_sink.vcount),
+                debug.row.eq(self.extra_sink.ppu_count),
+                debug.col.eq(self.extra_sink.ppu_vcount),
                 debug.ppu_hcount.eq(self.nes_outputs.row),
                 debug.ppu_vcount.eq(self.nes_outputs.col),
                 debug.ppu_enable.eq(self.extra_sink.ppu_enable),
                 debug.ppu_count.eq(self.extra_sink.last_ppu_enable_count),
                 debug.ppu_count2.eq(self.extra_sink.ppu_enable_count),
-                debug.pvactive.eq(self.nes_outputs.last_frame_cycle),
             ]
