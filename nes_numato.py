@@ -66,7 +66,7 @@ class _CRG(LiteXModule):
 
 class BaseSoC(SoCCore):
     def add_video_generator(self, display_pads, output_pads, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
-        generator = HdmiGenerator(display_pads, output_pads)
+        generator = ClockDomainsRenamer({"sys": clock_domain})(HdmiGenerator(display_pads, output_pads))
 
         # Video Timing Generator.
         self.check_if_exists(f"{name}_vtg")

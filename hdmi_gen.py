@@ -348,6 +348,8 @@ class HdmiGenerator(LiteXModule):
             self.comb += [
                 debug.row.eq(self.vtg_sink.hcount),
                 debug.col.eq(self.vtg_sink.vcount),
+                debug.ppu_hcount.eq(self.extra_sink.ppu_count),
+                debug.ppu_vcount.eq(self.extra_sink.ppu_vcount),
                 debug.ppu_enable.eq(self.extra_sink.fast),
                 debug.ppu_count.eq(self.extra_sink.last_ppu_enable_count),
                 debug.ppu_count2.eq(self.extra_sink.ppu_enable_count),

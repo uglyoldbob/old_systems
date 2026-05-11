@@ -168,6 +168,8 @@ _io = [
         Subsignal("ppu_count", Pins(20)),
         Subsignal("ppu_count2", Pins(20)),
         Subsignal("pvactive", Pins(1)),
+        Subsignal("ppu_hcount", Pins(20)),
+        Subsignal("ppu_vcount", Pins(20)),
     ),
 ]
 
