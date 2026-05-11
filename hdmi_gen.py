@@ -18,7 +18,7 @@ video_extra_data_layout = [
     ("ppu_vcount", 9),
     ("ppu_enable_count", 17),
     ("last_ppu_enable_count", 17),
-    ("count_good", 1),
+    ("fast", 1),
 ]
 
 class VideoTimingGenerator(LiteXModule):
@@ -104,6 +104,7 @@ class VideoTimingGenerator(LiteXModule):
         # Generate timings.
         phactive = Signal()
         pvactive = Signal()
+        pvactive_fast = Signal()
         hactive = Signal()
         vactive = Signal()
         fsm = FSM(reset_state="IDLE")
@@ -154,7 +155,8 @@ class VideoTimingGenerator(LiteXModule):
                     If(pvactive,
                         NextValue(esource.ppu_vcount, esource.ppu_vcount + 1),
                         NextValue(esource.ppu_col, 0),
-                    ).Else(
+                    ).Elif(pvactive_fast, NextValue(esource.ppu_vcount, 1))
+                     .Else(
                         NextValue(esource.ppu_vcount, 0),
                     ),
                     If(esource.ppu_vcount == 2,
@@ -166,13 +168,13 @@ class VideoTimingGenerator(LiteXModule):
                     If(source.vcount == 0,           NextValue(pvactive,       1)),
                     If(source.vcount == 3,           NextValue(vactive,       1)), # Start of VActive.
                     If(source.vcount == vres,        NextValue(vactive,       0)), # End of VActive.
+                    If(source.vcount == ppu_vres,        NextValue(pvactive_fast,       1)),
                     If(source.vcount == ppu_vres,        NextValue(pvactive,       0)),
+                    If(source.vcount == ppu_vres2,        NextValue(pvactive_fast,       0)),
                     If(source.vcount == vsync_start, NextValue(source.vsync,  1)),
                     If(source.vcount == vsync_end,   NextValue(source.vsync,  0)), # End of VSync.
-                    If(source.vcount == vsync_end,
-                        NextValue(esource.last_ppu_enable_count, esource.ppu_enable_count),
-                    ),
                     If(source.vcount == vscan,
+                       NextValue(esource.last_ppu_enable_count, esource.ppu_enable_count),
                         NextValue(source.vcount, 0),
                         NextValue(esource.ppu_enable_count, 0),
                     ),
@@ -182,9 +184,9 @@ class VideoTimingGenerator(LiteXModule):
         self.sync += [
             self.esource.row_process.eq(phactive),
             self.esource.col_process.eq(pvactive),
+            self.esource.fast.eq(pvactive_fast),
         ]
         self.comb += self.esource.process.eq(phactive & pvactive)
-        self.comb += If(esource.last_ppu_enable_count == 89342, self.esource.count_good.eq(1)).Else(self.esource.count_good.eq(0))
         self.comb += If((esource.ppu_vcount == 1) & (esource.ppu_count == 1),
             self.esource.ppu_enable.eq(1)).Else(self.esource.ppu_enable.eq(0))
 
@@ -306,30 +308,30 @@ class SevenSegment(LiteXModule):
             ]
 
 class HdmiGenerator(LiteXModule):
-    def __init__(self, display_pads, output_pads):
+    def __init__(self, display_pads, output_pads, debug=None):
         self.extra_sink = stream.Endpoint(video_extra_data_layout)
         self.vtg_sink = stream.Endpoint(video_timing_layout)
         self.source   = stream.Endpoint(video_data_layout)
         self.data = Signal(32)
         self.random = Signal(32)
-        self.specials += Instance("lfsr32_hpf",
-            i_clock     = ClockSignal("hdmi"),
-            i_hp_enable = 1,
-            o_dout    = self.random,
-        )
+        #self.specials += Instance("lfsr32_hpf",
+        #    i_clock     = ClockSignal("sys"),
+        #    i_hp_enable = 1,
+        #    o_dout    = self.random,
+        #)
 
-        self.submodules.display = ClockDomainsRenamer({"sys": "hdmi"})(SevenSegment(display_pads))
+        self.submodules.display = SevenSegment(display_pads)
         self.comb += self.display.value.eq(self.extra_sink.last_ppu_enable_count[0:16])
         self.comb += output_pads[0].eq(self.extra_sink.ppu_enable)
 
         #self.submodules.nes_clock = ClockDomainsRenamer({"sys": "hdmi"})(NESClockScheduler())
         #self.comb += self.vtg_sink.connect(self.nes_clock.source)
 
-        self.sync.hdmi += [
+        self.sync += [
             If(self.extra_sink.ppu_enable, 
                self.data.eq(self.random)
             ).Else(
-                self.data.eq((self.extra_sink.last_ppu_enable_count))
+                self.data.eq(self.extra_sink.last_ppu_enable_count)
                 #If(self.extra_sink.count_good, self.data.eq(255 * 256)).Else(self.data.eq(255))
             )
         ]
@@ -340,3 +342,14 @@ class HdmiGenerator(LiteXModule):
         self.comb += self.source.hsync.eq(self.vtg_sink.hsync)
         self.comb += self.source.vsync.eq(self.vtg_sink.vsync)
         self.comb += self.source.de.eq(self.vtg_sink.de)
+
+        if debug is not None:
+            print(vars(debug))
+            self.comb += [
+                debug.row.eq(self.vtg_sink.hcount),
+                debug.col.eq(self.vtg_sink.vcount),
+                debug.ppu_enable.eq(self.extra_sink.fast),
+                debug.ppu_count.eq(self.extra_sink.last_ppu_enable_count),
+                debug.ppu_count2.eq(self.extra_sink.ppu_enable_count),
+                debug.pvactive.eq(self.extra_sink.col_process),
+            ]
