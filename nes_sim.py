@@ -240,6 +240,9 @@ class SimSoC(SoCCore):
         # Platform ---------------------------------------------------------------------------------
         platform = Platform()
 
+        nes = Nes()
+        nes.include_verilog(platform)
+
         # Parameters -------------------------------------------------------------------------------
         sys_clk_freq = int(1e6)
 

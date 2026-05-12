@@ -18,10 +18,11 @@ nes_system_outputs = [
     ("row", 9),
     ("col", 9),
     ("last_frame_cycle", 1),
+    ("vblank", 1),
 ]
 
 class NesSystem(LiteXModule):
-    def __init__(self):
+    def __init__(self, debug=None):
         self.inputs = inputs = stream.Endpoint(nes_system_inputs)
         self.outputs = outputs = stream.Endpoint(nes_system_outputs)
 
@@ -34,10 +35,33 @@ class NesSystem(LiteXModule):
         self.comb += fsm.reset.eq(0)
         self.submodules.fsm = fsm
 
+        self.registers = registers = [Signal(8, name=f"registers_{i}") for i in range(8)]
+        self.address_bit = address_bit = Signal()
+        self.write_ignore_counter = write_ignore_counter = Signal(16)
+        self.write_enabled = write_enabled = Signal()
+        self.sim_done = Signal()
+
+        if debug is not None:
+            self.specials += Instance("sim_finish",
+                i_clk=ClockSignal(),
+                i_trigger=self.sim_done,
+            )
+
         fsm.act("IDLE",
                 NextValue(nes_ppu_hcount, 42),
                 NextValue(ppu_vcount, 0),
                 NextValue(odd_frame, 0),
+                NextValue(address_bit, 0),
+                NextValue(write_ignore_counter, 29658),
+                NextValue(registers[0], 0),
+                NextValue(registers[1], 0),
+                NextValue(registers[2], 0),
+                NextValue(registers[3], 0),
+                NextValue(registers[4], 0),
+                NextValue(registers[5], 0),
+                NextValue(registers[6], 0),
+                NextValue(registers[7], 0),
+                NextValue(self.sim_done, 0),
                 NextState("RUN")
         )
         fsm.act("RUN",
@@ -49,7 +73,10 @@ class NesSystem(LiteXModule):
                   If(ppu_vcount == 261,
                      NextValue(ppu_vcount, 0),
                      NextValue(odd_frame, ~odd_frame),
-                     )
+                     If(odd_frame, 
+                        NextValue(self.sim_done, 1)
+                     ),
+                  ),
                ),
                If(nes_ppu_hcount == 338, 
                   If(ppu_vcount == 261,
@@ -58,6 +85,7 @@ class NesSystem(LiteXModule):
                         )
                      )
                   ),
+               If(write_ignore_counter > 0, NextValue(write_ignore_counter, write_ignore_counter - 1)),
                outputs.r.eq(42),
                outputs.g.eq(42),
                outputs.b.eq(42),
@@ -65,6 +93,7 @@ class NesSystem(LiteXModule):
         )
         self.comb += [
             If((ppu_vcount == 261) & (nes_ppu_hcount == 340), outputs.last_frame_cycle.eq(1)).Else(outputs.last_frame_cycle.eq(0)),
+            If(write_ignore_counter == 0, write_enabled.eq(1)).Else(write_enabled.eq(0)),
             outputs.col.eq(nes_ppu_hcount),
             outputs.row.eq(ppu_vcount),
         ]

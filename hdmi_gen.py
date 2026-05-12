@@ -3,11 +3,32 @@ from migen.genlib.cdc import MultiReg
 from litex.gen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
-from litex.soc.cores.video import video_data_layout
-from litex.soc.cores.video import video_timing_layout
 from litex.soc.cores.video import hbits, vbits, video_timings
 
 from .nes.hdl.nes import NesSystem, nes_system_inputs, nes_system_outputs
+
+video_timing_layout = [
+    # Synchronization signals.
+    ("hsync", 1),
+    ("vsync", 1),
+    ("de",    1),
+    # Extended/Optional synchronization signals.
+    ("hres",   hbits),
+    ("vres",   vbits),
+    ("hcount", hbits),
+    ("vcount", vbits),
+]
+
+video_data_layout = [
+    # Synchronization signals.
+    ("hsync", 1),
+    ("vsync", 1),
+    ("de",    1),
+    # Data signals.
+    ("r",     8),
+    ("g",     8),
+    ("b",     8),
+]
 
 video_extra_data_layout = [
     ("row_process", 1),
@@ -333,7 +354,7 @@ class HdmiGenerator(LiteXModule):
         self.nes_outputs = stream.Endpoint(nes_system_outputs)
 
         self.comb += self.nes_inputs.enable.eq(self.extra_sink.ppu_enable)
-        self.submodules.nes_system = NesSystem()
+        self.submodules.nes_system = NesSystem(debug)
         self.comb += self.nes_inputs.connect(self.nes_system.inputs)
         self.comb += self.nes_system.outputs.connect(self.nes_outputs)
         self.comb += self.nes_inputs.valid.eq(1)

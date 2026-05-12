@@ -96,7 +96,8 @@ class BaseSoC(SoCCore):
 
         test = platform.request("test")
 
-        nes = Nes(platform)
+        nes = Nes()
+        nes.include_verilog(platform)
 
         # CRG --------------------------------------------------------------------------------------
         self.crg = _CRG(platform, sys_clk_freq)
