@@ -1,34 +1,167 @@
 from migen import *
 from migen.genlib.cdc import MultiReg
+from litex.build.io import SDROutput, DDROutput
 from litex.gen import *
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect import stream
+from litex.soc.cores.code_tmds import TMDSEncoder
+from litex.soc.cores.video import video_data_layout
+from litex.soc.cores.video import video_timing_layout
 from litex.soc.cores.video import hbits, vbits, video_timings
 
 from .nes.hdl.nes import NesSystem, nes_system_inputs, nes_system_outputs
 
-video_timing_layout = [
-    # Synchronization signals.
-    ("hsync", 1),
-    ("vsync", 1),
-    ("de",    1),
-    # Extended/Optional synchronization signals.
-    ("hres",   hbits),
-    ("vres",   vbits),
-    ("hcount", hbits),
-    ("vcount", vbits),
-]
+# ============================================================
+# 32-bit LFSR
+# Equivalent to VHDL entity: lfsr32
+# ============================================================
 
-video_data_layout = [
+class LFSR32(LiteXModule):
+    def __init__(self):
+        self.dout = Signal(32)
+
+        # Internal state
+        d     = Signal(32, reset=0x00000001)
+        reset = Signal()
+        e     = Signal()
+
+        # Outputs
+        self.comb += self.dout.eq(d)
+
+        # e <= d(31) xnor d(21) xnor d(1) xnor d(0)
+        #
+        # XNOR of 4 bits:
+        # result = ~(a ^ b ^ c ^ d)
+        #
+        self.comb += e.eq(~(d[31] ^ d[21] ^ d[1] ^ d[0]))
+
+        # if d == 0 -> reset = 1
+        self.comb += reset.eq(d == 0)
+
+        # d <= d(30 downto 0) & (reset or e)
+        self.sync += d.eq(Cat(reset | e, d[:31]))
+
+
+# ============================================================
+# 8-bit LFSR
+# Equivalent to VHDL entity: lfsr8
+# ============================================================
+
+class LFSR8(LiteXModule):
+    def __init__(self):
+        self.dout = Signal(8)
+
+        # Internal state
+        d     = Signal(8, reset=0x01)
+        reset = Signal()
+        e     = Signal()
+
+        # Outputs
+        self.comb += self.dout.eq(d)
+
+        # e <= d(7) xnor d(5) xnor d(4) xnor d(3)
+        self.comb += e.eq(~(d[7] ^ d[5] ^ d[4] ^ d[3]))
+
+        # Zero-state recovery
+        self.comb += reset.eq(d == 0)
+
+        # Shift
+        self.sync += d.eq(Cat(reset | e, d[:7]))
+
+
+# ============================================================
+# 32-bit LFSR with High-Pass Filter
+# Equivalent to VHDL entity: lfsr32_hpf
+# ============================================================
+
+class LFSR32HPF(LiteXModule):
+    def __init__(self):
+        self.hp_enable = Signal()
+        self.dout      = Signal(32)
+
+        # ====================================================
+        # LFSR
+        # ====================================================
+
+        d     = Signal(32, reset=0x00000001)
+        reset = Signal()
+        e     = Signal()
+
+        self.comb += [
+            e.eq(~(d[31] ^ d[21] ^ d[1] ^ d[0])),
+            reset.eq(d == 0),
+        ]
+
+        self.sync += d.eq(Cat(reset | e, d[:31]))
+
+        # ====================================================
+        # Filter State
+        # ====================================================
+
+        x_in  = Signal((32, True))
+        x_z1  = Signal((32, True))
+        y_z1  = Signal((32, True))
+        y_out = Signal((32, True))
+
+        self.comb += x_in.eq(d)
+
+        # Temporary 33-bit signed intermediates
+        diff = Signal((33, True))
+        summ = Signal((33, True))
+        ytmp = Signal((33, True))
+
+        self.comb += [
+            diff.eq(x_in - x_z1),
+            summ.eq(y_z1 + diff),
+            ytmp.eq(summ >> 1),   # alpha = 0.5
+        ]
+
+        # ====================================================
+        # Filter Process
+        # ====================================================
+
+        self.sync += [
+            If(~self.hp_enable,
+                x_z1.eq(x_in),
+                y_z1.eq(0),
+                y_out.eq(x_in)
+            ).Else(
+                x_z1.eq(x_in),
+                y_z1.eq(ytmp[:32]),
+                y_out.eq(ytmp[:32]),
+            )
+        ]
+
+        # ====================================================
+        # Output Select
+        # ====================================================
+
+        self.comb += If(
+            self.hp_enable,
+            self.dout.eq(y_out)
+        ).Else(
+            self.dout.eq(d)
+        )
+
+hdmi_video_data_layout = [
     # Synchronization signals.
     ("hsync", 1),
     ("vsync", 1),
-    ("de",    1),
+    ("mode",  3),
     # Data signals.
     ("r",     8),
     ("g",     8),
     ("b",     8),
+    ("ctl",   4),
+    ("aux",  12),
 ]
+
+MODE_VIDEO = 0
+MODE_VIDEO_GUARD = 1
+MODE_DATA_GUARD = 2
+MODE_DATA = 3
+MODE_DATA_PREAMBLE = 4
+MODE_VIDEO_PREAMBLE = 5
 
 video_extra_data_layout = [
     ("row_process", 1),
@@ -43,6 +176,36 @@ video_extra_data_layout = [
     ("last_ppu_enable_count", 17),
     ("fast", 1),
 ]
+
+terc4_table = {
+    0x0: 0b1010011100,
+    0x1: 0b1001100011,
+    0x2: 0b1011100100,
+    0x3: 0b1011100010,
+    0x4: 0b0101110001,
+    0x5: 0b0100011110,
+    0x6: 0b0110001110,
+    0x7: 0b0100111100,
+    0x8: 0b1011001100,
+    0x9: 0b0100111001,
+    0xA: 0b0110011100,
+    0xB: 0b1011000110,
+    0xC: 0b1010001110,
+    0xD: 0b1001110001,
+    0xE: 0b0101100011,
+    0xF: 0b1011000011,
+}
+
+class TERC4Encoder(Module):
+    def __init__(self):
+        self.d = Signal(4)
+        self.q = Signal(10)
+
+        cases = {}
+        for k, v in terc4_table.items():
+            cases[k] = self.q.eq(v)
+
+        self.comb += Case(self.d, cases)
 
 class VideoTimingGenerator(LiteXModule):
     def __init__(self, default_video_timings="800x600@60Hz"):
@@ -227,6 +390,79 @@ class VideoTimingGenerator(LiteXModule):
         self.comb += If((esource.ppu_vcount == 1) & (esource.ppu_count == 1),
             self.esource.ppu_enable.eq(1)).Else(self.esource.ppu_enable.eq(0))
 
+class VideoGenericHdmiPHY(LiteXModule):
+    def __init__(self, pads, clock_domain="sys"):
+        self.sink = sink = stream.Endpoint(hdmi_video_data_layout)
+
+        # Always ack Sink, no backpressure.
+        self.comb += sink.ready.eq(1)
+
+        encoder0 = ClockDomainsRenamer(clock_domain)(TMDSEncoder())
+        encoder1 = ClockDomainsRenamer(clock_domain)(TMDSEncoder())
+        encoder2 = ClockDomainsRenamer(clock_domain)(TMDSEncoder())
+        terc0 = ClockDomainsRenamer(clock_domain)(TERC4Encoder())
+        terc1 = ClockDomainsRenamer(clock_domain)(TERC4Encoder())
+        terc2 = ClockDomainsRenamer(clock_domain)(TERC4Encoder())
+        self.submodules += encoder0
+        self.submodules += encoder1
+        self.submodules += encoder2
+        self.submodules += terc0
+        self.submodules += terc1
+        self.submodules += terc2
+
+        self.comb += [
+            pads.clk.eq(ClockSignal()),
+            pads.mode.eq(sink.mode),
+            Case(sink.mode, {
+                MODE_VIDEO: [
+                    encoder0.d.eq(self.sink.b),
+                    encoder1.d.eq(self.sink.g),
+                    encoder2.d.eq(self.sink.r),
+                    encoder0.de.eq(1),
+                    encoder1.de.eq(1),
+                    encoder2.de.eq(1),
+                    encoder0.c.eq(0),
+                    encoder1.c.eq(0),
+                    encoder2.c.eq(0),
+                    pads.d0.eq(encoder0.out),
+                    pads.d1.eq(encoder1.out),
+                    pads.d2.eq(encoder2.out),
+                ],
+                MODE_VIDEO_PREAMBLE: [
+                    terc0.d.eq(Cat(sink.hsync, sink.vsync, 1, 1, 0, 0, 0, 0)),
+                    pads.d0.eq(terc0.q),
+                    encoder1.de.eq(0),
+                    encoder2.de.eq(0),
+                    encoder1.c.eq(0b10),
+                    encoder2.c.eq(0b00),
+                    pads.d1.eq(encoder1.out),
+                    pads.d2.eq(encoder2.out),
+                ],
+                MODE_DATA_PREAMBLE: [
+                    terc0.d.eq(Cat(sink.hsync, sink.vsync, 1, 1, 0, 0, 0, 0)),
+                    pads.d0.eq(terc0.q),
+                    encoder1.de.eq(0),
+                    encoder2.de.eq(0),
+                    encoder1.c.eq(0b10),
+                    encoder2.c.eq(0b10),
+                    pads.d1.eq(encoder1.out),
+                    pads.d2.eq(encoder2.out),
+                ],
+                MODE_VIDEO_GUARD: [
+                    pads.d0.eq(0b1011001100),
+                    pads.d1.eq(0b0100110011),
+                    pads.d2.eq(0b1011001100),
+                ],
+                MODE_DATA_GUARD: [
+                    terc0.d.eq(Cat(sink.hsync, sink.vsync, 1, 1, 0, 0, 0, 0)),
+                    pads.d0.eq(terc0.q),
+                    pads.d1.eq(0b0100110011),
+                    pads.d2.eq(0b0100110011),
+                ],
+            }),
+        ]
+
+
 class SevenSegment(LiteXModule):
     """
     4-digit multiplexed seven segment driver.
@@ -348,7 +584,7 @@ class HdmiGenerator(LiteXModule):
     def __init__(self, display_pads, output_pads, debug=None):
         self.extra_sink = stream.Endpoint(video_extra_data_layout)
         self.vtg_sink = stream.Endpoint(video_timing_layout)
-        self.source   = stream.Endpoint(video_data_layout)
+        self.source   = stream.Endpoint(hdmi_video_data_layout)
 
         self.nes_inputs = stream.Endpoint(nes_system_inputs)
         self.nes_outputs = stream.Endpoint(nes_system_outputs)
@@ -367,13 +603,16 @@ class HdmiGenerator(LiteXModule):
         #self.submodules.nes_clock = ClockDomainsRenamer({"sys": "hdmi"})(NESClockScheduler())
         #self.comb += self.vtg_sink.connect(self.nes_clock.source)
 
+        self.submodules.random = LFSR32HPF()
+        self.comb += self.random.hp_enable.eq(1)
+
         self.comb += self.vtg_sink.ready.eq(1)
-        self.comb += self.source.r.eq(self.nes_outputs.r)
-        self.comb += self.source.g.eq(self.nes_outputs.g)
-        self.comb += self.source.b.eq(self.nes_outputs.b)
+        self.comb += self.source.r.eq(self.random.dout[0:8])
+        self.comb += self.source.g.eq(self.random.dout[8:16])
+        self.comb += self.source.b.eq(self.random.dout[16:24])
         self.comb += self.source.hsync.eq(self.vtg_sink.hsync)
         self.comb += self.source.vsync.eq(self.vtg_sink.vsync)
-        self.comb += self.source.de.eq(self.vtg_sink.de)
+        self.comb += self.source.mode.eq(0)
 
         if debug is not None:
             self.comb += [

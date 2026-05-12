@@ -42,7 +42,7 @@ from liteeth.core.icmp          import LiteEthICMP
 from liteeth.core               import LiteEthUDPIPCore
 from liteeth.frontend.etherbone import LiteEthEtherbone
 
-from .hdmi_gen import HdmiGenerator, VideoTimingGenerator
+from .hdmi_gen import HdmiGenerator, VideoGenericHdmiPHY, VideoTimingGenerator
 from .nes import Nes
 
 # IOs ----------------------------------------------------------------------------------------------
@@ -136,14 +136,13 @@ _io = [
         Subsignal("ntrst", Pins(1)),
     ),
 
-    # Video (VGA).
-    ("vga", 0,
-        Subsignal("hsync", Pins(1)),
-        Subsignal("vsync", Pins(1)),
-        Subsignal("de",    Pins(1)),
-        Subsignal("r",     Pins(8)),
-        Subsignal("g",     Pins(8)),
-        Subsignal("b",     Pins(8)),
+    # Video (HDMI).
+    ("hdmi", 0,
+        Subsignal("clk", Pins(1)),
+        Subsignal("d0",    Pins(10)),
+        Subsignal("d1",     Pins(10)),
+        Subsignal("d2",     Pins(10)),
+        Subsignal("mode", Pins(3)),
     ),
 
     ("test", 0, Pins(1)),
@@ -407,7 +406,7 @@ class SimSoC(SoCCore):
             self.submodules.videophy = VideoGenericPHY(platform.request("vga"))
             self.add_video_colorbars(phy=self.videophy, timings="640x480@60Hz")
         
-        self.submodules.videophy = VideoGenericPHY(platform.request("vga"))
+        self.submodules.videophy = VideoGenericHdmiPHY(platform.request("hdmi"))
         self.add_video_generator(platform.request("seven_segment"), platform.request("test"), platform.request("debug"), "hdmi_out", self.videophy, clock_domain="sys")
 
 
