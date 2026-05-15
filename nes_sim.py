@@ -42,7 +42,7 @@ from liteeth.core.icmp          import LiteEthICMP
 from liteeth.core               import LiteEthUDPIPCore
 from liteeth.frontend.etherbone import LiteEthEtherbone
 
-from .hdmi_gen import HdmiGenerator, VideoGenericHdmiPHY, VideoTimingGenerator
+from .hdmi_gen import HdmiGenerator, NesTimingGenerator, VideoGenericHdmiPHY, HdmiVideoTimingGenerator
 from .nes import Nes
 
 # IOs ----------------------------------------------------------------------------------------------
@@ -188,24 +188,27 @@ class SimSoC(SoCCore):
 
         # Video Timing Generator.
         self.check_if_exists(f"{name}_vtg")
-        vtg = VideoTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1])
+        vtg = HdmiVideoTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1])
         vtg = ClockDomainsRenamer(clock_domain)(vtg)
         self.add_module(name=f"{name}_vtg", module=vtg)
 
-        # ColorsBars Pattern.
+        nes_gen = ClockDomainsRenamer(clock_domain)(NesTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1]))
+        self.add_module(name=f"{name}_nes_vtg", module=nes_gen)
+
         self.check_if_exists(name)
         self.add_module(name=name, module=generator)
 
         if debug is not None:
             self.comb += [
-                debug.pvactive.eq(vtg.nes_frame_done),
+                debug.pvactive.eq(nes_gen.nes_frame_done),
             ]
 
         # Connect Video Timing Generator to ColorsBars Pattern.
         self.comb += [
-            vtg.source.connect(generator.vtg_sink),
-            vtg.nes_ppu_end.eq(generator.nes_outputs.last_frame_cycle),
-            vtg.esource.connect(generator.extra_sink),
+            vtg.source.connect(nes_gen.vtg_sink),
+            nes_gen.forward.connect(generator.vtg_sink),
+            nes_gen.nes_ppu_end.eq(generator.nes_outputs.last_frame_cycle),
+            nes_gen.esource.connect(generator.extra_sink),
             generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
         ]
 
