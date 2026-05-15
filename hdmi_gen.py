@@ -7,7 +7,7 @@ from litex.soc.interconnect import stream
 from litex.soc.cores.code_tmds import TMDSEncoder
 from litex.soc.cores.video import video_data_layout
 from litex.soc.cores.video import video_timing_layout
-from litex.soc.cores.video import hbits, vbits, video_timings
+from litex.soc.cores.video import hbits, vbits, video_timings, VideoS7HDMI10to1Serializer
 
 from .nes.hdl.nes import NesSystem, nes_system_inputs, nes_system_outputs
 
@@ -144,6 +144,26 @@ class LFSR32HPF(LiteXModule):
             self.dout.eq(d)
         )
 
+hdmi_phy_layout = [
+    ("d0", 10),
+    ("d1", 10),
+    ("d2", 10),
+    ("mode", 3),
+]
+
+hdmi_video_timing_layout = [
+    # Synchronization signals.
+    ("hsync", 1),
+    ("vsync", 1),
+    ("de",    1),
+    ("mode",    3),
+    # Extended/Optional synchronization signals.
+    ("hres",   hbits),
+    ("vres",   vbits),
+    ("hcount", hbits),
+    ("vcount", vbits),
+]
+
 hdmi_video_data_layout = [
     # Synchronization signals.
     ("hsync", 1),
@@ -163,6 +183,7 @@ MODE_DATA_GUARD = 2
 MODE_DATA = 3
 MODE_DATA_PREAMBLE = 4
 MODE_VIDEO_PREAMBLE = 5
+MODE_CONTROL = 6
 
 video_extra_data_layout = [
     ("row_process", 1),
@@ -196,6 +217,17 @@ terc4_table = {
     0xE: 0b0101100011,
     0xF: 0b1011000011,
 }
+
+class HdmiControl(Module):
+    def __init__(self):
+        self.d = Signal(2)
+        self.q = Signal(10)
+        self.comb += Case(self.d, {
+            0: self.q.eq(0b1101010100),
+            1: self.q.eq(0b0010101011),
+            2: self.q.eq(0b0101010100),
+            3: self.q.eq(0b1010101011),
+        })
 
 class TERC4Encoder(Module):
     def __init__(self):
@@ -246,8 +278,8 @@ class NesTimingGenerator(LiteXModule):
         pvactive = Signal()
         pvactive_fast = Signal()
         self.nes_ppu_end = Signal()
-        self.vtg_sink = vtg_sink = stream.Endpoint(video_timing_layout)
-        self.forward = forward = stream.Endpoint(video_timing_layout)
+        self.vtg_sink = vtg_sink = stream.Endpoint(hdmi_video_timing_layout)
+        self.forward = forward = stream.Endpoint(hdmi_video_timing_layout)
         self.esource = esource = stream.Endpoint(video_extra_data_layout)
         self.fsm = fsm = FSM(reset_state="IDLE")
         self.nes_frame_done = nes_frame_done = Signal()
@@ -275,6 +307,7 @@ class NesTimingGenerator(LiteXModule):
             forward.vres.eq(vtg_sink.vres),
             forward.hcount.eq(vtg_sink.hcount),
             forward.vcount.eq(vtg_sink.vcount),
+            forward.mode.eq(vtg_sink.mode),
             If(self.nes_ppu_end,        NextValue(nes_frame_done,       1)),
             If(vtg_sink.ready,
                 If(vtg_sink.hcount == pre_h_start, NextValue(phactive, 1)),
@@ -339,6 +372,10 @@ class HdmiVideoTimingGenerator(LiteXModule):
         else:
             self.video_timings = vt = default_video_timings
 
+        # HDMI timing constants
+        PREAMBLE_PIXELS = 8
+        GUARD_PIXELS    = 2
+
         # MMAP Control/Status Registers.
         self._enable      = CSRStorage(reset=1, description="Video Timing Generator enable.")
 
@@ -361,7 +398,7 @@ class HdmiVideoTimingGenerator(LiteXModule):
             description="Vertical scan period.")
 
         # Video Timing Source
-        self.source = source = stream.Endpoint(video_timing_layout)
+        self.source = source = stream.Endpoint(hdmi_video_timing_layout)
 
         # # #
 
@@ -389,6 +426,21 @@ class HdmiVideoTimingGenerator(LiteXModule):
         self.specials += MultiReg(self._vsync_end.storage,   vsync_end)
         self.specials += MultiReg(self._vscan.storage,       vscan)
 
+        self.ihcount = Signal(hbits)
+
+        # HDMI mode transition points:
+        #
+        #  hcount: 0                  hres             hscan-9     hscan-1  hscan
+        #          |<----- VIDEO ----->|<--- CONTROL --->|<-PREAMBLE->|<-GRD->|  (wraps to 0)
+        #
+        pre_preamble = Signal(hbits)  # hscan - 9 : first VIDEO_PREAMBLE pixel
+        pre_guard    = Signal(hbits)  # hscan - 1 : first VIDEO_GUARD pixel
+
+        self.comb += [
+            pre_preamble.eq(hscan - (PREAMBLE_PIXELS + GUARD_PIXELS) + 1),
+            pre_guard.eq(hscan - GUARD_PIXELS + 1),
+        ]
+
         # Generate timings.
         hactive = Signal()
         vactive = Signal()
@@ -397,15 +449,17 @@ class HdmiVideoTimingGenerator(LiteXModule):
         self.fsm = fsm
         self.comb += fsm.reset.eq(~enable)
         fsm.act("IDLE",
-            NextValue(hactive, 0),
-            NextValue(vactive, 0),
-            NextValue(source.hres, hres),
-            NextValue(source.vres, vres),
-            NextValue(source.hcount,  0),
+            NextValue(hactive,        0),
+            NextValue(vactive,        0),
+            NextValue(source.hres,    hres),
+            NextValue(source.vres,    vres),
+            NextValue(source.hcount,  vt["h_active"] + vt["h_blanking"] - 8),
+            NextValue(self.ihcount,   0),
             NextValue(source.vcount,  0),
+            NextValue(source.mode,    MODE_CONTROL),
             NextState("RUN")
         )
-        self.comb += source.de.eq(hactive & vactive) # DE when both HActive and VActive.
+        self.comb += source.de.eq(hactive & vactive)
         self.sync += source.first.eq((source.hcount ==     0) & (source.vcount ==     0)),
         self.sync += source.last.eq( (source.hcount == hscan) & (source.vcount == vscan)),
         fsm.act("RUN",
@@ -413,139 +467,140 @@ class HdmiVideoTimingGenerator(LiteXModule):
             If(source.ready,
                 # Increment HCount.
                 NextValue(source.hcount, source.hcount + 1),
-                # Generate HActive / HSync.
-                If(source.hcount == 0,           NextValue(hactive,       1)), # Start of HActive.
-                If(source.hcount == hres,        NextValue(hactive,       0)), # End of HActive.
-                If(source.hcount == hsync_start, NextValue(source.hsync,  1)),
-                If(source.hcount == hsync_end,   NextValue(source.hsync,  0)), # End of HSync.
-                If(source.hcount == hscan,       NextValue(source.hcount, 0)), # End of HScan.
+
+                # -----------------------------------------------------------------
+                # HDMI horizontal mode sequencing (per line):
+                #   CONTROL → VIDEO_PREAMBLE(8) → VIDEO_GUARD(2) → VIDEO → CONTROL
+                # -----------------------------------------------------------------
+                If(source.hcount == 0,
+                    # First active pixel: enter VIDEO mode.
+                    NextValue(hactive,       1),
+                    NextValue(source.mode,   MODE_VIDEO),
+                ),
+                If(source.hcount == hres,
+                    # End of active video: straight to CONTROL (no post-active guard).
+                    NextValue(hactive,       0),
+                    NextValue(source.mode,   MODE_CONTROL),
+                ),
+                If(source.hcount == pre_preamble,
+                    # Start of 8-pixel VIDEO_PREAMBLE before next active line.
+                    NextValue(source.mode,   MODE_VIDEO_PREAMBLE),
+                ),
+                If(source.hcount == pre_guard,
+                    # Start of 2-pixel VIDEO_GUARD immediately before active video.
+                    NextValue(source.mode,   MODE_VIDEO_GUARD),
+                ),
+                If(source.hcount == hscan,
+                    # End of scan line: wrap hcount back to 0.
+                    NextValue(source.hcount, 0),
+                ),
+
+                # Generate HSync.
+                If(source.hcount == hsync_start, NextValue(source.hsync, 1)),
+                If(source.hcount == hsync_end,   NextValue(source.hsync, 0)),
 
                 If(source.hcount == hsync_start,
                     # Increment VCount.
                     NextValue(source.vcount, source.vcount + 1),
                     # Generate VActive / VSync.
-                    If(source.vcount == 0,           NextValue(vactive,       1)), # Start of VActive.
-                    If(source.vcount == vres,        NextValue(vactive,       0)), # End of VActive.
+                    If(source.vcount == 0,           NextValue(vactive,       1)),
+                    If(source.vcount == vres,        NextValue(vactive,       0)),
                     If(source.vcount == vsync_start, NextValue(source.vsync,  1)),
-                    If(source.vcount == vsync_end,   NextValue(source.vsync,  0)), # End of VSync.
-                    If(source.vcount == vscan,       NextValue(source.vcount, 0))  # End of VScan.
+                    If(source.vcount == vsync_end,   NextValue(source.vsync,  0)),
+                    If(source.vcount == vscan,       NextValue(source.vcount, 0)),
                 )
             )
         )
 
-class VideoGenericHdmiPHY(LiteXModule):
-    def __init__(self, pads, clock_domain="sys"):
-        self.sink = sink = stream.Endpoint(hdmi_video_data_layout)
+class VideoGenericHdmiEncoder(LiteXModule):
+    def __init__(self, clock_domain="sys"):
+        self.sink   = sink   = stream.Endpoint(hdmi_video_data_layout)
+        self.source = source = stream.Endpoint(hdmi_phy_layout)
 
         # Always ack Sink, no backpressure.
         self.comb += sink.ready.eq(1)
 
-        encoder0 = ClockDomainsRenamer(clock_domain)(TMDSEncoder())
-        encoder1 = ClockDomainsRenamer(clock_domain)(TMDSEncoder())
-        encoder2 = ClockDomainsRenamer(clock_domain)(TMDSEncoder())
-        terc0 = ClockDomainsRenamer(clock_domain)(TERC4Encoder())
-        terc1 = ClockDomainsRenamer(clock_domain)(TERC4Encoder())
-        terc2 = ClockDomainsRenamer(clock_domain)(TERC4Encoder())
-        self.submodules += encoder0
-        self.submodules += encoder1
-        self.submodules += encoder2
-        self.submodules += terc0
-        self.submodules += terc1
-        self.submodules += terc2
+        # Submodules.
+        control = ClockDomainsRenamer(clock_domain)(HdmiControl())
+        encoders = [ClockDomainsRenamer(clock_domain)(TMDSEncoder()) for _ in range(3)]
+        tercs    = [ClockDomainsRenamer(clock_domain)(TERC4Encoder()) for _ in range(3)]
+        self.submodules += control, *encoders, *tercs
+
+        # Unpack for readability.
+        encoder0, encoder1, encoder2 = encoders
+        terc0,    terc1,    terc2    = tercs
+
+        # Channel inputs (sink color → encoder data).
+        for enc, color in zip(encoders, [sink.b, sink.g, sink.r]):
+            self.comb += enc.d.eq(color)
 
         self.comb += [
-            pads.clk.eq(ClockSignal(clock_domain)),
-            pads.mode.eq(sink.mode),
-            encoder0.d.eq(sink.b),
-            encoder1.d.eq(sink.g),
-            encoder2.d.eq(sink.r),
-            Case(sink.mode, {
-                MODE_VIDEO: [
-                    terc0.d.eq(0),
-                    terc1.d.eq(0),
-                    terc2.d.eq(0),
-                    encoder0.de.eq(1),
-                    encoder1.de.eq(1),
-                    encoder2.de.eq(1),
-                    encoder0.c.eq(0),
-                    encoder1.c.eq(0),
-                    encoder2.c.eq(0),
-                    pads.d0.eq(encoder0.out),
-                    pads.d1.eq(encoder1.out),
-                    pads.d2.eq(encoder2.out),
-                ],
-                MODE_DATA: [
-                    terc0.d.eq(Cat(sink.hsync, sink.vsync, sink.aux[0:2])),
-                    terc1.d.eq(sink.aux[2:6]),
-                    terc2.d.eq(sink.aux[6:10]),
-                    encoder0.de.eq(0),
-                    encoder1.de.eq(0),
-                    encoder2.de.eq(0),
-                    encoder0.c.eq(0),
-                    encoder1.c.eq(0),
-                    encoder2.c.eq(0),
-                    pads.d0.eq(terc0.q),
-                    pads.d1.eq(terc1.q),
-                    pads.d2.eq(terc2.q),
-                ],
-                MODE_VIDEO_PREAMBLE: [
-                    terc0.d.eq(Cat(sink.hsync, sink.vsync, 1, 1)),
-                    terc1.d.eq(0),
-                    terc2.d.eq(0),
-                    encoder0.de.eq(0),
-                    encoder1.de.eq(0),
-                    encoder2.de.eq(0),
-                    encoder0.c.eq(0),
-                    encoder1.c.eq(0b10),
-                    encoder2.c.eq(0b00),
-                    pads.d0.eq(terc0.q),
-                    pads.d1.eq(encoder1.out),
-                    pads.d2.eq(encoder2.out),
-                ],
-                MODE_DATA_PREAMBLE: [
-                    terc0.d.eq(Cat(sink.hsync, sink.vsync, 1, 1)),
-                    terc1.d.eq(0),
-                    terc2.d.eq(0),
-                    encoder0.de.eq(0),
-                    encoder1.de.eq(0),
-                    encoder2.de.eq(0),
-                    encoder0.c.eq(0),
-                    encoder1.c.eq(0b10),
-                    encoder2.c.eq(0b10),
-                    pads.d0.eq(terc0.q),
-                    pads.d1.eq(encoder1.out),
-                    pads.d2.eq(encoder2.out),
-                ],
-                MODE_VIDEO_GUARD: [
-                    terc0.d.eq(0),
-                    terc1.d.eq(0),
-                    terc2.d.eq(0),
-                    encoder0.de.eq(0),
-                    encoder1.de.eq(0),
-                    encoder2.de.eq(0),
-                    encoder0.c.eq(0),
-                    encoder1.c.eq(0),
-                    encoder2.c.eq(0),
-                    pads.d0.eq(0b1011001100),
-                    pads.d1.eq(0b0100110011),
-                    pads.d2.eq(0b1011001100),
-                ],
-                MODE_DATA_GUARD: [
-                    terc0.d.eq(Cat(sink.hsync, sink.vsync, 1, 1)),
-                    terc1.d.eq(0),
-                    terc2.d.eq(0),
-                    encoder0.de.eq(0),
-                    encoder1.de.eq(0),
-                    encoder2.de.eq(0),
-                    encoder0.c.eq(0),
-                    encoder1.c.eq(0),
-                    encoder2.c.eq(0),
-                    pads.d0.eq(terc0.q),
-                    pads.d1.eq(0b0100110011),
-                    pads.d2.eq(0b0100110011),
-                ],
-            }),
+            source.mode.eq(sink.mode),
+            control.d.eq(Cat(sink.hsync, sink.vsync)),
         ]
+
+        # Helper to drive all encoders' de/c signals and all tercs' d signals.
+        def drive_all(de, c0, c1, c2, t0=0, t1=0, t2=0):
+            return [
+                *[enc.de.eq(de) for enc in encoders],
+                encoder0.c.eq(c0), encoder1.c.eq(c1), encoder2.c.eq(c2),
+                terc0.d.eq(t0),    terc1.d.eq(t1),    terc2.d.eq(t2),
+            ]
+
+        self.comb += Case(sink.mode, {
+            MODE_VIDEO: [
+                *drive_all(de=1, c0=0, c1=0, c2=0),
+                source.d0.eq(encoder0.out),
+                source.d1.eq(encoder1.out),
+                source.d2.eq(encoder2.out),
+            ],
+            MODE_DATA: [
+                *drive_all(de=0, c0=0, c1=0, c2=0,
+                    t0=Cat(sink.hsync, sink.vsync, sink.aux[0:2]),
+                    t1=sink.aux[2:6],
+                    t2=sink.aux[6:10],
+                ),
+                source.d0.eq(terc0.q),
+                source.d1.eq(terc1.q),
+                source.d2.eq(terc2.q),
+            ],
+            MODE_CONTROL: [
+                *drive_all(de=0, c0=0, c1=0b10, c2=0b00),
+                source.d0.eq(control.q),
+                source.d1.eq(0b1101010100),
+                source.d2.eq(0b1101010100),
+            ],
+            MODE_VIDEO_PREAMBLE: [
+                *drive_all(de=0, c0=0, c1=0b10, c2=0b00,
+                    t0=Cat(sink.hsync, sink.vsync, 1, 1),
+                ),
+                source.d0.eq(terc0.q),
+                source.d1.eq(encoder1.out),
+                source.d2.eq(encoder2.out),
+            ],
+            MODE_DATA_PREAMBLE: [
+                *drive_all(de=0, c0=0, c1=0b10, c2=0b10,
+                    t0=Cat(sink.hsync, sink.vsync, 1, 1),
+                ),
+                source.d0.eq(terc0.q),
+                source.d1.eq(encoder1.out),
+                source.d2.eq(encoder2.out),
+            ],
+            MODE_VIDEO_GUARD: [
+                *drive_all(de=0, c0=0, c1=0, c2=0),
+                source.d0.eq(0b1011001100),
+                source.d1.eq(0b0100110011),
+                source.d2.eq(0b1011001100),
+            ],
+            MODE_DATA_GUARD: [
+                *drive_all(de=0, c0=0, c1=0, c2=0,
+                    t0=Cat(sink.hsync, sink.vsync, 1, 1),
+                ),
+                source.d0.eq(terc0.q),
+                source.d1.eq(0b0100110011),
+                source.d2.eq(0b0100110011),
+            ],
+        })
 
 
 class SevenSegment(LiteXModule):
@@ -665,40 +720,75 @@ class SevenSegment(LiteXModule):
                 pads.en.eq(digit_enable)
             ]
 
-class HdmiGenerator(LiteXModule):
-    def __init__(self, display_pads, output_pads, debug=None):
-        self.extra_sink = stream.Endpoint(video_extra_data_layout)
-        self.vtg_sink = stream.Endpoint(video_timing_layout)
-        self.source   = stream.Endpoint(hdmi_video_data_layout)
+class VideoS7HDMIPHY2(LiteXModule):
+    def __init__(self, pads, clock_domain="sys"):
+        self.sink = sink = stream.Endpoint(hdmi_phy_layout)
+        # # #
 
-        self.nes_inputs = stream.Endpoint(nes_system_inputs)
+        # Always ack Sink, no backpressure.
+        self.comb += sink.ready.eq(1)
+
+        # Clocking + Differential Signaling.
+        pads_clk = Signal()
+        self.specials += DDROutput(i1=1, i2=0, o=pads_clk, clk=ClockSignal(clock_domain))
+        self.specials += Instance("OBUFDS", i_I=pads_clk, o_O=pads.clk_p, o_OB=pads.clk_n)
+
+        # Data channels.
+        for i, data_i in enumerate([sink.d0, sink.d1, sink.d2]):
+            pad_o = Signal(name=f"pad_o{i}")
+            serializer = VideoS7HDMI10to1Serializer(
+                data_i       = data_i,
+                data_o       = pad_o,
+                clock_domain = clock_domain,
+            )
+            setattr(self.submodules, f"serializer{i}", serializer)
+            self.specials += Instance("OBUFDS",
+                i_I  = pad_o,
+                o_O  = getattr(pads, f"data{i}_p"),
+                o_OB = getattr(pads, f"data{i}_n"),
+            )
+
+class HdmiGenerator(LiteXModule):
+    def __init__(self, display_pads, debug=None):
+        # Endpoints.
+        self.extra_sink  = stream.Endpoint(video_extra_data_layout)
+        self.vtg_sink    = stream.Endpoint(hdmi_video_timing_layout)
+        self.source      = stream.Endpoint(hdmi_video_data_layout)
+        self.nes_inputs  = stream.Endpoint(nes_system_inputs)
         self.nes_outputs = stream.Endpoint(nes_system_outputs)
 
-        self.comb += self.nes_inputs.enable.eq(self.extra_sink.ppu_enable)
+        # Submodules.
         self.submodules.nes_system = NesSystem(debug)
-        self.comb += self.nes_inputs.connect(self.nes_system.inputs)
-        self.comb += self.nes_system.outputs.connect(self.nes_outputs)
-        self.comb += self.nes_inputs.valid.eq(1)
-        self.comb += self.nes_outputs.ready.eq(1)
+        self.submodules.display    = SevenSegment(display_pads)
+        self.submodules.random     = LFSR32HPF()
 
-        self.submodules.display = SevenSegment(display_pads)
+        # NES system connections.
+        self.comb += [
+            self.nes_inputs.enable.eq(self.extra_sink.ppu_enable),
+            self.nes_inputs.valid.eq(1),
+            self.nes_inputs.connect(self.nes_system.inputs),
+            self.nes_system.outputs.connect(self.nes_outputs),
+            self.nes_outputs.ready.eq(1),
+        ]
+
+        # Display.
         self.comb += self.display.value.eq(self.extra_sink.last_ppu_enable_count[0:16])
-        self.comb += output_pads[0].eq(self.extra_sink.ppu_enable)
 
-        #self.submodules.nes_clock = ClockDomainsRenamer({"sys": "hdmi"})(NESClockScheduler())
-        #self.comb += self.vtg_sink.connect(self.nes_clock.source)
-
-        self.submodules.random = LFSR32HPF()
+        # Random noise generator.
         self.comb += self.random.hp_enable.eq(1)
 
-        self.comb += self.vtg_sink.ready.eq(1)
-        self.comb += self.source.r.eq(self.random.dout[0:8])
-        self.comb += self.source.g.eq(self.random.dout[8:16])
-        self.comb += self.source.b.eq(self.random.dout[16:24])
-        self.comb += self.source.hsync.eq(self.vtg_sink.hsync)
-        self.comb += self.source.vsync.eq(self.vtg_sink.vsync)
-        self.comb += self.source.mode.eq(0)
+        # Video output.
+        self.comb += [
+            self.vtg_sink.ready.eq(1),
+            self.source.r.eq(self.random.dout[0:8]),
+            self.source.g.eq(self.random.dout[8:16]),
+            self.source.b.eq(self.random.dout[16:24]),
+            self.source.hsync.eq(self.vtg_sink.hsync),
+            self.source.vsync.eq(self.vtg_sink.vsync),
+            self.source.mode.eq(self.vtg_sink.mode),
+        ]
 
+        # Debug.
         if debug is not None:
             self.comb += [
                 debug.row.eq(self.extra_sink.ppu_count),

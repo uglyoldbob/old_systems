@@ -42,7 +42,7 @@ from liteeth.core.icmp          import LiteEthICMP
 from liteeth.core               import LiteEthUDPIPCore
 from liteeth.frontend.etherbone import LiteEthEtherbone
 
-from .hdmi_gen import HdmiGenerator, NesTimingGenerator, VideoGenericHdmiPHY, HdmiVideoTimingGenerator
+from .hdmi_gen import HdmiGenerator, NesTimingGenerator, VideoGenericHdmiEncoder, HdmiVideoTimingGenerator
 from .nes import Nes
 
 # IOs ----------------------------------------------------------------------------------------------
@@ -183,8 +183,8 @@ class Platform(SimPlatform):
 class SimSoC(SoCCore):
     supported_ethernet_phy_models = ["sim", "xgmii", "gmii"]
 
-    def add_video_generator(self, display_pads, output_pads, debug, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
-        generator = HdmiGenerator(display_pads, output_pads, debug)
+    def add_video_generator(self, hdmi_pads, display_pads, debug, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
+        generator = HdmiGenerator(display_pads, debug)
 
         # Video Timing Generator.
         self.check_if_exists(f"{name}_vtg")
@@ -203,13 +203,22 @@ class SimSoC(SoCCore):
                 debug.pvactive.eq(nes_gen.nes_frame_done),
             ]
 
+        encoder = ClockDomainsRenamer(clock_domain)(VideoGenericHdmiEncoder())
+        self.submodules += encoder
+
         # Connect Video Timing Generator to ColorsBars Pattern.
         self.comb += [
             vtg.source.connect(nes_gen.vtg_sink),
             nes_gen.forward.connect(generator.vtg_sink),
             nes_gen.nes_ppu_end.eq(generator.nes_outputs.last_frame_cycle),
             nes_gen.esource.connect(generator.extra_sink),
-            generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
+            generator.source.connect(encoder.sink),
+            hdmi_pads.clk.eq(ClockSignal(clock_domain)),
+            encoder.source.ready.eq(1),
+            hdmi_pads.d0.eq(encoder.source.d0),
+            hdmi_pads.d1.eq(encoder.source.d1),
+            hdmi_pads.d2.eq(encoder.source.d2),
+            hdmi_pads.mode.eq(encoder.source.mode),
         ]
 
     def __init__(self,
@@ -409,8 +418,8 @@ class SimSoC(SoCCore):
             self.submodules.videophy = VideoGenericPHY(platform.request("vga"))
             self.add_video_colorbars(phy=self.videophy, timings="640x480@60Hz")
         
-        self.submodules.videophy = VideoGenericHdmiPHY(platform.request("hdmi"))
-        self.add_video_generator(platform.request("seven_segment"), platform.request("test"), platform.request("debug"), "hdmi_out", self.videophy, clock_domain="sys")
+        self.submodules.videophy = VideoGenericHdmiEncoder()
+        self.add_video_generator(platform.request("hdmi"), platform.request("seven_segment"), platform.request("debug"), "hdmi_out", self.videophy, clock_domain="sys")
 
 
         # Simulation debugging ----------------------------------------------------------------------

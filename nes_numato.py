@@ -26,7 +26,7 @@ from litedram.modules import MT41J128M16
 from litedram.phy import s7ddrphy
 
 from liteeth.phy.s7rgmii import LiteEthPHYRGMII
-from .hdmi_gen import HdmiGenerator, VideoTimingGenerator
+from .hdmi_gen import HdmiGenerator, HdmiVideoTimingGenerator, NesTimingGenerator, VideoGenericHdmiEncoder, VideoS7HDMIPHY2
 from .nes import Nes
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -65,26 +65,39 @@ class _CRG(LiteXModule):
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
-    def add_video_generator(self, display_pads, output_pads, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
-        generator = ClockDomainsRenamer({"sys": clock_domain})(HdmiGenerator(display_pads, output_pads))
+    def add_video_generator(self, display_pads, debug=None, name="video_generator", phy=None, timings="1280x720@60Hz", clock_domain="sys"):
+        generator = HdmiGenerator(display_pads)
 
         # Video Timing Generator.
         self.check_if_exists(f"{name}_vtg")
-        vtg = VideoTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1])
+        vtg = HdmiVideoTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1])
         vtg = ClockDomainsRenamer(clock_domain)(vtg)
         self.add_module(name=f"{name}_vtg", module=vtg)
 
-        # ColorsBars Pattern.
+        nes_gen = ClockDomainsRenamer(clock_domain)(NesTimingGenerator(default_video_timings=timings if isinstance(timings, str) else timings[1]))
+        self.add_module(name=f"{name}_nes_vtg", module=nes_gen)
+
         self.check_if_exists(name)
         self.add_module(name=name, module=generator)
 
+        if debug is not None:
+            self.comb += [
+                debug.pvactive.eq(nes_gen.nes_frame_done),
+            ]
+        
+        encoder = ClockDomainsRenamer(clock_domain)(VideoGenericHdmiEncoder())
+        self.add_module(name="hdmi_encoder", module=encoder)
+
         # Connect Video Timing Generator to ColorsBars Pattern.
         self.comb += [
-            vtg.source.connect(generator.vtg_sink),
-            vtg.esource.connect(generator.extra_sink),
-            generator.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
+            vtg.source.connect(nes_gen.vtg_sink),
+            nes_gen.forward.connect(generator.vtg_sink),
+            nes_gen.nes_ppu_end.eq(generator.nes_outputs.last_frame_cycle),
+            nes_gen.esource.connect(generator.extra_sink),
+            generator.source.connect(encoder.sink),
+            encoder.source.connect(phy if isinstance(phy, stream.Endpoint) else phy.sink)
         ]
-
+    
     def __init__(self, sys_clk_freq=100e6,
         with_led_chaser = True,
         with_ethernet   = False,
@@ -130,10 +143,10 @@ class BaseSoC(SoCCore):
                 pads         = platform.request_all("user_led"),
                 sys_clk_freq = sys_clk_freq)
         
-        hdmi_phy = VideoS7HDMIPHY(self.platform.request("hdmi_out"))
+        hdmi_phy = VideoS7HDMIPHY2(self.platform.request("hdmi_out"))
         self.submodules.hdmi_phy = ClockDomainsRenamer({"sys": "hdmi", "sys5x": "hdmi5"})(hdmi_phy)
         
-        self.add_video_generator(platform.request("seven_segment"), test, "hdmi_out", self.hdmi_phy, clock_domain="hdmi")
+        self.add_video_generator(platform.request("seven_segment"), name="hdmi_out", phy=self.hdmi_phy, clock_domain="hdmi")
 
 # Build --------------------------------------------------------------------------------------------
 
