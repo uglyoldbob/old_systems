@@ -4,4 +4,5 @@ exclude = ["nes/hdl/riscv-bios-rust"]
 members = ["nes/hdmi",
     "nes/rust",
     "snes/rust",
+    "android",
 ]
