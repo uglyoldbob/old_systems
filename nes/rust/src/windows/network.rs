@@ -1,18 +1,7 @@
 //! This module is for the window that allows a user to set network options
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
 
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui::TextEdit;
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui_glow::EguiGlow};
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 use crate::emulator_data::NesEmulatorData;
 
 /// The network configuration window.

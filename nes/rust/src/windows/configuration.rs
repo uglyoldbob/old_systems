@@ -3,17 +3,7 @@
 use crate::NesEmulatorData;
 use strum::IntoEnumIterator;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 
 /// Defines messages that can some from other threads
 enum Message {

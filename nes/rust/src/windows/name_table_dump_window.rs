@@ -3,17 +3,7 @@ use crate::NesEmulatorData;
 
 use common_emulator::video::RgbImage;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui, egui_glow::EguiGlow};
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 
 /// The window for dumping ppu nametable data
 pub struct DumpWindow {
@@ -22,10 +12,8 @@ pub struct DumpWindow {
     /// The image for the attribute table
     buf2: Box<RgbImage>,
     /// The texture used for rendering the image.
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     texture: Option<egui::TextureHandle>,
     /// The texture used for rendering the attribute table.
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     texture2: Option<egui::TextureHandle>,
 }
 

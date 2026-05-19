@@ -3,17 +3,7 @@
 use crate::NesEmulatorData;
 use common_emulator::video::RgbImage;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui_glow::EguiGlow};
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 
 /// The window for dumping cartridge program data
 #[cfg(feature = "egui-multiwin")]
@@ -21,7 +11,6 @@ pub struct DumpWindow {
     /// The image to use for the dump
     buf: Box<RgbImage>,
     /// The texture used for rendering the image.
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     texture: Option<egui_multiwin::egui::TextureHandle>,
 }
 

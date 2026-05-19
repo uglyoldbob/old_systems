@@ -1,6 +1,10 @@
 //! dfor user input related code
 
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
 
 /// The types of user input that can be accepted
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone, Debug)]

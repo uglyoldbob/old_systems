@@ -4,23 +4,20 @@ use crate::{cartridge::NesCartridge, NesEmulatorData};
 
 use common_emulator::romlist::RomRanking;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
 
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui::Sense, egui_glow::EguiGlow};
 use strum::IntoEnumIterator;
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 
 /// The structure for a window that helps a user select a rom to load.
 pub struct RomFinder {
     /// Set when the initial scroll to the currently loaded rom has occurred
-    scrolled: bool,
+    pub scrolled: bool,
+}
+
+impl RomFinder {
+    pub fn new() -> Self {
+        RomFinder { scrolled: false }
+    }
 }
 
 #[cfg(feature = "egui-multiwin")]
@@ -28,7 +25,7 @@ impl RomFinder {
     /// Create a new request to make a RomFinder window.
     pub fn new_request() -> NewWindowRequest {
         NewWindowRequest {
-            window_state: super::Windows::RomFinder(RomFinder { scrolled: false }),
+            window_state: super::Windows::RomFinder(Self::new()),
             builder: egui_multiwin::winit::window::WindowBuilder::new()
                 .with_resizable(true)
                 .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {

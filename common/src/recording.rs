@@ -40,7 +40,7 @@ impl Recording {
     pub fn start(
         &mut self,
         have_gstreamer: &Result<(), gstreamer::glib::Error>,
-        image: &crate::video::PixelImage<egui_multiwin::egui::Color32>,
+        image: &crate::video::PixelImage<egui::Color32>,
         framerate: u8,
         name: PathBuf,
         cpu_frequency: f32,
@@ -161,7 +161,7 @@ impl Recording {
     }
 
     /// Send a frame of data to the recording
-    pub fn send_frame(&mut self, image: &crate::video::PixelImage<egui_multiwin::egui::Color32>) {
+    pub fn send_frame(&mut self, image: &crate::video::PixelImage<egui::Color32>) {
         if let Some(_pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
                 let mut buf =

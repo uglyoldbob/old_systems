@@ -3,11 +3,7 @@
 use std::time::Duration;
 
 use common_emulator::input::UserInput;
-#[cfg(feature = "eframe")]
 use eframe::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui;
 
 /// Defines how inputs get from user to the ButtonCombination
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
@@ -43,7 +39,6 @@ impl ControllerConfig {
     }
 
     /// Set the given button with egui data
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub fn set_key_egui(&mut self, index: usize, k: egui::Key) {
         self.buttons[index] = UserInput::Egui(k);
     }
@@ -247,7 +242,6 @@ impl ButtonCombination {
     }
 
     /// Update what buttons can be updated with an egui input
-    #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
     pub fn update_egui_buttons(&mut self, i: &egui::InputState, config: &ControllerConfig) {
         for (index, b) in config.buttons.iter().enumerate() {
             if index == BUTTON_COMBO_TURBOA {
@@ -397,12 +391,7 @@ pub trait NesControllerTrait {
     /// Dump data from the controller. No side effects.
     fn dump_data(&self) -> u8;
     /// Read data from the controller.
-    fn read_data(
-        &mut self,
-        screen: &common_emulator::video::RgbImage,
-        x: u16,
-        y: u16,
-    ) -> u8;
+    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8;
     /// Return the data for all button states
     fn button_data(&self) -> ButtonCombination;
 }
@@ -574,12 +563,7 @@ impl NesControllerTrait for FourScore {
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(
-        &mut self,
-        screen: &common_emulator::video::RgbImage,
-        x: u16,
-        y: u16,
-    ) -> u8 {
+    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8 {
         match self.clock_counter {
             0..=7 => self.controllers[0].read_data(screen, x, y),
             8..=15 => self.controllers[1].read_data(screen, x, y),
@@ -631,12 +615,7 @@ impl NesControllerTrait for DummyController {
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(
-        &mut self,
-        screen: &common_emulator::video::RgbImage,
-        x: u16,
-        y: u16,
-    ) -> u8 {
+    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8 {
         0xff
     }
 }
@@ -696,12 +675,7 @@ impl NesControllerTrait for Zapper {
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(
-        &mut self,
-        screen: &common_emulator::video::RgbImage,
-        x: u16,
-        y: u16,
-    ) -> u8 {
+    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8 {
         let mut d = self.dump_data();
         if x < 256 && y < 240 {
             let color = screen.get_pixel(egui::Vec2 {
@@ -884,12 +858,7 @@ impl NesControllerTrait for StandardController {
         data | 0x1e
     }
 
-    fn read_data(
-        &mut self,
-        screen: &common_emulator::video::RgbImage,
-        x: u16,
-        y: u16,
-    ) -> u8 {
+    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8 {
         self.dump_data()
     }
 }

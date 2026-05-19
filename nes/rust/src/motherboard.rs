@@ -375,20 +375,14 @@ impl NesMotherboard {
                         self.last_cpu_data = response;
                     }
                     0x4016 => {
-                        let d = self.controllers[0].read_data(
-                            per.ppu.get_frame(),
-                            self.x,
-                            self.y,
-                        ) & 0x1f;
+                        let d = self.controllers[0].read_data(per.ppu.get_frame(), self.x, self.y)
+                            & 0x1f;
                         response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         self.last_cpu_data = response;
                     }
                     0x4017 => {
-                        let d = self.controllers[1].read_data(
-                            per.ppu.get_frame(),
-                            self.x,
-                            self.y,
-                        ) & 0x1f;
+                        let d = self.controllers[1].read_data(per.ppu.get_frame(), self.x, self.y)
+                            & 0x1f;
                         response = (d ^ 0x1f) | (self.last_cpu_data & 0xe0);
                         self.last_cpu_data = response;
                     }

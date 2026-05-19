@@ -2,16 +2,12 @@
 
 use crate::motherboard::NesMotherboard;
 use common_emulator::video::RgbImage;
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui;
 
 use serde_with::Bytes;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
 
 use egui::Vec2;
-
 
 /// The various modes of evaluating sprites for a scanline
 #[non_exhaustive]

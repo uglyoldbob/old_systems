@@ -2,17 +2,7 @@
 
 use crate::NesEmulatorData;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui_glow::EguiGlow};
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 
 /// The structure for a debug window of the emulator.
 pub struct DebugNesWindow {

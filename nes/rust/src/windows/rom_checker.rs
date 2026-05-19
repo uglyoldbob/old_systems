@@ -6,20 +6,7 @@ use crate::{cartridge::NesCartridge, NesEmulatorData};
 
 use common_emulator::rom_status::RomStatus;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui::ScrollArea;
-
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::{arboard, egui_glow::EguiGlow};
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::{
-    multi_window::NewWindowRequest,
-    tracked_window::{RedrawResponse, TrackedWindow},
-};
 
 /// The structure for a debug window of the emulator.
 pub struct Window {

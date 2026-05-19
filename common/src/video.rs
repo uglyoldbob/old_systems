@@ -1,6 +1,10 @@
 //! Common code for video processing
 
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui;
+
+#[cfg(feature = "eframe")]
+use eframe::egui;
 
 /// The types of algorithms for scaling up the image
 #[derive(
@@ -67,6 +71,7 @@ impl PixelImage<egui::Color32> {
     /// Converts the image to an egui usable format
     pub fn to_egui(self) -> egui::ColorImage {
         egui::ColorImage {
+            source_size: [self.width as f32, self.height as f32].into(),
             size: [self.width as usize, self.height as usize],
             pixels: self.pixels,
         }

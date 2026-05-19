@@ -12,13 +12,7 @@ use crate::{
 
 use common_emulator::audio::AudioProducerWithRate;
 
-#[cfg(feature = "eframe")]
 use eframe::egui;
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui;
-
-#[cfg(feature = "egui-multiwin")]
-use crate::egui_multiwin_dynamic::multi_window::NewWindowRequest;
 
 /// Persistent configuration for the emulator
 #[non_exhaustive]
@@ -46,7 +40,6 @@ pub struct EmulatorConfiguration {
 impl Default for EmulatorConfiguration {
     fn default() -> Self {
         let mut controller = [crate::controller::ControllerConfig::new(); 4];
-        #[cfg(any(feature = "eframe", feature = "egui-multiwin"))]
         {
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_A, egui::Key::F);
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_B, egui::Key::D);
@@ -105,6 +98,7 @@ impl EmulatorConfiguration {
 
     ///Load a configuration file
     pub fn load(name: std::path::PathBuf) -> Self {
+        println!("Loading from {:?}", name);
         let mut result = EmulatorConfiguration {
             path: name.clone().into_os_string().into_string().unwrap(),
             ..Default::default()
@@ -281,7 +275,7 @@ impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
         Self::new(
             #[cfg(feature = "egui-multiwin")]
-            None
+            None,
         )
     }
 }
@@ -299,8 +293,7 @@ impl LocalEmulatorDataClone {
 
     /// Create a new Self object with the given event loop proxy
     fn new(
-        #[cfg(feature = "egui-multiwin")]
-        proxy: Option<
+        #[cfg(feature = "egui-multiwin")] proxy: Option<
             egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
         >,
     ) -> Self {
@@ -389,8 +382,7 @@ impl NesEmulatorData {
 impl NesEmulatorData {
     /// Create a new nes emulator
     pub fn new(
-        #[cfg(feature = "egui-multiwin")]
-        proxy: Option<
+        #[cfg(feature = "egui-multiwin")] proxy: Option<
             egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
         >,
     ) -> Self {
@@ -420,7 +412,7 @@ impl NesEmulatorData {
             vblank_just_set: 0,
             local: LocalEmulatorDataClone::new(
                 #[cfg(feature = "egui-multiwin")]
-                proxy
+                proxy,
             ),
             olocal: Some(LocalEmulatorData::default()),
         }
