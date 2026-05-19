@@ -3,6 +3,7 @@
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui::TextEdit;
 #[cfg(feature = "egui-multiwin")]
 use egui_multiwin::{arboard, egui_glow::EguiGlow};

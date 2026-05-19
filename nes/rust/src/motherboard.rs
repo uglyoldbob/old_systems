@@ -33,7 +33,7 @@ pub struct NesMotherboard {
     last_cpu_data: u8,
     #[serde(skip)]
     /// The controllers for the system
-    controllers: [NesController; 2],
+    pub controllers: [NesController; 2],
     /// The speed ratio applied to the emulator
     pub speed_ratio: f32,
     ///zapper x coord

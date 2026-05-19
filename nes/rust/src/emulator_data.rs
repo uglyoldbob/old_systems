@@ -189,6 +189,7 @@ pub struct LocalEmulatorDataClone {
     pub resolution_locked: bool,
     /// The way to get system specific paths
     dirs: directories::ProjectDirs,
+    #[cfg(feature = "egui-multiwin")]
     /// The proxy for sending internal messages
     proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>>,
     /// The stored resized image for the emulator
@@ -198,6 +199,7 @@ pub struct LocalEmulatorDataClone {
 }
 
 impl LocalEmulatorDataClone {
+    #[cfg(feature = "egui-multiwin")]
     /// Returns a clone of the proxy
     pub fn get_proxy(
         &self,
@@ -277,7 +279,10 @@ impl LocalEmulatorDataClone {
 
 impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(
+            #[cfg(feature = "egui-multiwin")]
+            None
+        )
     }
 }
 
@@ -294,6 +299,7 @@ impl LocalEmulatorDataClone {
 
     /// Create a new Self object with the given event loop proxy
     fn new(
+        #[cfg(feature = "egui-multiwin")]
         proxy: Option<
             egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
         >,
@@ -314,6 +320,7 @@ impl LocalEmulatorDataClone {
             ),
             resolution_locked: false,
             dirs,
+            #[cfg(feature = "egui-multiwin")]
             proxy,
             image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
@@ -382,6 +389,7 @@ impl NesEmulatorData {
 impl NesEmulatorData {
     /// Create a new nes emulator
     pub fn new(
+        #[cfg(feature = "egui-multiwin")]
         proxy: Option<
             egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
         >,
@@ -410,7 +418,10 @@ impl NesEmulatorData {
             prev_irq: false,
             big_counter: 0,
             vblank_just_set: 0,
-            local: LocalEmulatorDataClone::new(proxy),
+            local: LocalEmulatorDataClone::new(
+                #[cfg(feature = "egui-multiwin")]
+                proxy
+            ),
             olocal: Some(LocalEmulatorData::default()),
         }
     }

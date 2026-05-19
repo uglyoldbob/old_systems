@@ -11,6 +11,7 @@ use eframe::egui;
 use egui_multiwin::{arboard, egui::Sense, egui_glow::EguiGlow};
 use strum::IntoEnumIterator;
 
+#[cfg(feature = "egui-multiwin")]
 use crate::egui_multiwin_dynamic::{
     multi_window::NewWindowRequest,
     tracked_window::{RedrawResponse, TrackedWindow},

@@ -136,10 +136,10 @@ impl NesMapperTrait for Mapper34 {
                 self.bank = data;
             }
             0x7ffe => {
-                self.regs[1] = data;
+                self.regs[0] = data;
             }
             0x7fff => {
-                self.regs[2] = data;
+                self.regs[1] = data;
             }
             0x8000..=0xffff => {
                 self.bank = data;

@@ -8,7 +8,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["egui-multiwin", "rom_status"]
+default = ["egui-multiwin"]
 debugger = []
 rom_status = []
 puffin = ["dep:puffin", "dep:puffin_egui"]
@@ -20,6 +20,7 @@ sdl2 = ["dep:sdl2", "dep:egui_sdl2_gl"]
 async-channel = "2.0.0"
 asynchronous-codec = "0.7.0"
 biquad = "0.4.2"
+bluetooth-rust = "0.3.9"
 chrono = "0.4.31"
 common-emulator = { path = "../../common" }
 cpal = {version = "0.15.2", optional=true}

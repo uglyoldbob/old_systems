@@ -9,6 +9,7 @@ use common_emulator::rom_status::RomStatus;
 #[cfg(feature = "eframe")]
 use eframe::egui;
 
+#[cfg(feature = "egui-multiwin")]
 use egui_multiwin::egui::ScrollArea;
 
 #[cfg(feature = "egui-multiwin")]
