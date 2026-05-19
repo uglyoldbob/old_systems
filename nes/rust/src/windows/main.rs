@@ -32,7 +32,7 @@ pub struct MainNesWindow {
     last_emulated_frame: std::time::Instant,
     /// Used to synchronize the emulator to the right frame rate
     emulator_time: std::time::Duration,
-    c: NesEmulatorData,
+    pub c: NesEmulatorData,
     /// The calculated frames per second performance of the program. Will be higher than the fps of the emulator.
     fps: f64,
     /// The calculated frames per second performance of the emulator.
@@ -66,13 +66,13 @@ pub struct MainNesWindow {
     /// The open rom window
     open_rom_window: Option<crate::windows::rom_finder::RomFinder>,
     /// The networking window
-    networking_window: bool,
+    networking_window: Option<crate::windows::network::Window>,
     /// The configuration window
-    configuration_window: bool,
+    configuration_window: Option<crate::windows::configuration::Window>,
     /// The controllers window
-    controllers_window: bool,
+    controllers_window: Option<crate::windows::controllers::Window>,
     /// The game genie window
-    game_genie_window: bool,
+    game_genie_window: Option<crate::windows::genie::Window>,
 }
 
 impl MainNesWindow {
@@ -114,10 +114,10 @@ impl MainNesWindow {
             recording: Recording::new(),
             audio_streaming: Vec::new(),
             render_percent: 0.0,
-            configuration_window: false,
-            controllers_window: false,
-            game_genie_window: false,
-            networking_window: false,
+            configuration_window: None,
+            controllers_window: None,
+            game_genie_window: None,
+            networking_window: None,
             open_rom_window: None,
         }
     }
@@ -462,104 +462,7 @@ impl eframe::App for MainNesWindow {
 
         let mut quit_rom_window = false;
         if let Some(win) = &mut self.open_rom_window {
-            ui.ctx().show_viewport_immediate(
-                egui::ViewportId::from_hash_of("ROM_LOAD_WINDOW"),
-                egui::ViewportBuilder::default()
-                    .with_title("ROM LOAD")
-                    .with_inner_size([400.0, 300.0]),
-                |ui, class| {
-                    //scan for roms if needed
-                    let rp = self.c.local.configuration.get_rom_path().to_owned();
-                    self.c.find_roms(&rp);
-                    //process to see if any new roms need to be checked
-                    self.c.process_roms();
-
-                    let mut save_list = false;
-                    let sp = self.c.local.save_path();
-                    egui::CentralPanel::default().show_inside(ui, |ui| {
-                        egui::ScrollArea::vertical().show(ui, |ui| {
-                            let mut new_rom = None;
-                            for ranking in RomRanking::iter() {
-                                let mut have_entry = false;
-                                for (p, entry) in self.c.local.parser.list_mut().elements.iter_mut()
-                                {
-                                    if let Some(Ok(r)) = &mut entry.result {
-                                        if r.ranking == ranking {
-                                            have_entry = true;
-                                            ui.horizontal(|ui| {
-                                                if ui.button("-").clicked() {
-                                                    r.ranking.decrease();
-                                                    save_list = true;
-                                                }
-                                                if ui.button("+").clicked() {
-                                                    r.ranking.increase();
-                                                    save_list = true;
-                                                }
-
-                                                ui.label(r.ranking.to_string());
-
-                                                let resp = ui.add(
-                                                    egui::Label::new(format!(
-                                                        "{:x}: {}",
-                                                        r.mapper,
-                                                        p.display()
-                                                    ))
-                                                    .sense(egui::Sense::click()),
-                                                );
-                                                if let Some(cart) = self.c.mb.cartridge() {
-                                                    if p.display().to_string() == cart.rom_name()
-                                                        && !win.scrolled
-                                                    {
-                                                        resp.scroll_to_me(Some(egui::Align::TOP));
-                                                        win.scrolled = true;
-                                                    }
-                                                }
-
-                                                if resp.double_clicked() {
-                                                    new_rom = Some(
-                                                        NesCartridge::load_cartridge(
-                                                            p.to_str().unwrap().into(),
-                                                            &sp,
-                                                        )
-                                                        .unwrap(),
-                                                    );
-                                                    quit_rom_window = true;
-                                                }
-                                            });
-                                        }
-                                    }
-                                }
-                                if have_entry {
-                                    ui.separator();
-                                }
-                            }
-                            ui.label("Unsupported roms below here");
-                            for (p, entry) in self.c.local.parser.list().elements.iter() {
-                                if let Some(Err(r)) = &entry.result {
-                                    ui.label(format!("Rom: {}: {:?}", p.display(), r));
-                                }
-                            }
-                            if let Some(nc) = new_rom {
-                                self.c.remove_cartridge();
-                                self.c.insert_cartridge(nc);
-                                self.c.power_cycle();
-                            }
-                        });
-                    });
-
-                    if save_list {
-                        let p = self.c.local.save_path();
-                        if self.c.local.parser.list().save_list(p).is_ok() {
-                            println!("Saved rom list");
-                        }
-                    }
-
-                    win.scrolled = true;
-                    if ui.ctx().input(|i| i.viewport().close_requested()) {
-                        quit_rom_window = true;
-                    }
-                },
-            );
+            win.show(ui, &mut quit_rom_window, &mut self.c);
         }
         if quit_rom_window {
             self.open_rom_window.take();
@@ -622,24 +525,24 @@ impl eframe::App for MainNesWindow {
 
                     let button = egui::Button::new("Networking");
                     if ui.add_enabled(true, button).clicked() {
-                        self.networking_window = true;
+                        self.networking_window = Some(crate::windows::network::Window::new());
                         ui.close_kind(egui::UiKind::Menu);
                     }
                 });
                 ui.menu_button("Edit", |ui| {
                     let button = egui::Button::new("Configuration");
                     if ui.add_enabled(true, button).clicked() {
-                        self.configuration_window = true;
+                        self.configuration_window = Some(crate::windows::configuration::Window::new());
                         ui.close_kind(egui::UiKind::Menu);
                     }
                     let button = egui::Button::new("Controllers");
                     if ui.add_enabled(true, button).clicked() {
-                        self.controllers_window = true;
+                        self.controllers_window = Some(crate::windows::controllers::Window::new());
                         ui.close_kind(egui::UiKind::Menu);
                     }
                     let button = egui::Button::new("Game genie");
                     if ui.add_enabled(true, button).clicked() {
-                        self.game_genie_window = true;
+                        self.game_genie_window = Some(crate::windows::genie::Window::new());
                         ui.close_kind(egui::UiKind::Menu);
                     }
                     if ui.button("Reset").clicked() {

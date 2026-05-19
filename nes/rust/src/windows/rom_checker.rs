@@ -20,10 +20,8 @@ pub struct Window {
     want_status: Option<Option<RomStatus>>,
 }
 
-#[cfg(feature = "egui-multiwin")]
 impl Window {
-    /// Create a new request for a Debug window.
-    pub fn new_request(data: &NesEmulatorData) -> NewWindowRequest {
+    pub fn new(data: &NesEmulatorData) -> Self {
         let mut index = 0;
         let mut max_i = 0;
         for (i, (path, _entry)) in data.local.parser.list().elements.iter().enumerate() {
@@ -38,38 +36,16 @@ impl Window {
         if index >= max_i {
             index = 0;
         }
-
-        NewWindowRequest {
-            window_state: super::Windows::RomChecker(Window {
-                index,
-                next_rom: None,
-                bug: "".to_string(),
-                want_status: None,
-            }),
-            builder: egui_multiwin::winit::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 640.0,
-                    height: 480.0,
-                })
-                .with_title("UglyOldBob NES ROM CHECKER"),
-            options: egui_multiwin::tracked_window::TrackedWindowOptions {
-                vsync: false,
-                shader: None,
-            },
-            id: egui_multiwin::multi_window::new_id(),
+        Window {
+            index,
+            next_rom: None,
+            bug: "".to_string(),
+            want_status: None,
         }
     }
 }
 
-#[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for Window {
-    fn is_root(&self) -> bool {
-        false
-    }
-
-    fn set_root(&mut self, _root: bool) {}
-
+impl Window {
     fn redraw(
         &mut self,
         c: &mut NesEmulatorData,

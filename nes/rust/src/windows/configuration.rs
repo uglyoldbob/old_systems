@@ -21,25 +21,10 @@ pub struct Window {
 }
 
 impl Window {
-    /// Create a request to create a new window of self.
-    #[cfg(feature = "egui-multiwin")]
-    pub fn new_request() -> NewWindowRequest {
-        NewWindowRequest {
-            window_state: super::Windows::Configuration(Window {
-                message_channel: std::sync::mpsc::channel(),
-            }),
-            builder: egui_multiwin::winit::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
-                })
-                .with_title("UglyOldBob NES Configuration"),
-            options: egui_multiwin::tracked_window::TrackedWindowOptions {
-                vsync: false,
-                shader: None,
-            },
-            id: egui_multiwin::multi_window::new_id(),
+    /// Create a new self.
+    pub fn new() -> Self {
+        Window {
+            message_channel: std::sync::mpsc::channel(),
         }
     }
 }

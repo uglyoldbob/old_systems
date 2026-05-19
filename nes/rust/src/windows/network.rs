@@ -10,26 +10,11 @@ pub struct Window {
     server: String,
 }
 
-#[cfg(feature = "egui-multiwin")]
 impl Window {
-    /// Create a request to create a new window of self.
-    pub fn new_request() -> NewWindowRequest {
-        NewWindowRequest {
-            window_state: super::Windows::Network(Window {
-                server: "".to_string(),
-            }),
-            builder: egui_multiwin::winit::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
-                })
-                .with_title("UglyOldBob NES Network Configuration"),
-            options: egui_multiwin::tracked_window::TrackedWindowOptions {
-                vsync: false,
-                shader: None,
-            },
-            id: egui_multiwin::multi_window::new_id(),
+    /// Create a new self.
+    pub fn new() -> Self {
+        Window {
+            server: "".to_string(),
         }
     }
 }

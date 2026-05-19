@@ -24,28 +24,13 @@ pub struct Window {
 }
 
 impl Window {
-    /// Create a request to create a new window of self.
-    #[cfg(feature = "egui-multiwin")]
-    pub fn new_request() -> NewWindowRequest {
-        NewWindowRequest {
-            window_state: super::Windows::Controllers(Window {
-                selected_controller: None,
-                known_keys: HashSet::new(),
-                waiting_for_input: None,
-                gilrs_last_known: (HashSet::new(), HashMap::new()),
-            }),
-            builder: egui_multiwin::winit::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 1024.0,
-                    height: 768.0,
-                })
-                .with_title("UglyOldBob NES Controller Configuration"),
-            options: egui_multiwin::tracked_window::TrackedWindowOptions {
-                vsync: false,
-                shader: None,
-            },
-            id: egui_multiwin::multi_window::new_id(),
+    /// Create a new self.
+    pub fn new() -> Self {
+        Window {
+            selected_controller: None,
+            known_keys: HashSet::new(),
+            waiting_for_input: None,
+            gilrs_last_known: (HashSet::new(), HashMap::new()),
         }
     }
 }
