@@ -318,7 +318,7 @@ version = "0.1.0"
 dependencies = [
  "android_logger",
  "anyhow",
- "bluetooth-rust 0.3.9",
+ "bluetooth-rust",
  "cert-common",
  "eframe 0.34.2",
  "egui-winit 0.34.2",
@@ -1192,28 +1192,6 @@ dependencies = [
  "serde",
  "simple_logger 5.2.0",
  "tlv_parser",
- "tokio",
- "windows 0.62.2",
- "winit 0.30.13",
-]
-
-[[package]]
-name = "bluetooth-rust"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d904f7197bc2c1fde5daa67c27fc94e75bb89facf99c74e48ad0ad70d20d9ffc"
-dependencies = [
- "async-trait",
- "bluer",
- "bytes",
- "enum_dispatch",
- "futures",
- "jni 0.21.1",
- "jni-min-helper",
- "libc",
- "log",
- "ouroboros",
- "serde",
  "tokio",
  "windows 0.62.2",
  "winit 0.30.13",
@@ -5688,7 +5666,7 @@ dependencies = [
  "asynchronous-codec",
  "bincode",
  "biquad",
- "bluetooth-rust 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bluetooth-rust",
  "chrono",
  "common-emulator",
  "cpal",

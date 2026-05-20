@@ -68,6 +68,7 @@ pub struct DemoApp {
     show_debug_strip: bool,
     button_opacity: f32,
     bluetooth_adapter: bluetooth_rust::BluetoothAdapter,
+    bluetooth_emulators: Vec<bluetooth_rust::BluetoothDevice>,
 }
 
 impl DemoApp {
@@ -79,6 +80,7 @@ impl DemoApp {
             show_debug_strip: true,
             button_opacity: 1.0,
             bluetooth_adapter,
+            bluetooth_emulators: Vec::new(),
         }
     }
 }
@@ -459,17 +461,31 @@ impl DemoApp {
             .add(egui::Button::new("Find emulator").min_size([70.0, 70.0].into()))
             .clicked()
         {
+            self.bluetooth_emulators.clear();
             if let Some(devs) = self.bluetooth_adapter.get_paired_devices() {
                 for mut dev in devs {
+                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Custom("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(), 0);
+                    dev.run_sdp(wanted_uuid);
+                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Unknown("76ecef8b-24d4-4f7c-9de0-706864b6bc14".to_string());
                     if let Ok(uuids) = dev.get_uuids() {
-                        if uuids.contains(&bluetooth_rust::BluetoothUuid::Custom("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(), 0)) {
+                        log::error!("UUIDS ARE {:?}", uuids);
+                        if uuids.contains(&wanted_uuid) {
                             child.label(format!("{:?}", dev.get_address()));
                             log::error!("Found bluetooth emulator {:?}", dev.get_address());
+                            self.bluetooth_emulators.push(dev);
                         } else {
                             child.label(format!("NOT {:?}", dev.get_address()));
                             log::error!("No bluetooth emulator {:?}", dev.get_address());
                         }
                     }
+                }
+            }
+        }
+        for d in &mut self.bluetooth_emulators {
+            if let Ok(a) = d.get_address() {
+                let btn = egui::Button::new(&format!("Connect to {}", a)).min_size([70.0, 70.0].into());
+                if child.add(btn).clicked() {
+                    log::error!("Need to connect to {}", a);
                 }
             }
         }

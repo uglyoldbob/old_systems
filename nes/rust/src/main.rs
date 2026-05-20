@@ -13,6 +13,7 @@ mod genie;
 mod motherboard;
 mod ppu;
 
+use bluetooth_rust::{BluetoothAdapterTrait, BluetoothRfcommConnectableAsyncTrait, BluetoothRfcommProfileAsyncTrait};
 use emulator_data::NesEmulatorData;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -35,6 +36,45 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 mod windows;
 
+async fn handle_bluetooth_controller_client(_stream: bluetooth_rust::BluetoothStream, a: [u8; 6]) {
+    println!("Got a bluetooth connection from {:?}", a)
+}
+
+async fn run_bluetooth() {
+    println!("Running bluetooth");
+    let mut bab = bluetooth_rust::BluetoothAdapterBuilder::new();
+    let s = tokio::sync::mpsc::channel(100);
+    bab.with_sender(s.0);
+    let ba = bab.async_build().await;
+    match ba {
+        Ok(ba) => {
+            let settings = bluetooth_rust::BluetoothRfcommProfileSettings {
+                uuid: "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
+                name: Some("NES Controller Service".to_string()),
+                service_uuid: Some("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string()),
+                channel: None,
+                psm: None,
+                authenticate: Some(false),
+                authorize: Some(false),
+                auto_connect: Some(true),
+                sdp_record: None,
+                sdp_version: None,
+                sdp_features: None,
+            };
+            let mut profile = ba.register_rfcomm_profile(settings).await.expect("Failed to register bluetooth profile");
+            loop {
+                let c = profile.connectable().await.expect("Failed to build connectable for bluetooth profile");
+                if let Ok(a) = c.accept().await {
+                    tokio::spawn(async move {
+                        handle_bluetooth_controller_client(a.0, a.1).await;
+                    });
+                }
+            }
+        }
+        Err(e) => eprintln!("Failed to get bluetooth adapter: {}", e),
+    }
+}
+
 fn main() {
     use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
 
@@ -44,6 +84,12 @@ fn main() {
     let mut options = eframe::NativeOptions::default();
     //TODO only disable vsync when required
     options.vsync = false;
+
+    let trt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to start async runtime");
+    trt.spawn(run_bluetooth());
 
     let mut nes_data = NesEmulatorData::new();
     println!(
