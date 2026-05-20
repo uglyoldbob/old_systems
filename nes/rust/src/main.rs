@@ -32,7 +32,6 @@ mod tests;
 use crate::cartridge::NesCartridge;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use eframe::egui;
 
 mod windows;
 
@@ -277,26 +276,6 @@ fn main() {
                 nes_data.insert_cartridge(nc);
             }
         }
-    }
-
-    #[cfg(feature = "debugger")]
-    {
-        if nes_data.paused {
-            let debug_win = windows::debug_window::DebugNesWindow::new_request();
-            let _e = multi_window.add(debug_win, &mut nes_data, &event_loop);
-        }
-    }
-
-    #[cfg(feature = "rom_status")]
-    {
-        todo!();
-        /*
-        let _e = multi_window.add(
-            windows::rom_checker::Window::new_request(&nes_data),
-            &mut nes_data,
-            &event_loop,
-        );
-        */
     }
 
     eframe::run_native(

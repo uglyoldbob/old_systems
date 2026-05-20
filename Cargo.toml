@@ -1,4 +1,5 @@
 [workspace]
+resolver = "3"
 
 exclude = ["nes/hdl/riscv-bios-rust"]
 members = ["nes/hdmi",
@@ -6,3 +7,9 @@ members = ["nes/hdmi",
     "snes/rust",
     "android",
 ]
+
+[profile.release]
+strip = true  # Automatically strip symbols from the binary.
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1

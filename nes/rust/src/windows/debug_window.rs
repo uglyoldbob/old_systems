@@ -26,7 +26,7 @@ impl DebugNesWindow {
             egui::ViewportBuilder::default()
                 .with_title("Debug")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("Debug window");
                     egui::ScrollArea::vertical().show(ui, |ui| {
@@ -77,7 +77,7 @@ impl DebugNesWindow {
                                 c.cpu_peripherals.ppu_frame_number()
                             ));
                             ui.label("Breakpoints");
-                            egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
+                            egui::ScrollArea::vertical().show(ui, |ui| {
                                 let mut found = false;
                                 let mut delete = None;
                                 for (i, b) in c.cpu.breakpoints.iter().enumerate() {

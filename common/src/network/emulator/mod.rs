@@ -172,7 +172,7 @@ pub enum OutboundSubstreamState {
 /// The libp2p handler struct
 pub struct Handler {
     /// The role played by this node in the network.
-    role: NodeRole,
+    _role: NodeRole,
     /// The protocol to use for communication.
     listen_protocol: Protocol,
     /// The waker used to wake up the poll stuff when is is marked pending.
@@ -192,7 +192,7 @@ pub struct Handler {
     /// Indicates that the audio source has been sent to the user
     asource_sent: bool,
     /// The optional details for when running a host
-    host: Option<ServerDetails>,
+    _host: Option<ServerDetails>,
 }
 
 impl Handler {
@@ -207,7 +207,7 @@ impl Handler {
         let avsink = s.take_sink();
         let asource = s.get_sound();
         Self {
-            role,
+            _role: role,
             listen_protocol: protocol,
             waker: Arc::new(Mutex::new(None)),
             inbound_stream: None,
@@ -217,7 +217,7 @@ impl Handler {
             avsink,
             asource: asource.map(|a| std::sync::Arc::new(std::sync::Mutex::new(a))),
             asource_sent: false,
-            host,
+            _host: host,
         }
     }
 }
@@ -506,25 +506,6 @@ impl ConnectionHandler for Handler {
     }
 }
 
-/// The message sent to the user after a [`RawMessage`] has been transformed by a
-/// [`crate::DataTransform`].
-pub struct Message {
-    /// Id of the peer that published this message.
-    pub source: Option<PeerId>,
-
-    /// Content of the message.
-    pub data: MessageToFromNetwork,
-}
-
-impl std::fmt::Debug for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Message")
-            .field("data", &format_args!("{:?}", self.data))
-            .field("source", &self.source)
-            .finish()
-    }
-}
-
 /// Represents a protocol configuration for the behavior.
 #[derive(Clone)]
 pub struct Config {
@@ -566,7 +547,7 @@ pub struct Behavior {
     /// The servers that this node might be connected to.
     server: Option<PeerId>,
     /// Optional image data used for running a server
-    img: Option<u32>,
+    _img: Option<u32>,
     /// The optional details for when running a host
     host: Option<ServerDetails>,
     /// Placeholder for transferring the audio producer back to the main thread
@@ -584,7 +565,7 @@ impl Behavior {
             waker: Arc::new(Mutex::new(None)),
             clients: HashSet::new(),
             server: None,
-            img: None,
+            _img: None,
             host: None,
             audio: None,
             role: NodeRole::Unknown,
@@ -638,13 +619,6 @@ impl Behavior {
                 panic!("Not really how there can be a disconnect when my role is unknown");
             }
         }
-    }
-
-    /// Take the audio producer
-    pub fn take_audio(
-        &mut self,
-    ) -> Option<std::sync::Weak<std::sync::Mutex<AudioProducerWithRate>>> {
-        self.audio.take()
     }
 
     /// Send the given controller data to the host.

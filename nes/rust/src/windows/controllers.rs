@@ -42,7 +42,7 @@ impl Window {
             egui::ViewportBuilder::default()
                 .with_title("Controller Config")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     let (old_gilrs_button, old_gilrs_axis) = self.gilrs_last_known.clone();
                     if let Some(olocal) = &mut c.olocal {
@@ -105,7 +105,7 @@ impl Window {
                     let mut controller_mod = None;
                     if let Some(i) = self.selected_controller {
                         let mut controller = c.mb.get_controller(i);
-                        let controllerr = egui::ComboBox::from_id_source("Controller Type")
+                        let controllerr = egui::ComboBox::from_id_salt("Controller Type")
                             .selected_text(controller.to_string())
                             .show_ui(ui, |ui| {
                                 let mut changed = false;

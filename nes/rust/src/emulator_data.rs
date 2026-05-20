@@ -183,9 +183,6 @@ pub struct LocalEmulatorDataClone {
     pub resolution_locked: bool,
     /// The way to get system specific paths
     dirs: directories::ProjectDirs,
-    #[cfg(feature = "egui-multiwin")]
-    /// The proxy for sending internal messages
-    proxy: Option<egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>>,
     /// The stored resized image for the emulator
     pub image: common_emulator::video::PixelImage<egui::Color32>,
     /// The number of samples per second of the audio output.
@@ -193,15 +190,6 @@ pub struct LocalEmulatorDataClone {
 }
 
 impl LocalEmulatorDataClone {
-    #[cfg(feature = "egui-multiwin")]
-    /// Returns a clone of the proxy
-    pub fn get_proxy(
-        &self,
-    ) -> Option<egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>>
-    {
-        self.proxy.clone()
-    }
-
     /// Returns the path to use for save states
     pub fn save_path(&self) -> std::path::PathBuf {
         Self::get_save_path(&self.dirs)
@@ -273,10 +261,7 @@ impl LocalEmulatorDataClone {
 
 impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
-        Self::new(
-            #[cfg(feature = "egui-multiwin")]
-            None,
-        )
+        Self::new()
     }
 }
 
@@ -292,11 +277,7 @@ impl LocalEmulatorDataClone {
     }
 
     /// Create a new Self object with the given event loop proxy
-    fn new(
-        #[cfg(feature = "egui-multiwin")] proxy: Option<
-            egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
-        >,
-    ) -> Self {
+    fn new() -> Self {
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
 
         let mut user_path = dirs.config_dir().to_path_buf();
@@ -313,8 +294,6 @@ impl LocalEmulatorDataClone {
             ),
             resolution_locked: false,
             dirs,
-            #[cfg(feature = "egui-multiwin")]
-            proxy,
             image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
         }
@@ -362,30 +341,17 @@ pub struct NesEmulatorData {
     pub olocal: Option<LocalEmulatorData>,
 }
 
-#[cfg(feature = "egui-multiwin")]
 impl NesEmulatorData {
-    /// Process any events received from the main event loop
-    pub fn process_event(&mut self, event: common_emulator::event::Event) -> Vec<NewWindowRequest> {
-        match event.message {
-            common_emulator::event::EventType::CheckNetwork => {
-                if let Some(olocal) = &mut self.olocal {
-                    if let Some(network) = &mut olocal.network {
-                        network.process_messages();
-                    }
-                }
+    pub fn check_network(&mut self) {
+        if let Some(olocal) = &mut self.olocal {
+            if let Some(network) = &mut olocal.network {
+                network.process_messages();
             }
         }
-        vec![]
     }
-}
 
-impl NesEmulatorData {
     /// Create a new nes emulator
-    pub fn new(
-        #[cfg(feature = "egui-multiwin")] proxy: Option<
-            egui_multiwin::winit::event_loop::EventLoopProxy<common_emulator::event::Event>,
-        >,
-    ) -> Self {
+    pub fn new() -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let apu = NesApu::new();
@@ -410,10 +376,7 @@ impl NesEmulatorData {
             prev_irq: false,
             big_counter: 0,
             vblank_just_set: 0,
-            local: LocalEmulatorDataClone::new(
-                #[cfg(feature = "egui-multiwin")]
-                proxy,
-            ),
+            local: LocalEmulatorDataClone::new(),
             olocal: Some(LocalEmulatorData::default()),
         }
     }

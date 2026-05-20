@@ -26,7 +26,7 @@ impl Window {
             egui::ViewportBuilder::default()
                 .with_title("Network")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     let cpu_frequency = c.cpu_frequency();
                     let framerate = c.ppu_frame_rate();

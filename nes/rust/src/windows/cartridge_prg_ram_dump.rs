@@ -21,7 +21,7 @@ impl CartridgeMemoryDumpWindow {
             egui::ViewportBuilder::default()
                 .with_title("PRG RAM DUMPER")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("Cartridge Ram Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {

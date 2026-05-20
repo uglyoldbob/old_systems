@@ -4,65 +4,6 @@ use crate::apu::NesApu;
 use crate::motherboard::NesMotherboard;
 use crate::ppu::NesPpu;
 
-/// Handles nmi detection
-#[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
-struct Nmi {
-    /// The current detected level of the nmi signal
-    level: bool,
-    /// An edge is detected
-    edge: bool,
-    /// The nmi might trigger
-    might_trigger: bool,
-    /// Holding variable
-    holding: bool,
-}
-
-impl Nmi {
-    /// Create a new nmi object
-    fn new() -> Self {
-        Self {
-            level: false,
-            edge: false,
-            might_trigger: false,
-            holding: false,
-        }
-    }
-
-    /// Poll the status of the irq line, must provide the logic level for the line.
-    fn poll(&mut self, sig: bool) {
-        self.holding = sig;
-    }
-
-    /// Check the edge and signal if appropriate
-    fn check_edge(&mut self) {
-        self.might_trigger = self.edge;
-    }
-
-    /// Provides the nmi input for the edge detector
-    fn process_signal(&mut self) {
-        if self.holding & !self.level {
-            self.edge = true;
-        }
-        self.level = self.holding;
-    }
-
-    /// Returns the signal level of the nmi
-    fn level(&self) -> bool {
-        self.level
-    }
-
-    /// Indicates that the nmi should interrupt right now
-    fn should_interrupt(&self) -> bool {
-        self.might_trigger
-    }
-
-    /// Indicates that the nmi has been handled
-    fn handled(&mut self) {
-        println!("NMI handled");
-        self.edge = false;
-    }
-}
-
 /// Handles irq detection
 #[derive(serde::Serialize, serde::Deserialize, Clone, Copy)]
 struct Irq {
@@ -103,11 +44,6 @@ impl Irq {
     fn should_interrupt(&self) -> bool {
         self.might_trigger && self.enabled
     }
-
-    /// Indicate that the irq has been handled
-    fn handled(&mut self) {
-        self.might_trigger = false;
-    }
 }
 
 /// The peripherals for the cpu
@@ -131,6 +67,7 @@ impl NesCpuPeripherals {
         self.ppu.cycle(bus);
     }
 
+    #[cfg(feature = "debugger")]
     /// A ppu dump cycle, no side effects
     pub fn ppu_dump(&self, addr: u16) -> Option<u8> {
         self.ppu.dump(addr)
@@ -7755,10 +7692,10 @@ impl NesCpu {
                 //special nop
                 0x82 | 0xc2 | 0xe2 => {
                     s.memory_cycle_read(
-                        |s, v| {
+                        |s, _v| {
                             #[cfg(feature = "debugger")]
                             {
-                                s.copy_debugger(format!("NOP* #${:02x}", v));
+                                s.copy_debugger(format!("NOP* #${:02x}", _v));
                                 s.done_fetching = true;
                             }
                             s.pc = s.pc.wrapping_add(2);

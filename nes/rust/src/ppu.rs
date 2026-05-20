@@ -5,10 +5,6 @@ use common_emulator::video::RgbImage;
 
 use serde_with::Bytes;
 
-use eframe::egui;
-
-use egui::Vec2;
-
 /// The various modes of evaluating sprites for a scanline
 #[non_exhaustive]
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -62,16 +58,19 @@ impl PpuSprite {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Returns the x coordinate
     pub fn x(&self) -> u8 {
         self.x
     }
 
+    #[cfg(feature = "debugger")]
     /// Returns the y coordinate
     pub fn y(&self) -> u8 {
         self.y
     }
 
+    #[cfg(feature = "debugger")]
     /// Returns the attribute of the sprite
     pub fn attribute(&self) -> u8 {
         self.attribute
@@ -397,6 +396,7 @@ impl NesPpu {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Returns the vram address of the ppu
     pub fn vram_address(&self) -> u16 {
         self.vram_address
@@ -420,6 +420,7 @@ impl NesPpu {
         s
     }
 
+    #[cfg(feature = "debugger")]
     /// Performs a dump of the ppu without side effects.
     pub fn dump(&self, addr: u16) -> Option<u8> {
         match addr {
@@ -1528,6 +1529,7 @@ impl NesPpu {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Renders a nametable pixel, returning the palette entry
     pub fn render_nametable_pixel_address(
         &self,
@@ -1581,6 +1583,7 @@ impl NesPpu {
         0x3f00 + palette_entry
     }
 
+    #[cfg(feature = "debugger")]
     /// Renders a attribute table pixel, returning the palette entry
     pub fn render_attribute_table_pixel_address(
         &self,
@@ -1614,6 +1617,7 @@ impl NesPpu {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Render the entire palette
     pub fn render_palette(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
@@ -1625,6 +1629,7 @@ impl NesPpu {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Renders the entire attribute table into the given buffer
     pub fn render_attribute_table(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
@@ -1650,6 +1655,7 @@ impl NesPpu {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Renders the entire nametable into the given buffer
     pub fn render_nametable(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
@@ -1675,6 +1681,7 @@ impl NesPpu {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Renders the entire pattern table into the given buffer
     pub fn render_pattern_table(&self, buf: &mut Box<RgbImage>, bus: &NesMotherboard) {
         for (i, pixel) in buf.data.chunks_exact_mut(3).enumerate() {
@@ -1714,15 +1721,5 @@ impl NesPpu {
     /// Returns the irq status for the ppu
     pub fn irq(&self) -> bool {
         self.vblank_nmi && !self.suppress_nmi
-    }
-
-    /// Converts the data in the given reference (from this module usually), into a form that sdl2 can use directly.
-    #[cfg(feature = "sdl2")]
-    pub fn convert_for_sdl2(f: &[u8; 256 * 240 * 3], buf: &mut Vec<egui_sdl2_gl::egui::Color32>) {
-        let pixels: Vec<egui_sdl2_gl::egui::Color32> = f
-            .chunks_exact(3)
-            .map(|p| egui_sdl2_gl::egui::Color32::from_rgb(p[0], p[1], p[2]))
-            .collect();
-        *buf = pixels;
     }
 }

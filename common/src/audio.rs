@@ -171,7 +171,7 @@ pub enum AudioBuffer {
 
 impl AudioBuffer {
     /// Return an iterator for the buffer.
-    pub fn iter(&self) -> AudioBufferIterator {
+    pub fn iter(&self) -> AudioBufferIterator<'_> {
         AudioBufferIterator {
             data: self,
             index: 0,

@@ -9,10 +9,10 @@ mod mapper05;
 mod mapper34;
 mod mapper71;
 
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+#[cfg(feature = "debugger")]
+use std::collections::BTreeMap;
+
+use std::path::{Path, PathBuf};
 
 use common_emulator::{storage::PersistentStorage, CartridgeError};
 use mapper00::Mapper00;
@@ -34,7 +34,7 @@ trait NesMapperTrait {
     /// Run a cpu memory read cycle
     fn memory_cycle_read(&mut self, cart: &mut NesCartridgeData, addr: u16) -> Option<u8>;
     /// A read cycle that does not target cartridge memory. Used for mappers that monitor reads like mmc5.
-    fn other_memory_read(&mut self, cart: &mut NesCartridgeData, addr: u16) {}
+    fn other_memory_read(&mut self, _cart: &mut NesCartridgeData, _addr: u16) {}
     /// Run a cpu memory write cycle
     fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8);
     /// A write cycle that does not target cartridge memory. Used for mappers that monitor writes like mmc5.
@@ -50,10 +50,13 @@ trait NesMapperTrait {
     fn ppu_memory_cycle_read(&mut self, cart: &mut NesCartridgeData) -> Option<u8>;
     /// Run a ppu write cycle
     fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8);
+    #[cfg(feature = "debugger")]
     /// Peek at a ppu memory address
     fn ppu_peek_address(&self, adr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>);
+    #[cfg(test)]
     /// Modify a byte for the cartridge rom
     fn rom_byte_hack(&mut self, cart: &mut NesCartridgeData, addr: u32, new_byte: u8);
+    #[cfg(feature = "debugger")]
     /// Returns a list of registers used by the cartridge
     fn cartridge_registers(&self) -> BTreeMap<String, u8>;
     /// Retrieve the irq signal
@@ -124,19 +127,6 @@ pub enum NesMapper {
     Mapper71,
 }
 
-/// The trait for cpu memory reads and writes, implemented by devices on the bus
-pub trait NesMemoryBusDevice {
-    /// Run a cpu memory read cycle on the cartridge
-    fn memory_cycle_read(
-        &mut self,
-        addr: u16,
-        out: [bool; 3],
-        controllers: [bool; 2],
-    ) -> Option<u8>;
-    /// Run a cpu memory write cycle on the cartridge
-    fn memory_cycle_write(&mut self, addr: u16, data: u8);
-}
-
 /// The data for a cartridge.
 #[non_exhaustive]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -185,7 +175,7 @@ impl VolatileCartridgeData {
     pub fn remove_code(&mut self, code: &GameGenieCode) {
         let mut codes = Vec::new();
         let len = self.genie.len();
-        for i in 0..len {
+        for _ in 0..len {
             let c = self.genie.pop().unwrap();
             if c != *code {
                 codes.push(c);
@@ -273,11 +263,6 @@ impl NesCartridge {
         pb.push(format!("{}.prgram", self.save));
         self.data.volatile.prg_ram.upgrade_to_persistent(pb);
         self.rom_name = old_data.rom_name;
-    }
-
-    /// Retrieve the hash of the rom contents
-    pub fn hash(&self) -> String {
-        self.hash.to_owned()
     }
 
     /// Retrieve the convenience name
@@ -615,11 +600,13 @@ impl NesCartridge {
         &mut self.data.volatile
     }
 
+    #[cfg(feature = "debugger")]
     /// Retrieve a list of cartridge registers
     pub fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         self.mapper.cartridge_registers()
     }
 
+    #[cfg(feature = "debugger")]
     /// Perform a dump of a cartridge
     pub fn memory_dump(&self, addr: u16) -> Option<u8> {
         self.mapper.memory_cycle_dump(&self.data, addr)
@@ -650,6 +637,7 @@ impl NesCartridge {
         self.mapper.memory_cycle_nop();
     }
 
+    #[cfg(feature = "debugger")]
     /// Perform a peek on ppu memory
     pub fn ppu_peek_1(&self, addr: u16) -> (bool, bool, Option<u8>) {
         self.mapper.ppu_peek_address(addr, &self.data)
@@ -676,6 +664,7 @@ impl NesCartridge {
         }
     }
 
+    #[cfg(feature = "debugger")]
     ///Used in testing to over-write the contents of a specific byte in the rom image
     #[cfg(test)]
     pub fn rom_byte_hack(&mut self, addr: u32, new_byte: u8) {

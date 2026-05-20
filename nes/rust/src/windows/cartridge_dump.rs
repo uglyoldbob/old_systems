@@ -9,7 +9,7 @@ pub struct CartridgeMemoryDumpWindow {}
 
 impl CartridgeMemoryDumpWindow {
     /// Create a new self.
-    pub fn new_request() -> Self {
+    pub fn new() -> Self {
         CartridgeMemoryDumpWindow {}
     }
 }
@@ -21,7 +21,7 @@ impl CartridgeMemoryDumpWindow {
             egui::ViewportBuilder::default()
                 .with_title("Cartridge dump")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
             egui::CentralPanel::default().show_inside(ui, |ui| {
                 ui.label("Cartridge Dump Window");
                 egui::ScrollArea::vertical().show(ui, |ui| {

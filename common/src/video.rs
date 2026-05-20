@@ -1,9 +1,5 @@
 //! Common code for video processing
 
-#[cfg(feature = "egui-multiwin")]
-use egui_multiwin::egui;
-
-#[cfg(feature = "eframe")]
 use eframe::egui;
 
 /// The types of algorithms for scaling up the image

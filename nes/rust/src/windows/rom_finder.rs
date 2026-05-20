@@ -27,7 +27,7 @@ impl RomFinder {
             egui::ViewportBuilder::default()
                 .with_title("ROM LOAD")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 //scan for roms if needed
                 let rp = c.local.configuration.get_rom_path().to_owned();
                 c.find_roms(&rp);

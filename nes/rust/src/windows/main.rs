@@ -2,7 +2,6 @@
 //!
 use std::io::Write;
 
-use crate::cartridge::NesCartridge;
 use crate::{
     controller::{ButtonCombination, NesControllerTrait},
     NesEmulatorData,
@@ -13,12 +12,7 @@ use common_emulator::network::NodeRole;
 use common_emulator::audio::AudioProducerWithRate;
 use common_emulator::recording::Recording;
 
-use common_emulator::romlist::RomRanking;
-use cpal::traits::StreamTrait;
-
 use eframe::egui;
-
-use strum::IntoEnumIterator;
 
 /// The struct for the main window of the emulator.
 pub struct MainNesWindow {
@@ -73,12 +67,40 @@ pub struct MainNesWindow {
     controllers_window: Option<crate::windows::controllers::Window>,
     /// The game genie window
     game_genie_window: Option<crate::windows::genie::Window>,
+    #[cfg(feature = "debugger")]
+    /// The cartridge dump window
+    cartridge_dump_window: Option<crate::windows::cartridge_dump::CartridgeMemoryDumpWindow>,
+    #[cfg(feature = "debugger")]
+    /// The prg ram dump window
+    cartridge_prm_ram_dump_window:
+        Option<crate::windows::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow>,
+    #[cfg(feature = "debugger")]
+    /// The cpu memory dump window
+    cpu_memory_dump_window: Option<crate::windows::cpu_memory_dump_window::CpuMemoryDumpWindow>,
+    #[cfg(feature = "debugger")]
+    /// The debug window
+    debug_window: Option<crate::windows::debug_window::DebugNesWindow>,
+    #[cfg(feature = "debugger")]
+    /// The nametable dump window
+    nametable_dump_window: Option<crate::windows::name_table_dump_window::DumpWindow>,
+    #[cfg(feature = "debugger")]
+    /// The pattern table dump window
+    pattern_table_dump_window: Option<crate::windows::pattern_table_dump_window::DumpWindow>,
+    #[cfg(feature = "debugger")]
+    /// The ppu memory dump window
+    ppu_memory_dump_window: Option<crate::windows::ppu_memory_dump_window::PpuMemoryDumpWindow>,
+    #[cfg(feature = "rom_status")]
+    /// The rom checker window
+    pub rom_checker_window: Option<crate::windows::rom_checker::Window>,
+    #[cfg(feature = "debugger")]
+    /// the sprite dump window
+    sprite_dump_window: Option<crate::windows::sprite_dump_window::DumpWindow>,
 }
 
 impl MainNesWindow {
     pub fn new(
         c: NesEmulatorData,
-        rate: u32,
+        _rate: u32,
         producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
     ) -> Self {
@@ -119,18 +141,38 @@ impl MainNesWindow {
             game_genie_window: None,
             networking_window: None,
             open_rom_window: None,
+            #[cfg(feature = "debugger")]
+            cartridge_dump_window: None,
+            #[cfg(feature = "debugger")]
+            cartridge_prm_ram_dump_window: None,
+            #[cfg(feature = "debugger")]
+            cpu_memory_dump_window: None,
+            #[cfg(feature = "debugger")]
+            debug_window: Some(crate::windows::debug_window::DebugNesWindow::new()),
+            #[cfg(feature = "debugger")]
+            nametable_dump_window: None,
+            #[cfg(feature = "debugger")]
+            pattern_table_dump_window: None,
+            #[cfg(feature = "debugger")]
+            ppu_memory_dump_window: None,
+            #[cfg(feature = "rom_status")]
+            rom_checker_window: Some(crate::windows::rom_checker::Window::new()),
+            #[cfg(feature = "debugger")]
+            sprite_dump_window: None,
         }
     }
 }
 
 impl eframe::App for MainNesWindow {
-    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         #[cfg(feature = "puffin")]
         {
             puffin::profile_function!();
             puffin::GlobalProfiler::lock().new_frame(); // call once per frame!
             puffin_egui::profiler_window(&egui.egui_ctx);
         }
+
+        self.c.check_network();
 
         let time_now = std::time::Instant::now();
         let frame_time = time_now.duration_since(self.last_frame_time);
@@ -334,12 +376,12 @@ impl eframe::App for MainNesWindow {
             'emulator_loop: loop {
                 #[cfg(feature = "debugger")]
                 {
-                    if !c.paused {
+                    if !self.c.paused {
                         self.c
                             .cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
                         if self.c.cpu_clock_counter == 0
                             && self.c.cpu.breakpoint_option()
-                            && (c.cpu.breakpoint() || self.c.single_step)
+                            && (self.c.cpu.breakpoint() || self.c.single_step)
                         {
                             self.c.paused = true;
                             self.c.single_step = false;
@@ -355,18 +397,19 @@ impl eframe::App for MainNesWindow {
                             self.c.wait_for_frame_end = false;
                         }
                         if !self.paused {
-                            let image = c
+                            let image = self
+                                .c
                                 .cpu_peripherals
                                 .ppu_get_frame()
                                 .to_pixels_egui()
-                                .resize(c.local.configuration.scaler);
+                                .resize(self.c.local.configuration.scaler);
                             self.c.local.image = image;
                         }
-                        self.recording.send_frame(&c.local.image);
+                        self.recording.send_frame(&self.c.local.image);
                         if let Some(olocal) = &mut self.c.olocal {
                             if let Some(network) = &mut olocal.network {
                                 if network.role() == NodeRole::PlayerHost {
-                                    let _e = network.video_data(&c.local.image);
+                                    let _e = network.video_data(&self.c.local.image);
                                 }
                             }
                         }
@@ -503,7 +546,97 @@ impl eframe::App for MainNesWindow {
                 self.networking_window.take();
             }
         }
-
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.cartridge_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.cartridge_dump_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.cartridge_prm_ram_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.cartridge_prm_ram_dump_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.cpu_memory_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.cpu_memory_dump_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.debug_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.debug_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.nametable_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.nametable_dump_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.pattern_table_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.pattern_table_dump_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.ppu_memory_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.ppu_memory_dump_window.take();
+            }
+        }
+        #[cfg(feature = "rom_status")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.rom_checker_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.rom_checker_window.take();
+            }
+        }
+        #[cfg(feature = "debugger")]
+        {
+            let mut quit_window = false;
+            if let Some(win) = &mut self.sprite_dump_window {
+                win.show(ui, &mut quit_window, &mut self.c);
+            }
+            if quit_window {
+                self.sprite_dump_window.take();
+            }
+        }
+        
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -515,8 +648,7 @@ impl eframe::App for MainNesWindow {
 
                     let button = egui::Button::new("Save state");
                     if ui.add_enabled(true, button).clicked()
-                        || ui.ctx()
-                            .input(|i| i.key_pressed(egui::Key::F5))
+                        || ui.ctx().input(|i| i.key_pressed(egui::Key::F5))
                     {
                         save_state = true;
                         ui.close_kind(egui::UiKind::Menu);
@@ -524,8 +656,7 @@ impl eframe::App for MainNesWindow {
 
                     let button = egui::Button::new("Load state");
                     if ui.add_enabled(true, button).clicked()
-                        || ui.ctx()
-                            .input(|i| i.key_pressed(egui::Key::F6))
+                        || ui.ctx().input(|i| i.key_pressed(egui::Key::F6))
                     {
                         load_state = true;
                         ui.close_kind(egui::UiKind::Menu);
@@ -534,18 +665,15 @@ impl eframe::App for MainNesWindow {
                     if !self.recording.is_recording() {
                         let button = egui::Button::new("Begin recording");
                         if ui.add_enabled(true, button).clicked()
-                            || ui.ctx()
-                                .input(|i| i.key_pressed(egui::Key::F6))
+                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F6))
                         {
                             start_stop_recording = Some(true);
                             ui.close_kind(egui::UiKind::Menu);
                         }
-                    }
-                    else {
+                    } else {
                         let button = egui::Button::new("Stop recording");
                         if ui.add_enabled(true, button).clicked()
-                            || ui.ctx()
-                                .input(|i| i.key_pressed(egui::Key::F6))
+                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F6))
                         {
                             start_stop_recording = Some(false);
                             ui.close_kind(egui::UiKind::Menu);
@@ -553,8 +681,7 @@ impl eframe::App for MainNesWindow {
                     }
 
                     let button = egui::Button::new("Open data path");
-                    if ui.add_enabled(true, button).clicked()
-                    {
+                    if ui.add_enabled(true, button).clicked() {
                         open::that_in_background(self.c.local.get_save_other());
                         ui.close_kind(egui::UiKind::Menu);
                     }
@@ -568,7 +695,8 @@ impl eframe::App for MainNesWindow {
                 ui.menu_button("Edit", |ui| {
                     let button = egui::Button::new("Configuration");
                     if ui.add_enabled(true, button).clicked() {
-                        self.configuration_window = Some(crate::windows::configuration::Window::new());
+                        self.configuration_window =
+                            Some(crate::windows::configuration::Window::new());
                         ui.close_kind(egui::UiKind::Menu);
                     }
                     let button = egui::Button::new("Controllers");
@@ -595,39 +723,43 @@ impl eframe::App for MainNesWindow {
                     ui.menu_button("Debug", |ui| {
                         if ui.button("Debugger").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create.push(super::debug_window::DebugNesWindow::new_request());
+                            self.debug_window = Some(super::debug_window::DebugNesWindow::new());
                         }
                         if ui.button("Dump CPU Data").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create.push(super::cpu_memory_dump_window::CpuMemoryDumpWindow::new_request());
+                            self.cpu_memory_dump_window =
+                                Some(super::cpu_memory_dump_window::CpuMemoryDumpWindow::new());
                         }
                         if ui.button("Dump PPU Data").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create.push(super::ppu_memory_dump_window::PpuMemoryDumpWindow::new_request());
+                            self.ppu_memory_dump_window =
+                                Some(super::ppu_memory_dump_window::PpuMemoryDumpWindow::new());
                         }
                         if ui.button("Dump Cartridge Data").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create.push(super::cartridge_dump::CartridgeMemoryDumpWindow::new_request());
+                            self.cartridge_dump_window =
+                                Some(super::cartridge_dump::CartridgeMemoryDumpWindow::new());
                         }
                         if ui.button("Dump Cartridge RAM").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create.push(
-                                super::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new_request(),
+                            self.cartridge_prm_ram_dump_window = Some(
+                                super::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new(),
                             );
                         }
                         if ui.button("Dump ppu pattern table").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create
-                                .push(super::pattern_table_dump_window::DumpWindow::new_request());
+                            self.pattern_table_dump_window =
+                                Some(super::pattern_table_dump_window::DumpWindow::new());
                         }
                         if ui.button("Dump ppu name tables").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create
-                                .push(super::name_table_dump_window::DumpWindow::new_request());
+                            self.nametable_dump_window =
+                                Some(super::name_table_dump_window::DumpWindow::new());
                         }
                         if ui.button("Dump ppu sprites").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            windows_to_create.push(super::sprite_dump_window::DumpWindow::new_request());
+                            self.sprite_dump_window =
+                                Some(super::sprite_dump_window::DumpWindow::new());
                         }
                     });
                 }
@@ -744,7 +876,7 @@ impl eframe::App for MainNesWindow {
                                 ui.vertical(|ui| {
                                     for i in 0..4 {
                                         if ui
-                                            .add(egui::SelectableLabel::new(
+                                            .add(egui::Button::selectable(
                                                 myc == Some(i),
                                                 format!("Controller {}", i),
                                             ))
@@ -754,7 +886,7 @@ impl eframe::App for MainNesWindow {
                                         }
                                     }
                                     if ui
-                                        .add(egui::SelectableLabel::new(
+                                        .add(egui::Button::selectable(
                                             myc.is_none(),
                                             "No controller",
                                         ))
@@ -843,11 +975,12 @@ impl eframe::App for MainNesWindow {
 
         #[cfg(feature = "debugger")]
         {
+            use cpal::traits::StreamTrait;
             if let Some(s) = &mut self.sound_stream {
                 if self.c.paused && !self.paused {
                     self.paused = s.pause().is_ok();
                 }
-                if !c.paused && self.paused {
+                if !self.c.paused && self.paused {
                     self.paused = s.play().is_err();
                 }
             }

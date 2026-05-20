@@ -110,9 +110,6 @@ struct InternalNetwork {
     recvr: async_channel::Receiver<MessageToNetworkThread>,
     /// The list of addresses that a server is listening on.
     addresses: HashSet<Multiaddr>,
-    #[cfg(feature = "egui-multiwin")]
-    /// The proxy object used to indicate that there are new messages on the `sender` channel.
-    proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
     /// The id of the listener for a server.
     listener: Option<ListenerId>,
 }
@@ -126,224 +123,167 @@ impl InternalNetwork {
             let f2 = self.recvr.recv().fuse();
             futures::pin_mut!(f2);
             futures::select! {
-                            r = f2 => {
-                                if let Ok(m) = r {
-                                    match m {
-                                        MessageToNetworkThread::VideoData(v) => {
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.video_data(v);
-                                        }
-                                        MessageToNetworkThread::AudioData(d) => {
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.audio_data(d);
-                                        }
-                                        MessageToNetworkThread::SetController(p, c) => {
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.set_controller(p, c);
-                                        }
-                                        MessageToNetworkThread::RequestController(c) => {
-                                            let myid = *self.swarm.local_peer_id();
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.request_controller(myid, c);
-                                        }
-                                        MessageToNetworkThread::SetUserRole(p, r) => {
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.set_user_role(p, r);
-                                        }
-                                        MessageToNetworkThread::RequestObserverStatus => {
-                                            let myid = *self.swarm.local_peer_id();
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.request_observer_status(myid);
-                                        }
-                                        MessageToNetworkThread::Connect(cs) => {
-                                            match cs.parse::<Multiaddr>() {
-                                                Ok(addr) => {
-                                                    println!("Attempt to connect to {} {:?}", cs, self.swarm.dial(addr));
-                                                }
-                                                Err(e) => {
-                                                    println!("Error parsing multiaddr {:?}", e);
-                                                }
-                                            }
-                                        }
-                                        MessageToNetworkThread::ControllerData(i, buttons) => {
-                                            let behavior = self.swarm.behaviour_mut();
-                                            behavior.emulator.send_controller_data(i, buttons);
-                                        }
-                                        MessageToNetworkThread::StopServer => {
-                                            if let Some(list) = &mut self.listener {
-                                                self.swarm.remove_listener(*list);
-                                            }
-                                            self.listener = None;
-                                            self.addresses.clear();
-                                            let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(false)).await;
-                                            #[cfg(feature = "egui-multiwin")]
-                                            let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                crate::event::EventType::CheckNetwork,
-                                            ));
-                                        }
-                                        MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency, role } => {
-                                            if self.listener.is_none() {
-                                                let listenres = self.swarm
-                                                .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
-                                                if let Ok(lis) = listenres {
-                                                    self.listener = Some(lis);
-                                                }
-                                                println!("Server start result is {:?}", listenres);
-                                                let s = self.listener.is_some();
-                                                let behavior = self.swarm.behaviour_mut();
-                                                behavior.emulator.send_server_details(width, height, framerate, cpu_frequency, role);
-                                                let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                        }
-            }
+                r = f2 => {
+                    if let Ok(m) = r {
+                        match m {
+                            MessageToNetworkThread::VideoData(v) => {
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.video_data(v);
+                            }
+                            MessageToNetworkThread::AudioData(d) => {
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.audio_data(d);
+                            }
+                            MessageToNetworkThread::SetController(p, c) => {
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.set_controller(p, c);
+                            }
+                            MessageToNetworkThread::RequestController(c) => {
+                                let myid = *self.swarm.local_peer_id();
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.request_controller(myid, c);
+                            }
+                            MessageToNetworkThread::SetUserRole(p, r) => {
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.set_user_role(p, r);
+                            }
+                            MessageToNetworkThread::RequestObserverStatus => {
+                                let myid = *self.swarm.local_peer_id();
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.request_observer_status(myid);
+                            }
+                            MessageToNetworkThread::Connect(cs) => {
+                                match cs.parse::<Multiaddr>() {
+                                    Ok(addr) => {
+                                        println!("Attempt to connect to {} {:?}", cs, self.swarm.dial(addr));
+                                    }
+                                    Err(e) => {
+                                        println!("Error parsing multiaddr {:?}", e);
+                                    }
                                 }
-                            },
-                            ev = f1 => {
-                                match ev {
-                                    libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established: _, cause: _ } => {
-                                        let behavior = self.swarm.behaviour_mut();
-                                        behavior.emulator.disconnect(peer_id);
-                                        let _ = self.sender
-                                            .send(MessageFromNetworkThread::PlayerObserverDisconnect(peer_id))
-                                            .await;
-                                        #[cfg(feature = "egui-multiwin")]
-                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                            crate::event::EventType::CheckNetwork,
-                                        ));
-                                    }
-                                    libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
-                                        println!("Listening on {address:?}");
-                                        let _ = self.sender
-                                            .send(MessageFromNetworkThread::NewAddress(address.clone()))
-                                            .await;
-                                        #[cfg(feature = "egui-multiwin")]
-                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                            crate::event::EventType::CheckNetwork,
-                                        ));
-                                        self.addresses.insert(address);
-                                    }
-                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                                        libp2p::upnp::Event::NewExternalAddr(addr),
-                                    )) => {
-                                        println!("New external address: {addr}");
-                                        let _ = self.sender
-                                            .send(MessageFromNetworkThread::NewAddress(addr.clone()))
-                                            .await;
-                                        #[cfg(feature = "egui-multiwin")]
-                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                            crate::event::EventType::CheckNetwork,
-                                        ));
-                                        self.addresses.insert(addr);
-                                    }
-                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                                        libp2p::upnp::Event::GatewayNotFound,
-                                    )) => {
-                                        println!("Gateway does not support UPnP");
-                                    }
-                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                                        libp2p::upnp::Event::NonRoutableGateway,
-                                    )) => {
-                                        println!("Gateway is not exposed directly to the public Internet, i.e. it itself has a private IP address.");
-                                    }
-                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                                        libp2p::upnp::Event::ExpiredExternalAddr(addr),
-                                    )) => {
-                                        println!("Expired address: {}", addr);
-                                        let _ = self.sender
-                                            .send(MessageFromNetworkThread::ExpiredAddress(addr.clone()))
-                                            .await;
-                                        #[cfg(feature = "egui-multiwin")]
-                                        let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                            crate::event::EventType::CheckNetwork,
-                                        ));
-                                        self.addresses.remove(&addr);
-                                    }
-                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
-                                        match e {
-                                            emulator::MessageToSwarm::AudioProducer(a) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::AudioProducer(a))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::AvStream(d) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::AvStream(d))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::ConnectedToHost => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::ConnectedToHost)
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::RequestController(i, c) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::RequestController(i, c))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::SetController(c) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::SetController(c))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::SetRole(r) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::NewRole(r))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::RequestRole(p, r) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::RequestRole(p, r))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                            emulator::MessageToSwarm::ControllerData(i, d) => {
-                                                let _ = self.sender
-                                                    .send(MessageFromNetworkThread::ControllerData(i, d))
-                                                    .await;
-                                                #[cfg(feature = "egui-multiwin")]
-                                                let _ = self.proxy.send_event(crate::event::Event::new_general(
-                                                    crate::event::EventType::CheckNetwork,
-                                                ));
-                                            }
-                                        }
-                                    }
-                                    _ => {}
+                            }
+                            MessageToNetworkThread::ControllerData(i, buttons) => {
+                                let behavior = self.swarm.behaviour_mut();
+                                behavior.emulator.send_controller_data(i, buttons);
+                            }
+                            MessageToNetworkThread::StopServer => {
+                                if let Some(list) = &mut self.listener {
+                                    self.swarm.remove_listener(*list);
                                 }
-                            },
+                                self.listener = None;
+                                self.addresses.clear();
+                                let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(false)).await;
+                            }
+                            MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency, role } => {
+                                if self.listener.is_none() {
+                                    let listenres = self.swarm
+                                    .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
+                                    if let Ok(lis) = listenres {
+                                        self.listener = Some(lis);
+                                    }
+                                    println!("Server start result is {:?}", listenres);
+                                    let s = self.listener.is_some();
+                                    let behavior = self.swarm.behaviour_mut();
+                                    behavior.emulator.send_server_details(width, height, framerate, cpu_frequency, role);
+                                    let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
+                                }
+                            }
+}
+                    }
+                },
+                ev = f1 => {
+                    match ev {
+                        libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established: _, cause: _ } => {
+                            let behavior = self.swarm.behaviour_mut();
+                            behavior.emulator.disconnect(peer_id);
+                            let _ = self.sender
+                                .send(MessageFromNetworkThread::PlayerObserverDisconnect(peer_id))
+                                .await;
                         }
+                        libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
+                            println!("Listening on {address:?}");
+                            let _ = self.sender
+                                .send(MessageFromNetworkThread::NewAddress(address.clone()))
+                                .await;
+                            self.addresses.insert(address);
+                        }
+                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                            libp2p::upnp::Event::NewExternalAddr(addr),
+                        )) => {
+                            println!("New external address: {addr}");
+                            let _ = self.sender
+                                .send(MessageFromNetworkThread::NewAddress(addr.clone()))
+                                .await;
+                            self.addresses.insert(addr);
+                        }
+                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                            libp2p::upnp::Event::GatewayNotFound,
+                        )) => {
+                            println!("Gateway does not support UPnP");
+                        }
+                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                            libp2p::upnp::Event::NonRoutableGateway,
+                        )) => {
+                            println!("Gateway is not exposed directly to the public Internet, i.e. it itself has a private IP address.");
+                        }
+                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                            libp2p::upnp::Event::ExpiredExternalAddr(addr),
+                        )) => {
+                            println!("Expired address: {}", addr);
+                            let _ = self.sender
+                                .send(MessageFromNetworkThread::ExpiredAddress(addr.clone()))
+                                .await;
+                            self.addresses.remove(&addr);
+                        }
+                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
+                            match e {
+                                emulator::MessageToSwarm::AudioProducer(a) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::AudioProducer(a))
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::AvStream(d) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::AvStream(d))
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::ConnectedToHost => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::ConnectedToHost)
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::RequestController(i, c) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::RequestController(i, c))
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::SetController(c) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::SetController(c))
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::SetRole(r) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::NewRole(r))
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::RequestRole(p, r) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::RequestRole(p, r))
+                                        .await;
+                                }
+                                emulator::MessageToSwarm::ControllerData(i, d) => {
+                                    let _ = self.sender
+                                        .send(MessageFromNetworkThread::ControllerData(i, d))
+                                        .await;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                },
+            }
         }
-        Some(())
     }
 
     /// Start the network thread with the tokio runtime.
@@ -351,14 +291,11 @@ impl InternalNetwork {
         runtime: &mut tokio::runtime::Runtime,
         s: async_channel::Sender<MessageFromNetworkThread>,
         r: async_channel::Receiver<MessageToNetworkThread>,
-        #[cfg(feature = "egui-multiwin")]
-        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
         version: &'static str,
     ) -> tokio::task::JoinHandle<()> {
         runtime.spawn(async move {
             println!("Started async code");
             if let Some(mut i) = Self::try_new(s, r, 
-                #[cfg(feature = "egui-multiwin")]proxy, 
                 version) {
                 i.do_the_thing().await;
             }
@@ -369,8 +306,6 @@ impl InternalNetwork {
     fn try_new(
         s: async_channel::Sender<MessageFromNetworkThread>,
         r: async_channel::Receiver<MessageToNetworkThread>,
-        #[cfg(feature = "egui-multiwin")]
-        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
         version: &'static str,
     ) -> Option<Self> {
         let swarm = libp2p::SwarmBuilder::with_new_identity()
@@ -392,8 +327,6 @@ impl InternalNetwork {
             recvr: r,
             sender: s,
             addresses: HashSet::new(),
-            #[cfg(feature = "egui-multiwin")]
-            proxy,
             listener: None,
         })
     }
@@ -402,9 +335,9 @@ impl InternalNetwork {
 /// The main networking struct for the emulator
 pub struct Network {
     /// The tokio runtime for the network thread.
-    tokio: tokio::runtime::Runtime,
+    _tokio: tokio::runtime::Runtime,
     /// The thread that the tokio runtime runs on
-    thread: tokio::task::JoinHandle<()>,
+    _thread: tokio::task::JoinHandle<()>,
     /// The channel for sending messages to the network thread.
     sender: async_channel::Sender<MessageToNetworkThread>,
     /// The channel for receiving messages from the network thread.
@@ -438,8 +371,6 @@ pub struct Network {
 impl Network {
     ///Create a new instance of network with the given role
     pub fn new(
-        #[cfg(feature = "egui-multiwin")]
-        proxy: egui_multiwin::winit::event_loop::EventLoopProxy<crate::event::Event>,
         audio_rate: u32,
         blank_controller: Vec<u8>,
         version: &'static str,
@@ -451,12 +382,10 @@ impl Network {
             .build()
             .unwrap();
         let t2 = InternalNetwork::start(&mut t, s2, r1, 
-            #[cfg(feature = "egui-multiwin")]
-            proxy, 
             version);
         Self {
-            tokio: t,
-            thread: t2,
+            _tokio: t,
+            _thread: t2,
             sender: s1,
             recvr: r2,
             addresses: HashSet::new(),

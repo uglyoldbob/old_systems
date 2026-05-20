@@ -30,7 +30,7 @@ impl DumpWindow {
             egui::ViewportBuilder::default()
                 .with_title("Pattern Table Dump")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("PPU Pattern Table Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {

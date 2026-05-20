@@ -36,7 +36,7 @@ impl DumpWindow {
             egui::ViewportBuilder::default()
                 .with_title("Nametable dump")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("PPU Name Table Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {

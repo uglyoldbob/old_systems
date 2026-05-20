@@ -35,7 +35,7 @@ impl DumpWindow {
             egui::ViewportBuilder::default()
                 .with_title("Geme genie")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("PPU Sprite Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {

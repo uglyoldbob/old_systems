@@ -615,7 +615,7 @@ impl NesControllerTrait for DummyController {
     }
 
     #[doc = " Read data from the controller."]
-    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8 {
+    fn read_data(&mut self, _screen: &common_emulator::video::RgbImage, _x: u16, _y: u16) -> u8 {
         0xff
     }
 }
@@ -669,7 +669,7 @@ impl NesControllerTrait for Zapper {
 
     #[doc = " Dump data from the controller. No side effects."]
     fn dump_data(&self) -> u8 {
-        let d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
+        let _d3 = self.combo[0].buttons[BUTTON_COMBO_LIGHT].is_some();
         let d4 = self.combo[0].buttons[BUTTON_COMBO_FIRE].is_some();
         0xE7 | if !d4 { 1 << 4 } else { 0 }
     }
@@ -858,7 +858,7 @@ impl NesControllerTrait for StandardController {
         data | 0x1e
     }
 
-    fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8 {
+    fn read_data(&mut self, _screen: &common_emulator::video::RgbImage, _x: u16, _y: u16) -> u8 {
         self.dump_data()
     }
 }

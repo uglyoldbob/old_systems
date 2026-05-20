@@ -36,7 +36,7 @@ impl Window {
             egui::ViewportBuilder::default()
                 .with_title("Configuration")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("Emulator Configuration Window");
 

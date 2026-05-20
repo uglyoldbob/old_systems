@@ -1,5 +1,6 @@
 //! Implements mapper 04
 
+#[cfg(feature = "debugger")]
 use std::collections::BTreeMap;
 
 use crate::cartridge::NesCartridgeData;
@@ -181,6 +182,7 @@ impl NesMapperTrait for Mapper04 {
         self.irq_pending
     }
 
+    #[cfg(feature = "debugger")]
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         let mut hm = BTreeMap::new();
         hm.insert("PPU bank 0".to_string(), self.chr_roms[0]);
@@ -335,6 +337,7 @@ impl NesMapperTrait for Mapper04 {
         }
     }
 
+    #[cfg(feature = "debugger")]
     fn ppu_peek_address(&self, addr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);
         let data = self.ppu_read(addr, cart);
@@ -448,5 +451,6 @@ impl NesMapperTrait for Mapper04 {
         }
     }
 
+    #[cfg(test)]
     fn rom_byte_hack(&mut self, _cart: &mut NesCartridgeData, _addr: u32, _new_byte: u8) {}
 }

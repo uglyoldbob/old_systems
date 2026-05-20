@@ -21,7 +21,7 @@ impl CpuMemoryDumpWindow {
             egui::ViewportBuilder::default()
                 .with_title("Cpu memory dump")
                 .with_inner_size([400.0, 300.0]),
-            |ui, class| {
+            |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
                     ui.label("CPU Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {

@@ -1,5 +1,6 @@
 //! Implements mapper 05
 
+#[cfg(feature = "debugger")]
 use std::collections::BTreeMap;
 
 use crate::cartridge::NesCartridgeData;
@@ -297,6 +298,7 @@ impl NesMapperTrait for Mapper05 {
         i
     }
 
+    #[cfg(feature = "debugger")]
     fn cartridge_registers(&self) -> BTreeMap<String, u8> {
         let mut hm = BTreeMap::new();
         for i in 0..8 {
@@ -441,7 +443,7 @@ impl NesMapperTrait for Mapper05 {
         }
     }
 
-    fn other_memory_read(&mut self, cart: &mut NesCartridgeData, addr: u16) {
+    fn other_memory_read(&mut self, _cart: &mut NesCartridgeData, addr: u16) {
         match addr {
             //pattern table
             0..=0x1fff => {
@@ -479,7 +481,7 @@ impl NesMapperTrait for Mapper05 {
 
     fn memory_cycle_nop(&mut self) {}
 
-    fn memory_cycle_write(&mut self, cart: &mut NesCartridgeData, addr: u16, data: u8) {
+    fn memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, addr: u16, data: u8) {
         match addr {
             0x5100..=0x5107 => {
                 let i = addr & 7;
@@ -560,6 +562,7 @@ impl NesMapperTrait for Mapper05 {
         }
     }
 
+    #[cfg(feature = "debugger")]
     fn ppu_peek_address(&self, addr: u16, cart: &NesCartridgeData) -> (bool, bool, Option<u8>) {
         let (mirror, thing) = self.check_mirroring(addr);
         let data = self.ppu_read(addr, cart);
@@ -602,14 +605,15 @@ impl NesMapperTrait for Mapper05 {
         self.ppu_read(self.ppu_address, cart)
     }
 
-    fn ppu_memory_cycle_write(&mut self, cart: &mut NesCartridgeData, data: u8) {
+    fn ppu_memory_cycle_write(&mut self, _cart: &mut NesCartridgeData, _data: u8) {
         self.idle += 1;
         if self.idle == 3 {
             self.set_inframe(false);
             self.last_ppu_address = None;
         }
-        let addr = self.ppu_address;
+        let _addr = self.ppu_address;
     }
 
+    #[cfg(test)]
     fn rom_byte_hack(&mut self, _cart: &mut NesCartridgeData, _addr: u32, _new_byte: u8) {}
 }

@@ -273,6 +273,7 @@ impl NesMotherboard {
         //TODO clock expansion port for both left and right
     }
 
+    #[cfg(feature = "debugger")]
     /// Perform a read operation on the cpu memory bus, but doesn;t have any side effects like a normal read might
     pub fn memory_dump(&self, addr: u16, per: &NesCpuPeripherals) -> Option<u8> {
         let mut response: Option<u8> = None;
@@ -471,6 +472,7 @@ impl NesMotherboard {
         }
     }
 
+    #[cfg(feature = "debugger")]
     /// Performs a non-modifying ppu read
     pub fn ppu_peek(&self, addr: u16) -> u8 {
         if let Some(cart) = &self.cart {
