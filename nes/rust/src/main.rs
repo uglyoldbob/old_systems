@@ -52,7 +52,7 @@ async fn run_bluetooth() {
                 uuid: "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
                 name: Some("NES Controller Service".to_string()),
                 service_uuid: Some("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string()),
-                channel: None,
+                channel: Some(23),
                 psm: None,
                 authenticate: Some(false),
                 authorize: Some(false),

@@ -1,4 +1,4 @@
-use bluetooth_rust::{BluetoothAdapterTrait, BluetoothDeviceTrait};
+use bluetooth_rust::{BluetoothAdapterTrait, BluetoothDeviceTrait, BluetoothSocketTrait};
 use eframe::{
     NativeOptions,
     egui::{
@@ -486,6 +486,16 @@ impl DemoApp {
                 let btn = egui::Button::new(&format!("Connect to {}", a)).min_size([70.0, 70.0].into());
                 if child.add(btn).clicked() {
                     log::error!("Need to connect to {}", a);
+                    match d.get_rfcomm_socket(23, bluetooth_rust::BluetoothUuid::Custom("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(), 0), false) {
+                        Ok(mut socket) =>  {
+                            if socket.sync_connect().is_ok() {
+                                log::error!("Got connection to emulator");
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Error connecting to emulator {}", e);
+                        }
+                    }
                 }
             }
         }
