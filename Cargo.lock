@@ -5682,7 +5682,7 @@ dependencies = [
 
 [[package]]
 name = "nes"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-channel 2.5.0",
  "asynchronous-codec",

@@ -1,6 +1,6 @@
 [package]
 name = "nes"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Thomas Epperson <thomas.epperson@gmail.com>"]
 description = "A NES emulator written in Rust"
 edition = "2021"

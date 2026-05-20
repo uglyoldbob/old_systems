@@ -636,7 +636,7 @@ impl eframe::App for MainNesWindow {
                 self.sprite_dump_window.take();
             }
         }
-        
+
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
@@ -787,17 +787,9 @@ impl eframe::App for MainNesWindow {
         }
 
         if ui.ctx().input(|i| i.key_pressed(egui::Key::F12)) {
-            todo!()
-            /*
-            match window.fullscreen() {
-                Some(_a) => window.set_fullscreen(None),
-                None => {
-                    window.set_fullscreen(Some(
-                        winit::window::Fullscreen::Borderless(None),
-                    ));
-                }
-            }
-            */
+            let f = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
+            ui.ctx()
+                .send_viewport_cmd(egui::ViewportCommand::Fullscreen(!f));
         }
 
         let record_path = self.c.local.record_path();
@@ -958,7 +950,8 @@ impl eframe::App for MainNesWindow {
             });
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::Title(format!(
-                    "UglyOldBob NES Emulator - {:.0} FPS {:.1} percent",
+                    "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
+                    env!("CARGO_PKG_VERSION"),
                     self.emulator_fps,
                     self.render_percent * 100.0
                 )));
