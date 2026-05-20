@@ -29,103 +29,93 @@ impl Window {
     }
 }
 
-#[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for Window {
-    fn is_root(&self) -> bool {
-        false
-    }
+impl Window {
+    pub fn show(&mut self, ui: &mut egui::Ui, quit_rom_window: &mut bool, c: &mut NesEmulatorData) {
+        ui.ctx().show_viewport_immediate(
+            egui::ViewportId::from_hash_of("CONFIGURATION_WINDOW"),
+            egui::ViewportBuilder::default()
+                .with_title("Configuration")
+                .with_inner_size([400.0, 300.0]),
+            |ui, class| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    ui.label("Emulator Configuration Window");
 
-    fn set_root(&mut self, _root: bool) {}
+                    let mut save_config = false;
 
-    fn redraw(
-        &mut self,
-        c: &mut NesEmulatorData,
-        egui: &mut EguiGlow,
-        _window: &egui_multiwin::winit::window::Window,
-        _clipboard: &mut arboard::Clipboard,
-    ) -> RedrawResponse {
-        egui.egui_ctx.request_repaint();
-        let quit = false;
-        let windows_to_create = vec![];
-
-        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            ui.label("Emulator Configuration Window");
-
-            let mut save_config = false;
-
-            while let Ok(message) = self.message_channel.1.try_recv() {
-                match message {
-                    Message::NewRomPath(pb) => {
-                        c.local.configuration.set_rom_path(pb);
-                    }
-                }
-            }
-
-            if ui
-                .checkbox(&mut c.local.configuration.sticky_rom, "Remember last rom")
-                .changed()
-                && !c.local.configuration.sticky_rom
-            {
-                c.local.configuration.set_startup("".to_string());
-            }
-
-            let mut scaler = c.local.configuration.scaler;
-            if !c.local.resolution_locked {
-                egui::ComboBox::from_label("Scaling algorithm")
-                    .selected_text(
-                        scaler
-                            .map(|i| format!("{}", i))
-                            .unwrap_or("None".to_string())
-                            .to_string(),
-                    )
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut scaler, None, "None");
-                        for opt in common_emulator::video::ScalingAlgorithm::iter() {
-                            ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
+                    while let Ok(message) = self.message_channel.1.try_recv() {
+                        match message {
+                            Message::NewRomPath(pb) => {
+                                c.local.configuration.set_rom_path(pb);
+                            }
                         }
-                    });
-                if scaler != c.local.configuration.scaler {
-                    c.local.configuration.scaler = scaler;
-                    save_config = true;
-                }
-            } else {
-                ui.label(format!(
-                    "Scaling algorithm: {}",
-                    scaler
-                        .map(|i| format!("{}", i))
-                        .unwrap_or("None".to_string())
-                ));
-            }
+                    }
 
-            ui.label("Folder for roms:");
-            if ui
-                .add(
-                    egui::Label::new(c.local.configuration.get_rom_path())
-                        .sense(egui::Sense::click()),
-                )
-                .clicked()
-            {
-                let f = rfd::AsyncFileDialog::new()
-                    .set_title("Select rom folder")
-                    .set_directory(c.local.default_rom_path())
-                    .pick_folder();
-                let message_sender = self.message_channel.0.clone();
-                crate::execute(async move {
-                    let file = f.await;
-                    if let Some(file) = file {
-                        let fname = file.path().to_path_buf();
-                        message_sender.send(Message::NewRomPath(fname)).ok();
+                    if ui
+                        .checkbox(&mut c.local.configuration.sticky_rom, "Remember last rom")
+                        .changed()
+                        && !c.local.configuration.sticky_rom
+                    {
+                        c.local.configuration.set_startup("".to_string());
+                    }
+
+                    let mut scaler = c.local.configuration.scaler;
+                    if !c.local.resolution_locked {
+                        egui::ComboBox::from_label("Scaling algorithm")
+                            .selected_text(
+                                scaler
+                                    .map(|i| format!("{}", i))
+                                    .unwrap_or("None".to_string())
+                                    .to_string(),
+                            )
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut scaler, None, "None");
+                                for opt in common_emulator::video::ScalingAlgorithm::iter() {
+                                    ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
+                                }
+                            });
+                        if scaler != c.local.configuration.scaler {
+                            c.local.configuration.scaler = scaler;
+                            save_config = true;
+                        }
+                    } else {
+                        ui.label(format!(
+                            "Scaling algorithm: {}",
+                            scaler
+                                .map(|i| format!("{}", i))
+                                .unwrap_or("None".to_string())
+                        ));
+                    }
+
+                    ui.label("Folder for roms:");
+                    if ui
+                        .add(
+                            egui::Label::new(c.local.configuration.get_rom_path())
+                                .sense(egui::Sense::click()),
+                        )
+                        .clicked()
+                    {
+                        let f = rfd::AsyncFileDialog::new()
+                            .set_title("Select rom folder")
+                            .set_directory(c.local.default_rom_path())
+                            .pick_folder();
+                        let message_sender = self.message_channel.0.clone();
+                        crate::execute(async move {
+                            let file = f.await;
+                            if let Some(file) = file {
+                                let fname = file.path().to_path_buf();
+                                message_sender.send(Message::NewRomPath(fname)).ok();
+                            }
+                        });
+                    }
+
+                    if save_config {
+                        c.local.configuration.save();
                     }
                 });
-            }
-
-            if save_config {
-                c.local.configuration.save();
-            }
-        });
-        RedrawResponse {
-            quit,
-            new_windows: windows_to_create,
-        }
+                if ui.ctx().input(|i| i.viewport().close_requested()) {
+                    *quit_rom_window = true;
+                }
+            },
+        );
     }
 }

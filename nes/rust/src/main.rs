@@ -303,7 +303,7 @@ fn main() {
         "UglyOldBob NES Emulator",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(crate::windows::main::MainNesWindow::new_request(
+            Ok(Box::new(crate::windows::main::MainNesWindow::new(
                 nes_data,
                 sound_rate,
                 sound_producer,

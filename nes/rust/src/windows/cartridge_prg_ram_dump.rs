@@ -5,83 +5,56 @@ use crate::NesEmulatorData;
 use eframe::egui;
 
 /// The window for dumping cartridge program data
-#[cfg(feature = "egui-multiwin")]
 pub struct CartridgeMemoryDumpWindow {}
 
-#[cfg(feature = "egui-multiwin")]
 impl CartridgeMemoryDumpWindow {
-    /// Create a request to create a new window of self.
-    pub fn new_request() -> NewWindowRequest {
-        NewWindowRequest {
-            window_state: super::Windows::CartridgePrgRamDump(CartridgeMemoryDumpWindow {}),
-            builder: egui_multiwin::winit::window::WindowBuilder::new()
-                .with_resizable(true)
-                .with_inner_size(egui_multiwin::winit::dpi::LogicalSize {
-                    width: 320.0,
-                    height: 240.0,
-                })
-                .with_title("UglyOldBob NES Cartridge ram Dump"),
-            options: egui_multiwin::tracked_window::TrackedWindowOptions {
-                vsync: false,
-                shader: None,
-            },
-            id: egui_multiwin::multi_window::new_id(),
-        }
+    /// Create a new self.
+    pub fn new() -> Self {
+        CartridgeMemoryDumpWindow {}
     }
 }
 
-#[cfg(feature = "egui-multiwin")]
-impl TrackedWindow for CartridgeMemoryDumpWindow {
-    fn is_root(&self) -> bool {
-        false
-    }
-
-    fn set_root(&mut self, _root: bool) {}
-
-    fn redraw(
-        &mut self,
-        c: &mut NesEmulatorData,
-        egui: &mut EguiGlow,
-        _window: &egui_multiwin::winit::window::Window,
-        _clipboard: &mut arboard::Clipboard,
-    ) -> RedrawResponse {
-        egui.egui_ctx.request_repaint();
-        let quit = false;
-        let windows_to_create = vec![];
-
-        egui_multiwin::egui::CentralPanel::default().show(&egui.egui_ctx, |ui| {
-            ui.label("Cartridge Ram Dump Window");
-            egui_multiwin::egui::ScrollArea::vertical().show(ui, |ui| {
-                #[cfg(feature = "debugger")]
-                {
-                    if let Some(cart) = c.mb.cartridge() {
-                        for (i, chunk) in cart
-                            .cartridge()
-                            .volatile
-                            .prg_ram
-                            .chunks_exact(8)
-                            .enumerate()
+impl CartridgeMemoryDumpWindow {
+    pub fn show(&mut self, ui: &mut egui::Ui, quit_rom_window: &mut bool, c: &mut NesEmulatorData) {
+        ui.ctx().show_viewport_immediate(
+            egui::ViewportId::from_hash_of("PRG_RAM_DUMP_WINDOW"),
+            egui::ViewportBuilder::default()
+                .with_title("PRG RAM DUMPER")
+                .with_inner_size([400.0, 300.0]),
+            |ui, class| {
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    ui.label("Cartridge Ram Dump Window");
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        #[cfg(feature = "debugger")]
                         {
-                            ui.label(format!(
-                                "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
-                                i * 8,
-                                chunk[0],
-                                chunk[1],
-                                chunk[2],
-                                chunk[3],
-                                chunk[4],
-                                chunk[5],
-                                chunk[6],
-                                chunk[7],
-                            ));
+                            if let Some(cart) = c.mb.cartridge() {
+                                for (i, chunk) in cart
+                                    .cartridge()
+                                    .volatile
+                                    .prg_ram
+                                    .chunks_exact(8)
+                                    .enumerate()
+                                {
+                                    ui.label(format!(
+                                        "{:04X}: {:02X} {:02X} {:02X} {:02X}\t{:02X} {:02X} {:02X} {:02X}",
+                                        i * 8,
+                                        chunk[0],
+                                        chunk[1],
+                                        chunk[2],
+                                        chunk[3],
+                                        chunk[4],
+                                        chunk[5],
+                                        chunk[6],
+                                        chunk[7],
+                                    ));
+                                }
+                            }
                         }
-                    }
+                    });
+                });
+                if ui.ctx().input(|i| i.viewport().close_requested()) {
+                    *quit_rom_window = true;
                 }
             });
-        });
-        RedrawResponse {
-            quit,
-            new_windows: windows_to_create,
-        }
     }
 }
