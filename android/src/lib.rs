@@ -5,7 +5,7 @@ use eframe::{
         self, Align2, Color32, Event, FontId, Pos2, Rect, Rounding, Sense, TouchPhase, Vec2, vec2,
     },
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Write};
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -490,6 +490,7 @@ impl DemoApp {
                         Ok(mut socket) =>  {
                             if socket.sync_connect().is_ok() {
                                 log::error!("Got connection to emulator");
+                                socket.write_all(&[42]);
                             }
                         }
                         Err(e) => {

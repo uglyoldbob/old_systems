@@ -15,6 +15,7 @@ mod ppu;
 
 use bluetooth_rust::{BluetoothAdapterTrait, BluetoothRfcommConnectableAsyncTrait, BluetoothRfcommProfileAsyncTrait};
 use emulator_data::NesEmulatorData;
+use tokio::io::AsyncReadExt;
 
 #[cfg(not(target_arch = "wasm32"))]
 ///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
@@ -36,8 +37,11 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 mod windows;
 
-async fn handle_bluetooth_controller_client(_stream: bluetooth_rust::BluetoothStream, a: [u8; 6]) {
-    println!("Got a bluetooth connection from {:?}", a)
+async fn handle_bluetooth_controller_client(mut stream: bluetooth_rust::BluetoothStream, a: [u8; 6]) -> Result<(), std::io::Error> {
+    println!("Got a bluetooth connection from {:?}", a);
+    let ab = stream.read_u8().await?;
+    println!("Received a command {:x} from {:?}", ab, a);
+    Ok(())
 }
 
 async fn run_bluetooth() {
@@ -66,7 +70,9 @@ async fn run_bluetooth() {
                 let c = profile.connectable().await.expect("Failed to build connectable for bluetooth profile");
                 if let Ok(a) = c.accept().await {
                     tokio::spawn(async move {
-                        handle_bluetooth_controller_client(a.0, a.1).await;
+                        if let Err(e) = handle_bluetooth_controller_client(a.0, a.1).await {
+                            println!("Error communicating with bluetooth client: {:?}", e);
+                        }
                     });
                 }
             }
