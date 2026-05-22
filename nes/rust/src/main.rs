@@ -13,9 +13,8 @@ mod genie;
 mod motherboard;
 mod ppu;
 
-use bluetooth_rust::{BluetoothAdapterTrait, BluetoothRfcommConnectableAsyncTrait, BluetoothRfcommProfileAsyncTrait};
 use emulator_data::NesEmulatorData;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[cfg(not(target_arch = "wasm32"))]
 ///Run an asynchronous object on a new thread. Maybe not the best way of accomplishing this, but it does work.
@@ -37,10 +36,40 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 mod windows;
 
-async fn handle_bluetooth_controller_client(mut stream: bluetooth_rust::BluetoothStream, a: [u8; 6]) -> Result<(), std::io::Error> {
+async fn handle_bluetooth_controller_client(
+    mut stream: bluetooth_rust::BluetoothStream,
+    a: [u8; 6],
+) -> Result<(), std::io::Error> {
     println!("Got a bluetooth connection from {:?}", a);
-    let ab = stream.read_u8().await?;
-    println!("Received a command {:x} from {:?}", ab, a);
+
+    let mut packet_buf = [0u8; 256];
+    loop {
+        let packet_len = stream.read_u16().await?;
+        if packet_len as usize > packet_buf.len() {
+            return Err(std::io::Error::other(format!("Received a packet that was too long {packet_len:x}")));
+        }
+
+        stream
+            .read_exact(&mut packet_buf[..packet_len as usize])
+            .await?;
+        let packet: ::controller::ControllerSend =
+            bincode::deserialize(&packet_buf[..packet_len as usize])
+                .map_err(|e| std::io::Error::other(e))?;
+        match packet {
+            ::controller::ControllerSend::Dummy(a) => {
+                println!("Received dummy command from controller {a}");
+                let d = bincode::serialize(&::controller::ControllerReceive::PlayerNumber(1))
+                    .map_err(|e| std::io::Error::other(e))?;
+                stream.write_u16(d.len() as u16).await?;
+                stream.write_all(&d).await?;
+                stream.flush().await?;
+            }
+            ::controller::ControllerSend::ButtonData(data) => {
+                println!("Received button data 0x{:x}", data);
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -49,7 +78,7 @@ async fn run_bluetooth() {
     let mut bab = bluetooth_rust::BluetoothAdapterBuilder::new();
     let s = tokio::sync::mpsc::channel(100);
     bab.with_sender(s.0);
-    let ba = bab.async_build().await;
+    let ba = bab.build().await;
     match ba {
         Ok(ba) => {
             let settings = bluetooth_rust::BluetoothRfcommProfileSettings {
@@ -65,15 +94,22 @@ async fn run_bluetooth() {
                 sdp_version: None,
                 sdp_features: None,
             };
-            let mut profile = ba.register_rfcomm_profile(settings).await.expect("Failed to register bluetooth profile");
+            let mut profile = ba
+                .register_rfcomm_profile(settings)
+                .await
+                .expect("Failed to register bluetooth profile");
             loop {
-                let c = profile.connectable().await.expect("Failed to build connectable for bluetooth profile");
+                let c = profile
+                    .connectable()
+                    .await
+                    .expect("Failed to build connectable for bluetooth profile");
                 if let Ok(a) = c.accept().await {
                     tokio::spawn(async move {
                         if let Err(e) = handle_bluetooth_controller_client(a.0, a.1).await {
                             println!("Error communicating with bluetooth client: {:?}", e);
                         }
                     });
+                    break;
                 }
             }
         }
@@ -84,12 +120,19 @@ async fn run_bluetooth() {
 fn main() {
     use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
 
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        // Only print, don't propagate during cleanup
+        eprintln!("Panic (possibly during shutdown): {info}");
+        default_hook(info);
+    }));
+
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
 
     let mut options = eframe::NativeOptions::default();
     //TODO only disable vsync when required
-    options.vsync = false;
+    //options.vsync = false;
 
     let trt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

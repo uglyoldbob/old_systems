@@ -1,11 +1,11 @@
-use bluetooth_rust::{BluetoothAdapterTrait, BluetoothDeviceTrait, BluetoothSocketTrait};
+use byteorder::NetworkEndian;
 use eframe::{
     NativeOptions,
     egui::{
         self, Align2, Color32, Event, FontId, Pos2, Rect, Rounding, Sense, TouchPhase, Vec2, vec2,
     },
 };
-use std::{collections::HashMap, io::Write};
+use std::{collections::HashMap, io::Write, thread::JoinHandle};
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -60,6 +60,86 @@ enum Page {
     Config,
 }
 
+struct EmulatorHandler {
+    stream: bluetooth_rust::BluetoothSocket,
+    number: Option<u8>,
+}
+
+impl EmulatorHandler {
+    fn new(mut stream: bluetooth_rust::BluetoothSocket) -> Self {
+        let mut s = Self { 
+            stream,
+            number: None,
+        };
+        s.get_player_num();
+        s
+    }
+
+    fn receive_packet(&mut self) -> Result<(), std::io::Error> {
+        use byteorder::BigEndian;
+        use byteorder::ReadBytesExt;
+        use byteorder::WriteBytesExt;
+        use std::io::Read;
+        use std::io::Write;
+        log::error!("Reading packet length");
+        let mut packet_buf = [0u8; 256];
+        let packet_len = self.stream.read_u16::<BigEndian>()?;
+        if packet_len as usize > packet_buf.len() {
+            return Err(std::io::Error::other(format!("Received a packet that was too long {packet_len:x}")));
+        }
+        log::error!("Got packet length 0x{:x}", packet_len);
+
+        self.stream.read_exact(&mut packet_buf[..packet_len as usize])?;
+        let packet: controller::ControllerReceive =
+            bincode::deserialize(&packet_buf[..packet_len as usize])
+                .map_err(|e| std::io::Error::other(e))?;
+        log::error!("Got packet {:x?}", packet);
+        match packet {
+            controller::ControllerReceive::PlayerNumber(i) => {
+                log::error!("I am player {}", i);
+                self.number = Some(i);
+            }
+            controller::ControllerReceive::AcknowledgeButtonData(a) => {
+                log::error!("Button presses were received {}", a);
+            }
+        }
+        Ok(())
+    }
+
+    fn get_player_num(&mut self) -> Result<(), std::io::Error> {
+        use byteorder::BigEndian;
+        use byteorder::ReadBytesExt;
+        use byteorder::WriteBytesExt;
+        use std::io::Read;
+        use std::io::Write;
+        if self.number.is_none() {
+            let d = bincode::serialize(&controller::ControllerSend::Dummy(1))
+                .map_err(|e| std::io::Error::other(e))?;
+            self.stream.write_u16::<BigEndian>(d.len() as u16)?;
+            self.stream.write_all(&d)?;
+            self.stream.flush()?;
+            self.receive_packet();
+        }
+        Ok(())
+    }
+
+    fn send_controller_data(&mut self, data: u8) -> Result<(), std::io::Error> {
+        use byteorder::BigEndian;
+        use byteorder::ReadBytesExt;
+        use byteorder::WriteBytesExt;
+        use std::io::Read;
+        use std::io::Write;
+        
+        let d = bincode::serialize(&controller::ControllerSend::ButtonData(data))
+            .map_err(|e| std::io::Error::other(e))?;
+        self.stream.write_u16::<BigEndian>(d.len() as u16)?;
+        self.stream.write_all(&d)?;
+        self.stream.flush()?;
+        self.receive_packet();
+        Ok(())
+    }
+}
+
 pub struct DemoApp {
     active_touches: HashMap<u64, egui::Pos2>,
     rects: ButtonRects,
@@ -69,6 +149,16 @@ pub struct DemoApp {
     button_opacity: f32,
     bluetooth_adapter: bluetooth_rust::BluetoothAdapter,
     bluetooth_emulators: Vec<bluetooth_rust::BluetoothDevice>,
+    emulator_socket: Option<EmulatorHandler>,
+
+    up_p  : bool,
+    down_p  : bool,
+    left_p  : bool,
+    right_p : bool,
+    select_p : bool,
+    start_p : bool,
+    b_p : bool,
+    a_p : bool,
 }
 
 impl DemoApp {
@@ -81,6 +171,15 @@ impl DemoApp {
             button_opacity: 1.0,
             bluetooth_adapter,
             bluetooth_emulators: Vec::new(),
+            emulator_socket: None,
+            up_p  : false,
+            down_p  : false,
+            left_p  : false,
+            right_p : false,
+            select_p : false,
+            start_p : false,
+            b_p : false,
+            a_p : false,
         }
     }
 }
@@ -309,15 +408,15 @@ impl DemoApp {
         let hit_dl = self.touch_hits(d.down_left);
         let hit_dr = self.touch_hits(d.down_right);
 
-        let up_p = self.touch_hits(d.up) || hit_ul || hit_ur;
-        let down_p = self.touch_hits(d.down) || hit_dl || hit_dr;
-        let left_p = self.touch_hits(d.left) || hit_ul || hit_dl;
-        let right_p = self.touch_hits(d.right) || hit_ur || hit_dr;
+        self.up_p = self.touch_hits(d.up) || hit_ul || hit_ur;
+        self.down_p = self.touch_hits(d.down) || hit_dl || hit_dr;
+        self.left_p = self.touch_hits(d.left) || hit_ul || hit_dl;
+        self.right_p = self.touch_hits(d.right) || hit_ur || hit_dr;
 
-        let select_p = self.touch_hits(self.rects.select);
-        let start_p = self.touch_hits(self.rects.start);
-        let b_p = self.touch_hits(self.rects.b);
-        let a_p = self.touch_hits(self.rects.a);
+        self.select_p = self.touch_hits(self.rects.select);
+        self.start_p = self.touch_hits(self.rects.start);
+        self.b_p = self.touch_hits(self.rects.b);
+        self.a_p = self.touch_hits(self.rects.a);
 
         // Config button tap — navigate on release (touch ended this frame)
         // We detect this by checking if the rect was hit last frame but has
@@ -353,18 +452,18 @@ impl DemoApp {
         self.paint_diagonal(ui, dl_rect, hit_dl, cell * 0.45, Dir::Down, Dir::Left);
         self.paint_diagonal(ui, dr_rect, hit_dr, cell * 0.45, Dir::Down, Dir::Right);
 
-        self.paint_cardinal(ui, up_rect, up_p, 4.0, Dir::Up);
-        self.paint_cardinal(ui, down_rect, down_p, 4.0, Dir::Down);
-        self.paint_cardinal(ui, left_rect, left_p, 4.0, Dir::Left);
-        self.paint_cardinal(ui, right_rect, right_p, 4.0, Dir::Right);
+        self.paint_cardinal(ui, up_rect, self.up_p, 4.0, Dir::Up);
+        self.paint_cardinal(ui, down_rect, self.down_p, 4.0, Dir::Down);
+        self.paint_cardinal(ui, left_rect, self.left_p, 4.0, Dir::Left);
+        self.paint_cardinal(ui, right_rect, self.right_p, 4.0, Dir::Right);
 
         // Centre fill
         let centre = Rect::from_min_size(egui::pos2(cx - cell * 0.5, cy - cell * 0.5), sz);
         ui.painter()
             .rect_filled(centre, Rounding::ZERO, Color32::from_rgb(60, 60, 70));
 
-        self.paint_btn(ui, sel_rect, "SELECT", select_p, pill_h * 0.5);
-        self.paint_btn(ui, sta_rect, "START", start_p, pill_h * 0.5);
+        self.paint_btn(ui, sel_rect, "SELECT", self.select_p, pill_h * 0.5);
+        self.paint_btn(ui, sta_rect, "START", self.start_p, pill_h * 0.5);
 
         // Config button — gear symbol, dimmer than action buttons
         let cfg_alpha = (self.button_opacity * 180.0) as u8;
@@ -386,20 +485,20 @@ impl DemoApp {
             Color32::from_rgba_unmultiplied(160, 160, 180, cfg_alpha),
         );
 
-        self.paint_btn(ui, b_rect, "B", b_p, ab_r);
-        self.paint_btn(ui, a_rect, "A", a_p, ab_r);
+        self.paint_btn(ui, b_rect, "B", self.b_p, ab_r);
+        self.paint_btn(ui, a_rect, "A", self.a_p, ab_r);
 
         // ── Debug strip ────────────────────────────────────────────────────
         if self.show_debug_strip {
             let pressed: Vec<&str> = [
-                (up_p, "Up"),
-                (down_p, "Down"),
-                (left_p, "Left"),
-                (right_p, "Right"),
-                (select_p, "Select"),
-                (start_p, "Start"),
-                (b_p, "B"),
-                (a_p, "A"),
+                (self.up_p, "Up"),
+                (self.down_p, "Down"),
+                (self.left_p, "Left"),
+                (self.right_p, "Right"),
+                (self.select_p, "Select"),
+                (self.start_p, "Start"),
+                (self.b_p, "B"),
+                (self.a_p, "A"),
             ]
             .iter()
             .filter_map(|&(p, n)| if p { Some(n) } else { None })
@@ -422,6 +521,14 @@ impl DemoApp {
     }
 
     fn show_config(&mut self, ui: &mut egui::Ui) {
+        self.up_p = false;
+        self.down_p = false;
+        self.left_p = false;
+        self.right_p = false;
+        self.select_p = false;
+        self.start_p = false;
+        self.a_p = false;
+        self.b_p = false;
         let panel_rect = ui.available_rect_before_wrap();
         ui.painter()
             .rect_filled(panel_rect, Rounding::ZERO, Color32::from_rgb(22, 22, 30));
@@ -464,9 +571,14 @@ impl DemoApp {
             self.bluetooth_emulators.clear();
             if let Some(devs) = self.bluetooth_adapter.get_paired_devices() {
                 for mut dev in devs {
-                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Custom("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(), 0);
+                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Custom(
+                        "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
+                        0,
+                    );
                     dev.run_sdp(wanted_uuid);
-                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Unknown("76ecef8b-24d4-4f7c-9de0-706864b6bc14".to_string());
+                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Unknown(
+                        "76ecef8b-24d4-4f7c-9de0-706864b6bc14".to_string(),
+                    );
                     if let Ok(uuids) = dev.get_uuids() {
                         log::error!("UUIDS ARE {:?}", uuids);
                         if uuids.contains(&wanted_uuid) {
@@ -482,19 +594,38 @@ impl DemoApp {
             }
         }
         for d in &mut self.bluetooth_emulators {
-            if let Ok(a) = d.get_address() {
-                let btn = egui::Button::new(&format!("Connect to {}", a)).min_size([70.0, 70.0].into());
-                if child.add(btn).clicked() {
-                    log::error!("Need to connect to {}", a);
-                    match d.get_rfcomm_socket(23, bluetooth_rust::BluetoothUuid::Custom("76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(), 0), false) {
-                        Ok(mut socket) =>  {
-                            if socket.sync_connect().is_ok() {
-                                log::error!("Got connection to emulator");
-                                socket.write_all(&[42]);
+            if let Ok(bluetooth_rust::PairingStatus::Paired) = d.get_pair_state() {
+                if let Ok(a) = d.get_address() {
+                    if self.emulator_socket.is_none() {
+                        let btn = egui::Button::new(&format!("Connect to {}", a))
+                            .min_size([70.0, 70.0].into());
+                        if child.add(btn).clicked() {
+                            log::error!("Need to connect to {}", a);
+
+                            match d.get_rfcomm_socket(
+                                23,
+                                bluetooth_rust::BluetoothUuid::Custom(
+                                    "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
+                                    0,
+                                ),
+                                false,
+                            ) {
+                                Ok(mut socket) => {
+                                    if socket.sync_connect().is_ok() {
+                                        log::error!("Got connection to emulator");
+                                        self.emulator_socket = Some(EmulatorHandler::new(socket));
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Error connecting to emulator {}", e);
+                                }
                             }
                         }
-                        Err(e) => {
-                            log::error!("Error connecting to emulator {}", e);
+                    } else {
+                        let btn = egui::Button::new("Disconnect from emulator")
+                            .min_size([70.0, 70.0].into());
+                        if child.add(btn).clicked() {
+                            self.emulator_socket.take();
                         }
                     }
                 }
@@ -531,6 +662,40 @@ impl eframe::App for DemoApp {
             });
         } else {
             self.active_touches.clear();
+        }
+
+        if let Some(es) = &mut self.emulator_socket {
+
+            /// Flag for the a button
+            const BUTTON_A: u8 = 0x01;
+            /// Flag for the b button
+            const BUTTON_B: u8 = 0x02;
+            /// Flag for the select button
+            const BUTTON_SELECT: u8 = 0x04;
+            /// Flag for the start button
+            const BUTTON_START: u8 = 0x08;
+            /// Flag for the up button
+            const BUTTON_UP: u8 = 0x10;
+            /// Flag for the down button
+            const BUTTON_DOWN: u8 = 0x20;
+            /// Flag for the left button
+            const BUTTON_LEFT: u8 = 0x40;
+            /// Flag for the right button
+            const BUTTON_RIGHT: u8 = 0x80;
+
+            let mut data = 0u8;
+
+            if self.up_p { data |= BUTTON_UP; }
+            if self.down_p { data |= BUTTON_DOWN; }
+            if self.left_p { data |= BUTTON_LEFT; }
+            if self.right_p { data |= BUTTON_RIGHT; }
+            if self.select_p { data |= BUTTON_SELECT; }
+            if self.start_p { data |= BUTTON_START; }
+            if self.a_p { data |= BUTTON_A; }
+            if self.b_p { data |= BUTTON_B; }
+
+
+            es.send_controller_data(data);
         }
 
         egui::CentralPanel::default().show_inside(ui, |ui| match self.page {

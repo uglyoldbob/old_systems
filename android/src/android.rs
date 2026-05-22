@@ -1,9 +1,10 @@
 use egui_winit::winit;
-use jni::objects::{JObject, JValue};
 use jni::JNIEnv;
+use jni::objects::{JObject, JValue};
 
-pub fn request_bluetooth_connect(app: &winit::platform::android::activity::AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
-
+pub fn request_bluetooth_connect(
+    app: &winit::platform::android::activity::AndroidApp,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Get JVM + attach thread
     let vm = app.vm_as_ptr();
 
@@ -12,16 +13,12 @@ pub fn request_bluetooth_connect(app: &winit::platform::android::activity::Andro
     let mut env = vm.attach_current_thread()?;
 
     // Get Activity
-    let activity = unsafe {
-        JObject::from_raw(app.activity_as_ptr().cast())
-    };
+    let activity = unsafe { JObject::from_raw(app.activity_as_ptr().cast()) };
 
     // Check SDK version
     let version_class = env.find_class("android/os/Build$VERSION")?;
 
-    let sdk_int = env
-        .get_static_field(version_class, "SDK_INT", "I")?
-        .i()?;
+    let sdk_int = env.get_static_field(version_class, "SDK_INT", "I")?.i()?;
 
     // Android 12+
     if sdk_int < 31 {
@@ -29,8 +26,7 @@ pub fn request_bluetooth_connect(app: &winit::platform::android::activity::Andro
     }
 
     // android.Manifest.permission.BLUETOOTH_CONNECT
-    let manifest_permission =
-        env.find_class("android/Manifest$permission")?;
+    let manifest_permission = env.find_class("android/Manifest$permission")?;
 
     let bluetooth_connect = env
         .get_static_field(
@@ -59,27 +55,16 @@ pub fn request_bluetooth_connect(app: &winit::platform::android::activity::Andro
     // Create String[]
     let string_class = env.find_class("java/lang/String")?;
 
-    let permissions = env.new_object_array(
-        1,
-        string_class,
-        JObject::null(),
-    )?;
+    let permissions = env.new_object_array(1, string_class, JObject::null())?;
 
-    env.set_object_array_element(
-        &permissions,
-        0,
-        &bluetooth_connect,
-    )?;
+    env.set_object_array_element(&permissions, 0, &bluetooth_connect)?;
 
     // requestPermissions(String[], int)
     env.call_method(
         &activity,
         "requestPermissions",
         "([Ljava/lang/String;I)V",
-        &[
-            JValue::Object(&permissions),
-            JValue::Int(1001),
-        ],
+        &[JValue::Object(&permissions), JValue::Int(1001)],
     )?;
 
     log::error!("Requested BLUETOOTH_CONNECT permission");
