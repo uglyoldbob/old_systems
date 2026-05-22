@@ -61,11 +61,18 @@ async fn handle_bluetooth_controller_client(
                 let d = bincode::serialize(&::controller::ControllerReceive::PlayerNumber(1))
                     .map_err(|e| std::io::Error::other(e))?;
                 stream.write_u16(d.len() as u16).await?;
+                println!("Sending data {:02x?}", d);
                 stream.write_all(&d).await?;
                 stream.flush().await?;
             }
             ::controller::ControllerSend::ButtonData(data) => {
                 println!("Received button data 0x{:x}", data);
+                let d = bincode::serialize(&::controller::ControllerReceive::AcknowledgeButtonData(1))
+                    .map_err(|e| std::io::Error::other(e))?;
+                stream.write_u16(d.len() as u16).await?;
+                println!("Sending data {:02x?}", d);
+                stream.write_all(&d).await?;
+                stream.flush().await?;
             }
         }
     }

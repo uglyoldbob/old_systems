@@ -2,6 +2,7 @@ android:
   gradle: false
   manifest:
     application:
+      label: "UglyOldController"
       activities:
         - orientation: sensorLandscape
     package: "com.uglyoldbob.NesController"

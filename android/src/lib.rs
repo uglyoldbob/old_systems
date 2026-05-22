@@ -71,7 +71,9 @@ impl EmulatorHandler {
             stream,
             number: None,
         };
-        s.get_player_num();
+        if let Err(e) = s.get_player_num() {
+            log::error!("Error getting player number: {:?}", e);
+        }
         s
     }
 
@@ -83,13 +85,17 @@ impl EmulatorHandler {
         use std::io::Write;
         log::error!("Reading packet length");
         let mut packet_buf = [0u8; 256];
+        log::error!("About to receive a packet");
         let packet_len = self.stream.read_u16::<BigEndian>()?;
         if packet_len as usize > packet_buf.len() {
+            log::error!("Received a bad packet of length {packet_len:x}");
             return Err(std::io::Error::other(format!("Received a packet that was too long {packet_len:x}")));
         }
         log::error!("Got packet length 0x{:x}", packet_len);
 
         self.stream.read_exact(&mut packet_buf[..packet_len as usize])?;
+
+        log::error!("Pakcet contents {:02x?}", &packet_buf[..packet_len as usize]);
         let packet: controller::ControllerReceive =
             bincode::deserialize(&packet_buf[..packet_len as usize])
                 .map_err(|e| std::io::Error::other(e))?;
@@ -115,10 +121,12 @@ impl EmulatorHandler {
         if self.number.is_none() {
             let d = bincode::serialize(&controller::ControllerSend::Dummy(1))
                 .map_err(|e| std::io::Error::other(e))?;
+            log::error!("About to write request to get player number");
             self.stream.write_u16::<BigEndian>(d.len() as u16)?;
             self.stream.write_all(&d)?;
             self.stream.flush()?;
-            self.receive_packet();
+            log::error!("Done with write request to get player number");
+            self.receive_packet()?;
         }
         Ok(())
     }
@@ -135,7 +143,7 @@ impl EmulatorHandler {
         self.stream.write_u16::<BigEndian>(d.len() as u16)?;
         self.stream.write_all(&d)?;
         self.stream.flush()?;
-        self.receive_packet();
+        self.receive_packet()?;
         Ok(())
     }
 }
@@ -695,7 +703,9 @@ impl eframe::App for DemoApp {
             if self.b_p { data |= BUTTON_B; }
 
 
-            es.send_controller_data(data);
+            if let Err(e) = es.send_controller_data(data) {
+                log::error!("Error sending controller data: {:?}", e);
+            }
         }
 
         egui::CentralPanel::default().show_inside(ui, |ui| match self.page {
