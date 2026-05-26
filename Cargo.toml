@@ -1,11 +1,11 @@
 [workspace]
 resolver = "3"
 
-exclude = ["nes/hdl/riscv-bios-rust"]
+exclude = ["android", "nes/hdl/riscv-bios-rust"]
 members = ["nes/hdmi",
     "nes/rust",
     "snes/rust",
-    "android", "controller",
+    "controller",
 ]
 
 [profile.release]
