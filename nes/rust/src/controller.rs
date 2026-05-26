@@ -869,7 +869,6 @@ impl StandardController {
                 } else {
                     BUTTON_RIGHT
                 };
-            println!("Loading buttons with {:x}", controller_buttons);
             self.shift_register = controller_buttons;
         }
     }

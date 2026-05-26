@@ -247,14 +247,16 @@ impl eframe::App for MainNesWindow {
             ui.ctx().input(|i| {
                 for index in 0..4 {
                     let controller = self.c.mb.get_controller_mut(index);
-                    if let crate::controller::NesController::Zapper(z) = controller {
-                        z.provide_zapper_data(self.mouse, self.mouse_vision);
-                    } else {
-                        for contr in controller.get_buttons_iter_mut() {
-                            let cnum = index;
-                            let button_config =
-                                &self.c.local.configuration.controller_config[cnum as usize];
-                            contr.update_egui_buttons(i, button_config);
+                    if !controller.should_ignore_local_inputs() {
+                        if let crate::controller::NesController::Zapper(z) = controller {
+                            z.provide_zapper_data(self.mouse, self.mouse_vision);
+                        } else {
+                            for contr in controller.get_buttons_iter_mut() {
+                                let cnum = index;
+                                let button_config =
+                                    &self.c.local.configuration.controller_config[cnum as usize];
+                                contr.update_egui_buttons(i, button_config);
+                            }
                         }
                     }
                 }

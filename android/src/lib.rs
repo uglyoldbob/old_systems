@@ -5,7 +5,9 @@ use eframe::{
         self, Align2, Color32, Event, FontId, Pos2, Rect, Rounding, Sense, TouchPhase, Vec2, vec2,
     },
 };
-use std::{collections::HashMap, io::Write, thread::JoinHandle};
+use std::{collections::HashMap, io::Write, sync::atomic::AtomicU16, thread::JoinHandle};
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -60,16 +62,56 @@ enum Page {
     Config,
 }
 
+struct EmulatorHandlerRunner {
+    a: JoinHandle<()>,
+    data: Arc<AtomicU16>,
+    done: Arc<AtomicBool>,
+}
+
+impl EmulatorHandlerRunner {
+    pub fn run(mut e: EmulatorHandler) -> Self {
+        let data = e.data.clone();
+        let done = e.done.clone();
+        let a = std::thread::spawn(move || {
+            loop {
+                if e.send().is_err() {
+                    e.done.store(true, std::sync::atomic::Ordering::Relaxed);
+                    break;
+                }
+            }
+            log::error!("Controller handler ended");
+        });
+        Self {
+            a,
+            data,
+            done,
+        }
+    }
+
+    fn is_done(&self) -> bool {
+        self.done.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn send_controller_data(&mut self, data: u16) -> Result<(), std::io::Error> {
+        self.data.store(data, std::sync::atomic::Ordering::Relaxed);
+        Ok(())
+    }
+}
+
 struct EmulatorHandler {
     stream: bluetooth_rust::BluetoothSocket,
     number: Option<u8>,
+    data: Arc<AtomicU16>,
+    done: Arc<AtomicBool>,
 }
 
 impl EmulatorHandler {
     fn new(mut stream: bluetooth_rust::BluetoothSocket) -> Self {
-        let mut s = Self { 
+        let mut s = Self {
             stream,
             number: None,
+            data: Arc::new(AtomicU16::new(0)),
+            done: Arc::new(AtomicBool::new(false)),
         };
         s
     }
@@ -86,13 +128,19 @@ impl EmulatorHandler {
         let packet_len = self.stream.read_u16::<BigEndian>()?;
         if packet_len as usize > packet_buf.len() {
             log::error!("Received a bad packet of length {packet_len:x}");
-            return Err(std::io::Error::other(format!("Received a packet that was too long {packet_len:x}")));
+            return Err(std::io::Error::other(format!(
+                "Received a packet that was too long {packet_len:x}"
+            )));
         }
         log::error!("Got packet length 0x{:x}", packet_len);
 
-        self.stream.read_exact(&mut packet_buf[..packet_len as usize])?;
+        self.stream
+            .read_exact(&mut packet_buf[..packet_len as usize])?;
 
-        log::error!("Pakcet contents {:02x?}", &packet_buf[..packet_len as usize]);
+        log::error!(
+            "Pakcet contents {:02x?}",
+            &packet_buf[..packet_len as usize]
+        );
         let packet: controller::ControllerReceive =
             bincode::deserialize(&packet_buf[..packet_len as usize])
                 .map_err(|e| std::io::Error::other(e))?;
@@ -128,7 +176,7 @@ impl EmulatorHandler {
         Ok(())
     }
 
-    fn send_controller_data(&mut self, data: u16) -> Result<(), std::io::Error> {
+    fn send(&mut self) -> Result<(), std::io::Error> {
         use byteorder::BigEndian;
         use byteorder::ReadBytesExt;
         use byteorder::WriteBytesExt;
@@ -136,8 +184,10 @@ impl EmulatorHandler {
         use std::io::Write;
         self.get_player_num();
         if self.number.is_some() {
-            let d = bincode::serialize(&controller::ControllerSend::ButtonData(data))
-                .map_err(|e| std::io::Error::other(e))?;
+            let d = bincode::serialize(&controller::ControllerSend::ButtonData(
+                self.data.load(std::sync::atomic::Ordering::Relaxed),
+            ))
+            .map_err(|e| std::io::Error::other(e))?;
             self.stream.write_u16::<BigEndian>(d.len() as u16)?;
             self.stream.write_all(&d)?;
             self.stream.flush()?;
@@ -156,16 +206,16 @@ pub struct DemoApp {
     button_opacity: f32,
     bluetooth_adapter: bluetooth_rust::BluetoothAdapter,
     bluetooth_emulators: Vec<bluetooth_rust::BluetoothDevice>,
-    emulator_socket: Option<EmulatorHandler>,
+    emulator_socket: Option<EmulatorHandlerRunner>,
 
-    up_p  : bool,
-    down_p  : bool,
-    left_p  : bool,
-    right_p : bool,
-    select_p : bool,
-    start_p : bool,
-    b_p : bool,
-    a_p : bool,
+    up_p: bool,
+    down_p: bool,
+    left_p: bool,
+    right_p: bool,
+    select_p: bool,
+    start_p: bool,
+    b_p: bool,
+    a_p: bool,
 }
 
 impl DemoApp {
@@ -179,14 +229,14 @@ impl DemoApp {
             bluetooth_adapter,
             bluetooth_emulators: Vec::new(),
             emulator_socket: None,
-            up_p  : false,
-            down_p  : false,
-            left_p  : false,
-            right_p : false,
-            select_p : false,
-            start_p : false,
-            b_p : false,
-            a_p : false,
+            up_p: false,
+            down_p: false,
+            left_p: false,
+            right_p: false,
+            select_p: false,
+            start_p: false,
+            b_p: false,
+            a_p: false,
         }
     }
 }
@@ -620,7 +670,9 @@ impl DemoApp {
                                 Ok(mut socket) => {
                                     if socket.sync_connect().is_ok() {
                                         log::error!("Got connection to emulator");
-                                        self.emulator_socket = Some(EmulatorHandler::new(socket));
+                                        let eh = EmulatorHandler::new(socket);
+                                        let eh = EmulatorHandlerRunner::run(eh);
+                                        self.emulator_socket = Some(eh);
                                     }
                                 }
                                 Err(e) => {
@@ -671,8 +723,12 @@ impl eframe::App for DemoApp {
             self.active_touches.clear();
         }
 
+        let mut end_socket = false;
         if let Some(es) = &mut self.emulator_socket {
-
+            ui.ctx().request_repaint();
+            if es.is_done() {
+                end_socket = true;
+            }
             /// The index into the button combination array for button A
             pub const BUTTON_COMBO_A: usize = 0;
             /// The index into the button combination array for turbo A
@@ -706,19 +762,37 @@ impl eframe::App for DemoApp {
 
             let mut data = 0u16;
 
-            if self.up_p { data |= 1<<BUTTON_COMBO_UP; }
-            if self.down_p { data |= 1<<BUTTON_COMBO_DOWN; }
-            if self.left_p { data |= 1<<BUTTON_COMBO_LEFT; }
-            if self.right_p { data |= 1<<BUTTON_COMBO_RIGHT; }
-            if self.select_p { data |= 1<<BUTTON_COMBO_SELECT; }
-            if self.start_p { data |= 1<<BUTTON_COMBO_START; }
-            if self.a_p { data |= 1<<BUTTON_COMBO_A; }
-            if self.b_p { data |= 1<<BUTTON_COMBO_B; }
-
+            if self.up_p {
+                data |= 1 << BUTTON_COMBO_UP;
+            }
+            if self.down_p {
+                data |= 1 << BUTTON_COMBO_DOWN;
+            }
+            if self.left_p {
+                data |= 1 << BUTTON_COMBO_LEFT;
+            }
+            if self.right_p {
+                data |= 1 << BUTTON_COMBO_RIGHT;
+            }
+            if self.select_p {
+                data |= 1 << BUTTON_COMBO_SELECT;
+            }
+            if self.start_p {
+                data |= 1 << BUTTON_COMBO_START;
+            }
+            if self.a_p {
+                data |= 1 << BUTTON_COMBO_A;
+            }
+            if self.b_p {
+                data |= 1 << BUTTON_COMBO_B;
+            }
 
             if let Err(e) = es.send_controller_data(data) {
                 log::error!("Error sending controller data: {:?}", e);
             }
+        }
+        if end_socket {
+            self.emulator_socket.take();
         }
 
         egui::CentralPanel::default().show_inside(ui, |ui| match self.page {

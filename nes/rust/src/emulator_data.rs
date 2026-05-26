@@ -437,23 +437,23 @@ impl NesEmulatorData {
                             }
                         }
                         crate::BluetoothControllerInfoMessage::Dummy => {}
+                        crate::BluetoothControllerInfoMessage::Disconnect(pnum) => {
+                            if let Some(pnum) = pnum {
+                                let controller = self.mb.get_controller_mut(pnum);
+                                controller.ignore_local_inputs(false);
+                            }
+                        }
                         crate::BluetoothControllerInfoMessage::ButtonData(pnum, d) => {
-                            println!("Got bluetooth button data {:x}", d);
                             if let Some(bcontrol) = olocal.bluetooth_controllers.get(pnum as usize)
                             {
-                                println!("Bluetooth controller {} is set", pnum);
                                 if let Some(bcontrol) = bcontrol {
-                                    println!("Bluetooth controller {} is double set", pnum);
                                     if let Ok(b2) = bcontrol.lock() {
-                                        println!("Bluetooth controller {} is reade", pnum);
                                         let controller = self.mb.get_controller_mut(pnum);
                                         if let Some(button_combo) =
                                             controller.get_buttons_iter_mut().next()
                                         {
-                                            println!("Updating button");
                                             for button_num in 0..16 {
                                                 let state = (d & (1 << button_num)) != 0;
-                                                println!("Button {} is {}", button_num, state);
                                                 button_combo.update_bluetooth_buttons(
                                                     b2.address,
                                                     button_num as u8,
@@ -461,7 +461,6 @@ impl NesEmulatorData {
                                                     &b2.controller_config,
                                                 );
                                             }
-                                            println!("button combo is now {:x?}", button_combo);
                                         }
                                     }
                                 }

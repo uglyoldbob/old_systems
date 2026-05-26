@@ -227,6 +227,12 @@ impl RomList {
         }
     }
 
+    /// Delete the rom list
+    pub fn delete_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
+        pb.push("roms.bin");
+        std::fs::remove_file(pb)
+    }
+
     /// Save the rom list to disk
     pub fn save_list(&self, mut pb: PathBuf) -> std::io::Result<()> {
         pb.push("roms.bin");
@@ -276,6 +282,11 @@ impl RomListParser {
     /// Returns a mutable reference to the list of roms.
     pub fn list_mut(&mut self) -> &mut RomList {
         &mut self.list
+    }
+
+    /// Delete the list
+    pub fn refresh_roms(&mut self, pb: PathBuf) {
+        let _ = self.list.delete_list(pb);
     }
 
     /// Performs a recursive search for files in the filesystem. It currently uses all files in the specified roms folder (dir).

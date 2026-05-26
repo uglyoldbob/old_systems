@@ -1,5 +1,7 @@
 //! This modules contains the window for editing controller properties
 
+use std::str::FromStr;
+
 use crate::NesEmulatorData;
 use strum::IntoEnumIterator;
 
@@ -106,6 +108,10 @@ impl Window {
                                 message_sender.send(Message::NewRomPath(fname)).ok();
                             }
                         });
+                    }
+
+                    if ui.button("Refresh rom list").clicked() {
+                        c.local.parser.refresh_roms(c.local.get_save_other());
                     }
 
                     if save_config {
