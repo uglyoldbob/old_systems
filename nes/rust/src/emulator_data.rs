@@ -5,6 +5,7 @@ use std::{io::Write, path::PathBuf};
 use crate::{
     apu::NesApu,
     cartridge::NesCartridge,
+    controller::NesControllerTrait,
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
@@ -39,7 +40,12 @@ pub struct EmulatorConfiguration {
 
 impl Default for EmulatorConfiguration {
     fn default() -> Self {
-        let mut controller = [crate::controller::ControllerConfig::new(); 4];
+        let mut controller = [
+            crate::controller::ControllerConfig::new(),
+            crate::controller::ControllerConfig::new(),
+            crate::controller::ControllerConfig::new(),
+            crate::controller::ControllerConfig::new(),
+        ];
         {
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_A, egui::Key::F);
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_B, egui::Key::D);
@@ -152,19 +158,44 @@ impl EmulatorConfiguration {
     }
 }
 
-/// Just like LocalEmulatorDataClone, but the members must do not implement Clone
+/// The data used to convey what is being pressed and by who
+pub struct BluetoothControllerOwner {
+    /// The bluetooth address of the soft controller
+    pub address: [u8; 6],
+    /// The controller config for the bluetooth controller
+    pub controller_config: crate::controller::ControllerConfig,
+}
+
+pub struct PendingBluetoothController {
+    /// The bluetooth address
+    pub addr: [u8; 6],
+    /// The channel to communicate back to the controller
+    pub response: tokio::sync::mpsc::Sender<crate::BluetoothControllerResponse>,
+}
+
+/// Just like LocalEmulatorDataClone, but the members do not implement Clone
 pub struct LocalEmulatorData {
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
+    /// The bluetooth controller button data
+    pub bluetooth_controllers:
+        [Option<std::sync::Arc<std::sync::Mutex<BluetoothControllerOwner>>>; 4],
     /// The network object for interacting with other emulators
     pub network: Option<common_emulator::network::Network>,
+    /// The bluetooth receiver for bluetooth controllers
+    pub blue_recv: Option<tokio::sync::mpsc::Receiver<crate::BluetoothControllerInfo>>,
+    /// The pending bluetooth controller addresses
+    pub pending_bluetooth_controllers: std::collections::VecDeque<PendingBluetoothController>,
 }
 
 impl Default for LocalEmulatorData {
     fn default() -> Self {
         Self {
             gilrs: gilrs::GilrsBuilder::new().build().unwrap(),
+            bluetooth_controllers: [const { None }; 4],
             network: None,
+            blue_recv: None,
+            pending_bluetooth_controllers: std::collections::VecDeque::new(),
         }
     }
 }
@@ -351,11 +382,13 @@ impl NesEmulatorData {
     }
 
     /// Create a new nes emulator
-    pub fn new() -> Self {
+    pub fn new(recv: tokio::sync::mpsc::Receiver<crate::BluetoothControllerInfo>) -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let apu = NesApu::new();
 
+        let mut olocal = LocalEmulatorData::default();
+        olocal.blue_recv = Some(recv);
         Self {
             cpu: NesCpu::new(),
             cpu_peripherals: NesCpuPeripherals::new(ppu, apu),
@@ -377,7 +410,66 @@ impl NesEmulatorData {
             big_counter: 0,
             vblank_just_set: 0,
             local: LocalEmulatorDataClone::new(),
-            olocal: Some(LocalEmulatorData::default()),
+            olocal: Some(olocal),
+        }
+    }
+
+    /// Pull messages from bluetooth controllers
+    pub fn check_bluetooth_controllers(&mut self) {
+        if let Some(olocal) = &mut self.olocal {
+            if let Some(recv) = &mut olocal.blue_recv {
+                while let Ok(m) = recv.try_recv() {
+                    match m.message {
+                        crate::BluetoothControllerInfoMessage::Initialize => {
+                            let mut available = false;
+                            for b in olocal.bluetooth_controllers.iter() {
+                                if b.is_none() {
+                                    available = true;
+                                    break;
+                                }
+                            }
+                            if available {
+                                let p = PendingBluetoothController {
+                                    addr: m.address,
+                                    response: m.response,
+                                };
+                                olocal.pending_bluetooth_controllers.push_back(p);
+                            }
+                        }
+                        crate::BluetoothControllerInfoMessage::Dummy => {}
+                        crate::BluetoothControllerInfoMessage::ButtonData(pnum, d) => {
+                            println!("Got bluetooth button data {:x}", d);
+                            if let Some(bcontrol) = olocal.bluetooth_controllers.get(pnum as usize)
+                            {
+                                println!("Bluetooth controller {} is set", pnum);
+                                if let Some(bcontrol) = bcontrol {
+                                    println!("Bluetooth controller {} is double set", pnum);
+                                    if let Ok(b2) = bcontrol.lock() {
+                                        println!("Bluetooth controller {} is reade", pnum);
+                                        let controller = self.mb.get_controller_mut(pnum);
+                                        if let Some(button_combo) =
+                                            controller.get_buttons_iter_mut().next()
+                                        {
+                                            println!("Updating button");
+                                            for button_num in 0..16 {
+                                                let state = (d & (1 << button_num)) != 0;
+                                                println!("Button {} is {}", button_num, state);
+                                                button_combo.update_bluetooth_buttons(
+                                                    b2.address,
+                                                    button_num as u8,
+                                                    state,
+                                                    &b2.controller_config,
+                                                );
+                                            }
+                                            println!("button combo is now {:x?}", button_combo);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

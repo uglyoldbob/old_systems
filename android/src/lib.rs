@@ -71,9 +71,6 @@ impl EmulatorHandler {
             stream,
             number: None,
         };
-        if let Err(e) = s.get_player_num() {
-            log::error!("Error getting player number: {:?}", e);
-        }
         s
     }
 
@@ -102,11 +99,11 @@ impl EmulatorHandler {
         log::error!("Got packet {:x?}", packet);
         match packet {
             controller::ControllerReceive::PlayerNumber(i) => {
-                log::error!("I am player {}", i);
-                self.number = Some(i);
+                log::error!("I am player {:?}", i);
+                self.number = i;
             }
-            controller::ControllerReceive::AcknowledgeButtonData(a) => {
-                log::error!("Button presses were received {}", a);
+            controller::ControllerReceive::AcknowledgeButtonData => {
+                log::error!("Button presses were received");
             }
         }
         Ok(())
@@ -119,7 +116,7 @@ impl EmulatorHandler {
         use std::io::Read;
         use std::io::Write;
         if self.number.is_none() {
-            let d = bincode::serialize(&controller::ControllerSend::Dummy(1))
+            let d = bincode::serialize(&controller::ControllerSend::GetPlayerNumber)
                 .map_err(|e| std::io::Error::other(e))?;
             log::error!("About to write request to get player number");
             self.stream.write_u16::<BigEndian>(d.len() as u16)?;
@@ -131,19 +128,21 @@ impl EmulatorHandler {
         Ok(())
     }
 
-    fn send_controller_data(&mut self, data: u8) -> Result<(), std::io::Error> {
+    fn send_controller_data(&mut self, data: u16) -> Result<(), std::io::Error> {
         use byteorder::BigEndian;
         use byteorder::ReadBytesExt;
         use byteorder::WriteBytesExt;
         use std::io::Read;
         use std::io::Write;
-        
-        let d = bincode::serialize(&controller::ControllerSend::ButtonData(data))
-            .map_err(|e| std::io::Error::other(e))?;
-        self.stream.write_u16::<BigEndian>(d.len() as u16)?;
-        self.stream.write_all(&d)?;
-        self.stream.flush()?;
-        self.receive_packet()?;
+        self.get_player_num();
+        if self.number.is_some() {
+            let d = bincode::serialize(&controller::ControllerSend::ButtonData(data))
+                .map_err(|e| std::io::Error::other(e))?;
+            self.stream.write_u16::<BigEndian>(d.len() as u16)?;
+            self.stream.write_all(&d)?;
+            self.stream.flush()?;
+            self.receive_packet()?;
+        }
         Ok(())
     }
 }
@@ -674,33 +673,47 @@ impl eframe::App for DemoApp {
 
         if let Some(es) = &mut self.emulator_socket {
 
-            /// Flag for the a button
-            const BUTTON_A: u8 = 0x01;
-            /// Flag for the b button
-            const BUTTON_B: u8 = 0x02;
-            /// Flag for the select button
-            const BUTTON_SELECT: u8 = 0x04;
-            /// Flag for the start button
-            const BUTTON_START: u8 = 0x08;
-            /// Flag for the up button
-            const BUTTON_UP: u8 = 0x10;
-            /// Flag for the down button
-            const BUTTON_DOWN: u8 = 0x20;
-            /// Flag for the left button
-            const BUTTON_LEFT: u8 = 0x40;
-            /// Flag for the right button
-            const BUTTON_RIGHT: u8 = 0x80;
+            /// The index into the button combination array for button A
+            pub const BUTTON_COMBO_A: usize = 0;
+            /// The index into the button combination array for turbo A
+            pub const BUTTON_COMBO_TURBOA: usize = 1;
+            /// The index into the button combination array for turbo B
+            pub const BUTTON_COMBO_TURBOB: usize = 2;
+            /// The index into the button combination array for button b
+            pub const BUTTON_COMBO_B: usize = 3;
+            /// The index into the button combination array for button start
+            pub const BUTTON_COMBO_START: usize = 4;
+            /// The index into the button combination array for button slow
+            pub const BUTTON_COMBO_SLOW: usize = 5;
+            /// The index into the button combination array for button select
+            pub const BUTTON_COMBO_SELECT: usize = 6;
+            /// The index into the button combination array for button up
+            pub const BUTTON_COMBO_UP: usize = 7;
+            /// The index into the button combination array for button down
+            pub const BUTTON_COMBO_DOWN: usize = 8;
+            /// The index into the button combination array for button left
+            pub const BUTTON_COMBO_LEFT: usize = 9;
+            /// The index into the button combination array for button right
+            pub const BUTTON_COMBO_RIGHT: usize = 10;
+            /// The index into the button combination array for fire/trigger
+            pub const BUTTON_COMBO_FIRE: usize = 11;
+            /// The index into the button combination array for a light sensor
+            pub const BUTTON_COMBO_LIGHT: usize = 12;
+            /// The index into the button combination array for a potentiometer
+            pub const BUTTON_COMBO_POTENTIOMETER: usize = 13;
+            /// The extra button for the power pad
+            pub const BUTTON_COMBO_POWERPAD: usize = 14;
 
-            let mut data = 0u8;
+            let mut data = 0u16;
 
-            if self.up_p { data |= BUTTON_UP; }
-            if self.down_p { data |= BUTTON_DOWN; }
-            if self.left_p { data |= BUTTON_LEFT; }
-            if self.right_p { data |= BUTTON_RIGHT; }
-            if self.select_p { data |= BUTTON_SELECT; }
-            if self.start_p { data |= BUTTON_START; }
-            if self.a_p { data |= BUTTON_A; }
-            if self.b_p { data |= BUTTON_B; }
+            if self.up_p { data |= 1<<BUTTON_COMBO_UP; }
+            if self.down_p { data |= 1<<BUTTON_COMBO_DOWN; }
+            if self.left_p { data |= 1<<BUTTON_COMBO_LEFT; }
+            if self.right_p { data |= 1<<BUTTON_COMBO_RIGHT; }
+            if self.select_p { data |= 1<<BUTTON_COMBO_SELECT; }
+            if self.start_p { data |= 1<<BUTTON_COMBO_START; }
+            if self.a_p { data |= 1<<BUTTON_COMBO_A; }
+            if self.b_p { data |= 1<<BUTTON_COMBO_B; }
 
 
             if let Err(e) = es.send_controller_data(data) {

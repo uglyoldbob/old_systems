@@ -173,7 +173,7 @@ impl Window {
                                             {
                                                 "Waiting for input".to_string()
                                             } else {
-                                                keys[crate::controller::BUTTON_COMBO_A].to_string()
+                                                keys[crate::controller::BUTTON_COMBO_A].as_string()
                                             },
                                         )
                                         .clicked()
@@ -192,7 +192,7 @@ impl Window {
                                             {
                                                 "Waiting for input".to_string()
                                             } else {
-                                                keys[crate::controller::BUTTON_COMBO_B].to_string()
+                                                keys[crate::controller::BUTTON_COMBO_B].as_string()
                                             },
                                         )
                                         .clicked()
@@ -212,7 +212,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_TURBOA]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -242,7 +242,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_TURBOB]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -272,7 +272,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_START]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -292,7 +292,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_SELECT]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -311,7 +311,7 @@ impl Window {
                                             {
                                                 "Waiting for input".to_string()
                                             } else {
-                                                keys[crate::controller::BUTTON_COMBO_UP].to_string()
+                                                keys[crate::controller::BUTTON_COMBO_UP].as_string()
                                             },
                                         )
                                         .clicked()
@@ -331,7 +331,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_DOWN]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -350,7 +350,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_LEFT]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -369,7 +369,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_RIGHT]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()
@@ -388,7 +388,7 @@ impl Window {
                                                 "Waiting for input".to_string()
                                             } else {
                                                 keys[crate::controller::BUTTON_COMBO_FIRE]
-                                                    .to_string()
+                                                    .as_string()
                                             },
                                         )
                                         .clicked()

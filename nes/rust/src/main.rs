@@ -36,51 +36,232 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 mod windows;
 
-async fn handle_bluetooth_controller_client(
-    mut stream: bluetooth_rust::BluetoothStream,
-    a: [u8; 6],
-) -> Result<(), std::io::Error> {
-    println!("Got a bluetooth connection from {:?}", a);
+struct BluetoothReadHalf(std::sync::Arc<tokio::sync::Mutex<bluetooth_rust::BluetoothStream>>);
+struct BluetoothWriteHalf(std::sync::Arc<tokio::sync::Mutex<bluetooth_rust::BluetoothStream>>);
 
-    let mut packet_buf = [0u8; 256];
-    loop {
-        let packet_len = stream.read_u16().await?;
-        if packet_len as usize > packet_buf.len() {
-            return Err(std::io::Error::other(format!("Received a packet that was too long {packet_len:x}")));
+impl tokio::io::AsyncRead for BluetoothReadHalf {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let mut guard = self
+            .0
+            .try_lock()
+            .expect("BluetoothReadHalf polled while write is in progress");
+        std::pin::Pin::new(&mut *guard).poll_read(cx, buf)
+    }
+}
+
+impl tokio::io::AsyncWrite for BluetoothWriteHalf {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let mut guard = self
+            .0
+            .try_lock()
+            .expect("BluetoothWriteHalf polled while read is in progress");
+        std::pin::Pin::new(&mut *guard).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let mut guard = self
+            .0
+            .try_lock()
+            .expect("BluetoothWriteHalf polled while read is in progress");
+        std::pin::Pin::new(&mut *guard).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let mut guard = self
+            .0
+            .try_lock()
+            .expect("BluetoothWriteHalf polled while read is in progress");
+        std::pin::Pin::new(&mut *guard).poll_shutdown(cx)
+    }
+}
+
+fn split_bluetooth(
+    stream: bluetooth_rust::BluetoothStream,
+) -> (BluetoothReadHalf, BluetoothWriteHalf) {
+    let shared = std::sync::Arc::new(tokio::sync::Mutex::new(stream));
+    (
+        BluetoothReadHalf(shared.clone()),
+        BluetoothWriteHalf(shared),
+    )
+}
+
+struct BluetoothPacketReceiver {
+    stream: BluetoothReadHalf,
+    len0: Option<u8>,
+    len1: Option<u8>,
+    buf: Vec<u8>,
+    buf_pos: usize,
+}
+
+impl BluetoothPacketReceiver {
+    async fn receive_packet(&mut self) -> Option<Option<::controller::ControllerSend>> {
+        if self.len0.is_none() {
+            self.len0 = Some(self.stream.read_u8().await.ok()?);
+            println!("Received len0 {:x?}", self.len0);
         }
-
-        stream
-            .read_exact(&mut packet_buf[..packet_len as usize])
-            .await?;
-        let packet: ::controller::ControllerSend =
-            bincode::deserialize(&packet_buf[..packet_len as usize])
-                .map_err(|e| std::io::Error::other(e))?;
-        match packet {
-            ::controller::ControllerSend::Dummy(a) => {
-                println!("Received dummy command from controller {a}");
-                let d = bincode::serialize(&::controller::ControllerReceive::PlayerNumber(1))
-                    .map_err(|e| std::io::Error::other(e))?;
-                stream.write_u16(d.len() as u16).await?;
-                println!("Sending data {:02x?}", d);
-                stream.write_all(&d).await?;
-                stream.flush().await?;
+        if self.len0.is_some() {
+            if self.len1.is_none() {
+                self.len1 = Some(self.stream.read_u8().await.ok()?);
+                println!("Received len1 {:x?}", self.len1);
             }
-            ::controller::ControllerSend::ButtonData(data) => {
-                println!("Received button data 0x{:x}", data);
-                let d = bincode::serialize(&::controller::ControllerReceive::AcknowledgeButtonData(1))
-                    .map_err(|e| std::io::Error::other(e))?;
-                stream.write_u16(d.len() as u16).await?;
-                println!("Sending data {:02x?}", d);
-                stream.write_all(&d).await?;
-                stream.flush().await?;
+        }
+        if let Some(a) = self.len0 {
+            if let Some(b) = self.len1 {
+                let len = u16::from_be_bytes([a, b]) as usize;
+                if self.buf.len() < len {
+                    self.buf.resize(len, 0);
+                }
+                while self.buf_pos < len {
+                    let n = self
+                        .stream
+                        .read(&mut self.buf[self.buf_pos..len])
+                        .await
+                        .ok()?;
+                    if n == 0 {
+                        return Some(None); // EOF
+                    }
+                    self.buf_pos += n;
+                }
+                let packet = bincode::deserialize(&self.buf[..len]).ok()?;
+                self.len0 = None;
+                self.len1 = None;
+                self.buf_pos = 0;
+                println!("Received a bluetooth packet: {:?}", packet);
+                return Some(Some(packet));
+            }
+        }
+        None
+    }
+}
+
+async fn handle_bluetooth_controller_client(
+    stream: bluetooth_rust::BluetoothStream,
+    addr: [u8; 6],
+    send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,
+) -> Result<(), std::io::Error> {
+    println!("Got a bluetooth connection from {:?}", addr);
+
+    let mut split = split_bluetooth(stream);
+
+    let mut mychan = tokio::sync::mpsc::channel(10);
+
+    let mut brecv = BluetoothPacketReceiver {
+        stream: split.0,
+        len0: None,
+        len1: None,
+        buf: Vec::new(),
+        buf_pos: 0,
+    };
+
+    let mut my_player_number = None;
+
+    send.send(BluetoothControllerInfo {
+        address: addr,
+        response: mychan.0.clone(),
+        message: BluetoothControllerInfoMessage::Initialize,
+    })
+    .await
+    .map_err(|e| std::io::Error::other(e))?;
+
+    loop {
+        tokio::select! {
+            r = mychan.1.recv() => {
+                match r {
+                    None => break,
+                    Some(a) => {
+                        match a {
+                            BluetoothControllerResponse::SetPlayerNumber(i) => {
+                                my_player_number = Some(i);
+                            }
+                        }
+                    }
+                }
+            }
+            a = brecv.receive_packet() => {
+                match a {
+                    None => {
+                        // Did not receive a full packet, continue
+                    }
+                    Some(a) => {
+                        match a {
+                            None => break,
+                            Some(p) => match p {
+                                ::controller::ControllerSend::GetPlayerNumber => {
+                                    println!("Received get player number command from controller");
+                                    let d = bincode::serialize(&::controller::ControllerReceive::PlayerNumber(my_player_number))
+                                        .map_err(|e| std::io::Error::other(e))?;
+                                    split.1.write_u16(d.len() as u16).await?;
+                                    split.1.write_all(&d).await?;
+                                    split.1.flush().await?;
+                                }
+                                ::controller::ControllerSend::ButtonData(data) => {
+                                    println!("Received button data 0x{:x}", data);
+                                    if let Some(pnum) = my_player_number {
+                                        send.send(BluetoothControllerInfo {
+                                            address: addr,
+                                            response: mychan.0.clone(),
+                                            message: BluetoothControllerInfoMessage::ButtonData(pnum, data),
+                                        })
+                                        .await
+                                        .map_err(|e| std::io::Error::other(e))?;
+                                    }
+                                    let d = bincode::serialize(&::controller::ControllerReceive::AcknowledgeButtonData)
+                                            .map_err(|e| std::io::Error::other(e))?;
+                                        split.1.write_u16(d.len() as u16).await?;
+                                        split.1.write_all(&d).await?;
+                                        split.1.flush().await?;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-
     Ok(())
 }
 
-async fn run_bluetooth() {
+/// The responses to a bluetooth controller communication
+pub enum BluetoothControllerResponse {
+    /// Set the player number for the controller
+    SetPlayerNumber(u8),
+}
+
+/// The types of messages that can be delivered from a bluetooth controller
+pub enum BluetoothControllerInfoMessage {
+    /// Initialize the bluetooth controller
+    Initialize,
+    /// A dummy message from the bluetooth controller
+    Dummy,
+    /// The controller number, then the button data from the controller
+    ButtonData(u8, u16),
+}
+
+/// Commands that be sent from a bluetooth thread
+pub struct BluetoothControllerInfo {
+    /// The bluetooth address of the controller
+    address: [u8; 6],
+    /// Response channel
+    response: tokio::sync::mpsc::Sender<BluetoothControllerResponse>,
+    /// The actual message
+    message: BluetoothControllerInfoMessage,
+}
+
+async fn run_bluetooth(send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>) {
     println!("Running bluetooth");
     let mut bab = bluetooth_rust::BluetoothAdapterBuilder::new();
     let s = tokio::sync::mpsc::channel(100);
@@ -111,8 +292,10 @@ async fn run_bluetooth() {
                     .await
                     .expect("Failed to build connectable for bluetooth profile");
                 if let Ok(a) = c.accept().await {
+                    let chan2 = send.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = handle_bluetooth_controller_client(a.0, a.1).await {
+                        let chan3 = chan2;
+                        if let Err(e) = handle_bluetooth_controller_client(a.0, a.1, chan3).await {
                             println!("Error communicating with bluetooth client: {:?}", e);
                         }
                     });
@@ -139,15 +322,16 @@ fn main() {
 
     let mut options = eframe::NativeOptions::default();
     //TODO only disable vsync when required
-    //options.vsync = false;
+    options.vsync = false;
 
     let trt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .expect("Failed to start async runtime");
-    trt.spawn(run_bluetooth());
+    let chan = tokio::sync::mpsc::channel(100);
+    trt.spawn(run_bluetooth(chan.0));
 
-    let mut nes_data = NesEmulatorData::new();
+    let mut nes_data = NesEmulatorData::new(chan.1);
     println!(
         "There are {} roms in the romlist",
         nes_data.local.parser.list().elements.len()

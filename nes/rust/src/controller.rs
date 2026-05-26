@@ -6,7 +6,7 @@ use common_emulator::input::UserInput;
 use eframe::egui;
 
 /// Defines how inputs get from user to the ButtonCombination
-#[derive(serde::Serialize, serde::Deserialize, Copy, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct ControllerConfig {
     /// The array of user input specified for a controller.
     buttons: [UserInput; 15],
@@ -18,7 +18,7 @@ impl ControllerConfig {
     /// Create a new blank configuration
     pub fn new() -> Self {
         Self {
-            buttons: [UserInput::NoInput; 15],
+            buttons: [const { UserInput::NoInput }; 15],
             rates: [Duration::from_millis(50); 2],
         }
     }
@@ -41,6 +41,13 @@ impl ControllerConfig {
     /// Set the given button with egui data
     pub fn set_key_egui(&mut self, index: usize, k: egui::Key) {
         self.buttons[index] = UserInput::Egui(k);
+    }
+
+    /// Set the keys to all bluetooth control
+    pub fn set_keys_bluetooth(&mut self, addr: [u8; 6]) {
+        for (i, b) in self.buttons.iter_mut().enumerate() {
+            *b = UserInput::BluetoothButton(addr, i as u8);
+        }
     }
 
     /// Set the given button with gilrs code data
@@ -178,6 +185,33 @@ impl ButtonCombination {
     pub fn clear_buttons(&mut self) {
         for i in BUTTON_COMBO_A..=BUTTON_COMBO_POWERPAD {
             self.clear_button(i);
+        }
+    }
+
+    /// Update button information with bluetooth button presses
+    pub fn update_bluetooth_buttons(
+        &mut self,
+        address: [u8; 6],
+        button_index: u8,
+        state: bool,
+        config: &ControllerConfig,
+    ) {
+        for (index, b) in config.buttons.iter().enumerate() {
+            if index == BUTTON_COMBO_TURBOA {
+                self.try_set_rate(index, config.rates[0]);
+            }
+            if index == BUTTON_COMBO_TURBOB {
+                self.try_set_rate(index, config.rates[1]);
+            }
+            if let UserInput::BluetoothButton(baddress, match_index) = b {
+                if address == *baddress && button_index == *match_index {
+                    if state {
+                        self.set_button(index, 0);
+                    } else {
+                        self.clear_button(index);
+                    }
+                }
+            }
         }
     }
 
@@ -394,6 +428,10 @@ pub trait NesControllerTrait {
     fn read_data(&mut self, screen: &common_emulator::video::RgbImage, x: u16, y: u16) -> u8;
     /// Return the data for all button states
     fn button_data(&self) -> ButtonCombination;
+    /// Set the state of the controller inputs being ignore in favor of bluetooth or some other input method
+    fn ignore_local_inputs(&mut self, ignore: bool);
+    /// Should the local inputs be ignored
+    fn should_ignore_local_inputs(&self) -> bool;
 }
 
 /// A generic implementation of a NES controller
@@ -532,6 +570,15 @@ impl NesControllerTrait for FourScore {
         self.prevclk = c;
     }
 
+    fn ignore_local_inputs(&mut self, ignore: bool) {
+        self.controllers[0].ignore_local_inputs(ignore);
+        self.controllers[1].ignore_local_inputs(ignore);
+    }
+
+    fn should_ignore_local_inputs(&self) -> bool {
+        self.controllers[0].should_ignore_local_inputs()
+    }
+
     #[doc = " Used to operate the rapid fire mechanisms. time is the time since the last call"]
     fn rapid_fire(&mut self, time: Duration) {
         self.controllers[0].rapid_fire(time);
@@ -580,12 +627,15 @@ impl NesControllerTrait for FourScore {
 pub struct DummyController {
     /// Required to make the NesControllerTrait functional
     combo: [ButtonCombination; 1],
+    /// ignore local input
+    ignore_input: bool,
 }
 
 impl Default for DummyController {
     fn default() -> Self {
         Self {
             combo: [ButtonCombination::new()],
+            ignore_input: false,
         }
     }
 }
@@ -602,6 +652,14 @@ impl NesControllerTrait for DummyController {
 
     fn button_data(&self) -> ButtonCombination {
         self.combo[0]
+    }
+
+    fn ignore_local_inputs(&mut self, ignore: bool) {
+        self.ignore_input = ignore;
+    }
+
+    fn should_ignore_local_inputs(&self) -> bool {
+        self.ignore_input
     }
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
@@ -625,12 +683,15 @@ impl NesControllerTrait for DummyController {
 pub struct Zapper {
     /// The button combination
     combo: [ButtonCombination; 1],
+    /// ignore local input
+    ignore_input: bool,
 }
 
 impl Default for Zapper {
     fn default() -> Self {
         Self {
             combo: [ButtonCombination::new()],
+            ignore_input: false,
         }
     }
 }
@@ -660,6 +721,14 @@ impl NesControllerTrait for Zapper {
 
     fn button_data(&self) -> ButtonCombination {
         self.combo[0]
+    }
+
+    fn ignore_local_inputs(&mut self, ignore: bool) {
+        self.ignore_input = ignore;
+    }
+
+    fn should_ignore_local_inputs(&self) -> bool {
+        self.ignore_input
     }
 
     #[doc = " Get a mutable iterator of all button combinations for this controller."]
@@ -703,6 +772,8 @@ pub struct StandardController {
     prevclk: bool,
     /// The mask for and time since a toggle of rapid_fire
     rapid_fire: [(bool, Duration); 3],
+    /// ignore local input
+    ignore_input: bool,
 }
 
 /// Flag for the a button
@@ -730,12 +801,13 @@ impl Default for StandardController {
             strobe: false,
             prevclk: false,
             rapid_fire: [(false, Duration::from_millis(0)); 3],
+            ignore_input: false,
         }
     }
 }
 
 impl StandardController {
-    ///convenience function to check the strobe, to determine of the buttons should be loaded to the shift register
+    ///convenience function to check the strobe, to determine if the buttons should be loaded to the shift register
     fn check_strobe(&mut self) {
         if self.strobe {
             let rapida =
@@ -797,6 +869,7 @@ impl StandardController {
                 } else {
                     BUTTON_RIGHT
                 };
+            println!("Loading buttons with {:x}", controller_buttons);
             self.shift_register = controller_buttons;
         }
     }
@@ -806,6 +879,14 @@ impl NesControllerTrait for StandardController {
     fn parallel_signal(&mut self, s: bool) {
         self.strobe = s;
         self.check_strobe();
+    }
+
+    fn ignore_local_inputs(&mut self, ignore: bool) {
+        self.ignore_input = ignore;
+    }
+
+    fn should_ignore_local_inputs(&self) -> bool {
+        self.ignore_input
     }
 
     fn rapid_fire(&mut self, time: Duration) {

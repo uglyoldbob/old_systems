@@ -4,6 +4,7 @@ use std::io::Write;
 
 use crate::{
     controller::{ButtonCombination, NesControllerTrait},
+    emulator_data::BluetoothControllerOwner,
     NesEmulatorData,
 };
 
@@ -268,14 +269,16 @@ impl eframe::App for MainNesWindow {
                     for (code, button) in gs.buttons() {
                         for index in 0..4 {
                             let controller = self.c.mb.get_controller_mut(index);
-                            if let crate::controller::NesController::Zapper(_z) = controller {
-                            } else {
-                                for contr in controller.get_buttons_iter_mut() {
-                                    let cnum = index;
-                                    let button_config =
-                                        &self.c.local.configuration.controller_config
-                                            [cnum as usize];
-                                    contr.update_gilrs_buttons(id, code, button, button_config);
+                            if !controller.should_ignore_local_inputs() {
+                                if let crate::controller::NesController::Zapper(_z) = controller {
+                                } else {
+                                    for contr in controller.get_buttons_iter_mut() {
+                                        let cnum = index;
+                                        let button_config =
+                                            &self.c.local.configuration.controller_config
+                                                [cnum as usize];
+                                        contr.update_gilrs_buttons(id, code, button, button_config);
+                                    }
                                 }
                             }
                         }
@@ -283,20 +286,24 @@ impl eframe::App for MainNesWindow {
                     for (code, axis) in gs.axes() {
                         for index in 0..4 {
                             let controller = self.c.mb.get_controller_mut(index);
-                            if let crate::controller::NesController::Zapper(_z) = controller {
-                            } else {
-                                for contr in controller.get_buttons_iter_mut() {
-                                    let cnum = index;
-                                    let button_config =
-                                        &self.c.local.configuration.controller_config
-                                            [cnum as usize];
-                                    contr.update_gilrs_axes(id, code, axis, button_config);
+                            if !controller.should_ignore_local_inputs() {
+                                if let crate::controller::NesController::Zapper(_z) = controller {
+                                } else {
+                                    for contr in controller.get_buttons_iter_mut() {
+                                        let cnum = index;
+                                        let button_config =
+                                            &self.c.local.configuration.controller_config
+                                                [cnum as usize];
+                                        contr.update_gilrs_axes(id, code, axis, button_config);
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+
+            self.c.check_bluetooth_controllers();
 
             if let Some(olocal) = &mut self.c.olocal {
                 if let Some(network) = &mut olocal.network {
@@ -501,6 +508,60 @@ impl eframe::App for MainNesWindow {
         //Some(true) means start recording, Some(false) means stop recording
         let mut start_stop_recording: Option<bool> = None;
 
+        if let Some(olocal) = &mut self.c.olocal {
+            let mut pop_front = false;
+            let mut pending_player = None;
+            if let Some(pending) = olocal.pending_bluetooth_controllers.front() {
+                ui.ctx().show_viewport_immediate(
+                    egui::ViewportId::from_hash_of("CONTROLLERS_WINDOW"),
+                    egui::ViewportBuilder::default()
+                        .with_title("Controller Config")
+                        .with_inner_size([400.0, 300.0]),
+                    |ui, _class| {
+                        egui::CentralPanel::default().show_inside(ui, |ui| {
+                            ui.label(format!("Select the player number for {:x?}", pending.addr));
+                            ui.horizontal(|ui| {
+                                for i in 0..4 {
+                                    let btn = egui::Button::new(format!("{}", i + 1))
+                                        .min_size([50.0, 50.0].into());
+                                    if ui.add(btn).clicked() {
+                                        println!(
+                                            "Need to indicate that address {:x?} is player {}",
+                                            pending.addr,
+                                            i + 1
+                                        );
+                                        let _ = pending.response.blocking_send(
+                                            crate::BluetoothControllerResponse::SetPlayerNumber(i),
+                                        );
+                                        pop_front = true;
+                                        pending_player = Some(i);
+                                    }
+                                }
+                            });
+                        });
+                    },
+                );
+            }
+            if pop_front {
+                if let Some(a) = olocal.pending_bluetooth_controllers.pop_front() {
+                    let addr = a.addr;
+                    if let Some(player) = pending_player {
+                        let nes_controller = self.c.mb.get_controller_mut(player);
+                        nes_controller.ignore_local_inputs(true);
+                        let c = &mut olocal.bluetooth_controllers[player as usize];
+                        if c.is_none() {
+                            let mut cc = crate::controller::ControllerConfig::new();
+                            cc.set_keys_bluetooth(addr);
+                            let d = BluetoothControllerOwner {
+                                address: addr,
+                                controller_config: cc,
+                            };
+                            *c = Some(std::sync::Arc::new(std::sync::Mutex::new(d)));
+                        }
+                    }
+                }
+            }
+        }
         {
             let mut quit_rom_window = false;
             if let Some(win) = &mut self.open_rom_window {
