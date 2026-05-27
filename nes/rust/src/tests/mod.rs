@@ -37,8 +37,8 @@ fn basic_cpu_test() {
         if cpu.instruction_start() {
             log_line += 1;
             t = goldenlog.next().unwrap().unwrap();
-            println!("Instruction end at cycle {}", i + 1);
-            println!("NESTEST LOG LINE {}: {}", log_line, t);
+            log::info!("Instruction end at cycle {}", i + 1);
+            log::info!("NESTEST LOG LINE {}: {}", log_line, t);
             b = t.as_bytes();
             let d = convert_hex_to_decimal(b[0] as char) as u16;
             let d2 = convert_hex_to_decimal(b[1] as char) as u16;
@@ -66,9 +66,9 @@ fn basic_cpu_test() {
                 convert_hex_to_decimal(b[71] as char) << 4 | convert_hex_to_decimal(b[72] as char);
             assert_eq!(cpu.get_sp(), reg_sp);
 
-            println!("Address is {:x} {:x}", address, cpu.get_pc());
+            log::info!("Address is {:x} {:x}", address, cpu.get_pc());
             assert_eq!(cpu.get_pc(), address);
-            println!();
+            log::info!();
 
             let mut logcycle: u32 = 0;
             for i in 90..95 {
@@ -2339,7 +2339,7 @@ fn controller3() {
         (crate::controller::BUTTON_COMBO_RIGHT, "Right", 0x241),
     ];
     for (thebutton, text, vram) in tests {
-        println!("Testing {}", text);
+        log::info!("Testing {}", text);
         assert!(nes_data.mb.check_vram(vram, text.to_string().as_bytes()));
         let c = nes_data.mb.get_controller_mut(0);
         let mut buttons = c.get_buttons_iter_mut();

@@ -104,7 +104,7 @@ impl EmulatorConfiguration {
 
     ///Load a configuration file
     pub fn load(name: std::path::PathBuf) -> Self {
-        println!("Loading from {:?}", name);
+        log::info!("Loading from {:?}", name);
         let mut result = EmulatorConfiguration {
             path: name.clone().into_os_string().into_string().unwrap(),
             ..Default::default()
@@ -117,7 +117,7 @@ impl EmulatorConfiguration {
                         result.path = name.into_os_string().into_string().unwrap();
                     }
                     Err(e) => {
-                        println!("Failed to load config file: {}", e);
+                        log::error!("Failed to load config file: {}", e);
                     }
                 }
             }

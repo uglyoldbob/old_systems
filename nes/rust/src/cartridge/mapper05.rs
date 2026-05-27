@@ -284,7 +284,7 @@ impl Mapper05 {
 
     /// Set the irq pending flag
     fn set_irq(&mut self) {
-        println!("Set mmc5 irq");
+        log::debug!("Set mmc5 irq");
         self.irq |= 0x80;
     }
 }
@@ -293,7 +293,7 @@ impl NesMapperTrait for Mapper05 {
     fn irq(&self) -> bool {
         let i = (self.irq & 0x80) != 0;
         if i {
-            println!("mmc5 irq fire");
+            log::debug!("mmc5 irq fire");
         }
         i
     }
@@ -580,11 +580,11 @@ impl NesMapperTrait for Mapper05 {
         }
         let t1 = (0x2000..=0x2fff).contains(&self.ppu_address);
         if t1 {
-            println!("mmc5 address range match {:X}", self.ppu_address);
+            log::debug!("mmc5 address range match {:X}", self.ppu_address);
         }
         if t1 && Some(self.ppu_address) == self.last_ppu_address {
             self.address_match += 1;
-            println!("mmc5 address match {}", self.address_match);
+            log::debug!("mmc5 address match {}", self.address_match);
             if self.address_match == 2 {
                 if !self.get_inframe() {
                     self.set_inframe(true);

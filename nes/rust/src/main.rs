@@ -182,7 +182,6 @@ impl BluetoothControllerClient {
     }
 
     async fn end(&mut self) {
-        println!("Sending end for bluetooth controller");
         let _ = self
             .send
             .send(BluetoothControllerInfo {
@@ -213,8 +212,6 @@ impl BluetoothControllerClient {
     }
 
     async fn handle_bluetooth_controller_client(&mut self) -> Result<(), std::io::Error> {
-        println!("Got a bluetooth connection from {:?}", self.addr);
-
         let mut mychan = tokio::sync::mpsc::channel(10);
 
         self.send
@@ -231,7 +228,6 @@ impl BluetoothControllerClient {
                 r = mychan.1.recv() => {
                     match r {
                         None => {
-                            println!("Got no message from channel");
                             break;
                         }
                         Some(a) => {
@@ -256,7 +252,6 @@ impl BluetoothControllerClient {
                                 Some(a) => {
                                     match a {
                                         None => {
-                                            println!("Got no message from bluetooth");
                                             break;
                                         }
                                         Some(p) => match p {
@@ -319,7 +314,6 @@ pub struct BluetoothControllerInfo {
 async fn run_bluetooth(
     send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,
 ) -> Result<(), String> {
-    println!("Running bluetooth");
     let mut bab = bluetooth_rust::BluetoothAdapterBuilder::new();
     let s = tokio::sync::mpsc::channel(100);
     bab.with_sender(s.0);
@@ -348,25 +342,29 @@ async fn run_bluetooth(
                         let chan3 = chan2.clone();
                         let mut cl = BluetoothControllerClient::new(a.0, a.1, chan3);
                         if let Err(e) = cl.handle_bluetooth_controller_client().await {
-                            println!("Error communicating with bluetooth client: {:?}", e);
+                            log::error!("Error communicating with bluetooth client: {:?}", e);
                         }
                         cl.end().await;
                     });
                 }
             }
         }
-        Err(e) => eprintln!("Failed to get bluetooth adapter: {}", e),
+        Err(e) => log::error!("Failed to get bluetooth adapter: {}", e),
     }
     Ok(())
 }
 
 fn main() {
     use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
+    simple_logger::init_with_env().unwrap();
 
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         // Only print, don't propagate during cleanup
-        eprintln!("Panic (possibly during shutdown): {info}");
+        log::error!("Panic (possibly during shutdown): {info}");
         default_hook(info);
     }));
 
@@ -384,12 +382,12 @@ fn main() {
     let chan = tokio::sync::mpsc::channel(100);
     trt.spawn(async {
         if let Err(e) = run_bluetooth(chan.0).await {
-            println!("Error running bluetooth: {:?}", e);
+            log::error!("Error running bluetooth: {:?}", e);
         }
     });
 
     let mut nes_data = NesEmulatorData::new(chan.1);
-    println!(
+    log::info!(
         "There are {} roms in the romlist",
         nes_data.local.parser.list().elements.len()
     );
@@ -409,7 +407,7 @@ fn main() {
         if let Ok(r) = ranges {
             let mut configs: Vec<cpal::SupportedStreamConfigRange> = r.collect();
             for c in &configs {
-                println!(
+                log::info!(
                     "Audio: {:?} {:?}-{:?}",
                     c.sample_format(),
                     c.min_sample_rate(),
@@ -442,7 +440,7 @@ fn main() {
 
             let supportedconfig = configs[0].clone().with_max_sample_rate();
             let format = supportedconfig.sample_format();
-            println!("output format is {:?}", format);
+            log::info!("output format is {:?}", format);
             let mut config = supportedconfig.config();
             let mut num_samples = (config.sample_rate as f32 * 0.1) as usize;
             let sbs = supportedconfig.buffer_size();
@@ -462,11 +460,11 @@ fn main() {
             };
             config.buffer_size = num_samples_buffer;
             config.channels = 2;
-            println!("SBS IS {:?}", sbs);
+            log::info!("SBS IS {:?}", sbs);
 
-            println!("audio config is {:?}", config);
+            log::info!("audio config is {:?}", config);
 
-            println!(
+            log::info!(
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples, config.sample_rate
             );
@@ -594,7 +592,7 @@ fn main() {
     };
 
     let wdir = std::env::current_dir().unwrap();
-    println!("Current dir is {}", wdir.display());
+    log::info!("Current dir is {}", wdir.display());
     nes_data.mb.set_controller(
         0,
         nes_data.local.configuration.controller_type[0].make_controller(),

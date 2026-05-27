@@ -275,7 +275,6 @@ impl NesCpu {
         self.debugger.s = self.s;
         self.debugger.p = self.p;
         self.debugger.pc = self.pc;
-        //println!("I: {}", s);
         self.debugger.disassembly = s;
     }
 
@@ -505,7 +504,7 @@ impl NesCpu {
         if self.done_fetching {
             for v in &self.breakpoints {
                 if self.debugger.pc == *v {
-                    println!("subcycle for breakpoint is {}", self.subcycle);
+                    log::debug!("subcycle for breakpoint is {}", self.subcycle);
                     b = true;
                 }
             }

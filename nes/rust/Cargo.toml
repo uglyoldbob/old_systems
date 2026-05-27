@@ -28,6 +28,8 @@ enum_dispatch = "0.3.13"
 gilrs = {version = "0.11.1", features = ["serde-serialize"]}
 hex_fmt = "0.3.0"
 libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
+log = "0.4.30"
+simple_logger = "5.2.0"
 
 #update later
 rand = "0.8.5" 

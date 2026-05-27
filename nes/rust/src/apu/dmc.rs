@@ -106,7 +106,6 @@ impl ApuDmcChannel {
                 self.bit_counter = 0;
             }
         }
-        //println!("DMC CYCLE {} {}", self.rate_counter, self.bit_counter);
     }
 
     /// Return the audio sample for this channel

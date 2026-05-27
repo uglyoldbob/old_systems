@@ -458,7 +458,6 @@ impl NesMotherboard {
             0x4018..=0x401f => {
                 //disabled apu and io functionality
                 //test mode
-                //println!("TODO implement functionality {:x}", addr);
                 if let Some(cart) = &mut self.cart {
                     cart.memory_nop();
                     cart.other_memory_write(addr, data);
@@ -518,7 +517,7 @@ impl NesMotherboard {
     /// Perform the address part of a ppu memory cycle
     pub fn ppu_cycle_1(&mut self, addr: u16, ppu: &NesPpu) {
         if self.last_ppu_cycle != 2 {
-            println!(
+            log::error!(
                 "ERROR PPU CYCLING a @ {},{} from {:?}",
                 ppu.column(),
                 ppu.row(),
@@ -545,7 +544,7 @@ impl NesMotherboard {
     /// Perform the write portion of a ppu memory cycle
     pub fn ppu_cycle_2_write(&mut self, data: u8, ppu: &NesPpu) {
         if self.last_ppu_cycle != 1 {
-            println!(
+            log::error!(
                 "ERROR PPU CYCLING b @ {},{} from {:?}",
                 ppu.column(),
                 ppu.row(),
@@ -581,7 +580,7 @@ impl NesMotherboard {
     /// Perform the read portion of a ppu memory cycle
     pub fn ppu_cycle_2_read(&mut self, ppu: &NesPpu) -> u8 {
         if self.last_ppu_cycle != 1 {
-            println!(
+            log::error!(
                 "ERROR PPU CYCLING c @ {},{} from {:?}",
                 ppu.column(),
                 ppu.row(),

@@ -560,7 +560,7 @@ impl NesPpu {
             7 => {
                 if let 0..=0x3eff = self.vram_address {
                     if self.pend_vram_write.is_some() {
-                        println!(
+                        log::error!(
                             "Failed to write some VRAM {:X} {:x} {},{}",
                             self.vram_address,
                             self.registers[1] & 0x1E,
@@ -912,7 +912,7 @@ impl NesPpu {
                                         <= ((self.oamdata as u16) + self.sprite_height() as u16)
                                 {
                                     if self.secondaryoamaddress == 32 {
-                                        println!(
+                                        log::error!(
                                             "BUG: mode {:?}\n\trow {}\n\tcolumn {}\n\toamaddress: {:x}",
                                             self.sprite_eval_mode, row, self.scanline_cycle, self.oamaddress
                                         );
@@ -1063,17 +1063,6 @@ impl NesPpu {
                         self.attributetable_shift[1]
                     };
                     let extra_palette_bits = (attribute >> (2 * combined)) & 3;
-                    #[cfg(feature = "debugger")]
-                    {
-                        if let Some((x, y)) = self.bg_debug {
-                            if cycle == x && self.scanline_number == y as u16 {
-                                //println!("PIXEL {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
-                            }
-                        }
-                        if cycle == 8 {
-                            //println!("PIXEL2 {},{} is {:x} {:x}", cycle, self.scanline_number, self.vram_address, self.scrollx)
-                        }
-                    }
                     let lower_bits = (upper_bit << 1) | lower_bit;
 
                     let mut palette_entry = if lower_bits == 0 {
@@ -1187,7 +1176,7 @@ impl NesPpu {
                     != 0
                 {
                     //TODO implement color emphasis
-                    //println!("TODO: implement color emphasis");
+                    log::error!("TODO: implement color emphasis");
                 }
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];

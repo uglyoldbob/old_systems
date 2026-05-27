@@ -109,7 +109,7 @@ impl RomFinder {
                 if save_list {
                     let p = c.local.save_path();
                     if c.local.parser.list().save_list(p).is_ok() {
-                        println!("Saved rom list");
+                        log::info!("Saved rom list");
                     }
                 }
 

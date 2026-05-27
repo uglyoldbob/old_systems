@@ -403,11 +403,6 @@ impl NesCartridge {
 
         if file_offset != rom_contents.len() {
             return Err(CartridgeError::RomTooLong);
-            /*println!(
-                "Expected to read {:x} bytes, read {:x}",
-                rom_contents.len(),
-                file_offset
-            );*/
         }
         let hash = calc_sha256(rom_contents);
 
@@ -493,7 +488,6 @@ impl NesCartridge {
 
         if file_offset < rom_contents.len() {
             return Err(CartridgeError::RomTooLong);
-            //println!("Didn't use the entire rom file, I should report this as a failure");
         }
 
         let mappernum = (rom_contents[6] >> 4) as u16

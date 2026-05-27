@@ -112,9 +112,9 @@ struct CpuBench1 {
 
 pub fn cpu_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("basic cpu test");
-    println!("Checking current directory");
+    log::info!("Checking current directory");
     let wdir = std::env::current_dir().unwrap();
-    println!("Current dir is {}", wdir.display());
+    log::info!("Current dir is {}", wdir.display());
 
     let mut nes_data = NesEmulatorData::new();
     group.bench_function("basic 2", |b| {
@@ -189,9 +189,9 @@ pub fn cpu_bench(c: &mut Criterion) {
                             | convert_hex_to_decimal(b[72] as char);
                         assert_eq!(data.cpu.get_sp(), reg_sp);
 
-                        //            println!("Address is {:x} {:x}", address, cpu.get_pc());
+                        //            log::info!("Address is {:x} {:x}", address, cpu.get_pc());
                         assert_eq!(data.cpu.get_pc(), address);
-                        //            println!("");
+                        //            log::info!("");
 
                         let mut logcycle: u32 = 0;
                         for i in 90..95 {
@@ -212,7 +212,7 @@ pub fn cpu_bench(c: &mut Criterion) {
 
 pub fn bench1(c: &mut Criterion) {
     let wdir = std::env::current_dir().unwrap();
-    println!("Current dir is {}", wdir.display());
+    log::info!("Current dir is {}", wdir.display());
 
     let mut group = c.benchmark_group("basic ppu rendering");
     let mut nes_data = NesEmulatorData::new();
@@ -229,7 +229,7 @@ pub fn bench1(c: &mut Criterion) {
 
 pub fn romlist_bench(c: &mut Criterion) {
     let wdir = std::env::current_dir().unwrap();
-    println!("Current dir is {}", wdir.display());
+    log::info!("Current dir is {}", wdir.display());
 
     let mut group = c.benchmark_group("romlist parse bench");
     group.bench_function("first run", |b| {

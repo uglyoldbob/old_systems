@@ -109,7 +109,7 @@ impl MainNesWindow {
 
         let have_gstreamer = gstreamer::init();
         if let Err(e) = &have_gstreamer {
-            println!("Failed to open gstreamer: {:?}", e);
+            log::error!("Failed to open gstreamer: {:?}", e);
         }
         Self {
             c,
@@ -220,7 +220,7 @@ impl eframe::App for MainNesWindow {
         puffin::profile_scope!("frame rendering");
 
         if self.filter.is_none() && self.sound_stream.is_some() {
-            println!(
+            log::info!(
                 "Initializing with sample rate {}",
                 self.c.local.get_sound_rate()
             );
@@ -364,7 +364,7 @@ impl eframe::App for MainNesWindow {
                 if let Some(_a) = e.upgrade() {
                     tvec.push(e);
                 } else {
-                    println!("Dropping a weak audio producer");
+                    log::info!("Dropping a weak audio producer");
                 }
             }
             self.audio_streaming = tvec;
@@ -397,7 +397,7 @@ impl eframe::App for MainNesWindow {
                     }
                     if self.c.cpu_peripherals.ppu_frame_end() {
                         if self.c.wait_for_frame_end {
-                            println!("End of frame for debugger");
+                            log::debug!("End of frame for debugger");
                             self.c.paused = true;
                             self.c.wait_for_frame_end = false;
                         }
@@ -523,11 +523,6 @@ impl eframe::App for MainNesWindow {
                                     let btn = egui::Button::new(format!("{}", i + 1))
                                         .min_size([50.0, 50.0].into());
                                     if ui.add(btn).clicked() {
-                                        println!(
-                                            "Need to indicate that address {:x?} is player {}",
-                                            pending.addr,
-                                            i + 1
-                                        );
                                         let _ = pending.response.blocking_send(
                                             crate::BluetoothControllerResponse::SetPlayerNumber(i),
                                         );
@@ -900,7 +895,7 @@ impl eframe::App for MainNesWindow {
             if let Ok(a) = std::fs::read(save_path) {
                 let e = self.c.deserialize(a);
                 if e.is_err() {
-                    println!("Error loading state {:?}", e);
+                    log::error!("Error loading state {:?}", e);
                 }
             }
         }
@@ -908,7 +903,7 @@ impl eframe::App for MainNesWindow {
         if rewind_state {
             let e = self.c.deserialize(self.rewinds[1].clone());
             if e.is_err() {
-                println!("Error loading rewind state {:?}", e);
+                log::error!("Error loading rewind state {:?}", e);
             }
         }
 
@@ -998,8 +993,6 @@ impl eframe::App for MainNesWindow {
                                     && pixel.r() > 100
                                     && pixel.g() > 100
                                     && pixel.b() > 100;
-
-                                //println!("Hover at {:?}", pos - r.rect.left_top());
                             }
                         }
                     }
