@@ -157,10 +157,6 @@ impl StreamingOut {
     pub fn send_video_buffer(&mut self, buffer: Vec<u8>) {
         if let Some(pipeline) = &mut self.record_pipeline {
             if let Some(source) = &mut self.record_source {
-                let _dot =
-                    gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-                //std::fs::write("./pipeline_stream_out.dot", dot).expect("Unable to write pipeline file");
-
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
                 for (a, b) in buffer.iter().zip(p.iter_mut()) {
@@ -188,10 +184,6 @@ impl StreamingOut {
     /// Stop streaming
     pub fn stop(&mut self) -> Result<(), gstreamer::FlowError> {
         if let Some(pipeline) = &mut self.record_pipeline {
-            let _dot =
-                gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-            //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
-
             if let Some(source) = &mut self.record_source {
                 source.end_of_stream()?;
             }
@@ -437,19 +429,12 @@ impl StreamingIn {
                     }
                 }
             }
-            let dot =
-                gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-            std::fs::write("./pipeline_stream_in.dot", dot).expect("Unable to write pipeline file");
         }
     }
 
     /// Stop streaming
     pub fn stop(&mut self) -> Result<(), gstreamer::FlowError> {
         if let Some(pipeline) = &mut self.pipeline {
-            let _dot =
-                gstreamer::debug_bin_to_dot_data(pipeline, gstreamer::DebugGraphDetails::all());
-            //std::fs::write("./pipeline.dot", dot).expect("Unable to write pipeline file");
-
             if let Some(source) = &mut self.stream_source {
                 source.end_of_stream()?;
             }

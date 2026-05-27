@@ -108,10 +108,6 @@ impl MainNesWindow {
         use std::time::Duration;
 
         let have_gstreamer = gstreamer::init();
-        gstreamer::debug_add_log_function(|a, b, c, d, e, f, g| {
-            println!("GSTREAMER: {:?} {} {} {} {} {:?} {:?}", a, b, c, d, e, f, g);
-        });
-        gstreamer::debug_set_active(true);
         if let Err(e) = &have_gstreamer {
             println!("Failed to open gstreamer: {:?}", e);
         }

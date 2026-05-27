@@ -3,10 +3,9 @@ resolver = "3"
 
 exclude = ["nes/hdl/riscv-bios-rust"]
 members = [
-    "android", 
+    "android",
     "nes/hdmi",
     "nes/rust",
-    "snes/rust",
     "controller",
 ]
 

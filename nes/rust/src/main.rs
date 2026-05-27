@@ -444,7 +444,7 @@ fn main() {
             let format = supportedconfig.sample_format();
             println!("output format is {:?}", format);
             let mut config = supportedconfig.config();
-            let mut num_samples = (config.sample_rate.0 as f32 * 0.1) as usize;
+            let mut num_samples = (config.sample_rate as f32 * 0.1) as usize;
             let sbs = supportedconfig.buffer_size();
             let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
@@ -468,7 +468,7 @@ fn main() {
 
             println!(
                 "Audio buffer size is {} elements, sample rate is {}",
-                num_samples, config.sample_rate.0
+                num_samples, config.sample_rate
             );
 
             let (mut stream, user_audio) = match format {
@@ -581,8 +581,8 @@ fn main() {
 
             if let Some(s) = &mut stream {
                 s.play().unwrap();
-                sound_rate = config.sample_rate.0;
-                nes_data.local.set_sound_rate(config.sample_rate.0);
+                sound_rate = config.sample_rate;
+                nes_data.local.set_sound_rate(config.sample_rate);
                 sound_producer = Some(user_audio);
             }
             stream
