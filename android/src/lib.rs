@@ -5,9 +5,9 @@ use eframe::{
         self, Align2, Color32, Event, FontId, Pos2, Rect, Rounding, Sense, TouchPhase, Vec2, vec2,
     },
 };
-use std::{collections::HashMap, io::Write, sync::atomic::AtomicU16, thread::JoinHandle};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::{collections::HashMap, io::Write, sync::atomic::AtomicU16, thread::JoinHandle};
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -115,11 +115,7 @@ impl EmulatorHandlerRunner {
 
     fn get_player_num(&self) -> Option<u8> {
         let v = self.player.load(std::sync::atomic::Ordering::Relaxed);
-        if v == 0xffff {
-            None
-        } else {
-            Some(v as u8)
-        }
+        if v == 0xffff { None } else { Some(v as u8) }
     }
 }
 
@@ -174,9 +170,11 @@ impl EmulatorHandler {
             controller::ControllerReceive::PlayerNumber(i) => {
                 log::error!("I am player {:?}", i);
                 if let Some(a) = i {
-                    self.player.store(a as u16, std::sync::atomic::Ordering::Relaxed);
+                    self.player
+                        .store(a as u16, std::sync::atomic::Ordering::Relaxed);
                 } else {
-                    self.player.store(0xffff, std::sync::atomic::Ordering::Relaxed);
+                    self.player
+                        .store(0xffff, std::sync::atomic::Ordering::Relaxed);
                 }
             }
             controller::ControllerReceive::AcknowledgeButtonData => {
@@ -459,7 +457,7 @@ impl DemoApp {
 
         // ── Select / Start / Config ────────────────────────────────────────
         let pill_w = w * 0.10;
-        let pill_h = h * 0.055;
+        let pill_h = h * 0.10;
         let pill_y = origin.y + h * 0.55; // vertically centred
         let cfg_y = origin.y + h * 0.38; // config button sits above
 
@@ -533,10 +531,10 @@ impl DemoApp {
         };
 
         // ── Paint ──────────────────────────────────────────────────────────
-        self.paint_diagonal(ui, ul_rect, hit_ul, cell * 0.45, Dir::Up, Dir::Left);
-        self.paint_diagonal(ui, ur_rect, hit_ur, cell * 0.45, Dir::Up, Dir::Right);
-        self.paint_diagonal(ui, dl_rect, hit_dl, cell * 0.45, Dir::Down, Dir::Left);
-        self.paint_diagonal(ui, dr_rect, hit_dr, cell * 0.45, Dir::Down, Dir::Right);
+        self.paint_diagonal(ui, ul_rect, hit_ul, cell * 0.05, Dir::Up, Dir::Left);
+        self.paint_diagonal(ui, ur_rect, hit_ur, cell * 0.05, Dir::Up, Dir::Right);
+        self.paint_diagonal(ui, dl_rect, hit_dl, cell * 0.05, Dir::Down, Dir::Left);
+        self.paint_diagonal(ui, dr_rect, hit_dr, cell * 0.05, Dir::Down, Dir::Right);
 
         self.paint_cardinal(ui, up_rect, self.up_p, 4.0, Dir::Up);
         self.paint_cardinal(ui, down_rect, self.down_p, 4.0, Dir::Down);
@@ -572,7 +570,10 @@ impl DemoApp {
         );
 
         let player_rect = Rect::from_min_size(
-            egui::pos2(origin.x + w * 0.44 + pill_w * 0.15, cfg_y - cfg_rect.height() * 1.5),
+            egui::pos2(
+                origin.x + w * 0.44 + pill_w * 0.15,
+                cfg_y - cfg_rect.height() * 1.5,
+            ),
             vec2(cfg_w, pill_h),
         );
 
@@ -656,7 +657,8 @@ impl DemoApp {
         child.add_space(16.0);
 
         // ── Back button ───────────────────────────────────────────────────
-        if child.button("  Back to Controller  ").clicked() {
+        let b = egui::Button::new("  Back to Controller  ").min_size([50.0, 50.0].into());
+        if child.add(b).clicked() {
             self.page = Page::Controller;
         }
 
