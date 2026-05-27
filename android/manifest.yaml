@@ -1,6 +1,10 @@
 android:
+  icon: "./icon.png"
   gradle: true
   manifest:
+    sdk:
+      min_sdk_version: 35
+      target_sdk_version: 35
     application:
       label: "UglyOldController"
       activities:
