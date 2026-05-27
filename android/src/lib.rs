@@ -68,12 +68,21 @@ struct EmulatorHandlerRunner {
     done: Arc<AtomicBool>,
 }
 
+impl Drop for EmulatorHandlerRunner {
+    fn drop(&mut self) {
+        self.set_done();
+    }
+}
+
 impl EmulatorHandlerRunner {
     pub fn run(mut e: EmulatorHandler) -> Self {
         let data = e.data.clone();
         let done = e.done.clone();
         let a = std::thread::spawn(move || {
             loop {
+                if e.done.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
                 if e.send().is_err() {
                     e.done.store(true, std::sync::atomic::Ordering::Relaxed);
                     break;
@@ -86,6 +95,10 @@ impl EmulatorHandlerRunner {
             data,
             done,
         }
+    }
+
+    fn set_done(&mut self) {
+        self.done.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn is_done(&self) -> bool {
