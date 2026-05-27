@@ -66,6 +66,7 @@ struct EmulatorHandlerRunner {
     a: JoinHandle<()>,
     data: Arc<AtomicU16>,
     done: Arc<AtomicBool>,
+    player: Arc<AtomicU16>,
 }
 
 impl Drop for EmulatorHandlerRunner {
@@ -78,6 +79,7 @@ impl EmulatorHandlerRunner {
     pub fn run(mut e: EmulatorHandler) -> Self {
         let data = e.data.clone();
         let done = e.done.clone();
+        let player = e.player.clone();
         let a = std::thread::spawn(move || {
             loop {
                 if e.done.load(std::sync::atomic::Ordering::Relaxed) {
@@ -94,6 +96,7 @@ impl EmulatorHandlerRunner {
             a,
             data,
             done,
+            player,
         }
     }
 
@@ -109,22 +112,31 @@ impl EmulatorHandlerRunner {
         self.data.store(data, std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
+
+    fn get_player_num(&self) -> Option<u8> {
+        let v = self.player.load(std::sync::atomic::Ordering::Relaxed);
+        if v == 0xffff {
+            None
+        } else {
+            Some(v as u8)
+        }
+    }
 }
 
 struct EmulatorHandler {
     stream: bluetooth_rust::BluetoothSocket,
-    number: Option<u8>,
     data: Arc<AtomicU16>,
     done: Arc<AtomicBool>,
+    player: Arc<AtomicU16>,
 }
 
 impl EmulatorHandler {
     fn new(mut stream: bluetooth_rust::BluetoothSocket) -> Self {
         let mut s = Self {
             stream,
-            number: None,
             data: Arc::new(AtomicU16::new(0)),
             done: Arc::new(AtomicBool::new(false)),
+            player: Arc::new(AtomicU16::new(0xffff)),
         };
         s
     }
@@ -161,7 +173,11 @@ impl EmulatorHandler {
         match packet {
             controller::ControllerReceive::PlayerNumber(i) => {
                 log::error!("I am player {:?}", i);
-                self.number = i;
+                if let Some(a) = i {
+                    self.player.store(a as u16, std::sync::atomic::Ordering::Relaxed);
+                } else {
+                    self.player.store(0xffff, std::sync::atomic::Ordering::Relaxed);
+                }
             }
             controller::ControllerReceive::AcknowledgeButtonData => {
                 log::error!("Button presses were received");
@@ -176,7 +192,7 @@ impl EmulatorHandler {
         use byteorder::WriteBytesExt;
         use std::io::Read;
         use std::io::Write;
-        if self.number.is_none() {
+        if self.player.load(std::sync::atomic::Ordering::Relaxed) == 0xffff {
             let d = bincode::serialize(&controller::ControllerSend::GetPlayerNumber)
                 .map_err(|e| std::io::Error::other(e))?;
             log::error!("About to write request to get player number");
@@ -196,7 +212,7 @@ impl EmulatorHandler {
         use std::io::Read;
         use std::io::Write;
         self.get_player_num();
-        if self.number.is_some() {
+        if self.player.load(std::sync::atomic::Ordering::Relaxed) != 0xffff {
             let d = bincode::serialize(&controller::ControllerSend::ButtonData(
                 self.data.load(std::sync::atomic::Ordering::Relaxed),
             ))
@@ -553,6 +569,27 @@ impl DemoApp {
             "CFG",
             FontId::proportional(cfg_rect.height() * 0.45),
             Color32::from_rgba_unmultiplied(160, 160, 180, cfg_alpha),
+        );
+
+        let player_rect = Rect::from_min_size(
+            egui::pos2(origin.x + w * 0.44 + pill_w * 0.15, cfg_y - cfg_rect.height() * 1.5),
+            vec2(cfg_w, pill_h),
+        );
+
+        ui.painter().text(
+            player_rect.center(),
+            Align2::CENTER_CENTER,
+            if let Some(es) = &self.emulator_socket {
+                if let Some(pn) = es.get_player_num() {
+                    format!("Connected as player {}", pn + 1)
+                } else {
+                    "Waiting on emulator".to_string()
+                }
+            } else {
+                "Not connected".to_string()
+            },
+            FontId::proportional(14.0),
+            Color32::from_rgb(180, 180, 200),
         );
 
         self.paint_btn(ui, b_rect, "B", self.b_p, ab_r);
