@@ -1,7 +1,5 @@
 //! This modules contains the window for editing controller properties
 
-use std::str::FromStr;
-
 use crate::NesEmulatorData;
 use strum::IntoEnumIterator;
 

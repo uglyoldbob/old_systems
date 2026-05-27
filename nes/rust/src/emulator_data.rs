@@ -421,20 +421,11 @@ impl NesEmulatorData {
                 while let Ok(m) = recv.try_recv() {
                     match m.message {
                         crate::BluetoothControllerInfoMessage::Initialize => {
-                            let mut available = false;
-                            for b in olocal.bluetooth_controllers.iter() {
-                                if b.is_none() {
-                                    available = true;
-                                    break;
-                                }
-                            }
-                            if available {
-                                let p = PendingBluetoothController {
-                                    addr: m.address,
-                                    response: m.response,
-                                };
-                                olocal.pending_bluetooth_controllers.push_back(p);
-                            }
+                            let p = PendingBluetoothController {
+                                addr: m.address,
+                                response: m.response,
+                            };
+                            olocal.pending_bluetooth_controllers.push_back(p);
                         }
                         crate::BluetoothControllerInfoMessage::Dummy => {}
                         crate::BluetoothControllerInfoMessage::Disconnect(pnum) => {

@@ -150,14 +150,19 @@ struct BluetoothControllerClient {
     streamw: BluetoothWriteHalf,
     addr: [u8; 6],
     send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,
-    mychan: (tokio::sync::mpsc::Sender<BluetoothControllerResponse>, tokio::sync::mpsc::Receiver<BluetoothControllerResponse>),
+    mychan: (
+        tokio::sync::mpsc::Sender<BluetoothControllerResponse>,
+        tokio::sync::mpsc::Receiver<BluetoothControllerResponse>,
+    ),
     my_player_number: Option<u8>,
 }
 
 impl BluetoothControllerClient {
-    fn new(stream: bluetooth_rust::BluetoothStream,
+    fn new(
+        stream: bluetooth_rust::BluetoothStream,
         addr: [u8; 6],
-        send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,) -> Self {
+        send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,
+    ) -> Self {
         let stream = split_bluetooth(stream);
         let brecv = BluetoothPacketReceiver {
             stream: stream.0,
@@ -178,36 +183,48 @@ impl BluetoothControllerClient {
 
     async fn end(&mut self) {
         println!("Sending end for bluetooth controller");
-        let _ = self.send.send(BluetoothControllerInfo { 
-            address: self.addr, 
-            response: self.mychan.0.clone(),
-            message: BluetoothControllerInfoMessage::Disconnect(self.my_player_number),
-        }).await;
+        let _ = self
+            .send
+            .send(BluetoothControllerInfo {
+                address: self.addr,
+                response: self.mychan.0.clone(),
+                message: BluetoothControllerInfoMessage::Disconnect(self.my_player_number),
+            })
+            .await;
     }
 
-    async fn send_message(&mut self, msg: &::controller::ControllerReceive) -> Result<Result<(), std::io::Error>, std::io::Error> {
-        let d = bincode::serialize(msg)
-            .map_err(|e| std::io::Error::other(e))?;
-        tokio::time::timeout(std::time::Duration::from_secs(1), self.streamw.write_u16(d.len() as u16)).await??;
-        tokio::time::timeout(std::time::Duration::from_secs(1), self.streamw.write_all(&d)).await??;
+    async fn send_message(
+        &mut self,
+        msg: &::controller::ControllerReceive,
+    ) -> Result<Result<(), std::io::Error>, std::io::Error> {
+        let d = bincode::serialize(msg).map_err(|e| std::io::Error::other(e))?;
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            self.streamw.write_u16(d.len() as u16),
+        )
+        .await??;
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            self.streamw.write_all(&d),
+        )
+        .await??;
         tokio::time::timeout(std::time::Duration::from_secs(1), self.streamw.flush()).await??;
         Ok(Ok(()))
     }
 
-    async fn handle_bluetooth_controller_client(
-        &mut self
-    ) -> Result<(), std::io::Error> {
+    async fn handle_bluetooth_controller_client(&mut self) -> Result<(), std::io::Error> {
         println!("Got a bluetooth connection from {:?}", self.addr);
 
         let mut mychan = tokio::sync::mpsc::channel(10);
 
-        self.send.send(BluetoothControllerInfo {
-            address: self.addr,
-            response: mychan.0.clone(),
-            message: BluetoothControllerInfoMessage::Initialize,
-        })
-        .await
-        .map_err(|e| std::io::Error::other(e))?;
+        self.send
+            .send(BluetoothControllerInfo {
+                address: self.addr,
+                response: mychan.0.clone(),
+                message: BluetoothControllerInfoMessage::Initialize,
+            })
+            .await
+            .map_err(|e| std::io::Error::other(e))?;
 
         loop {
             tokio::select! {
@@ -299,7 +316,9 @@ pub struct BluetoothControllerInfo {
     message: BluetoothControllerInfoMessage,
 }
 
-async fn run_bluetooth(send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>) {
+async fn run_bluetooth(
+    send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,
+) -> Result<(), String> {
     println!("Running bluetooth");
     let mut bab = bluetooth_rust::BluetoothAdapterBuilder::new();
     let s = tokio::sync::mpsc::channel(100);
@@ -320,15 +339,9 @@ async fn run_bluetooth(send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>)
                 sdp_version: None,
                 sdp_features: None,
             };
-            let mut profile = ba
-                .register_rfcomm_profile(settings)
-                .await
-                .expect("Failed to register bluetooth profile");
+            let mut profile = ba.register_rfcomm_profile(settings).await?;
             loop {
-                let c = profile
-                    .connectable()
-                    .await
-                    .expect("Failed to build connectable for bluetooth profile");
+                let c = profile.connectable().await?;
                 if let Ok(a) = c.accept().await {
                     let chan2 = send.clone();
                     tokio::spawn(async move {
@@ -339,12 +352,12 @@ async fn run_bluetooth(send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>)
                         }
                         cl.end().await;
                     });
-                    break;
                 }
             }
         }
         Err(e) => eprintln!("Failed to get bluetooth adapter: {}", e),
     }
+    Ok(())
 }
 
 fn main() {
@@ -369,7 +382,11 @@ fn main() {
         .build()
         .expect("Failed to start async runtime");
     let chan = tokio::sync::mpsc::channel(100);
-    trt.spawn(run_bluetooth(chan.0));
+    trt.spawn(async {
+        if let Err(e) = run_bluetooth(chan.0).await {
+            println!("Error running bluetooth: {:?}", e);
+        }
+    });
 
     let mut nes_data = NesEmulatorData::new(chan.1);
     println!(
