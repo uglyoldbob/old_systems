@@ -551,15 +551,13 @@ impl eframe::App for MainNesWindow {
                         let nes_controller = self.c.mb.get_controller_mut(player);
                         nes_controller.ignore_local_inputs(true);
                         let c = &mut olocal.bluetooth_controllers[player as usize];
-                        if c.is_none() {
-                            let mut cc = crate::controller::ControllerConfig::new();
-                            cc.set_keys_bluetooth(addr);
-                            let d = BluetoothControllerOwner {
-                                address: addr,
-                                controller_config: cc,
-                            };
-                            *c = Some(std::sync::Arc::new(std::sync::Mutex::new(d)));
-                        }
+                        let mut cc = crate::controller::ControllerConfig::new();
+                        cc.set_keys_bluetooth(addr);
+                        let d = BluetoothControllerOwner {
+                            address: addr,
+                            controller_config: cc,
+                        };
+                        *c = Some(std::sync::Arc::new(std::sync::Mutex::new(d)));
                     }
                 }
             }

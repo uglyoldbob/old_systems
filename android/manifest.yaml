@@ -1,5 +1,5 @@
 android:
-  gradle: false
+  gradle: true
   manifest:
     application:
       label: "UglyOldController"

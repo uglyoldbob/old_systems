@@ -1,8 +1,10 @@
 [workspace]
 resolver = "3"
 
-exclude = ["android", "nes/hdl/riscv-bios-rust"]
-members = ["nes/hdmi",
+exclude = ["nes/hdl/riscv-bios-rust"]
+members = [
+    "android", 
+    "nes/hdmi",
     "nes/rust",
     "snes/rust",
     "controller",
