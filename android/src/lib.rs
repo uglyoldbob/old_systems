@@ -90,7 +90,6 @@ impl EmulatorHandlerRunner {
                     break;
                 }
             }
-            log::error!("Controller handler ended");
         });
         Self {
             a,
@@ -143,9 +142,7 @@ impl EmulatorHandler {
         use byteorder::WriteBytesExt;
         use std::io::Read;
         use std::io::Write;
-        log::error!("Reading packet length");
         let mut packet_buf = [0u8; 256];
-        log::error!("About to receive a packet");
         let packet_len = self.stream.read_u16::<BigEndian>()?;
         if packet_len as usize > packet_buf.len() {
             log::error!("Received a bad packet of length {packet_len:x}");
@@ -153,22 +150,15 @@ impl EmulatorHandler {
                 "Received a packet that was too long {packet_len:x}"
             )));
         }
-        log::error!("Got packet length 0x{:x}", packet_len);
 
         self.stream
             .read_exact(&mut packet_buf[..packet_len as usize])?;
 
-        log::error!(
-            "Pakcet contents {:02x?}",
-            &packet_buf[..packet_len as usize]
-        );
         let packet: controller::ControllerReceive =
             bincode::deserialize(&packet_buf[..packet_len as usize])
                 .map_err(|e| std::io::Error::other(e))?;
-        log::error!("Got packet {:x?}", packet);
         match packet {
             controller::ControllerReceive::PlayerNumber(i) => {
-                log::error!("I am player {:?}", i);
                 if let Some(a) = i {
                     self.player
                         .store(a as u16, std::sync::atomic::Ordering::Relaxed);
@@ -177,9 +167,7 @@ impl EmulatorHandler {
                         .store(0xffff, std::sync::atomic::Ordering::Relaxed);
                 }
             }
-            controller::ControllerReceive::AcknowledgeButtonData => {
-                log::error!("Button presses were received");
-            }
+            controller::ControllerReceive::AcknowledgeButtonData => {}
         }
         Ok(())
     }
@@ -193,11 +181,9 @@ impl EmulatorHandler {
         if self.player.load(std::sync::atomic::Ordering::Relaxed) == 0xffff {
             let d = bincode::serialize(&controller::ControllerSend::GetPlayerNumber)
                 .map_err(|e| std::io::Error::other(e))?;
-            log::error!("About to write request to get player number");
             self.stream.write_u16::<BigEndian>(d.len() as u16)?;
             self.stream.write_all(&d)?;
             self.stream.flush()?;
-            log::error!("Done with write request to get player number");
             self.receive_packet()?;
         }
         Ok(())
@@ -374,40 +360,44 @@ impl DemoApp {
         );
 
         let c = rect.center();
-        let s = rect.size().min_elem() * 0.22;
+        let s = rect.size().min_elem() * 0.28;
         let alpha = (self.button_opacity * 255.0) as u8;
         let arrow_color = Color32::from_rgba_unmultiplied(255, 255, 255, alpha);
 
-        let v_offset = match vdir {
-            Dir::Up => vec2(0.0, -s * 0.6),
-            Dir::Down => vec2(0.0, s * 0.6),
-            _ => vec2(0.0, 0.0),
+        // Determine diagonal direction unit vector
+        let dx = match hdir {
+            Dir::Left => -1.0,
+            Dir::Right => 1.0,
+            _ => 0.0,
         };
-        let h_offset = match hdir {
-            Dir::Left => vec2(-s * 0.6, 0.0),
-            Dir::Right => vec2(s * 0.6, 0.0),
-            _ => vec2(0.0, 0.0),
-        };
-
-        let vc = c + v_offset + h_offset * 0.3;
-        let vt: [Pos2; 3] = match vdir {
-            Dir::Up => [vc + vec2(-s, s), vc + vec2(s, s), vc + vec2(0.0, -s)],
-            _ => [vc + vec2(-s, -s), vc + vec2(s, -s), vc + vec2(0.0, s)],
+        let dy = match vdir {
+            Dir::Up => -1.0,
+            Dir::Down => 1.0,
+            _ => 0.0,
         };
 
-        let hc = c + h_offset + v_offset * 0.3;
-        let ht: [Pos2; 3] = match hdir {
-            Dir::Left => [hc + vec2(s, -s), hc + vec2(s, s), hc + vec2(-s, 0.0)],
-            _ => [hc + vec2(-s, -s), hc + vec2(-s, s), hc + vec2(s, 0.0)],
-        };
+        // Diagonal axis (normalized)
+        let diag = vec2(dx, dy).normalized();
+        // Perpendicular axis
+        let perp = vec2(-diag.y, diag.x);
 
-        for tri in [vt, ht] {
-            ui.painter().add(egui::Shape::convex_polygon(
-                tri.to_vec(),
-                arrow_color,
-                egui::Stroke::NONE,
-            ));
-        }
+        // Arrow tip and tail
+        let tip = c + diag * s;
+        let tail = c - diag * s;
+
+        // Arrowhead: tip + two base corners offset perpendicular from tail
+        let head_size = s * 0.85;
+        let tri: [Pos2; 3] = [
+            tip,
+            tail + perp * head_size * 0.6,
+            tail - perp * head_size * 0.6,
+        ];
+
+        ui.painter().add(egui::Shape::convex_polygon(
+            tri.to_vec(),
+            arrow_color,
+            egui::Stroke::NONE,
+        ));
     }
 
     // ── Pages ──────────────────────────────────────────────────────────────
@@ -689,14 +679,8 @@ impl DemoApp {
                         "76ecef8b-24d4-4f7c-9de0-706864b6bc14".to_string(),
                     );
                     if let Ok(uuids) = dev.get_uuids() {
-                        log::error!("UUIDS ARE {:?}", uuids);
                         if uuids.contains(&wanted_uuid) {
-                            child.label(format!("{:?}", dev.get_address()));
-                            log::error!("Found bluetooth emulator {:?}", dev.get_address());
                             self.bluetooth_emulators.push(dev);
-                        } else {
-                            child.label(format!("NOT {:?}", dev.get_address()));
-                            log::error!("No bluetooth emulator {:?}", dev.get_address());
                         }
                     }
                 }
@@ -709,8 +693,6 @@ impl DemoApp {
                         let btn = egui::Button::new(&format!("Connect to {}", a))
                             .min_size([70.0, 70.0].into());
                         if child.add(btn).clicked() {
-                            log::error!("Need to connect to {}", a);
-
                             match d.get_rfcomm_socket(
                                 23,
                                 bluetooth_rust::BluetoothUuid::Custom(
@@ -721,7 +703,6 @@ impl DemoApp {
                             ) {
                                 Ok(mut socket) => {
                                     if socket.sync_connect().is_ok() {
-                                        log::error!("Got connection to emulator");
                                         let eh = EmulatorHandler::new(socket);
                                         let eh = EmulatorHandlerRunner::run(eh);
                                         self.emulator_socket = Some(eh);
