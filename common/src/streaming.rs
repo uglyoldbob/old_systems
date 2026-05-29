@@ -155,7 +155,7 @@ impl StreamingOut {
 
     /// Send a chunk of video data to the pipeline
     pub fn send_video_buffer(&mut self, buffer: Vec<u8>) {
-        if let Some(pipeline) = &mut self.record_pipeline {
+        if self.record_pipeline.is_some() {
             if let Some(source) = &mut self.record_source {
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
@@ -413,7 +413,7 @@ impl StreamingIn {
 
     /// Send data to the receiving end of the pipeline
     pub fn send_data(&mut self, buffer: Vec<u8>) {
-        if let Some(pipeline) = &mut self.pipeline {
+        if let Some(_pipeline) = &mut self.pipeline {
             if let Some(source) = &mut self.stream_source {
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
                 let mut p = buf.make_mut().map_writable().unwrap();
