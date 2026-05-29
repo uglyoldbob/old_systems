@@ -466,7 +466,8 @@ fn main() {
 
             log::info!(
                 "Audio buffer size is {} elements, sample rate is {}",
-                num_samples, config.sample_rate
+                num_samples,
+                config.sample_rate
             );
 
             let (mut stream, user_audio) = match format {

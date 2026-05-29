@@ -251,7 +251,7 @@ impl PersistentStorage {
     }
 
     /// Retrieve a mutable reference to the contents
-    fn contents_mut(&mut self) -> &mut [u8] {
+    pub fn contents_mut(&mut self) -> &mut [u8] {
         match self {
             PersistentStorage::Persistent(_pb, mm) => mm.as_mut(),
             PersistentStorage::ShouldBePersistent(v) => &mut v[..],
