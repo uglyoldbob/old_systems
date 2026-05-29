@@ -1,13 +1,12 @@
-use byteorder::NetworkEndian;
 use eframe::{
     NativeOptions,
     egui::{
-        self, Align2, Color32, Event, FontId, Pos2, Rect, Rounding, Sense, TouchPhase, Vec2, vec2,
+        self, Align2, Color32, CornerRadius, Event, FontId, Pos2, Rect, Sense, TouchPhase, vec2,
     },
 };
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::{collections::HashMap, io::Write, sync::atomic::AtomicU16, thread::JoinHandle};
+use std::{collections::HashMap, sync::atomic::AtomicU16, thread::JoinHandle};
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -63,7 +62,7 @@ enum Page {
 }
 
 struct EmulatorHandlerRunner {
-    a: JoinHandle<()>,
+    a: Option<JoinHandle<()>>,
     data: Arc<AtomicU16>,
     done: Arc<AtomicBool>,
     player: Arc<AtomicU16>,
@@ -72,6 +71,9 @@ struct EmulatorHandlerRunner {
 impl Drop for EmulatorHandlerRunner {
     fn drop(&mut self) {
         self.set_done();
+        if let Some(a) = self.a.take() {
+            let _ = a.join();
+        }
     }
 }
 
@@ -92,7 +94,7 @@ impl EmulatorHandlerRunner {
             }
         });
         Self {
-            a,
+            a: Some(a),
             data,
             done,
             player,
@@ -126,22 +128,19 @@ struct EmulatorHandler {
 }
 
 impl EmulatorHandler {
-    fn new(mut stream: bluetooth_rust::BluetoothSocket) -> Self {
-        let mut s = Self {
+    fn new(stream: bluetooth_rust::BluetoothSocket) -> Self {
+        Self {
             stream,
             data: Arc::new(AtomicU16::new(0)),
             done: Arc::new(AtomicBool::new(false)),
             player: Arc::new(AtomicU16::new(0xffff)),
-        };
-        s
+        }
     }
 
     fn receive_packet(&mut self) -> Result<(), std::io::Error> {
         use byteorder::BigEndian;
         use byteorder::ReadBytesExt;
-        use byteorder::WriteBytesExt;
         use std::io::Read;
-        use std::io::Write;
         let mut packet_buf = [0u8; 256];
         let packet_len = self.stream.read_u16::<BigEndian>()?;
         if packet_len as usize > packet_buf.len() {
@@ -174,9 +173,7 @@ impl EmulatorHandler {
 
     fn get_player_num(&mut self) -> Result<(), std::io::Error> {
         use byteorder::BigEndian;
-        use byteorder::ReadBytesExt;
         use byteorder::WriteBytesExt;
-        use std::io::Read;
         use std::io::Write;
         if self.player.load(std::sync::atomic::Ordering::Relaxed) == 0xffff {
             let d = bincode::serialize(&controller::ControllerSend::GetPlayerNumber)
@@ -191,11 +188,9 @@ impl EmulatorHandler {
 
     fn send(&mut self) -> Result<(), std::io::Error> {
         use byteorder::BigEndian;
-        use byteorder::ReadBytesExt;
         use byteorder::WriteBytesExt;
-        use std::io::Read;
         use std::io::Write;
-        self.get_player_num();
+        self.get_player_num()?;
         if self.player.load(std::sync::atomic::Ordering::Relaxed) != 0xffff {
             let d = bincode::serialize(&controller::ControllerSend::ButtonData(
                 self.data.load(std::sync::atomic::Ordering::Relaxed),
@@ -260,7 +255,7 @@ impl DemoApp {
         #[cfg(target_os = "android")]
         b.with_android_app(options.android_app.as_ref().unwrap().clone());
         #[cfg(target_os = "android")]
-        android::request_bluetooth_connect(options.android_app.as_ref().unwrap());
+        android::request_bluetooth_connect(options.android_app.as_ref().unwrap()).unwrap();
         let b = b.build().expect("Failed to connect to bluetooth");
         let da = DemoApp::new(b);
         eframe::run_native(
@@ -295,7 +290,7 @@ impl DemoApp {
         let (fill, stroke) = self.btn_colors(pressed);
         ui.painter().rect(
             rect,
-            Rounding::same(round as u8),
+            CornerRadius::same(round as u8),
             fill,
             stroke,
             egui::StrokeKind::Inside,
@@ -316,7 +311,7 @@ impl DemoApp {
         let (fill, stroke) = self.btn_colors(pressed);
         ui.painter().rect(
             rect,
-            Rounding::same(round as u8),
+            CornerRadius::same(round as u8),
             fill,
             stroke,
             egui::StrokeKind::Inside,
@@ -353,7 +348,7 @@ impl DemoApp {
         let (fill, stroke) = self.btn_colors(pressed);
         ui.painter().rect(
             rect,
-            Rounding::same(round as u8),
+            CornerRadius::same(round as u8),
             fill,
             stroke,
             egui::StrokeKind::Inside,
@@ -406,7 +401,7 @@ impl DemoApp {
         let panel_rect = ui.available_rect_before_wrap();
         ui.painter().rect_filled(
             panel_rect,
-            Rounding::same(24),
+            CornerRadius::same(24),
             Color32::from_rgb(30, 30, 38),
         );
 
@@ -534,7 +529,7 @@ impl DemoApp {
         // Centre fill
         let centre = Rect::from_min_size(egui::pos2(cx - cell * 0.5, cy - cell * 0.5), sz);
         ui.painter()
-            .rect_filled(centre, Rounding::ZERO, Color32::from_rgb(60, 60, 70));
+            .rect_filled(centre, CornerRadius::ZERO, Color32::from_rgb(60, 60, 70));
 
         self.paint_btn(ui, sel_rect, "SELECT", self.select_p, pill_h * 0.5);
         self.paint_btn(ui, sta_rect, "START", self.start_p, pill_h * 0.5);
@@ -543,7 +538,7 @@ impl DemoApp {
         let cfg_alpha = (self.button_opacity * 180.0) as u8;
         ui.painter().rect(
             cfg_rect,
-            Rounding::same((pill_h * 0.5) as u8),
+            CornerRadius::same((pill_h * 0.5) as u8),
             Color32::from_rgba_unmultiplied(50, 50, 60, cfg_alpha),
             egui::Stroke::new(
                 1.5,
@@ -628,8 +623,11 @@ impl DemoApp {
         self.a_p = false;
         self.b_p = false;
         let panel_rect = ui.available_rect_before_wrap();
-        ui.painter()
-            .rect_filled(panel_rect, Rounding::ZERO, Color32::from_rgb(22, 22, 30));
+        ui.painter().rect_filled(
+            panel_rect,
+            CornerRadius::ZERO,
+            Color32::from_rgb(22, 22, 30),
+        );
 
         // Use a normal egui layout inside a padded inner rect
         let padding = 24.0;
@@ -670,11 +668,7 @@ impl DemoApp {
             self.bluetooth_emulators.clear();
             if let Some(devs) = self.bluetooth_adapter.get_paired_devices() {
                 for mut dev in devs {
-                    let wanted_uuid = bluetooth_rust::BluetoothUuid::Custom(
-                        "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
-                        0,
-                    );
-                    dev.run_sdp(wanted_uuid);
+                    let _ = dev.run_sdp();
                     let wanted_uuid = bluetooth_rust::BluetoothUuid::Unknown(
                         "76ecef8b-24d4-4f7c-9de0-706864b6bc14".to_string(),
                     );
@@ -686,43 +680,45 @@ impl DemoApp {
                 }
             }
         }
-        for d in &mut self.bluetooth_emulators {
-            if let Ok(bluetooth_rust::PairingStatus::Paired) = d.get_pair_state() {
-                if let Ok(a) = d.get_address() {
-                    if self.emulator_socket.is_none() {
-                        let btn = egui::Button::new(&format!("Connect to {}", a))
-                            .min_size([70.0, 70.0].into());
-                        if child.add(btn).clicked() {
-                            match d.get_rfcomm_socket(
-                                23,
-                                bluetooth_rust::BluetoothUuid::Custom(
-                                    "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
-                                    0,
-                                ),
-                                false,
-                            ) {
-                                Ok(mut socket) => {
-                                    if socket.sync_connect().is_ok() {
-                                        let eh = EmulatorHandler::new(socket);
-                                        let eh = EmulatorHandlerRunner::run(eh);
-                                        self.emulator_socket = Some(eh);
+        child.horizontal(|child| {
+            for d in &mut self.bluetooth_emulators {
+                if let Ok(bluetooth_rust::PairingStatus::Paired) = d.get_pair_state() {
+                    if let Ok(a) = d.get_address() {
+                        if self.emulator_socket.is_none() {
+                            let btn = egui::Button::new(&format!("Connect to {}", a))
+                                .min_size([70.0, 70.0].into());
+                            if child.add(btn).clicked() {
+                                match d.get_rfcomm_socket(
+                                    23,
+                                    bluetooth_rust::BluetoothUuid::Custom(
+                                        "76ECEF8B-24D4-4F7C-9DE0-706864B6BC14".to_string(),
+                                        0,
+                                    ),
+                                    false,
+                                ) {
+                                    Ok(mut socket) => {
+                                        if socket.sync_connect().is_ok() {
+                                            let eh = EmulatorHandler::new(socket);
+                                            let eh = EmulatorHandlerRunner::run(eh);
+                                            self.emulator_socket = Some(eh);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Error connecting to emulator {}", e);
                                     }
                                 }
-                                Err(e) => {
-                                    log::error!("Error connecting to emulator {}", e);
-                                }
                             }
-                        }
-                    } else {
-                        let btn = egui::Button::new("Disconnect from emulator")
-                            .min_size([70.0, 70.0].into());
-                        if child.add(btn).clicked() {
-                            self.emulator_socket.take();
+                        } else {
+                            let btn = egui::Button::new("Disconnect from emulator")
+                                .min_size([70.0, 70.0].into());
+                            if child.add(btn).clicked() {
+                                self.emulator_socket.take();
+                            }
                         }
                     }
                 }
             }
-        }
+        });
     }
 }
 
@@ -764,14 +760,17 @@ impl eframe::App for DemoApp {
             }
             /// The index into the button combination array for button A
             pub const BUTTON_COMBO_A: usize = 0;
+            #[allow(unused)]
             /// The index into the button combination array for turbo A
             pub const BUTTON_COMBO_TURBOA: usize = 1;
+            #[allow(unused)]
             /// The index into the button combination array for turbo B
             pub const BUTTON_COMBO_TURBOB: usize = 2;
             /// The index into the button combination array for button b
             pub const BUTTON_COMBO_B: usize = 3;
             /// The index into the button combination array for button start
             pub const BUTTON_COMBO_START: usize = 4;
+            #[allow(unused)]
             /// The index into the button combination array for button slow
             pub const BUTTON_COMBO_SLOW: usize = 5;
             /// The index into the button combination array for button select
@@ -784,12 +783,16 @@ impl eframe::App for DemoApp {
             pub const BUTTON_COMBO_LEFT: usize = 9;
             /// The index into the button combination array for button right
             pub const BUTTON_COMBO_RIGHT: usize = 10;
+            #[allow(unused)]
             /// The index into the button combination array for fire/trigger
             pub const BUTTON_COMBO_FIRE: usize = 11;
+            #[allow(unused)]
             /// The index into the button combination array for a light sensor
             pub const BUTTON_COMBO_LIGHT: usize = 12;
+            #[allow(unused)]
             /// The index into the button combination array for a potentiometer
             pub const BUTTON_COMBO_POTENTIOMETER: usize = 13;
+            #[allow(unused)]
             /// The extra button for the power pad
             pub const BUTTON_COMBO_POWERPAD: usize = 14;
 

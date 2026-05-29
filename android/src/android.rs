@@ -1,5 +1,4 @@
 use egui_winit::winit;
-use jni::JNIEnv;
 use jni::objects::{JObject, JValue};
 
 pub fn request_bluetooth_connect(
