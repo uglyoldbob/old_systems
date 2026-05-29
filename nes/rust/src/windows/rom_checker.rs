@@ -54,7 +54,7 @@ impl Window {
                 .with_inner_size([400.0, 300.0]),
             |ui, class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
-                    ScrollArea::vertical().show(ui, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
                         ui.label("Rom checking window");
                         let mut save_state = None;
                         if let Some(rom) = c.mb.cartridge() {
@@ -270,9 +270,15 @@ impl Window {
                         let bad = c.local.parser.list().get_bad_quantity();
                         ui.label(format!("INVALID: {}", bad));
                         let mut sum = bad;
-                        for (mapper, quantity) in c.local.parser.list().get_mapper_quantity() {
+                        for (mapper, quantity) in c.local.parser.list().get_good_mapper_quantity() {
                             sum += quantity;
-                            ui.label(format!("Mapper {}: {}", mapper, quantity));
+                            ui.label(format!("GOOD Mapper {}: {}", mapper, quantity));
+                        }
+                        for (mapper, quantity) in
+                            c.local.parser.list().get_unknown_mapper_quantity()
+                        {
+                            sum += quantity;
+                            ui.label(format!("UNIMPLEMENTED Mapper {}: {}", mapper, quantity));
                         }
                         ui.label(format!(
                             "Total good+bad is {}/{}",

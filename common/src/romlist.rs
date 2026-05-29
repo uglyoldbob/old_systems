@@ -185,18 +185,26 @@ impl RomList {
     }
 
     /// Get a mapper count tree. Maps mappernumber to quantity
-    pub fn get_mapper_quantity(&self) -> std::collections::BTreeMap<u32, u32> {
+    pub fn get_good_mapper_quantity(&self) -> std::collections::BTreeMap<u32, u32> {
         let mut mq = std::collections::BTreeMap::new();
         for rs in self.elements.values() {
             if let Some(rs) = &rs.result {
-                match rs {
-                    Ok(rom) => {
-                        mq.insert(rom.mapper, mq.get(&rom.mapper).unwrap_or(&0) + 1);
-                    }
-                    Err(romerr) => {
-                        if let CartridgeError::IncompatibleMapper(m) = romerr {
-                            mq.insert(*m, mq.get(m).unwrap_or(&0) + 1);
-                        }
+                if let Ok(rom) = rs {
+                    mq.insert(rom.mapper, mq.get(&rom.mapper).unwrap_or(&0) + 1);
+                }
+            }
+        }
+        mq
+    }
+
+    /// Get a mapper count tree. Maps mappernumber to quantity
+    pub fn get_unknown_mapper_quantity(&self) -> std::collections::BTreeMap<u32, u32> {
+        let mut mq = std::collections::BTreeMap::new();
+        for rs in self.elements.values() {
+            if let Some(rs) = &rs.result {
+                if let Err(romerr) = rs {
+                    if let CartridgeError::IncompatibleMapper(m) = romerr {
+                        mq.insert(*m, mq.get(m).unwrap_or(&0) + 1);
                     }
                 }
             }

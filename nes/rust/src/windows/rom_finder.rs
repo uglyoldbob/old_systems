@@ -59,7 +59,7 @@ impl RomFinder {
 
                                             let resp = ui.add(
                                                 egui::Label::new(format!(
-                                                    "{:x}: {}",
+                                                    "{}: {}",
                                                     r.mapper,
                                                     p.display()
                                                 ))

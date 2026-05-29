@@ -111,6 +111,8 @@ impl MainNesWindow {
         if let Err(e) = &have_gstreamer {
             log::error!("Failed to open gstreamer: {:?}", e);
         }
+        #[cfg(feature = "rom_status")]
+        let rom_checker_window = crate::windows::rom_checker::Window::new(&c);
         Self {
             c,
             have_gstreamer,
@@ -145,7 +147,7 @@ impl MainNesWindow {
             #[cfg(feature = "debugger")]
             cpu_memory_dump_window: None,
             #[cfg(feature = "debugger")]
-            debug_window: Some(crate::windows::debug_window::DebugNesWindow::new()),
+            debug_window: Some(crate::windows::debug_window::DebugNesWindow::new(&c)),
             #[cfg(feature = "debugger")]
             nametable_dump_window: None,
             #[cfg(feature = "debugger")]
@@ -153,7 +155,7 @@ impl MainNesWindow {
             #[cfg(feature = "debugger")]
             ppu_memory_dump_window: None,
             #[cfg(feature = "rom_status")]
-            rom_checker_window: Some(crate::windows::rom_checker::Window::new()),
+            rom_checker_window: Some(rom_checker_window),
             #[cfg(feature = "debugger")]
             sprite_dump_window: None,
         }

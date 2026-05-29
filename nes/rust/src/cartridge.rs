@@ -6,6 +6,7 @@ mod mapper02;
 mod mapper03;
 mod mapper04;
 //mod mapper05;
+mod mapper07;
 mod mapper11;
 mod mapper34;
 mod mapper71;
@@ -22,6 +23,7 @@ use mapper02::Mapper02;
 use mapper03::Mapper03;
 use mapper04::Mapper04;
 //use mapper05::Mapper05;
+use mapper07::Mapper07;
 use mapper11::Mapper11;
 use mapper34::Mapper34;
 use mapper71::Mapper71;
@@ -124,6 +126,7 @@ pub enum NesMapper {
     Mapper02,
     Mapper03,
     Mapper04,
+    Mapper07,
     Mapper11,
     Mapper34,
     Mapper71,
@@ -246,6 +249,11 @@ impl NesCartridge {
         self.mapper.irq()
     }
 
+    /// Get the hash of the cartridge
+    pub fn hash(&self) -> String {
+        self.hash.clone()
+    }
+
     /// "Parses" an obsolete ines rom
     fn load_obsolete_ines(_name: String, _rom_contents: &[u8]) -> Result<Self, CartridgeError> {
         Err(CartridgeError::IncompatibleRom)
@@ -286,6 +294,7 @@ impl NesCartridge {
             3 => mapper03::Mapper03::new(rom_data),
             4 => mapper04::Mapper04::new(rom_data),
             //5 => mapper05::Mapper05::new(rom_data),
+            7 => mapper07::Mapper07::new(rom_data),
             11 => mapper11::Mapper11::new(rom_data),
             34 => mapper34::Mapper34::new(rom_data),
             71 => mapper71::Mapper71::new(rom_data),
