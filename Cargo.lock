@@ -886,6 +886,8 @@ dependencies = [
 [[package]]
 name = "bluetooth-rust"
 version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f5b7676672e092b58354fd6af32056e46e75e36c936cb7b38d6aa2fa71bd4fa"
 dependencies = [
  "async-trait",
  "bluer",
@@ -896,8 +898,6 @@ dependencies = [
  "libc",
  "log",
  "serde",
- "simple_logger",
- "tlv_parser",
  "tokio",
  "windows 0.62.2",
  "winit",
@@ -7051,12 +7051,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "tlv_parser"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1ec81733847de9f966af633ecd698a0881e5b75f028cbab161c3f0669175c15"
 
 [[package]]
 name = "tokio"

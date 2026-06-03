@@ -1176,7 +1176,7 @@ impl NesPpu {
                     != 0
                 {
                     //TODO implement color emphasis
-                    log::error!("TODO: implement color emphasis");
+                    //log::error!("TODO: implement color emphasis");
                 }
 
                 let pixel = PPU_PALETTE[pixel_entry as usize];

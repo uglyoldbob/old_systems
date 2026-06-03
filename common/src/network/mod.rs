@@ -123,166 +123,166 @@ impl InternalNetwork {
             let f2 = self.recvr.recv().fuse();
             futures::pin_mut!(f2);
             futures::select! {
-                r = f2 => {
-                    if let Ok(m) = r {
-                        match m {
-                            MessageToNetworkThread::VideoData(v) => {
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.video_data(v);
-                            }
-                            MessageToNetworkThread::AudioData(d) => {
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.audio_data(d);
-                            }
-                            MessageToNetworkThread::SetController(p, c) => {
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.set_controller(p, c);
-                            }
-                            MessageToNetworkThread::RequestController(c) => {
-                                let myid = *self.swarm.local_peer_id();
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.request_controller(myid, c);
-                            }
-                            MessageToNetworkThread::SetUserRole(p, r) => {
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.set_user_role(p, r);
-                            }
-                            MessageToNetworkThread::RequestObserverStatus => {
-                                let myid = *self.swarm.local_peer_id();
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.request_observer_status(myid);
-                            }
-                            MessageToNetworkThread::Connect(cs) => {
-                                match cs.parse::<Multiaddr>() {
-                                    Ok(addr) => {
-                                        println!("Attempt to connect to {} {:?}", cs, self.swarm.dial(addr));
-                                    }
-                                    Err(e) => {
-                                        println!("Error parsing multiaddr {:?}", e);
-                                    }
-                                }
-                            }
-                            MessageToNetworkThread::ControllerData(i, buttons) => {
-                                let behavior = self.swarm.behaviour_mut();
-                                behavior.emulator.send_controller_data(i, buttons);
-                            }
-                            MessageToNetworkThread::StopServer => {
-                                if let Some(list) = &mut self.listener {
-                                    self.swarm.remove_listener(*list);
-                                }
-                                self.listener = None;
-                                self.addresses.clear();
-                                let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(false)).await;
-                            }
-                            MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency, role } => {
-                                if self.listener.is_none() {
-                                    let listenres = self.swarm
-                                    .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
-                                    if let Ok(lis) = listenres {
-                                        self.listener = Some(lis);
-                                    }
-                                    println!("Server start result is {:?}", listenres);
-                                    let s = self.listener.is_some();
-                                    let behavior = self.swarm.behaviour_mut();
-                                    behavior.emulator.send_server_details(width, height, framerate, cpu_frequency, role);
-                                    let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
-                                }
-                            }
-}
-                    }
-                },
-                ev = f1 => {
-                    match ev {
-                        libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established: _, cause: _ } => {
-                            let behavior = self.swarm.behaviour_mut();
-                            behavior.emulator.disconnect(peer_id);
-                            let _ = self.sender
-                                .send(MessageFromNetworkThread::PlayerObserverDisconnect(peer_id))
-                                .await;
-                        }
-                        libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
-                            println!("Listening on {address:?}");
-                            let _ = self.sender
-                                .send(MessageFromNetworkThread::NewAddress(address.clone()))
-                                .await;
-                            self.addresses.insert(address);
-                        }
-                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                            libp2p::upnp::Event::NewExternalAddr(addr),
-                        )) => {
-                            println!("New external address: {addr}");
-                            let _ = self.sender
-                                .send(MessageFromNetworkThread::NewAddress(addr.clone()))
-                                .await;
-                            self.addresses.insert(addr);
-                        }
-                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                            libp2p::upnp::Event::GatewayNotFound,
-                        )) => {
-                            println!("Gateway does not support UPnP");
-                        }
-                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                            libp2p::upnp::Event::NonRoutableGateway,
-                        )) => {
-                            println!("Gateway is not exposed directly to the public Internet, i.e. it itself has a private IP address.");
-                        }
-                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
-                            libp2p::upnp::Event::ExpiredExternalAddr(addr),
-                        )) => {
-                            println!("Expired address: {}", addr);
-                            let _ = self.sender
-                                .send(MessageFromNetworkThread::ExpiredAddress(addr.clone()))
-                                .await;
-                            self.addresses.remove(&addr);
-                        }
-                        libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
-                            match e {
-                                emulator::MessageToSwarm::AudioProducer(a) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::AudioProducer(a))
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::AvStream(d) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::AvStream(d))
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::ConnectedToHost => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::ConnectedToHost)
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::RequestController(i, c) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::RequestController(i, c))
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::SetController(c) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::SetController(c))
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::SetRole(r) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::NewRole(r))
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::RequestRole(p, r) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::RequestRole(p, r))
-                                        .await;
-                                }
-                                emulator::MessageToSwarm::ControllerData(i, d) => {
-                                    let _ = self.sender
-                                        .send(MessageFromNetworkThread::ControllerData(i, d))
-                                        .await;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                },
+                            r = f2 => {
+                                if let Ok(m) = r {
+                                    match m {
+                                        MessageToNetworkThread::VideoData(v) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.video_data(v);
+                                        }
+                                        MessageToNetworkThread::AudioData(d) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.audio_data(d);
+                                        }
+                                        MessageToNetworkThread::SetController(p, c) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.set_controller(p, c);
+                                        }
+                                        MessageToNetworkThread::RequestController(c) => {
+                                            let myid = *self.swarm.local_peer_id();
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.request_controller(myid, c);
+                                        }
+                                        MessageToNetworkThread::SetUserRole(p, r) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.set_user_role(p, r);
+                                        }
+                                        MessageToNetworkThread::RequestObserverStatus => {
+                                            let myid = *self.swarm.local_peer_id();
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.request_observer_status(myid);
+                                        }
+                                        MessageToNetworkThread::Connect(cs) => {
+                                            match cs.parse::<Multiaddr>() {
+                                                Ok(addr) => {
+                                                    println!("Attempt to connect to {} {:?}", cs, self.swarm.dial(addr));
+                                                }
+                                                Err(e) => {
+                                                    println!("Error parsing multiaddr {:?}", e);
+                                                }
+                                            }
+                                        }
+                                        MessageToNetworkThread::ControllerData(i, buttons) => {
+                                            let behavior = self.swarm.behaviour_mut();
+                                            behavior.emulator.send_controller_data(i, buttons);
+                                        }
+                                        MessageToNetworkThread::StopServer => {
+                                            if let Some(list) = &mut self.listener {
+                                                self.swarm.remove_listener(*list);
+                                            }
+                                            self.listener = None;
+                                            self.addresses.clear();
+                                            let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(false)).await;
+                                        }
+                                        MessageToNetworkThread::StartServer{ width, height, framerate, cpu_frequency, role } => {
+                                            if self.listener.is_none() {
+                                                let listenres = self.swarm
+                                                .listen_on("/ip4/0.0.0.0/tcp/0".parse().ok()?);
+                                                if let Ok(lis) = listenres {
+                                                    self.listener = Some(lis);
+                                                }
+                                                println!("Server start result is {:?}", listenres);
+                                                let s = self.listener.is_some();
+                                                let behavior = self.swarm.behaviour_mut();
+                                                behavior.emulator.send_server_details(width, height, framerate, cpu_frequency, role);
+                                                let _ = self.sender.send(MessageFromNetworkThread::ServerStatus(s)).await;
+                                            }
+                                        }
             }
+                                }
+                            },
+                            ev = f1 => {
+                                match ev {
+                                    libp2p::swarm::SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established: _, cause: _ } => {
+                                        let behavior = self.swarm.behaviour_mut();
+                                        behavior.emulator.disconnect(peer_id);
+                                        let _ = self.sender
+                                            .send(MessageFromNetworkThread::PlayerObserverDisconnect(peer_id))
+                                            .await;
+                                    }
+                                    libp2p::swarm::SwarmEvent::NewListenAddr { address, .. } => {
+                                        println!("Listening on {address:?}");
+                                        let _ = self.sender
+                                            .send(MessageFromNetworkThread::NewAddress(address.clone()))
+                                            .await;
+                                        self.addresses.insert(address);
+                                    }
+                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                                        libp2p::upnp::Event::NewExternalAddr(addr),
+                                    )) => {
+                                        println!("New external address: {addr}");
+                                        let _ = self.sender
+                                            .send(MessageFromNetworkThread::NewAddress(addr.clone()))
+                                            .await;
+                                        self.addresses.insert(addr);
+                                    }
+                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                                        libp2p::upnp::Event::GatewayNotFound,
+                                    )) => {
+                                        println!("Gateway does not support UPnP");
+                                    }
+                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                                        libp2p::upnp::Event::NonRoutableGateway,
+                                    )) => {
+                                        println!("Gateway is not exposed directly to the public Internet, i.e. it itself has a private IP address.");
+                                    }
+                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Upnp(
+                                        libp2p::upnp::Event::ExpiredExternalAddr(addr),
+                                    )) => {
+                                        println!("Expired address: {}", addr);
+                                        let _ = self.sender
+                                            .send(MessageFromNetworkThread::ExpiredAddress(addr.clone()))
+                                            .await;
+                                        self.addresses.remove(&addr);
+                                    }
+                                    libp2p::swarm::SwarmEvent::Behaviour(SwarmBehaviorEvent::Emulator(e)) => {
+                                        match e {
+                                            emulator::MessageToSwarm::AudioProducer(a) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::AudioProducer(a))
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::AvStream(d) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::AvStream(d))
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::ConnectedToHost => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::ConnectedToHost)
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::RequestController(i, c) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::RequestController(i, c))
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::SetController(c) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::SetController(c))
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::SetRole(r) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::NewRole(r))
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::RequestRole(p, r) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::RequestRole(p, r))
+                                                    .await;
+                                            }
+                                            emulator::MessageToSwarm::ControllerData(i, d) => {
+                                                let _ = self.sender
+                                                    .send(MessageFromNetworkThread::ControllerData(i, d))
+                                                    .await;
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            },
+                        }
         }
     }
 
@@ -295,8 +295,7 @@ impl InternalNetwork {
     ) -> tokio::task::JoinHandle<()> {
         runtime.spawn(async move {
             println!("Started async code");
-            if let Some(mut i) = Self::try_new(s, r, 
-                version) {
+            if let Some(mut i) = Self::try_new(s, r, version) {
                 i.do_the_thing().await;
             }
         })
@@ -370,19 +369,14 @@ pub struct Network {
 
 impl Network {
     ///Create a new instance of network with the given role
-    pub fn new(
-        audio_rate: u32,
-        blank_controller: Vec<u8>,
-        version: &'static str,
-    ) -> Self {
+    pub fn new(audio_rate: u32, blank_controller: Vec<u8>, version: &'static str) -> Self {
         let (s1, r1) = async_channel::bounded(1000);
         let (s2, r2) = async_channel::bounded(1000);
         let mut t = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
-        let t2 = InternalNetwork::start(&mut t, s2, r1, 
-            version);
+        let t2 = InternalNetwork::start(&mut t, s2, r1, version);
         Self {
             _tokio: t,
             _thread: t2,
@@ -558,20 +552,21 @@ impl Network {
     }
 
     /// Retrieve a frame of data and decode it into the specified image.
-    pub fn get_video_data(
-        &mut self,
-        i: &mut crate::video::PixelImage<egui::Color32>,
-    ) {
+    pub fn get_video_data(&mut self, i: &mut crate::video::PixelImage<egui::Color32>) {
         let vs = self.streamin.video_source();
         if let Some(vs) = vs {
             let s = vs.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
             if let Some(s) = s {
+                println!("Got a video sample");
                 if let Some(sb) = s.buffer() {
+                    println!("Got a video sample buffer");
                     let mut v: Vec<u8> = vec![0; sb.size()];
                     sb.copy_to_slice(0, &mut v)
                         .expect("Failed to copy frame to vector");
                     i.receive_from_gstreamer(v);
                 }
+            } else {
+                println!("No video sample");
             }
         }
     }

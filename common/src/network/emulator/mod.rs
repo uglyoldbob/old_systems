@@ -206,10 +206,33 @@ impl Handler {
         }
         let avsink = s.take_sink();
         let asource = s.get_sound();
+        let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
+
+        // Register a GStreamer AppSink callback so that whenever the encoder produces
+        // a new encoded sample, the libp2p handler waker is fired. Without this, poll()
+        // is only re-driven when an inbound network message or a new VideoStream arrives,
+        // which means encoded output can be delayed or dropped if those events don't line
+        // up with the GStreamer encoding latency.
+        if let Some(sink) = &avsink {
+            let waker_clone = Arc::clone(&waker);
+            sink.set_callbacks(
+                gstreamer_app::AppSinkCallbacks::builder()
+                    .new_sample(move |_sink| {
+                        if let Some(w) = waker_clone.lock().unwrap().take() {
+                            w.wake();
+                        }
+                        // Return Ok to tell GStreamer the callback consumed the event;
+                        // the sample itself is still available via try_pull_sample.
+                        Ok(gstreamer::FlowSuccess::Ok)
+                    })
+                    .build(),
+            );
+        }
+
         Self {
             _role: role,
             listen_protocol: protocol,
-            waker: Arc::new(Mutex::new(None)),
+            waker,
             inbound_stream: None,
             outbound_stream: None,
             pending_out: VecDeque::new(),
