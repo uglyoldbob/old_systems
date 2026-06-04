@@ -92,6 +92,10 @@ impl StreamingOut {
                 .name("aqueue")
                 .build()
                 .expect("Could not create element.");
+            let aqueue2 = gstreamer::ElementFactory::make("queue")
+                .name("aqueue2")
+                .build()
+                .expect("Could not create element.");
             let aencoder = gstreamer::ElementFactory::make("avenc_ac3")
                 .name("aencode")
                 .build()
@@ -104,13 +108,45 @@ impl StreamingOut {
                 .name("mepgmux")
                 .build()
                 .expect("Could not create source element.");
+            let vparse = gstreamer::ElementFactory::make("h264parse")
+                .name("vparse")
+                .build()
+                .expect("Could not create source element.");
+            let vqueue = gstreamer::ElementFactory::make("queue")
+                .name("vqueue")
+                .build()
+                .expect("Could not create element.");
 
             let aresample = gstreamer::ElementFactory::make("audioresample")
                 .name("aresample")
                 .build()
                 .expect("Could not create source element.");
+            
 
-            let pipeline = gstreamer::Pipeline::with_name("streaming-pipeline");
+            let pad = app_source
+                .static_pad("src")
+                .expect("Could not get appsrc src pad");
+
+            use gstreamer::prelude::PadExtManual;
+            pad.add_probe(
+                gstreamer::PadProbeType::BUFFER,
+                |_pad, info| {
+                    if let Some(buffer) = info.buffer() {
+                        println!(
+                            "################################################\nVIDEO: size={} pts={:?} dts={:?} dur={:?}\n################################################",
+                            buffer.size(),
+                            buffer.pts(),
+                            buffer.dts(),
+                            buffer.duration()
+                        );
+                    }
+
+                    gstreamer::PadProbeReturn::Ok
+                },
+            );
+
+            let pb = gstreamer::Pipeline::builder().name("streaming-pipeline").latency(gstreamer::format::ClockTime::from_mseconds(50));
+            let pipeline = pb.build();
             pipeline
                 .add_many([
                     app_source.upcast_ref(),
@@ -121,25 +157,32 @@ impl StreamingOut {
                     &aresample,
                     &vencoder,
                     &mux,
+                    &vparse,
+                    &vqueue,
+                    &aqueue2,
                     sink.upcast_ref(),
                 ])
                 .unwrap();
-            gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder]).unwrap();
+            gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder, &vparse, &vqueue]).unwrap();
             gstreamer::Element::link_many([
                 audio_source.upcast_ref(),
                 &aqueue,
                 &aresample,
                 &aencoder,
+                &aqueue2,
             ])
             .unwrap();
 
-            aencoder.link(&mux).unwrap();
-            vencoder.link(&mux).unwrap();
+            aqueue2.link(&mux).unwrap();
+            
+            vqueue.link(&mux).unwrap();
             mux.link(&sink).unwrap();
 
             pipeline
                 .set_state(gstreamer::State::Playing)
                 .expect("Unable to set the pipeline to the `Playing` state");
+            use gstreamer::prelude::GstBinExt;
+            pipeline.recalculate_latency().unwrap();
 
             self.record_source = Some(app_source);
             self.record_pipeline = Some(pipeline);
@@ -163,6 +206,13 @@ impl StreamingOut {
                     *b = *a;
                 }
                 drop(p);
+                {
+                    let frame_duration =
+                        gstreamer::ClockTime::from_nseconds(
+                            1_000_000_000u64 / 60
+                        );
+                    buf.set_duration(frame_duration);
+                }
                 source.do_timestamp();
                 match source.push_buffer(buf) {
                     Ok(_a) => {}
