@@ -557,16 +557,12 @@ impl Network {
         if let Some(vs) = vs {
             let s = vs.try_pull_sample(gstreamer::format::ClockTime::from_mseconds(1));
             if let Some(s) = s {
-                println!("Got a video sample");
                 if let Some(sb) = s.buffer() {
-                    println!("Got a video sample buffer");
                     let mut v: Vec<u8> = vec![0; sb.size()];
                     sb.copy_to_slice(0, &mut v)
                         .expect("Failed to copy frame to vector");
                     i.receive_from_gstreamer(v);
                 }
-            } else {
-                println!("No video sample");
             }
         }
     }

@@ -16,6 +16,8 @@ pub struct StreamingOut {
     sink: Option<gstreamer_app::AppSink>,
     /// The audio source for the recording
     audio: Option<AudioProducerWithRate>,
+    /// The framerate in frames per second
+    framerate: u8,
 }
 
 impl StreamingOut {
@@ -26,6 +28,7 @@ impl StreamingOut {
             record_source: None,
             sink: None,
             audio: None,
+            framerate: 60,
         }
     }
 
@@ -47,6 +50,7 @@ impl StreamingOut {
     /// Start recording by setting up the necessary objects.
     pub fn start(&mut self, width: u16, height: u16, framerate: u8, cpu_frequency: f32) {
         if self.record_pipeline.is_none() {
+            self.framerate = framerate;
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
             let vinfo = gstreamer_video::VideoInfo::builder(
@@ -188,6 +192,7 @@ impl StreamingOut {
 
             self.audio = Some(AudioProducerWithRate::new_gstreamer(
                 44100,
+                44100,
                 cpu_frequency / 44100.0,
                 audio_source,
             ));
@@ -205,7 +210,7 @@ impl StreamingOut {
                 }
                 drop(p);
                 {
-                    let frame_duration = gstreamer::ClockTime::from_nseconds(1_000_000_000u64 / 60);
+                    let frame_duration = gstreamer::ClockTime::from_nseconds(1_000_000_000u64 / self.framerate as u64);
                     buf.make_mut().set_duration(frame_duration);
                 }
                 source.do_timestamp();

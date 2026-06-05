@@ -285,7 +285,10 @@ enum AudioProducerMethod {
     /// A ring buffer is used to produce the audio
     RingBuffer(AudioProducer),
     /// The audio is pushed directly to gstreamer for recordings
-    GStreamer(gstreamer_app::AppSrc),
+    GStreamer {
+        appsrc: gstreamer_app::AppSrc,
+        rate: u32,
+    },
 }
 
 impl AudioProducerMethod {
@@ -295,14 +298,13 @@ impl AudioProducerMethod {
             AudioProducerMethod::RingBuffer(rb) => {
                 rb.push_slice(slice);
             }
-            AudioProducerMethod::GStreamer(appsrc) => {
-                println!("SENDING AUDIO NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!11");
+            AudioProducerMethod::GStreamer{appsrc, rate} => {
                 let b: Vec<u8> = slice.gstreamer_slice();
                 let samples = b.len() / 4 / 2; // f32 = 4 bytes, stereo = 2 channels
                 let mut buf = gstreamer::Buffer::from_slice(b);
                 appsrc.do_timestamp();
                 
-                let duration_ns = (samples as u64 * 1_000_000_000) / 44100;
+                let duration_ns = (samples as u64 * 1_000_000_000) / *rate as u64;
                 buf.make_mut().set_duration(gstreamer::ClockTime::from_nseconds(duration_ns));
                 buf.make_mut().set_pts(gstreamer::ClockTime::NONE);
                 let e = appsrc.push_buffer(buf);
@@ -342,11 +344,11 @@ impl AudioProducerWithRate {
     }
 
     /// Create a new object and a new ringbuffer based on size
-    pub fn new_gstreamer(size: usize, interval: f32, src: gstreamer_app::AppSrc) -> Self {
+    pub fn new_gstreamer(size: usize, rate: u32, interval: f32, src: gstreamer_app::AppSrc) -> Self {
         Self {
             interval,
             counter: 0.0,
-            producer: AudioProducerMethod::GStreamer(src),
+            producer: AudioProducerMethod::GStreamer { appsrc: src, rate, },
             buffer: AudioBuffer::new_f32(size),
             buffer_index: 0,
         }

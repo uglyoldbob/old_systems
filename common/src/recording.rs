@@ -154,6 +154,7 @@ impl Recording {
 
             self.audio = Some(AudioProducerWithRate::new_gstreamer(
                 44100,
+                44100,
                 cpu_frequency / 44100.0,
                 audio_source,
             ));
