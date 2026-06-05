@@ -108,6 +108,10 @@ impl MainNesWindow {
         use std::time::Duration;
 
         let have_gstreamer = gstreamer::init();
+        gstreamer::log::set_threshold_from_string(
+            "appsink:WARN",
+            false,
+        );
         if let Err(e) = &have_gstreamer {
             log::error!("Failed to open gstreamer: {:?}", e);
         }

@@ -464,6 +464,10 @@ fn main() {
 
             log::info!("audio config is {:?}", config);
 
+            if config.sample_rate < 44100 {
+                config.sample_rate = 44100;
+            }
+
             log::info!(
                 "Audio buffer size is {} elements, sample rate is {}",
                 num_samples,

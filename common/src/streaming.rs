@@ -1,8 +1,8 @@
 //! The streaming module contains gstreamer code that allows an emulator session to be streamed to other participants
 
-use gstreamer::prelude::{
+use gstreamer::{DebugGraphDetails, prelude::{
     Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
-};
+}};
 
 use crate::audio::AudioProducerWithRate;
 
@@ -123,27 +123,45 @@ impl StreamingOut {
                 .expect("Could not create source element.");
             
 
-            let pad = app_source
-                .static_pad("src")
-                .expect("Could not get appsrc src pad");
-
             use gstreamer::prelude::PadExtManual;
+
+            let pad = audio_source
+                .static_pad("src")
+                .expect("Failed to get audio appsrc src pad");
+
             pad.add_probe(
-                gstreamer::PadProbeType::BUFFER,
-                |_pad, info| {
-                    if let Some(buffer) = info.buffer() {
-                        println!(
-                            "################################################\nVIDEO: size={} pts={:?} dts={:?} dur={:?}\n################################################",
+            gstreamer::PadProbeType::BLOCK
+                | gstreamer::PadProbeType::BUFFER
+                | gstreamer::PadProbeType::BUFFER_LIST,
+            |_pad, info| {
+                for _ in 0..20 {
+                    println!("AUDIO APPSRC HIT");
+                }
+                if let Some(buffer) = info.buffer() {
+                    println!(
+                            "  size={} pts={:?} dur={:?}",
                             buffer.size(),
                             buffer.pts(),
-                            buffer.dts(),
+                            buffer.duration()
+                        );
+                }
+
+                if let Some(list) = info.buffer_list() {
+                    println!("BUFFER LIST RECEIVED");
+                    for (i, buffer) in list.iter().enumerate() {
+                        println!(
+                            "  [{}] size={} pts={:?} dur={:?}",
+                            i,
+                            buffer.size(),
+                            buffer.pts(),
                             buffer.duration()
                         );
                     }
+                }
 
-                    gstreamer::PadProbeReturn::Ok
-                },
-            );
+                gstreamer::PadProbeReturn::Ok
+            },
+        );
 
             let pb = gstreamer::Pipeline::builder().name("streaming-pipeline").latency(gstreamer::format::ClockTime::from_mseconds(50));
             let pipeline = pb.build();
@@ -211,7 +229,7 @@ impl StreamingOut {
                         gstreamer::ClockTime::from_nseconds(
                             1_000_000_000u64 / 60
                         );
-                    buf.set_duration(frame_duration);
+                    buf.make_mut().set_duration(frame_duration);
                 }
                 source.do_timestamp();
                 match source.push_buffer(buf) {
