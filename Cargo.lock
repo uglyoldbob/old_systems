@@ -4566,51 +4566,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nes"
-version = "0.2.0"
-dependencies = [
- "async-channel",
- "asynchronous-codec",
- "bincode",
- "biquad",
- "bluetooth-rust",
- "chrono",
- "common-emulator",
- "controller",
- "cpal",
- "criterion",
- "data-encoding",
- "directories",
- "eframe",
- "egui 0.34.2",
- "enum_dispatch",
- "futures",
- "gilrs",
- "gstreamer",
- "gstreamer-app",
- "gstreamer-audio",
- "gstreamer-video",
- "hex_fmt",
- "libp2p",
- "log",
- "memmap2",
- "open",
- "puffin",
- "puffin_egui",
- "rand 0.8.6",
- "rfd",
- "ring",
- "ringbuf",
- "serde",
- "serde_with",
- "simple_logger",
- "strum 0.28.0",
- "tokio",
- "toml 1.1.2+spec-1.1.0",
- "walkdir",
-]
-
-[[package]]
 name = "netlink-packet-core"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9027,6 +8982,51 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "zesty-nes"
+version = "0.2.0"
+dependencies = [
+ "async-channel",
+ "asynchronous-codec",
+ "bincode",
+ "biquad",
+ "bluetooth-rust",
+ "chrono",
+ "common-emulator",
+ "controller",
+ "cpal",
+ "criterion",
+ "data-encoding",
+ "directories",
+ "eframe",
+ "egui 0.34.2",
+ "enum_dispatch",
+ "futures",
+ "gilrs",
+ "gstreamer",
+ "gstreamer-app",
+ "gstreamer-audio",
+ "gstreamer-video",
+ "hex_fmt",
+ "libp2p",
+ "log",
+ "memmap2",
+ "open",
+ "puffin",
+ "puffin_egui",
+ "rand 0.8.6",
+ "rfd",
+ "ring",
+ "ringbuf",
+ "serde",
+ "serde_with",
+ "simple_logger",
+ "strum 0.28.0",
+ "tokio",
+ "toml 1.1.2+spec-1.1.0",
+ "walkdir",
 ]
 
 [[package]]

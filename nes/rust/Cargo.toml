@@ -1,9 +1,10 @@
 [package]
-name = "nes"
+name = "zesty-nes"
 version = "0.2.0"
 authors = ["Thomas Epperson <thomas.epperson@gmail.com>"]
 description = "A NES emulator written in Rust"
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -66,3 +67,18 @@ harness = false
 
 [package.metadata.bundle]
 identifier = "com.uglyoldbob.nes_emulator"
+
+[package.metadata.deb]
+assets = [
+    ["target/release/zesty-nes", "usr/bin/", "755"],
+    ["zestynes.png", "/usr/share/icons/hicolor/256x256/apps/zestynes.png", "444"],
+    ["com.uglyoldbob.ZestyNes.desktop", "/usr/share/applications/com.uglyoldbob.ZestyNes.desktop", "644"],
+]
+depends = ["libgstreamer1.0-0",
+    "libgstreamer-plugins-base1.0-0",
+    "libgstreamer-plugins-bad1.0-0",
+    "libopenh264-7",
+    "gstreamer1.0-plugins-good",
+    "gstreamer1.0-plugins-base",
+    "gstreamer1.0-plugins-bad",
+    ]
