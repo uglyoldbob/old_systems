@@ -1,8 +1,8 @@
 //! The streaming module contains gstreamer code that allows an emulator session to be streamed to other participants
 
-use gstreamer::{DebugGraphDetails, prelude::{
+use gstreamer::prelude::{
     Cast, ElementExt, ElementExtManual, GstBinExtManual, GstObjectExt, PadExt,
-}};
+};
 
 use crate::audio::AudioProducerWithRate;
 
@@ -96,6 +96,13 @@ impl StreamingOut {
                 .name("aqueue2")
                 .build()
                 .expect("Could not create element.");
+            // The audio appsrc produces interleaved F32LE samples, but avenc_ac3
+            // expects a specific raw audio format/layout. Without audioconvert the
+            // encoder fails to negotiate caps and the whole pipeline stalls.
+            let aconv = gstreamer::ElementFactory::make("audioconvert")
+                .name("aconvert")
+                .build()
+                .expect("Could not create source element.");
             let aencoder = gstreamer::ElementFactory::make("avenc_ac3")
                 .name("aencode")
                 .build()
@@ -108,8 +115,11 @@ impl StreamingOut {
                 .name("mepgmux")
                 .build()
                 .expect("Could not create source element.");
+            // config-interval=-1 makes h264parse repeat SPS/PPS before every IDR
+            // frame, which mpegtsmux and the receiving decoder need to sync.
             let vparse = gstreamer::ElementFactory::make("h264parse")
                 .name("vparse")
+                .property("config-interval", -1i32)
                 .build()
                 .expect("Could not create source element.");
             let vqueue = gstreamer::ElementFactory::make("queue")
@@ -121,55 +131,17 @@ impl StreamingOut {
                 .name("aresample")
                 .build()
                 .expect("Could not create source element.");
-            
 
-            use gstreamer::prelude::PadExtManual;
-
-            let pad = audio_source
-                .static_pad("src")
-                .expect("Failed to get audio appsrc src pad");
-
-            pad.add_probe(
-            gstreamer::PadProbeType::BLOCK
-                | gstreamer::PadProbeType::BUFFER
-                | gstreamer::PadProbeType::BUFFER_LIST,
-            |_pad, info| {
-                for _ in 0..20 {
-                    println!("AUDIO APPSRC HIT");
-                }
-                if let Some(buffer) = info.buffer() {
-                    println!(
-                            "  size={} pts={:?} dur={:?}",
-                            buffer.size(),
-                            buffer.pts(),
-                            buffer.duration()
-                        );
-                }
-
-                if let Some(list) = info.buffer_list() {
-                    println!("BUFFER LIST RECEIVED");
-                    for (i, buffer) in list.iter().enumerate() {
-                        println!(
-                            "  [{}] size={} pts={:?} dur={:?}",
-                            i,
-                            buffer.size(),
-                            buffer.pts(),
-                            buffer.duration()
-                        );
-                    }
-                }
-
-                gstreamer::PadProbeReturn::Ok
-            },
-        );
-
-            let pb = gstreamer::Pipeline::builder().name("streaming-pipeline").latency(gstreamer::format::ClockTime::from_mseconds(50));
+            let pb = gstreamer::Pipeline::builder()
+                .name("streaming-pipeline")
+                .latency(gstreamer::format::ClockTime::from_mseconds(50));
             let pipeline = pb.build();
             pipeline
                 .add_many([
                     app_source.upcast_ref(),
                     audio_source.upcast_ref(),
                     &aqueue,
+                    &aconv,
                     &aencoder,
                     &vconv,
                     &aresample,
@@ -181,10 +153,18 @@ impl StreamingOut {
                     sink.upcast_ref(),
                 ])
                 .unwrap();
-            gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder, &vparse, &vqueue]).unwrap();
+            gstreamer::Element::link_many([
+                app_source.upcast_ref(),
+                &vconv,
+                &vencoder,
+                &vparse,
+                &vqueue,
+            ])
+            .unwrap();
             gstreamer::Element::link_many([
                 audio_source.upcast_ref(),
                 &aqueue,
+                &aconv,
                 &aresample,
                 &aencoder,
                 &aqueue2,
@@ -192,7 +172,7 @@ impl StreamingOut {
             .unwrap();
 
             aqueue2.link(&mux).unwrap();
-            
+
             vqueue.link(&mux).unwrap();
             mux.link(&sink).unwrap();
 
@@ -225,10 +205,7 @@ impl StreamingOut {
                 }
                 drop(p);
                 {
-                    let frame_duration =
-                        gstreamer::ClockTime::from_nseconds(
-                            1_000_000_000u64 / 60
-                        );
+                    let frame_duration = gstreamer::ClockTime::from_nseconds(1_000_000_000u64 / 60);
                     buf.make_mut().set_duration(frame_duration);
                 }
                 source.do_timestamp();
@@ -310,8 +287,16 @@ impl StreamingIn {
             let version = gstreamer::version_string().as_str().to_string();
             println!("GStreamer version is {}", version);
 
+            // The data fed in is a raw MPEG-TS stream coming off the network, so
+            // advertise that to downstream (tsparse/tsdemux) for caps negotiation.
+            let mpegts_caps = gstreamer::Caps::builder("video/mpegts")
+                .field("systemstream", true)
+                .field("packetsize", 188i32)
+                .build();
             let source = gstreamer_app::AppSrc::builder()
                 .name("emulator_av_mpeg")
+                .caps(&mpegts_caps)
+                .format(gstreamer::Format::Time)
                 .build();
 
             source.set_block(false);

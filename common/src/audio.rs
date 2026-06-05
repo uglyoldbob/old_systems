@@ -300,7 +300,7 @@ impl AudioProducerMethod {
                 let b: Vec<u8> = slice.gstreamer_slice();
                 let samples = b.len() / 4 / 2; // f32 = 4 bytes, stereo = 2 channels
                 let mut buf = gstreamer::Buffer::from_slice(b);
-                //appsrc.do_timestamp();
+                appsrc.do_timestamp();
                 
                 let duration_ns = (samples as u64 * 1_000_000_000) / 44100;
                 buf.make_mut().set_duration(gstreamer::ClockTime::from_nseconds(duration_ns));
