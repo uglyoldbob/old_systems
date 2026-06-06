@@ -222,12 +222,25 @@ impl eframe::App for MainNesWindow {
         #[cfg(feature = "puffin")]
         puffin::profile_scope!("frame rendering");
 
-        if self.filter.is_none() && self.sound_stream.is_some() {
-            log::info!(
-                "Initializing with sample rate {}",
-                self.c.local.get_sound_rate()
-            );
-            let rf = self.c.local.get_sound_rate() as f32;
+        // The audio filter gates ALL audio sample generation (see
+        // NesApu::build_audio_sample), including the samples fed to the streaming
+        // pipeline. Previously this was only initialized when a local audio output
+        // device was available. When hosting a stream on a machine without working
+        // local audio output, the filter stayed None, so no audio was produced and
+        // mpegtsmux stalled waiting for an audio stream, breaking streaming
+        // entirely. Initialize it whenever we have local audio OR we are hosting a
+        // stream, falling back to the streaming sample rate when no device exists.
+        if self.filter.is_none()
+            && (self.sound_stream.is_some() || !self.audio_streaming.is_empty())
+        {
+            let local_rate = self.c.local.get_sound_rate();
+            let rf = if local_rate == 0 {
+                // Matches the audio rate used by the streaming pipeline.
+                44100.0
+            } else {
+                local_rate as f32
+            };
+            log::info!("Initializing audio filter with sample rate {}", rf);
             let sampling_frequency = self.c.cpu_frequency();
             let filter_coeff = biquad::Coefficients::<f32>::from_params(
                 biquad::Type::LowPass,
