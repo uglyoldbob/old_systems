@@ -20,6 +20,30 @@ pub struct StreamingOut {
     framerate: u8,
 }
 
+fn dump_h264_nals(data: &[u8], label: &str) {
+    let mut i = 0;
+    while i + 4 <= data.len() {
+        let (start_code_len, nal_off) = if data[i..i+3] == [0, 0, 1] {
+            (3, i + 3)
+        } else if i + 4 <= data.len() && data[i..i+4] == [0, 0, 0, 1] {
+            (4, i + 4)
+        } else {
+            i += 1;
+            continue;
+        };
+        if nal_off < data.len() {
+            let header = data[nal_off];
+            let nal_type = header & 0x1F;
+            let end = (nal_off + 16).min(data.len());
+            println!(
+                "{label}: NAL type {nal_type} at offset {nal_off}, header=0x{header:02x}, first bytes: {:02x?}",
+                &data[nal_off..end]
+            );
+        }
+        i += start_code_len;
+    }
+}
+
 impl StreamingOut {
     /// Create a recording object
     pub fn new() -> Self {
@@ -83,15 +107,24 @@ impl StreamingOut {
                 .build();
 
             audio_source.set_block(false);
-            app_source.set_do_timestamp(true);
-            app_source.set_is_live(true);
-            audio_source.set_is_live(true);
-            app_source.set_block(false);
-            audio_source.set_do_timestamp(true);
+            //app_source.set_do_timestamp(true);
+            //app_source.set_is_live(true);
+            //audio_source.set_is_live(true);
+            app_source.set_block(true);
+            //audio_source.set_do_timestamp(true);
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
                 .build()
                 .expect("Could not create source element.");
+            let vfilter = gstreamer::ElementFactory::make("capsfilter")
+                .property(
+                    "caps",
+                    gstreamer::Caps::builder("video/x-raw")
+                        .field("format", "I420")
+                        .build(),
+                )
+                .build()
+                .unwrap();
             let aqueue = gstreamer::ElementFactory::make("queue")
                 .name("aqueue")
                 .build()
@@ -111,10 +144,12 @@ impl StreamingOut {
                 .name("aencode")
                 .build()
                 .expect("Could not create source element.");
-            let vencoder = gstreamer::ElementFactory::make("openh264enc")
+            let vencoder = gstreamer::ElementFactory::make("x264enc")
                 .name("vencode")
                 .build()
                 .expect("Could not create source element.");
+            use gstreamer::prelude::ObjectExt;
+            vencoder.set_property("byte-stream", true);
             let mux = gstreamer::ElementFactory::make("mpegtsmux")
                 .name("mepgmux")
                 .build()
@@ -126,6 +161,28 @@ impl StreamingOut {
                 .property("config-interval", -1i32)
                 .build()
                 .expect("Could not create source element.");
+
+            use gstreamer::prelude::PadExtManual;
+            let venc_src = vencoder.static_pad("src").unwrap();
+            venc_src.add_probe(gstreamer::PadProbeType::BUFFER, |_pad, info| {
+                if let Some(buffer) = info.buffer() {
+                    if let Ok(map) = buffer.map_readable() {
+                        let data = map.as_slice();
+                        let is_keyframe = !buffer
+                            .flags()
+                            .contains(gstreamer::BufferFlags::DELTA_UNIT);
+                        use sha2::Sha256;
+                        use sha2::Digest;
+                        println!(
+                            "--- x264enc out: {} bytes, pts={:?}, dts={:?}, sha256: {:x?}, keyframe={} ---",
+                            data.len(), buffer.pts(), buffer.dts(), Sha256::digest(&data).as_slice(), is_keyframe
+                        );
+                        //dump_h264_nals(data, "x264enc-out");
+                    }
+                }
+                gstreamer::PadProbeReturn::Ok
+            });
+
             let vqueue = gstreamer::ElementFactory::make("queue")
                 .name("vqueue")
                 .build()
@@ -148,6 +205,7 @@ impl StreamingOut {
                     &aconv,
                     &aencoder,
                     &vconv,
+                    &vfilter,
                     &aresample,
                     &vencoder,
                     &mux,
@@ -160,6 +218,7 @@ impl StreamingOut {
             gstreamer::Element::link_many([
                 app_source.upcast_ref(),
                 &vconv,
+                &vfilter,
                 &vencoder,
                 &vparse,
                 &vqueue,
@@ -175,9 +234,12 @@ impl StreamingOut {
             ])
             .unwrap();
 
-            aqueue2.link(&mux).unwrap();
+            let audio_pad = mux.request_pad_simple("sink_%d").unwrap();
+            let video_pad = mux.request_pad_simple("sink_%d").unwrap();
 
-            vqueue.link(&mux).unwrap();
+            aqueue2.static_pad("src").unwrap().link(&audio_pad).unwrap();
+            vqueue.static_pad("src").unwrap().link(&video_pad).unwrap();
+
             mux.link(&sink).unwrap();
 
             pipeline
@@ -301,17 +363,21 @@ impl StreamingIn {
             let source = gstreamer_app::AppSrc::builder()
                 .name("emulator_av_mpeg")
                 .caps(&mpegts_caps)
-                .format(gstreamer::Format::Time)
+                .format(gstreamer::Format::Bytes)
                 .build();
 
-            source.set_block(false);
-            source.set_do_timestamp(true);
-            source.set_is_live(true);
+            //source.set_block(false);
+            //source.set_do_timestamp(true);
+            //source.set_is_live(true);
 
             let queue = gstreamer::ElementFactory::make("queue")
                 .name("queue")
                 .build()
                 .expect("Could not create element.");
+
+            queue.set_property("max-size-bytes", 10_000_000u32);
+            queue.set_property("max-size-buffers", 0u32);
+            queue.set_property("max-size-time", 0u64);
 
             let sconv = gstreamer::ElementFactory::make("tsparse")
                 .name("tsparse")
@@ -332,6 +398,21 @@ impl StreamingIn {
                 .name("vdecode")
                 .build()
                 .expect("Could not create source element.");
+
+            use gstreamer::prelude::PadExtManual;
+            let dec_sink = vdecoder.static_pad("sink").unwrap();
+            dec_sink.add_probe(gstreamer::PadProbeType::BUFFER, |_pad, info| {
+                if let Some(buffer) = info.buffer() {
+                    if let Ok(map) = buffer.map_readable() {
+                        let data = map.as_slice();
+                        use sha2::Sha256;
+                        use sha2::Digest;
+                        println!("--- from vparse: {} bytes, sha256={:x?}, pts={:?} ---", data.len(), Sha256::digest(&data).as_slice(), buffer.pts());
+                        //dump_h264_nals(data, "to-decoder");
+                    }
+                }
+                gstreamer::PadProbeReturn::Ok
+            });
 
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
@@ -374,6 +455,10 @@ impl StreamingIn {
             println!("Audio caps: {:?}", acaps);
 
             let vsink = gstreamer_app::AppSink::builder().name("video_sink").build();
+
+            use gstreamer::prelude::ObjectExt;
+            vsink.set_property("sync", false);
+            asink.set_property("sync", false);
 
             let vcaps = gstreamer_video::VideoCapsBuilder::new()
                 .format(gstreamer_video::VideoFormat::Rgb)
@@ -474,17 +559,13 @@ impl StreamingIn {
         if let Some(_pipeline) = &mut self.pipeline {
             if let Some(source) = &mut self.stream_source {
                 let mut buf = gstreamer::Buffer::with_size(buffer.len()).unwrap();
-                let mut p = buf.make_mut().map_writable().unwrap();
-                for (a, b) in buffer.iter().zip(p.iter_mut()) {
-                    *b = *a;
+                {
+                    let mut map = buf.make_mut().map_writable().unwrap();
+                    map.copy_from_slice(&buffer);
                 }
-                drop(p);
-                source.do_timestamp();
                 match source.push_buffer(buf) {
-                    Ok(_a) => {}
-                    Err(e) => {
-                        println!("Error pushing video data: {:?}", e);
-                    }
+                    Ok(_) => {}
+                    Err(e) => eprintln!("Error pushing data to StreamingIn: {:?}", e),
                 }
             }
         }

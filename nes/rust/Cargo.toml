@@ -65,6 +65,14 @@ name="nes_bench"
 path="src/benchmark.rs"
 harness = false
 
+[[bin]]
+name = "zesty-nes"
+path = "./src/main.rs"
+
+[[bin]]
+name = "stream"
+path = "./src/streamtest.rs"
+
 [package.metadata.bundle]
 identifier = "com.uglyoldbob.nes_emulator"
 
