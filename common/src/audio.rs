@@ -288,6 +288,9 @@ enum AudioProducerMethod {
     GStreamer {
         appsrc: gstreamer_app::AppSrc,
         rate: u32,
+        /// The number of audio frames (samples per channel) pushed so far. Used
+        /// to compute a monotonically increasing PTS for each buffer.
+        samples_sent: u64,
     },
 }
 
@@ -298,15 +301,27 @@ impl AudioProducerMethod {
             AudioProducerMethod::RingBuffer(rb) => {
                 rb.push_slice(slice);
             }
-            AudioProducerMethod::GStreamer{appsrc, rate} => {
+            AudioProducerMethod::GStreamer {
+                appsrc,
+                rate,
+                samples_sent,
+            } => {
                 let b: Vec<u8> = slice.gstreamer_slice();
-                let samples = b.len() / 4 / 2; // f32 = 4 bytes, stereo = 2 channels
+                let samples = (b.len() / 4 / 2) as u64; // f32 = 4 bytes, stereo = 2 channels
                 let mut buf = gstreamer::Buffer::from_slice(b);
-                appsrc.do_timestamp();
-                
-                let duration_ns = (samples as u64 * 1_000_000_000) / *rate as u64;
-                buf.make_mut().set_duration(gstreamer::ClockTime::from_nseconds(duration_ns));
-                buf.make_mut().set_pts(gstreamer::ClockTime::NONE);
+
+                let duration_ns = (samples * 1_000_000_000) / *rate as u64;
+                let pts_ns = (*samples_sent * 1_000_000_000) / *rate as u64;
+                {
+                    let bm = buf.make_mut();
+                    bm.set_duration(gstreamer::ClockTime::from_nseconds(duration_ns));
+                    // Assign a monotonically increasing PTS derived from the number
+                    // of samples sent. mpegtsmux requires valid timestamps on every
+                    // pad in order to produce any output.
+                    bm.set_pts(gstreamer::ClockTime::from_nseconds(pts_ns));
+                    bm.set_dts(gstreamer::ClockTime::from_nseconds(pts_ns));
+                }
+                *samples_sent += samples;
                 let e = appsrc.push_buffer(buf);
                 if let Err(e) = e {
                     println!("ERROR SENDING AUDIO {:?}", e);
@@ -344,11 +359,20 @@ impl AudioProducerWithRate {
     }
 
     /// Create a new object and a new ringbuffer based on size
-    pub fn new_gstreamer(size: usize, rate: u32, interval: f32, src: gstreamer_app::AppSrc) -> Self {
+    pub fn new_gstreamer(
+        size: usize,
+        rate: u32,
+        interval: f32,
+        src: gstreamer_app::AppSrc,
+    ) -> Self {
         Self {
             interval,
             counter: 0.0,
-            producer: AudioProducerMethod::GStreamer { appsrc: src, rate, },
+            producer: AudioProducerMethod::GStreamer {
+                appsrc: src,
+                rate,
+                samples_sent: 0,
+            },
             buffer: AudioBuffer::new_f32(size),
             buffer_index: 0,
         }
@@ -392,22 +416,27 @@ impl AudioProducerWithRate {
         }
     }
 
+    /// fill the buffer immediately
+    pub fn direct_fill_audio_buffer(&mut self, sample: AudioSample) {
+        self.buffer.place(self.buffer_index, sample);
+        let out = if self.buffer_index < (self.buffer.len() - 1) {
+            self.buffer_index += 1;
+            None
+        } else {
+            self.buffer_index = 0;
+            Some(&self.buffer)
+        };
+        if let Some(out) = out {
+            self.producer.push_slice(out);
+        }
+    }
+
     /// Fill the local audio buffer with data, returning a Some when it is full
     pub fn fill_audio_buffer(&mut self, sample: AudioSample) {
         self.counter += 1.0;
         if self.counter >= self.interval {
             self.counter -= self.interval;
-            self.buffer.place(self.buffer_index, sample);
-            let out = if self.buffer_index < (self.buffer.len() - 1) {
-                self.buffer_index += 1;
-                None
-            } else {
-                self.buffer_index = 0;
-                Some(&self.buffer)
-            };
-            if let Some(out) = out {
-                self.producer.push_slice(out);
-            }
+            self.direct_fill_audio_buffer(sample);
         }
     }
 }

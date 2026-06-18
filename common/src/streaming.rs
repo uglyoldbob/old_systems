@@ -18,14 +18,18 @@ pub struct StreamingOut {
     audio: Option<AudioProducerWithRate>,
     /// The framerate in frames per second
     framerate: u8,
+    /// The presentation timestamp (in nanoseconds) to assign to the next video
+    /// buffer pushed into the pipeline. mpegtsmux needs monotonically increasing
+    /// timestamps to produce output.
+    video_pts_ns: u64,
 }
 
 fn dump_h264_nals(data: &[u8], label: &str) {
     let mut i = 0;
     while i + 4 <= data.len() {
-        let (start_code_len, nal_off) = if data[i..i+3] == [0, 0, 1] {
+        let (start_code_len, nal_off) = if data[i..i + 3] == [0, 0, 1] {
             (3, i + 3)
-        } else if i + 4 <= data.len() && data[i..i+4] == [0, 0, 0, 1] {
+        } else if i + 4 <= data.len() && data[i..i + 4] == [0, 0, 0, 1] {
             (4, i + 4)
         } else {
             i += 1;
@@ -53,6 +57,7 @@ impl StreamingOut {
             sink: None,
             audio: None,
             framerate: 60,
+            video_pts_ns: 0,
         }
     }
 
@@ -107,11 +112,12 @@ impl StreamingOut {
                 .build();
 
             audio_source.set_block(false);
-            //app_source.set_do_timestamp(true);
-            //app_source.set_is_live(true);
-            //audio_source.set_is_live(true);
             app_source.set_block(true);
-            //audio_source.set_do_timestamp(true);
+            // Buffers are timestamped explicitly when they are pushed (see
+            // `send_video_buffer` and the audio producer). Without valid PTS values
+            // mpegtsmux cannot produce any output, so the appsink would stay empty
+            // and nothing would ever be streamed or decoded.
+            self.video_pts_ns = 0;
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
                 .build()
@@ -146,6 +152,8 @@ impl StreamingOut {
                 .expect("Could not create source element.");
             let vencoder = gstreamer::ElementFactory::make("x264enc")
                 .name("vencode")
+                .property_from_str("tune", "zerolatency")
+                .property_from_str("speed-preset", "ultrafast")
                 .build()
                 .expect("Could not create source element.");
             use gstreamer::prelude::ObjectExt;
@@ -272,10 +280,17 @@ impl StreamingOut {
                 }
                 drop(p);
                 {
-                    let frame_duration = gstreamer::ClockTime::from_nseconds(1_000_000_000u64 / self.framerate as u64);
-                    buf.make_mut().set_duration(frame_duration);
+                    let frame_duration_ns = 1_000_000_000u64 / self.framerate as u64;
+                    let b = buf.make_mut();
+                    b.set_duration(gstreamer::ClockTime::from_nseconds(frame_duration_ns));
+                    // Assign a monotonically increasing PTS so that mpegtsmux can
+                    // build a valid MPEG-TS stream. Without a PTS the muxer never
+                    // produces output and nothing reaches the receiving pipeline.
+                    b.set_pts(gstreamer::ClockTime::from_nseconds(self.video_pts_ns));
+                    b.set_dts(gstreamer::ClockTime::from_nseconds(self.video_pts_ns));
+                    eprintln!("DBG video in pts_ns={}", self.video_pts_ns);
+                    self.video_pts_ns += frame_duration_ns;
                 }
-                source.do_timestamp();
                 match source.push_buffer(buf) {
                     Ok(_a) => {}
                     Err(e) => {
@@ -405,9 +420,14 @@ impl StreamingIn {
                 if let Some(buffer) = info.buffer() {
                     if let Ok(map) = buffer.map_readable() {
                         let data = map.as_slice();
-                        use sha2::Sha256;
                         use sha2::Digest;
-                        println!("--- from vparse: {} bytes, sha256={:x?}, pts={:?} ---", data.len(), Sha256::digest(&data).as_slice(), buffer.pts());
+                        use sha2::Sha256;
+                        println!(
+                            "--- from vparse: {} bytes, sha256={:x?}, pts={:?} ---",
+                            data.len(),
+                            Sha256::digest(&data).as_slice(),
+                            buffer.pts()
+                        );
                         //dump_h264_nals(data, "to-decoder");
                     }
                 }

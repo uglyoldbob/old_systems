@@ -8,7 +8,7 @@ fn main() {
     so.start(256, 240, 60, 1_000_000.0);
     std::thread::sleep(Duration::from_millis(500));
 
-    let samples_per_frame = 44100 / 60;
+    let samples_per_frame = 44100 / 50;
     let mut appsink = so.take_sink().expect("Failed to take sink");
     let mut aud = so.get_sound().expect("Failed to get audio");
 
@@ -20,6 +20,10 @@ fn main() {
     let mut encoded_frames = 0;
     let mut decoded_frames = 0;
 
+    for _ in 0..(44100-735) {
+        aud.direct_fill_audio_buffer(common_emulator::audio::AudioSample::F32(0.0));
+    }
+
     for i in 0..1600 {
         let fill = (i % 256) as u8;
         let mut image = RgbImage::new(256, 240);
@@ -29,7 +33,7 @@ fn main() {
             .map(|s| ((s as f32 / samples_per_frame as f32) * std::f32::consts::TAU).sin() * 0.5)
             .collect();
         for sample in &audio {
-            aud.fill_audio_buffer(common_emulator::audio::AudioSample::F32(*sample));
+            aud.direct_fill_audio_buffer(common_emulator::audio::AudioSample::F32(*sample));
         }
 
         loop {
