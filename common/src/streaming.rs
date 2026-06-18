@@ -154,6 +154,8 @@ impl StreamingOut {
                 .name("vencode")
                 .property_from_str("tune", "zerolatency")
                 .property_from_str("speed-preset", "ultrafast")
+                .property("bitrate", 2000u32)
+                .property("key-int-max", 30u32)
                 .build()
                 .expect("Could not create source element.");
             use gstreamer::prelude::ObjectExt;

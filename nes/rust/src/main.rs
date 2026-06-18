@@ -442,7 +442,12 @@ fn main() {
             let format = supportedconfig.sample_format();
             log::info!("output format is {:?}", format);
             let mut config = supportedconfig.config();
-            let mut num_samples = (config.sample_rate as f32 * 0.1) as usize;
+
+            if config.sample_rate < 44100 {
+                config.sample_rate = 44100;
+            }
+
+            let mut num_samples = (config.sample_rate as f32 * 0.05) as usize;
             let sbs = supportedconfig.buffer_size();
             let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
@@ -463,10 +468,6 @@ fn main() {
             log::info!("SBS IS {:?}", sbs);
 
             log::info!("audio config is {:?}", config);
-
-            if config.sample_rate < 44100 {
-                config.sample_rate = 44100;
-            }
 
             log::info!(
                 "Audio buffer size is {} elements, sample rate is {}",
