@@ -20,7 +20,7 @@ fn main() {
     let mut encoded_frames = 0;
     let mut decoded_frames = 0;
 
-    for _ in 0..(44100-735) {
+    for _ in 0..(44100 - 735) {
         aud.direct_fill_audio_buffer(common_emulator::audio::AudioSample::F32(0.0));
     }
 
@@ -44,7 +44,11 @@ fn main() {
                     let data = map.as_slice().to_vec();
                     total_bytes_sent += data.len();
                     encoded_frames += 1;
-                    println!("[frame {i}] encoded {} bytes (total: {})", data.len(), total_bytes_sent);
+                    println!(
+                        "[frame {i}] encoded {} bytes (total: {})",
+                        data.len(),
+                        total_bytes_sent
+                    );
                     si.send_data(data);
                 }
                 None => break,

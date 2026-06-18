@@ -170,27 +170,6 @@ impl StreamingOut {
                 .build()
                 .expect("Could not create source element.");
 
-            use gstreamer::prelude::PadExtManual;
-            let venc_src = vencoder.static_pad("src").unwrap();
-            venc_src.add_probe(gstreamer::PadProbeType::BUFFER, |_pad, info| {
-                if let Some(buffer) = info.buffer() {
-                    if let Ok(map) = buffer.map_readable() {
-                        let data = map.as_slice();
-                        let is_keyframe = !buffer
-                            .flags()
-                            .contains(gstreamer::BufferFlags::DELTA_UNIT);
-                        use sha2::Sha256;
-                        use sha2::Digest;
-                        println!(
-                            "--- x264enc out: {} bytes, pts={:?}, dts={:?}, sha256: {:x?}, keyframe={} ---",
-                            data.len(), buffer.pts(), buffer.dts(), Sha256::digest(&data).as_slice(), is_keyframe
-                        );
-                        //dump_h264_nals(data, "x264enc-out");
-                    }
-                }
-                gstreamer::PadProbeReturn::Ok
-            });
-
             let vqueue = gstreamer::ElementFactory::make("queue")
                 .name("vqueue")
                 .build()
@@ -288,7 +267,6 @@ impl StreamingOut {
                     // produces output and nothing reaches the receiving pipeline.
                     b.set_pts(gstreamer::ClockTime::from_nseconds(self.video_pts_ns));
                     b.set_dts(gstreamer::ClockTime::from_nseconds(self.video_pts_ns));
-                    eprintln!("DBG video in pts_ns={}", self.video_pts_ns);
                     self.video_pts_ns += frame_duration_ns;
                 }
                 match source.push_buffer(buf) {
@@ -413,26 +391,6 @@ impl StreamingIn {
                 .name("vdecode")
                 .build()
                 .expect("Could not create source element.");
-
-            use gstreamer::prelude::PadExtManual;
-            let dec_sink = vdecoder.static_pad("sink").unwrap();
-            dec_sink.add_probe(gstreamer::PadProbeType::BUFFER, |_pad, info| {
-                if let Some(buffer) = info.buffer() {
-                    if let Ok(map) = buffer.map_readable() {
-                        let data = map.as_slice();
-                        use sha2::Digest;
-                        use sha2::Sha256;
-                        println!(
-                            "--- from vparse: {} bytes, sha256={:x?}, pts={:?} ---",
-                            data.len(),
-                            Sha256::digest(&data).as_slice(),
-                            buffer.pts()
-                        );
-                        //dump_h264_nals(data, "to-decoder");
-                    }
-                }
-                gstreamer::PadProbeReturn::Ok
-            });
 
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
