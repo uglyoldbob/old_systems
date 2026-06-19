@@ -111,6 +111,9 @@ impl StreamingOut {
                 .name("network_sink")
                 .build();
 
+            use gstreamer::prelude::ObjectExt;
+            sink.set_property("sync", false);
+
             audio_source.set_block(false);
             app_source.set_block(true);
             // Buffers are timestamped explicitly when they are pushed (see
@@ -158,7 +161,6 @@ impl StreamingOut {
                 .property("key-int-max", 30u32)
                 .build()
                 .expect("Could not create source element.");
-            use gstreamer::prelude::ObjectExt;
             vencoder.set_property("byte-stream", true);
             let mux = gstreamer::ElementFactory::make("mpegtsmux")
                 .name("mepgmux")
