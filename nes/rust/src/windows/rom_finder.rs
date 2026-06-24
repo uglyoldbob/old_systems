@@ -12,11 +12,16 @@ use strum::IntoEnumIterator;
 pub struct RomFinder {
     /// Set when the initial scroll to the currently loaded rom has occurred
     pub scrolled: bool,
+    /// Found roms
+    found_roms: bool,
 }
 
 impl RomFinder {
     pub fn new() -> Self {
-        RomFinder { scrolled: false }
+        RomFinder {
+            scrolled: false,
+            found_roms: false,
+        }
     }
 }
 
@@ -28,11 +33,14 @@ impl RomFinder {
                 .with_title("ROM LOAD")
                 .with_inner_size([800.0, 640.0]),
             |ui, _class| {
-                //scan for roms if needed
-                let rp = c.local.configuration.get_rom_path().to_owned();
-                c.find_roms(&rp);
-                //process to see if any new roms need to be checked
-                c.process_roms();
+                if !self.found_roms {
+                    //scan for roms if needed
+                    let rp = c.local.configuration.get_rom_path().to_owned();
+                    c.find_roms(&rp);
+                    //process to see if any new roms need to be checked
+                    c.process_roms();
+                    self.found_roms = true;
+                }
 
                 let mut save_list = false;
                 let sp = c.local.save_path();

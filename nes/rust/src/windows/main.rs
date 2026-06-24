@@ -707,6 +707,7 @@ impl eframe::App for MainNesWindow {
 
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
+                let f = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
                 ui.menu_button("File", |ui| {
                     let button = egui::Button::new("Open rom?");
                     if ui.add_enabled(true, button).clicked() {
@@ -714,7 +715,7 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
-                    let button = egui::Button::new("Save state");
+                    let button = egui::Button::new("Save state - F5");
                     if ui.add_enabled(true, button).clicked()
                         || ui.ctx().input(|i| i.key_pressed(egui::Key::F5))
                     {
@@ -722,7 +723,7 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
-                    let button = egui::Button::new("Load state");
+                    let button = egui::Button::new("Load state - F6");
                     if ui.add_enabled(true, button).clicked()
                         || ui.ctx().input(|i| i.key_pressed(egui::Key::F6))
                     {
@@ -731,21 +732,54 @@ impl eframe::App for MainNesWindow {
                     }
 
                     if !self.recording.is_recording() {
-                        let button = egui::Button::new("Begin recording");
+                        let button = egui::Button::new("Begin recording - F7");
                         if ui.add_enabled(true, button).clicked()
-                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F6))
+                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F7))
                         {
                             start_stop_recording = Some(true);
                             ui.close_kind(egui::UiKind::Menu);
                         }
                     } else {
-                        let button = egui::Button::new("Stop recording");
+                        let button = egui::Button::new("Stop recording - F7");
                         if ui.add_enabled(true, button).clicked()
-                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F6))
+                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F7))
                         {
                             start_stop_recording = Some(false);
                             ui.close_kind(egui::UiKind::Menu);
                         }
+                    }
+
+                    let button = egui::Button::new("Rewind - F8");
+                    if ui.add_enabled(true, button).clicked()
+                        || ui.ctx().input(|i| i.key_pressed(egui::Key::F8))
+                    {
+                        rewind_state = true;
+                        ui.close_kind(egui::UiKind::Menu);
+                    }
+
+                    if self.c.mb.speed_ratio < 1.0 {
+                        let button = egui::Button::new("Disable slow mode - F11");
+                        if ui.add_enabled(true, button).clicked()
+                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F11))
+                        {
+                            self.c.mb.speed_ratio = 1.0;
+                        }
+                    } else {
+                        let button = egui::Button::new("Enable slow mode - F11");
+                        if ui.add_enabled(true, button).clicked()
+                            || ui.ctx().input(|i| i.key_pressed(egui::Key::F11))
+                        {
+                            self.c.mb.speed_ratio = 0.5;
+                        }
+                    }
+
+                    let button = egui::Button::new("Toggle fullscreen - F12");
+                    if ui.add_enabled(true, button).clicked()
+                        || ui.ctx().input(|i| i.key_pressed(egui::Key::F12))
+                    {
+                        ui.ctx()
+                            .send_viewport_cmd(egui::ViewportCommand::Fullscreen(!f));
+                        ui.close_kind(egui::UiKind::Menu);
                     }
 
                     let button = egui::Button::new("Open data path");
@@ -757,6 +791,12 @@ impl eframe::App for MainNesWindow {
                     let button = egui::Button::new("Networking");
                     if ui.add_enabled(true, button).clicked() {
                         self.networking_window = Some(crate::windows::network::Window::new());
+                        ui.close_kind(egui::UiKind::Menu);
+                    }
+
+                    let button = egui::Button::new("Exit");
+                    if ui.add_enabled(true, button).clicked() {
+                        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                         ui.close_kind(egui::UiKind::Menu);
                     }
                 });
@@ -831,6 +871,15 @@ impl eframe::App for MainNesWindow {
                         }
                     });
                 }
+                if f {
+                    let text = format!(
+                        "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
+                        env!("CARGO_PKG_VERSION"),
+                        self.emulator_fps,
+                        self.render_percent * 100.0
+                    );
+                    ui.label(text);
+                }
             });
         });
 
@@ -842,7 +891,17 @@ impl eframe::App for MainNesWindow {
             load_state = true;
         }
 
-        if ui.ctx().input(|i| i.key_pressed(egui::Key::F7)) {
+        if !self.recording.is_recording() {
+            if ui.ctx().input(|i| i.key_pressed(egui::Key::F7)) {
+                start_stop_recording = Some(true);
+            }
+        } else {
+            if ui.ctx().input(|i| i.key_pressed(egui::Key::F7)) {
+                start_stop_recording = Some(false);
+            }
+        }
+
+        if ui.ctx().input(|i| i.key_pressed(egui::Key::F8)) {
             rewind_state = true;
         }
 
@@ -924,53 +983,60 @@ impl eframe::App for MainNesWindow {
         }
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.vertical_centered(|ui| {
-                let size = ui.available_size();
-                ui.horizontal_centered(|ui| {
-                    if let Some(olocal) = &mut self.c.olocal {
-                        if let Some(network) = &mut olocal.network {
-                            let myc = network.get_controller_id();
-                            if network.role() == NodeRole::Observer
-                                || network.role() == NodeRole::Player
-                            {
-                                ui.vertical(|ui| {
-                                    for i in 0..4 {
-                                        if ui
-                                            .add(egui::Button::selectable(
-                                                myc == Some(i),
-                                                format!("Controller {}", i),
-                                            ))
-                                            .clicked()
-                                        {
-                                            let _e = network.request_controller(i);
-                                        }
-                                    }
-                                    if ui
-                                        .add(egui::Button::selectable(
-                                            myc.is_none(),
-                                            "No controller",
-                                        ))
-                                        .clicked()
-                                    {
-                                        let _e = network.release_controller();
-                                    }
-                                });
-                            }
-                        }
-                    }
+            let size = ui.available_size();
 
-                    if let Some(t) = &self.texture {
-                        let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
+            // Controller buttons — draw outside the centering logic
+            if let Some(olocal) = &mut self.c.olocal {
+                if let Some(network) = &mut olocal.network {
+                    let myc = network.get_controller_id();
+                    if network.role() == NodeRole::Observer || network.role() == NodeRole::Player {
+                        ui.vertical(|ui| {
+                            for i in 0..4 {
+                                if ui
+                                    .add(egui::Button::selectable(
+                                        myc == Some(i),
+                                        format!("Controller {}", i),
+                                    ))
+                                    .clicked()
+                                {
+                                    let _e = network.request_controller(i);
+                                }
+                            }
+                            if ui
+                                .add(egui::Button::selectable(myc.is_none(), "No controller"))
+                                .clicked()
+                            {
+                                let _e = network.release_controller();
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Center the image manually using add_sized + centering offset
+            if let Some(t) = &self.texture {
+                let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
+                let img_size = egui::Vec2 {
+                    x: t.size()[0] as f32 * zoom,
+                    y: t.size()[1] as f32 * zoom,
+                };
+
+                // Calculate top-left offset to center the image in the panel
+                let available = ui.available_size();
+                let offset = (available - img_size) * 0.5;
+                let offset = offset.max(egui::Vec2::ZERO);
+
+                ui.allocate_ui_at_rect(
+                    egui::Rect::from_min_size(ui.cursor().min + offset, img_size),
+                    |ui| {
                         let r = ui.add(
                             egui::Image::from_texture(egui::load::SizedTexture {
                                 id: t.id(),
-                                size: egui::Vec2 {
-                                    x: t.size()[0] as f32 * zoom,
-                                    y: t.size()[1] as f32 * zoom,
-                                },
+                                size: img_size,
                             })
                             .sense(egui::Sense::click_and_drag()),
                         );
+
                         if (r.clicked_by(egui::PointerButton::Secondary)
                             || r.dragged_by(egui::PointerButton::Secondary))
                             && !self.mouse
@@ -983,6 +1049,7 @@ impl eframe::App for MainNesWindow {
                             self.mouse_miss = false;
                             self.mouse_delay = 15;
                         }
+
                         if r.hovered() {
                             if let Some(pos) = r.hover_pos() {
                                 let coord = pos - r.rect.left_top();
@@ -1011,9 +1078,10 @@ impl eframe::App for MainNesWindow {
                                     && pixel.b() > 100;
                             }
                         }
-                    }
-                });
-            });
+                    },
+                );
+            }
+
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::Title(format!(
                     "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
@@ -1021,6 +1089,7 @@ impl eframe::App for MainNesWindow {
                     self.emulator_fps,
                     self.render_percent * 100.0
                 )));
+
             if self
                 .c
                 .mb

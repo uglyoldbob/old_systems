@@ -334,6 +334,7 @@ async fn run_bluetooth(
                 sdp_features: None,
             };
             let mut profile = ba.register_rfcomm_profile(settings).await?;
+            log::info!("Registered bluetooth");
             loop {
                 let c = profile.connectable().await?;
                 if let Ok(a) = c.accept().await {
@@ -387,16 +388,6 @@ fn main() {
     });
 
     let mut nes_data = NesEmulatorData::new(chan.1);
-    log::info!(
-        "There are {} roms in the romlist",
-        nes_data.local.parser.list().elements.len()
-    );
-    nes_data.local.parser.find_roms(
-        nes_data.local.configuration.get_rom_path(),
-        nes_data.local.save_path(),
-        nes_data.local.get_save_other(),
-        |n, p| NesCartridge::load_cartridge(n, p),
-    );
 
     let host = cpal::default_host();
     let device = host.default_output_device();
