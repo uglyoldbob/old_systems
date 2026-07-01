@@ -8986,7 +8986,7 @@ dependencies = [
 
 [[package]]
 name = "zesty-nes"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-channel",
  "asynchronous-codec",

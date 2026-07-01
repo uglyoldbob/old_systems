@@ -315,9 +315,9 @@ impl NesApu {
             + self.noise.audio()
             + self.dmc.audio();
         if let Some(filter) = filter {
-            let e = filter.run(audio / 5.0);
+            let e = filter.run((audio - 0.5) * 2.0);
             self.output_index += 1.0;
-            Some(AudioSample::F32(e.min(1.0).max(0.0)))
+            Some(AudioSample::F32(e.min(1.0).max(-1.0)))
         } else {
             None
         }

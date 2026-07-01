@@ -707,7 +707,7 @@ impl eframe::App for MainNesWindow {
 
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
-                let f = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
+                let is_fullscreen = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
                 ui.menu_button("File", |ui| {
                     let button = egui::Button::new("Open rom?");
                     if ui.add_enabled(true, button).clicked() {
@@ -778,7 +778,7 @@ impl eframe::App for MainNesWindow {
                         || ui.ctx().input(|i| i.key_pressed(egui::Key::F12))
                     {
                         ui.ctx()
-                            .send_viewport_cmd(egui::ViewportCommand::Fullscreen(!f));
+                            .send_viewport_cmd(egui::ViewportCommand::Fullscreen(!is_fullscreen));
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
@@ -871,7 +871,7 @@ impl eframe::App for MainNesWindow {
                         }
                     });
                 }
-                if f {
+                if is_fullscreen {
                     let text = format!(
                         "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
                         env!("CARGO_PKG_VERSION"),
