@@ -337,16 +337,23 @@ async fn run_bluetooth(
             log::info!("Registered bluetooth");
             loop {
                 let c = profile.connectable().await?;
-                if let Ok(a) = c.accept().await {
-                    let chan2 = send.clone();
-                    tokio::spawn(async move {
-                        let chan3 = chan2.clone();
-                        let mut cl = BluetoothControllerClient::new(a.0, a.1, chan3);
-                        if let Err(e) = cl.handle_bluetooth_controller_client().await {
-                            log::error!("Error communicating with bluetooth client: {:?}", e);
-                        }
-                        cl.end().await;
-                    });
+                match c.accept().await {
+                    Ok(a) => {
+                        log::info!("Got a bluetooth client: {:x?}", a.1);
+                        let chan2 = send.clone();
+                        tokio::spawn(async move {
+                            let chan3 = chan2.clone();
+                            let mut cl = BluetoothControllerClient::new(a.0, a.1, chan3);
+                            if let Err(e) = cl.handle_bluetooth_controller_client().await {
+                                log::error!("Error communicating with bluetooth client: {:?}", e);
+                            }
+                            log::info!("Ending bluetooth client {:x?}", a.1);
+                            cl.end().await;
+                        });
+                    }
+                    Err(e) => {
+                        log::error!("Error accepting connection: {}", e);
+                    }
                 }
             }
         }

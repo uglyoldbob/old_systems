@@ -885,9 +885,9 @@ dependencies = [
 
 [[package]]
 name = "bluetooth-rust"
-version = "0.4.0"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f5b7676672e092b58354fd6af32056e46e75e36c936cb7b38d6aa2fa71bd4fa"
+checksum = "fa555a8b72a2cb0390f1da3e89297842320bc084c3df5287f66494a4aed3fa73"
 dependencies = [
  "async-trait",
  "bluer",
