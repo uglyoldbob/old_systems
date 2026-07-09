@@ -1,0 +1,1 @@
+wix build main.wxs -ext WixToolset.Util.wixext -ext WixToolset.UI.wixext -arch x64

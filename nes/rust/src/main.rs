@@ -1,4 +1,4 @@
-//#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
 
