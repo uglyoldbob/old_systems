@@ -56,7 +56,7 @@
     <?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
 <?endif ?>
 
-<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
 
     <Product
         Id='*'
@@ -65,7 +65,7 @@
         Manufacturer='Thomas Epperson'
         Language='1033'
         Codepage='1252'
-        Version='$(var.Version)'>
+        Version='0.2.2'>
 
         <Package Id='*'
             Keywords='Installer'
@@ -122,9 +122,9 @@
                         <Component Id='binary0' Guid='*'>
                             <File
                                 Id='exe0'
-                                Name='nes.exe'
+                                Name='zesty-nes.exe'
                                 DiskId='1'
-                                Source='$(var.CargoTargetBinDir)\nes.exe'
+                                Source='..\zesty-nes.exe'
                                 KeyPath='yes'/>
                         </Component>
                         <Component Id="gstreamer" Guid='*'>
@@ -283,6 +283,42 @@
                                 Name='libgstvideoconvertscale.dll'
                                 DiskId='1'
                                 Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstvideoconvertscale.dll'
+                                KeyPath='yes'/>
+                            <File
+                                Id='gstcoreelements'
+                                Name='libgstcoreelements.dll'
+                                DiskId='1'
+                                Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstcoreelements.dll'
+                                KeyPath='yes'/>
+                            <File
+                                Id='gstlibav'
+                                Name='libgstlibav.dll'
+                                DiskId='1'
+                                Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstlibav.dll'
+                                KeyPath='yes'/>
+                            <File
+                                Id='gstlibmpegtsdemux'
+                                Name='libgstlibmpegtsdemux.dll'
+                                DiskId='1'
+                                Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstlibmpegtsdemux.dll'
+                                KeyPath='yes'/>
+                            <File
+                                Id='gstlibmpegtsmux'
+                                Name='libgstlibmpegtsmux.dll'
+                                DiskId='1'
+                                Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstlibmpegtsmux.dll'
+                                KeyPath='yes'/>
+                            <File
+                                Id='gstlibopenh264'
+                                Name='libgstlibopenh264.dll'
+                                DiskId='1'
+                                Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstlibopenh264.dll'
+                                KeyPath='yes'/>
+                            <File
+                                Id='gstvideoparsersbad'
+                                Name='libgstvideoparsersbad.dll'
+                                DiskId='1'
+                                Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstvideoparsersbad.dll'
                                 KeyPath='yes'/>
                         </Component>
                     </Directory>
