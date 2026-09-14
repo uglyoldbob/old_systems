@@ -465,7 +465,7 @@ impl NesEmulatorData {
 
     /// Return the framerate of the ppu
     pub fn ppu_frame_rate(&self) -> f32 {
-        60.0
+        60.0988
     }
 
     /// Return the cpu frequency.

@@ -443,7 +443,7 @@ fn main() {
                     .then_with(|| b.max_sample_rate().cmp(&a.max_sample_rate()))
             });
 
-            let supportedconfig = configs[0].clone().with_max_sample_rate();
+            let supportedconfig = configs[0].clone().with_sample_rate(44100);
             let format = supportedconfig.sample_format();
             log::info!("output format is {:?}", format);
             let mut config = supportedconfig.config();
@@ -452,7 +452,7 @@ fn main() {
                 config.sample_rate = 44100;
             }
 
-            let mut num_samples = (config.sample_rate as f32 * 0.05) as usize;
+            let mut num_samples = (config.sample_rate as f32 * 0.10) as usize;
             let sbs = supportedconfig.buffer_size();
             let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
                 if num_samples > *max as usize {
