@@ -370,10 +370,12 @@ fn main() {
 
     #[cfg(target_os = "windows")]
     {
-        let exe_dir = std::env::current_exe().unwrap()
+        let exe_dir = std::env::current_exe()
+            .unwrap()
             .parent()
             .map(std::path::PathBuf::from)
-            .ok_or("Could not determine executable directory").unwrap();
+            .ok_or("Could not determine executable directory")
+            .unwrap();
         std::env::set_var("GST_PLUGIN_PATH", exe_dir);
     }
     simple_file_logger::init_logger("ZestyNes", simple_file_logger::LogLevel::Info).unwrap();
@@ -421,28 +423,24 @@ fn main() {
                     c.max_sample_rate()
                 );
             }
-            configs.sort_by(|c, d| {
-                let index = |sf| match sf {
-                    cpal::SampleFormat::I8 => 10,
-                    cpal::SampleFormat::I16 => 10,
-                    cpal::SampleFormat::I32 => 10,
-                    cpal::SampleFormat::I64 => 10,
+            configs.sort_by(|a, b| {
+                let format_index = |sf| match sf {
+                    cpal::SampleFormat::F32 => 0,
+                    cpal::SampleFormat::U32 => 1,
+                    cpal::SampleFormat::U16 => 2,
                     cpal::SampleFormat::U8 => 3,
-                    cpal::SampleFormat::U16 => 1,
-                    cpal::SampleFormat::U32 => 0,
-                    cpal::SampleFormat::U64 => 10,
-                    cpal::SampleFormat::F32 => 2,
-                    cpal::SampleFormat::F64 => 10,
+                    cpal::SampleFormat::I8
+                    | cpal::SampleFormat::I16
+                    | cpal::SampleFormat::I32
+                    | cpal::SampleFormat::I64
+                    | cpal::SampleFormat::U64
+                    | cpal::SampleFormat::F64 => 10,
                     _ => 10,
                 };
-                let ic = index(c.sample_format());
-                let id = index(d.sample_format());
-                ic.partial_cmp(&id).unwrap()
-            });
-            configs.sort_by(|c, d| {
-                c.max_sample_rate()
-                    .partial_cmp(&d.max_sample_rate())
-                    .unwrap()
+
+                format_index(a.sample_format())
+                    .cmp(&format_index(b.sample_format()))
+                    .then_with(|| b.max_sample_rate().cmp(&a.max_sample_rate()))
             });
 
             let supportedconfig = configs[0].clone().with_max_sample_rate();

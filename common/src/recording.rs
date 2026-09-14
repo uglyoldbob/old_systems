@@ -2,7 +2,10 @@
 
 use std::path::PathBuf;
 
-use gstreamer::prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual};
+use gstreamer::{
+    glib::object::ObjectExt,
+    prelude::{Cast, ElementExt, ElementExtManual, GstBinExtManual},
+};
 
 use crate::audio::AudioProducerWithRate;
 
@@ -79,10 +82,7 @@ impl Recording {
             app_source.set_block(false);
             audio_source.set_do_timestamp(true);
 
-            let vbitrate = &format!(
-                "{}",
-                image.width as u32 * image.height as u32 * framerate as u32 / 8
-            );
+            let vbitrate = image.width as u32 * image.height as u32 * framerate as u32 / 8;
             println!("Video bitrate is calculated as {}", vbitrate);
 
             let vconv = gstreamer::ElementFactory::make("videoconvert")
@@ -94,15 +94,15 @@ impl Recording {
                 .name("aconvert")
                 .build()
                 .expect("Could not create source element.");
-            let aencoder = gstreamer::ElementFactory::make("alawenc")
-                .name("aencode")
-                .build()
-                .expect("Could not create source element.");
-            let vencoder = gstreamer::ElementFactory::make("openh264enc")
+            let vencoder = gstreamer::ElementFactory::make("x264enc")
                 .name("vencode")
-                .property_from_str("bitrate", vbitrate)
+                .property_from_str("tune", "zerolatency")
+                .property_from_str("speed-preset", "ultrafast")
+                .property("bitrate", vbitrate / 1024)
+                .property("key-int-max", 30u32)
                 .build()
                 .expect("Could not create source element.");
+            vencoder.set_property("byte-stream", true);
             let avimux = gstreamer::ElementFactory::make("avimux")
                 .name("avi")
                 .build()
@@ -124,7 +124,6 @@ impl Recording {
                 .add_many([
                     app_source.upcast_ref(),
                     audio_source.upcast_ref(),
-                    &aencoder,
                     &vconv,
                     &aconv,
                     &aresample,
@@ -134,15 +133,9 @@ impl Recording {
                 ])
                 .unwrap();
             gstreamer::Element::link_many([app_source.upcast_ref(), &vconv, &vencoder]).unwrap();
-            gstreamer::Element::link_many([
-                audio_source.upcast_ref(),
-                &aconv,
-                &aresample,
-                &aencoder,
-            ])
-            .unwrap();
+            gstreamer::Element::link_many([audio_source.upcast_ref(), &aconv, &aresample]).unwrap();
 
-            aencoder.link(&avimux).unwrap();
+            aresample.link(&avimux).unwrap();
             vencoder.link(&avimux).unwrap();
             avimux.link(&sink).unwrap();
 
