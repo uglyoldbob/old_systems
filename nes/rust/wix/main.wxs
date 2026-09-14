@@ -65,7 +65,7 @@
         Compressed='yes'
         Scope='perMachine'>
 
-        <Icon Id="ApplicationIcon.ico" SourceFile="../icon.png"/>
+        <Icon Id="ApplicationIcon.ico" SourceFile="../icon.ico"/>
 
         <MajorUpgrade
             Schedule='afterInstallInitialize'
@@ -125,6 +125,7 @@
                             Name='Zesty NES'
                             Description='Play NES games'
                             Target='[Bin]zesty-nes.exe'
+                            Icon="ApplicationIcon"
                             WorkingDirectory='Bin'/>
                         <RemoveFolder Id='CleanUpShortcutStartMenu' Directory='ApplicationProgramsFolder' On='uninstall'/>
                         <RegistryValue Root='HKCU' Key='Software\uglyoldbob\zestynes' Name='StartMenuShortcutInstalled' Type='integer' Value='1' KeyPath='yes'/>
@@ -136,6 +137,7 @@
                             Name='Zesty NES'
                             Description='Play NES games'
                             Target='[Bin]zesty-nes.exe'
+                            Icon="ApplicationIcon"
                             WorkingDirectory='Bin'/>
                         <RegistryValue Root='HKCU' Key='Software\uglyoldbob\zestynes' Name='DesktopShortcutInstalled' Type='integer' Value='1' KeyPath='yes'/>
                     </Component>
