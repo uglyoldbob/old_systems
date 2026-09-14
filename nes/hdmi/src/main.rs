@@ -8,7 +8,7 @@ struct HdmiOutput {
     vactive: bool,
     vsync: bool,
     vcount: u16,
-    de: bool,  // combinatorial: hactive & vactive
+    de: bool, // combinatorial: hactive & vactive
     pde: bool,
     ppu_enable: bool,
     ppu_count: u16,
@@ -30,12 +30,12 @@ const V_SYNC_WIDTH: u16 = 5;
 const V_BLANKING: u16 = 30;
 
 const HSYNC_START: u16 = 6 + H_ACTIVE + H_SYNC_OFFSET;
-const HSYNC_END:   u16 = 6 + H_ACTIVE + H_SYNC_OFFSET + H_SYNC_WIDTH;
-const HSCAN:       u16 = H_ACTIVE + H_BLANKING - 1;
+const HSYNC_END: u16 = 6 + H_ACTIVE + H_SYNC_OFFSET + H_SYNC_WIDTH;
+const HSCAN: u16 = H_ACTIVE + H_BLANKING - 1;
 
 const VSYNC_START: u16 = 3 + V_ACTIVE + V_SYNC_OFFSET;
-const VSYNC_END:   u16 = 3 + V_ACTIVE + V_SYNC_OFFSET + V_SYNC_WIDTH;
-const VSCAN:       u16 = V_ACTIVE + V_BLANKING - 1;
+const VSYNC_END: u16 = 3 + V_ACTIVE + V_SYNC_OFFSET + V_SYNC_WIDTH;
+const VSCAN: u16 = V_ACTIVE + V_BLANKING - 1;
 
 fn emit_image<F: Fn(&HdmiOutput) -> bool>(frame: &[HdmiOutput], name: &str, closure: F) {
     let mut image = Vec::new();
@@ -64,14 +64,14 @@ fn main() {
     let mut frame: Vec<HdmiOutput> = Vec::with_capacity(total_pixels);
 
     // Registered state (what the FSM holds)
-    let mut hcount:  u16  = 0;
-    let mut vcount:  u16  = 0;
+    let mut hcount: u16 = 0;
+    let mut vcount: u16 = 0;
     let mut hactive: bool = false;
     let mut vactive: bool = false;
     let mut phactive: bool = false;
     let mut pvactive: bool = false;
-    let mut hsync:   bool = false;
-    let mut vsync:   bool = false;
+    let mut hsync: bool = false;
+    let mut vsync: bool = false;
     let mut ppu_count: u16 = 0;
     let mut ppu_vcount: u16 = 0;
     let mut ppu_row: u16 = 0;
@@ -98,12 +98,12 @@ fn main() {
         });
 
         // Now compute NextValue updates (all happen simultaneously, like hardware)
-        let mut next_hcount  = hcount;
-        let mut next_vcount  = vcount;
+        let mut next_hcount = hcount;
+        let mut next_vcount = vcount;
         let mut next_hactive = hactive;
         let mut next_vactive = vactive;
-        let mut next_hsync   = hsync;
-        let mut next_vsync   = vsync;
+        let mut next_hsync = hsync;
+        let mut next_vsync = vsync;
         let mut next_phactive = phactive;
         let mut next_pvactive = pvactive;
         let mut next_ppu_count = ppu_count;
@@ -118,55 +118,83 @@ fn main() {
         } else {
             next_ppu_count = 0;
         }
-        if ppu_count == 2 { 
+        if ppu_count == 2 {
             next_ppu_count = 0;
         }
         if ppu_count == 2 {
             next_ppu_col = ppu_col + 1;
         }
 
-        if hcount == 0           { next_phactive = true;  }
-        if hcount == 6           { next_hactive = true;  }
-        if hcount == H_ACTIVE    { next_hactive = false; }
-        if hcount == H_ACTIVE    { next_phactive = false; }
-        if hcount == HSYNC_START { next_hsync   = true;  }
-        if hcount == HSYNC_END   { next_hsync   = false; }
-        if hcount == HSCAN       { next_hcount  = 0;     }
+        if hcount == 0 {
+            next_phactive = true;
+        }
+        if hcount == 6 {
+            next_hactive = true;
+        }
+        if hcount == H_ACTIVE {
+            next_hactive = false;
+        }
+        if hcount == H_ACTIVE {
+            next_phactive = false;
+        }
+        if hcount == HSYNC_START {
+            next_hsync = true;
+        }
+        if hcount == HSYNC_END {
+            next_hsync = false;
+        }
+        if hcount == HSCAN {
+            next_hcount = 0;
+        }
 
         // Vertical updates trigger at hsync_start
         if hcount == HSYNC_START {
             next_vcount = vcount + 1;
-            if pvactive && ppu_vcount < 262 { 
+            if pvactive && ppu_vcount < 262 {
                 next_ppu_vcount = ppu_vcount + 1;
                 next_ppu_col = 0;
             } else {
                 next_ppu_vcount = 0;
             }
-            if ppu_vcount == 2 { 
+            if ppu_vcount == 2 {
                 next_ppu_vcount = 0;
                 next_ppu_col = 0;
             }
             if vcount > V_ACTIVE && vcount <= PPUV_ACTIVE {
                 next_ppu_vcount = 1;
             }
-            if vcount == 0           { next_pvactive = true;  }
-            if vcount == 3           { next_vactive = true;  }
-            if vcount == V_ACTIVE    { next_vactive = false; }
-            if vcount == PPUV_ACTIVE    { next_pvactive = false; }
-            if vcount == VSYNC_START { next_vsync   = true;  }
-            if vcount == VSYNC_END   { next_vsync   = false; }
-            if vcount == VSCAN       { next_vcount  = 0;     }
+            if vcount == 0 {
+                next_pvactive = true;
+            }
+            if vcount == 3 {
+                next_vactive = true;
+            }
+            if vcount == V_ACTIVE {
+                next_vactive = false;
+            }
+            if vcount == PPUV_ACTIVE {
+                next_pvactive = false;
+            }
+            if vcount == VSYNC_START {
+                next_vsync = true;
+            }
+            if vcount == VSYNC_END {
+                next_vsync = false;
+            }
+            if vcount == VSCAN {
+                next_vcount = 0;
+            }
         }
 
         // Commit next state
-        hcount  = next_hcount;
-        vcount  = next_vcount;
+        hcount = next_hcount;
+        vcount = next_vcount;
         hactive = next_hactive;
         vactive = next_vactive;
         phactive = next_phactive;
         pvactive = next_pvactive;
-        hsync   = next_hsync;
-        vsync   = next_vsync;
+        hsync = next_hsync;
+        vsync = next_vsync;
         ppu_count = next_ppu_count;
         ppu_vcount = next_ppu_vcount;
         ppu_row = next_ppu_row;
@@ -189,5 +217,5 @@ fn main() {
             ppu_count += 1;
         }
     }
-    println!("There are {} ppu enables, {}", ppu_count, 341*262);
+    println!("There are {} ppu enables, {}", ppu_count, 341 * 262);
 }

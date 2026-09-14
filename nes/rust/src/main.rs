@@ -367,7 +367,16 @@ fn main() {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info");
     }
-    simple_logger::init_with_env().unwrap();
+
+    #[cfg(target_os = "windows")]
+    {
+        let exe_dir = std::env::current_exe().unwrap()
+            .parent()
+            .map(std::path::PathBuf::from)
+            .ok_or("Could not determine executable directory").unwrap();
+        std::env::set_var("GST_PLUGIN_PATH", exe_dir);
+    }
+    simple_file_logger::init_logger("ZestyNes", simple_file_logger::LogLevel::Info).unwrap();
 
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {

@@ -60,10 +60,12 @@
         Manufacturer='Thomas Epperson'
         Language='1033'
         Codepage='1252'
-        Version='0.2.2'
+        Version='0.2.3'
         InstallerVersion='500'
         Compressed='yes'
         Scope='perMachine'>
+
+        <Icon Id="ApplicationIcon.ico" SourceFile="../icon.png"/>
 
         <MajorUpgrade
             Schedule='afterInstallInitialize'
@@ -109,21 +111,6 @@
                 -->
 
                 <Directory Id='Bin' Name='bin'>
-                    <Component Id='Path' Guid='637FE215-00AB-4D94-8933-55A842433752' KeyPath='yes'>
-                        <!--
-                          Environment is a WiX extension element in v4 and must
-                          be namespace-qualified with util: (see xmlns:util
-                          declared on the root Wix element above).
-                        -->
-                        <Environment
-                            Id='PATH'
-                            Name='PATH'
-                            Value='[Bin]'
-                            Permanent='no'
-                            Part='last'
-                            Action='set'
-                            System='yes'/>
-                    </Component>
                     <Component Id='binary0' Guid='CB0D65E6-1F0A-4B1E-9C1A-0E0E5E5C7B01'>
                         <File
                             Id='exe0'
@@ -165,103 +152,97 @@
                       and directory, which is also valid in v4).
                     -->
                     <Component Id='gstaudio' Guid='1B1D6A3C-0001-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstaudio' Name='libgstaudio-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgstaudio-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gstaudio' Name='gstaudio-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstaudio-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstbase' Guid='1B1D6A3C-0002-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstbase' Name='libgstbase-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgstbase-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gstbase' Name='gstbase-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstbase-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gobject' Guid='1B1D6A3C-0003-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gobject' Name='libgobject-2.0-0.dll' Source='C:\msys64\ucrt64\bin\libgobject-2.0-0.dll' KeyPath='yes'/>
+                        <File Id='gobject' Name='gobject-2.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gobject-2.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstreamerlib' Guid='1B1D6A3C-0004-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstreamerlib' Name='libgstreamer-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgstreamer-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gstreamerlib' Name='gstreamer-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstreamer-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstvideo' Guid='1B1D6A3C-0005-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstvideo' Name='libgstvideo-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgstvideo-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gstvideo' Name='gstvideo-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstvideo-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='glib' Guid='1B1D6A3C-0006-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='glib' Name='libglib-2.0-0.dll' Source='C:\msys64\ucrt64\bin\libglib-2.0-0.dll' KeyPath='yes'/>
+                        <File Id='glib' Name='glib-2.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\glib-2.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstapp' Guid='1B1D6A3C-0007-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstapp' Name='libgstapp-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgstapp-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gstapp' Name='gstapp-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstapp-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gio' Guid='1B1D6A3C-0008-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gio' Name='libgio-2.0-0.dll' Source='C:\msys64\ucrt64\bin\libgio-2.0-0.dll' KeyPath='yes'/>
+                        <File Id='gio' Name='gio-2.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gio-2.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='intl' Guid='1B1D6A3C-0009-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='intl' Name='libintl-8.dll' Source='C:\msys64\ucrt64\bin\libintl-8.dll' KeyPath='yes'/>
+                        <File Id='intl' Name='intl-8.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\intl-8.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='orc' Guid='1B1D6A3C-000A-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='orc' Name='liborc-0.4-0.dll' Source='C:\msys64\ucrt64\bin\liborc-0.4-0.dll' KeyPath='yes'/>
+                        <File Id='orc' Name='orc-0.4-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\orc-0.4-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gsttag' Guid='1B1D6A3C-000B-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gsttag' Name='libgsttag-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgsttag-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gsttag' Name='gsttag-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gsttag-1.0-0.dll' KeyPath='yes'/>
+                    </Component>
+                    <Component Id='gstriff' Guid='1B1D6A3C-000B-4B1E-9C1A-0E0E5E5C7B02'>
+                        <File Id='gstriff' Name='gstriff-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstriff-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='ffi' Guid='1B1D6A3C-000C-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='ffi' Name='libffi-8.dll' Source='C:\msys64\ucrt64\bin\libffi-8.dll' KeyPath='yes'/>
+                        <File Id='ffi' Name='ffi-7.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\ffi-7.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gcc' Guid='1B1D6A3C-000D-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gcc' Name='libgcc_s_seh-1.dll' Source='C:\msys64\ucrt64\bin\libgcc_s_seh-1.dll' KeyPath='yes'/>
+                        <File Id='gcc' Name='libgcc_s_seh-1.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\libgcc_s_seh-1.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gmodule' Guid='1B1D6A3C-000E-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gmodule' Name='libgmodule-2.0-0.dll' Source='C:\msys64\ucrt64\bin\libgmodule-2.0-0.dll' KeyPath='yes'/>
+                        <File Id='gmodule' Name='gmodule-2.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gmodule-2.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='pcre' Guid='1B1D6A3C-000F-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='pcre' Name='libpcre2-8-0.dll' Source='C:\msys64\ucrt64\bin\libpcre2-8-0.dll' KeyPath='yes'/>
+                        <File Id='pcre' Name='pcre2-8-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\pcre2-8-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='iconv' Guid='1B1D6A3C-0010-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='iconv' Name='libiconv-2.dll' Source='C:\msys64\ucrt64\bin\libiconv-2.dll' KeyPath='yes'/>
+                        <File Id='iconv' Name='libiconv-2.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\libiconv-2.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='pthread' Guid='1B1D6A3C-0011-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='pthread' Name='libwinpthread-1.dll' Source='C:\msys64\ucrt64\bin\libwinpthread-1.dll' KeyPath='yes'/>
+                        <File Id='pthread' Name='libwinpthread-1.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\libwinpthread-1.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='zlib' Guid='1B1D6A3C-0012-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='zlib' Name='zlib1.dll' Source='C:\msys64\ucrt64\bin\zlib1.dll' KeyPath='yes'/>
+                        <File Id='zlib' Name='z-1.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\z-1.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstpbutils' Guid='1B1D6A3C-0013-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstpbutils' Name='libgstpbutils-1.0-0.dll' Source='C:\msys64\ucrt64\bin\libgstpbutils-1.0-0.dll' KeyPath='yes'/>
+                        <File Id='gstpbutils' Name='gstpbutils-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstpbutils-1.0-0.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='openh264' Guid='1B1D6A3C-0014-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='openh264' Name='libopenh264-7.dll' Source='C:\msys64\ucrt64\bin\libopenh264-7.dll' KeyPath='yes'/>
+                        <File Id='openh264' Name='openh264-7.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\openh264-7.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='stdcplusplus' Guid='1B1D6A3C-0015-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='stdcplusplus' Name='libstdc++-6.dll' Source='C:\msys64\ucrt64\bin\libstdc++-6.dll' KeyPath='yes'/>
+                        <File Id='stdcplusplus' Name='libstdc++-6.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\libstdc++-6.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstalaw' Guid='1B1D6A3C-0016-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstalaw' Name='libgstalaw.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstalaw.dll' KeyPath='yes'/>
+                        <File Id='gstalaw' Name='gstalaw.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstalaw.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='audioconvert' Guid='1B1D6A3C-0017-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='audioconvert' Name='libgstaudioconvert.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstaudioconvert.dll' KeyPath='yes'/>
+                        <File Id='audioconvert' Name='gstaudioconvert.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstaudioconvert.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='audioresample' Guid='1B1D6A3C-0018-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='audioresample' Name='libgstaudioresample.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstaudioresample.dll' KeyPath='yes'/>
+                        <File Id='audioresample' Name='gstaudioresample.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstaudioresample.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='avi' Guid='1B1D6A3C-0019-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='avi' Name='libgstavi.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstavi.dll' KeyPath='yes'/>
+                        <File Id='avi' Name='gstavi.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstavi.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstvideoconvertscale' Guid='1B1D6A3C-001A-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstvideoconvertscale' Name='libgstvideoconvertscale.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstvideoconvertscale.dll' KeyPath='yes'/>
+                        <File Id='gstvideoconvertscale' Name='gstvideoconvertscale.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstvideoconvertscale.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstcoreelements' Guid='1B1D6A3C-001B-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstcoreelements' Name='libgstcoreelements.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstcoreelements.dll' KeyPath='yes'/>
-                    </Component>
-                    <Component Id='gstlibav' Guid='1B1D6A3C-001C-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstlibav' Name='libgstlibav.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstlibav.dll' KeyPath='yes'/>
-                    </Component>
-                    <Component Id='gstlibmpegtsdemux' Guid='1B1D6A3C-001D-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstlibmpegtsdemux' Name='libgstmpegtsdemux.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstmpegtsdemux.dll' KeyPath='yes'/>
-                    </Component>
-                    <Component Id='gstlibmpegtsmux' Guid='1B1D6A3C-001E-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstlibmpegtsmux' Name='libgstmpegtsmux.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstmpegtsmux.dll' KeyPath='yes'/>
+                        <File Id='gstcoreelements' Name='gstcoreelements.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstcoreelements.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstlibopenh264' Guid='1B1D6A3C-001F-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstlibopenh264' Name='libgstopenh264.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstopenh264.dll' KeyPath='yes'/>
+                        <File Id='gstlibopenh264' Name='gstopenh264.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstopenh264.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstvideoparsersbad' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstvideoparsersbad' Name='libgstvideoparsersbad.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstvideoparsersbad.dll' KeyPath='yes'/>
+                        <File Id='gstvideoparsersbad' Name='gstvideoparsersbad.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstvideoparsersbad.dll' KeyPath='yes'/>
                     </Component>
-                    <Component Id='gstx264' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B02'>
-                        <File Id='gstx264' Name='libgstx264.dll' Source='C:\msys64\ucrt64\lib\gstreamer-1.0\libgstx264.dll' KeyPath='yes'/>
+                    <Component Id='gstavi' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B02'>
+                        <File Id='gstavi' Name='gstavi.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstavi.dll' KeyPath='yes'/>
                     </Component>
                 </Directory>
 
@@ -301,6 +282,7 @@
             <ComponentRef Id='intl'/>
             <ComponentRef Id='orc'/>
             <ComponentRef Id='gsttag'/>
+            <ComponentRef Id='gstriff'/>
             <ComponentRef Id='ffi'/>
             <ComponentRef Id='gcc'/>
             <ComponentRef Id='gmodule'/>
@@ -317,22 +299,9 @@
             <ComponentRef Id='avi'/>
             <ComponentRef Id='gstvideoconvertscale'/>
             <ComponentRef Id='gstcoreelements'/>
-            <ComponentRef Id='gstlibav'/>
-            <ComponentRef Id='gstlibmpegtsdemux'/>
-            <ComponentRef Id='gstlibmpegtsmux'/>
             <ComponentRef Id='gstlibopenh264'/>
             <ComponentRef Id='gstvideoparsersbad'/>
-            <ComponentRef Id='gstx264'/>
-
-            <Feature
-                Id='Environment'
-                Title='PATH Environment Variable'
-                Description='Add the install location of the [ProductName] executable to the PATH system environment variable. This allows the [ProductName] executable to be called from any location.'
-                Level='1'
-                AllowAbsent='yes'>
-                <ComponentRef Id='Path'/>
-            </Feature>
-
+            <ComponentRef Id='gstavi'/>
         </Feature>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>

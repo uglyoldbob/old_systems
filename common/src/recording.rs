@@ -88,7 +88,8 @@ impl Recording {
             let vconv = gstreamer::ElementFactory::make("videoconvert")
                 .name("vconvert")
                 .build()
-                .expect("Could not create source element.");
+                .map_err(|e| format!("Could not create videoconvert: {e:?}"))
+                .expect("Failed to open videoconvert");
             let aconv = gstreamer::ElementFactory::make("audioconvert")
                 .name("aconvert")
                 .build()

@@ -358,7 +358,8 @@ impl RomListParser {
         T: GetMapperNumber,
     {
         let compile_time = super::get_compile_time();
-        let data_time = chrono::DateTime::parse_from_str(&self.list.compile_time, "%+").unwrap_or_default();
+        let data_time =
+            chrono::DateTime::parse_from_str(&self.list.compile_time, "%+").unwrap_or_default();
         let force_refetch = compile_time > data_time;
         if force_refetch {
             println!("Forcing rom refresh {} {}", compile_time, data_time);

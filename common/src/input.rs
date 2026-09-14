@@ -19,7 +19,6 @@ pub enum UserInput {
 }
 
 impl UserInput {
-
     /// Convert the user input to a string, suitable for the user to see.
     pub fn as_string(&self) -> String {
         match self {
