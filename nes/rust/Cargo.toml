@@ -31,6 +31,7 @@ hex_fmt = "0.3.0"
 libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 log = "0.4.30"
 simple_file_logger = "0.4.2"
+winresource = "0.1.31"
 
 #update later
 rand = "0.8.5" 
@@ -56,6 +57,9 @@ walkdir = "2.5"
 serde = {version = "1.0.228", features = ["derive"]}
 serde_with = "3.20"
 bincode = "1.3.3"
+
+[build-dependencies]
+winresource = "0.1.31"
 
 [dev-dependencies]
 criterion = "0.8.2"
