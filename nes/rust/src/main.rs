@@ -423,6 +423,10 @@ fn main() {
                     c.max_sample_rate()
                 );
             }
+            configs.retain(|config| {
+                config.min_sample_rate() <= 44_100 &&
+                44_100 <= config.max_sample_rate()
+            });
             configs.sort_by(|a, b| {
                 let format_index = |sf| match sf {
                     cpal::SampleFormat::F32 => 0,
@@ -447,10 +451,6 @@ fn main() {
             let format = supportedconfig.sample_format();
             log::info!("output format is {:?}", format);
             let mut config = supportedconfig.config();
-
-            if config.sample_rate < 44100 {
-                config.sample_rate = 44100;
-            }
 
             let mut num_samples = (config.sample_rate as f32 * 0.10) as usize;
             let sbs = supportedconfig.buffer_size();

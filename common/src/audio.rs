@@ -319,7 +319,7 @@ impl AudioProducerMethod {
                     // of samples sent. mpegtsmux requires valid timestamps on every
                     // pad in order to produce any output.
                     bm.set_pts(gstreamer::ClockTime::from_nseconds(pts_ns));
-                    bm.set_dts(gstreamer::ClockTime::from_nseconds(pts_ns));
+                    //bm.set_dts(gstreamer::ClockTime::from_nseconds(pts_ns));
                 }
                 *samples_sent += samples;
                 let e = appsrc.push_buffer(buf);

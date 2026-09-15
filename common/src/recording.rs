@@ -80,7 +80,7 @@ impl Recording {
             app_source.set_is_live(true);
             audio_source.set_is_live(true);
             app_source.set_block(false);
-            audio_source.set_do_timestamp(true);
+            //audio_source.set_do_timestamp(true);
 
             let vbitrate = image.width as u32 * image.height as u32 * framerate as u32 / 8;
             println!("Video bitrate is calculated as {}", vbitrate);
@@ -176,17 +176,46 @@ impl Recording {
 
     /// Stop recording
     pub fn stop(&mut self) -> Result<(), gstreamer::FlowError> {
-        if let Some(pipeline) = &mut self.record_pipeline {
-            if let Some(source) = &mut self.record_source {
-                source.end_of_stream()?;
+        if let Some(pipeline) = &self.record_pipeline {
+            // Tell the pipeline that no more data will be produced.
+            pipeline.send_event(gstreamer::event::Eos::new());
+
+            // Wait for the muxer/sink to finish writing the file.
+            if let Some(bus) = pipeline.bus() {
+                match bus.timed_pop_filtered(
+                    gstreamer::ClockTime::from_seconds(5),
+                    &[gstreamer::MessageType::Eos, gstreamer::MessageType::Error],
+                ) {
+                    Some(msg) => {
+                        match msg.view() {
+                            gstreamer::MessageView::Eos(..) => {
+                                println!("Recording EOS received");
+                            }
+                            gstreamer::MessageView::Error(err) => {
+                                eprintln!(
+                                    "GStreamer recording error: {} ({:?})",
+                                    err.error(),
+                                    err.debug()
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                    None => {
+                        eprintln!("Timed out waiting for recording EOS");
+                    }
+                }
             }
+
             pipeline
                 .set_state(gstreamer::State::Null)
                 .expect("Unable to set the recording pipeline to the `Null` state");
         }
+
         self.record_pipeline = None;
         self.record_source = None;
         self.audio = None;
+
         Ok(())
     }
 }

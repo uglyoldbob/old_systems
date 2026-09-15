@@ -65,7 +65,7 @@
         Compressed='yes'
         Scope='perMachine'>
 
-        <Icon Id="ApplicationIcon.ico" SourceFile="../icon.ico"/>
+        <Icon Id="ApplicationIcon" SourceFile="../icon.ico"/>
 
         <MajorUpgrade
             Schedule='afterInstallInitialize'
@@ -125,7 +125,7 @@
                             Name='Zesty NES'
                             Description='Play NES games'
                             Target='[Bin]zesty-nes.exe'
-                            Icon="ApplicationIcon"
+                            Icon='ApplicationIcon'
                             WorkingDirectory='Bin'/>
                         <RemoveFolder Id='CleanUpShortcutStartMenu' Directory='ApplicationProgramsFolder' On='uninstall'/>
                         <RegistryValue Root='HKCU' Key='Software\uglyoldbob\zestynes' Name='StartMenuShortcutInstalled' Type='integer' Value='1' KeyPath='yes'/>
@@ -137,7 +137,7 @@
                             Name='Zesty NES'
                             Description='Play NES games'
                             Target='[Bin]zesty-nes.exe'
-                            Icon="ApplicationIcon"
+                            Icon='ApplicationIcon'
                             WorkingDirectory='Bin'/>
                         <RegistryValue Root='HKCU' Key='Software\uglyoldbob\zestynes' Name='DesktopShortcutInstalled' Type='integer' Value='1' KeyPath='yes'/>
                     </Component>
@@ -243,8 +243,8 @@
                     <Component Id='gstvideoparsersbad' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B01'>
                         <File Id='gstvideoparsersbad' Name='gstvideoparsersbad.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstvideoparsersbad.dll' KeyPath='yes'/>
                     </Component>
-                    <Component Id='gstavi' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B02'>
-                        <File Id='gstavi' Name='gstavi.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstavi.dll' KeyPath='yes'/>
+                    <Component Id='gstx264' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B03'>
+                        <File Id='gstx264' Name='gstx264.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstx264.dll' KeyPath='yes'/>
                     </Component>
                 </Directory>
 
@@ -293,17 +293,16 @@
             <ComponentRef Id='pthread'/>
             <ComponentRef Id='zlib'/>
             <ComponentRef Id='gstpbutils'/>
-            <ComponentRef Id='openh264'/>
             <ComponentRef Id='stdcplusplus'/>
             <ComponentRef Id='gstalaw'/>
             <ComponentRef Id='audioconvert'/>
             <ComponentRef Id='audioresample'/>
-            <ComponentRef Id='avi'/>
             <ComponentRef Id='gstvideoconvertscale'/>
             <ComponentRef Id='gstcoreelements'/>
             <ComponentRef Id='gstlibopenh264'/>
             <ComponentRef Id='gstvideoparsersbad'/>
-            <ComponentRef Id='gstavi'/>
+            <ComponentRef Id='avi'/>
+            <ComponentRef Id='gstx264'/>
         </Feature>
 
         <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
