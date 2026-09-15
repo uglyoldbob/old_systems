@@ -213,9 +213,6 @@
                     <Component Id='gstpbutils' Guid='1B1D6A3C-0013-4B1E-9C1A-0E0E5E5C7B01'>
                         <File Id='gstpbutils' Name='gstpbutils-1.0-0.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\gstpbutils-1.0-0.dll' KeyPath='yes'/>
                     </Component>
-                    <Component Id='openh264' Guid='1B1D6A3C-0014-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='openh264' Name='openh264-7.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\openh264-7.dll' KeyPath='yes'/>
-                    </Component>
                     <Component Id='stdcplusplus' Guid='1B1D6A3C-0015-4B1E-9C1A-0E0E5E5C7B01'>
                         <File Id='stdcplusplus' Name='libstdc++-6.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\bin\libstdc++-6.dll' KeyPath='yes'/>
                     </Component>
@@ -236,9 +233,6 @@
                     </Component>
                     <Component Id='gstcoreelements' Guid='1B1D6A3C-001B-4B1E-9C1A-0E0E5E5C7B01'>
                         <File Id='gstcoreelements' Name='gstcoreelements.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstcoreelements.dll' KeyPath='yes'/>
-                    </Component>
-                    <Component Id='gstlibopenh264' Guid='1B1D6A3C-001F-4B1E-9C1A-0E0E5E5C7B01'>
-                        <File Id='gstlibopenh264' Name='gstopenh264.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstopenh264.dll' KeyPath='yes'/>
                     </Component>
                     <Component Id='gstvideoparsersbad' Guid='1B1D6A3C-0020-4B1E-9C1A-0E0E5E5C7B01'>
                         <File Id='gstvideoparsersbad' Name='gstvideoparsersbad.dll' Source='C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\gstreamer-1.0\gstvideoparsersbad.dll' KeyPath='yes'/>
@@ -299,7 +293,6 @@
             <ComponentRef Id='audioresample'/>
             <ComponentRef Id='gstvideoconvertscale'/>
             <ComponentRef Id='gstcoreelements'/>
-            <ComponentRef Id='gstlibopenh264'/>
             <ComponentRef Id='gstvideoparsersbad'/>
             <ComponentRef Id='avi'/>
             <ComponentRef Id='gstx264'/>
