@@ -424,8 +424,7 @@ fn main() {
                 );
             }
             configs.retain(|config| {
-                config.min_sample_rate() <= 44_100 &&
-                44_100 <= config.max_sample_rate()
+                config.min_sample_rate() <= 44_100 && 44_100 <= config.max_sample_rate()
             });
             configs.sort_by(|a, b| {
                 let format_index = |sf| match sf {

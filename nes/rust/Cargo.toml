@@ -1,6 +1,6 @@
 [package]
 name = "zesty-nes"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Thomas Epperson <thomas.epperson@gmail.com>"]
 description = "A NES emulator written in Rust"
 edition = "2021"
