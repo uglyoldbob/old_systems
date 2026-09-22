@@ -51,9 +51,9 @@ impl ApuNoiseChannel {
                 1
             };
             let bit1 = self.shift_ctr & 1; // Bit 0
-            let bit2 = (self.shift_ctr >> shift) & 1; // Bit 1 or 6 from above
-            self.shift_ctr = (self.shift_ctr & 0x7fff) | ((bit1 ^ bit2) << 14);
-            self.shift_ctr >>= 1;
+            let bit2 = (self.shift_ctr >> shift) & 1; // Bit 1 or 6
+            let feedback = (bit1 ^ bit2) << 14;
+            self.shift_ctr = (self.shift_ctr >> 1) | feedback;
         }
     }
 

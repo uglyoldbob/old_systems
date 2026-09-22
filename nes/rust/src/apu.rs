@@ -59,32 +59,36 @@ impl ApuSweep {
             new_mute = true;
         }
 
-        *permod = if self.reload {
+        // Compute the target period. The target is always computed for muting purposes,
+        // even when sweep is disabled or shift is zero.
+        let delta = square_period >> shift;
+        // Use i32 arithmetic so we can detect overflow past $7FF without wrapping.
+        let target_i32: i32 = if negative {
+            match self.mode {
+                ApuSweepAddition::OnesComplement => square_period as i32 - delta as i32 - 1,
+                ApuSweepAddition::TwosComplement => square_period as i32 - delta as i32,
+            }
+        } else {
+            square_period as i32 + delta as i32
+        };
+        // Clamp negative targets to 0 (per spec).
+        let target = target_i32.max(0) as u16;
+        if target > 0x7ff {
+            new_mute = true;
+        }
+
+        // Advance the sweep divider and optionally apply the target period.
+        if self.reload {
             self.counter = period;
             self.reload = false;
-            *permod
         } else if self.counter > 0 {
             self.counter -= 1;
-            *permod
         } else {
             self.counter = period;
-            if enabled && shift != 0 {
-                let delta = square_period >> shift;
-                if negative {
-                    match self.mode {
-                        ApuSweepAddition::OnesComplement => *permod + (delta ^ 0xFFFF),
-                        ApuSweepAddition::TwosComplement => *permod - delta,
-                    }
-                } else {
-                    *permod + delta
-                }
-            } else {
-                *permod
+            // Only update the period when sweep is enabled, shift is nonzero, and not muting.
+            if enabled && shift != 0 && !new_mute {
+                *permod = target;
             }
-        };
-
-        if *permod > 0x7ff {
-            new_mute = true;
         }
 
         self.mute = new_mute;
@@ -301,13 +305,24 @@ impl NesApu {
         &mut self,
         filter: &mut Option<biquad::DirectForm1<f32>>,
     ) -> Option<AudioSample> {
-        let audio = self.squares[0].audio()
-            + self.squares[1].audio()
-            + self.triangle.audio()
-            + self.noise.audio()
-            + self.dmc.audio();
+        // Each channel's audio() returns its raw integer value divided by 255.
+        // Raw ranges: pulse/triangle/noise envelope = 0-15, DMC output = 0-127.
+        // Apply NES linear approximation mixer coefficients (from nesdev wiki):
+        //   pulse_out  = 0.00752  * (p1 + p2)   where p1,p2 in 0-15
+        //   tnd_out    = 0.00851  * tri          where tri   in 0-15
+        //              + 0.00494  * noise         where noise in 0-15
+        //              + 0.00335  * dmc           where dmc   in 0-127
+        // Since audio() = raw/255, multiply back: raw = audio() * 255.
+        //   pulse coeff * 255 = 1.9176
+        //   tri   coeff * 255 = 2.170
+        //   noise coeff * 255 = 1.260
+        //   dmc   coeff * 255 = 0.8543
+        let pulse_sum = (self.squares[0].audio() + self.squares[1].audio()) * 1.9176;
+        let tnd_sum =
+            self.triangle.audio() * 2.170 + self.noise.audio() * 1.260 + self.dmc.audio() * 0.8543;
+        let audio = pulse_sum + tnd_sum;
         if let Some(filter) = filter {
-            let e = filter.run(audio * 2.0);
+            let e = filter.run(audio);
             self.output_index += 1.0;
             Some(AudioSample::F32(e.min(1.0).max(-1.0)))
         } else {
@@ -496,6 +511,13 @@ impl NesApu {
             8..=11 => self.triangle.registers[(addr & 3) as usize] = data,
             12..=15 => self.noise.registers[(addr & 3) as usize] = data,
             16..=19 => self.dmc.registers[(addr & 3) as usize] = data,
+            _ => {}
+        }
+        // Reset the square sequencer phase after registers are written so freq_counter
+        // is loaded from the freshly-written timer values.
+        match addr {
+            3 => self.squares[0].reset_phase(),
+            7 => self.squares[1].reset_phase(),
             _ => {}
         }
     }

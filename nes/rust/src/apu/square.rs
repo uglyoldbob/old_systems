@@ -75,6 +75,12 @@ impl ApuSquareChannel {
         }
     }
 
+    /// Reset the sequencer phase, called on $4003/$4007 write
+    pub fn reset_phase(&mut self) {
+        self.duty_counter = 0;
+        self.freq_counter = self.get_freq_timer();
+    }
+
     /// Clock the envelope
     pub fn envelope_clock(&mut self) {
         self.envelope.clock(&self.registers);
