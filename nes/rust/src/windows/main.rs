@@ -10,7 +10,6 @@ use crate::{
 #[cfg(not(target_os = "android"))]
 use crate::emulator_data::BluetoothControllerOwner;
 
-
 #[cfg(not(target_os = "android"))]
 use common_emulator::network::NodeRole;
 
@@ -286,9 +285,11 @@ impl eframe::App for MainNesWindow {
                     }
                 }
             });
+            #[cfg(not(target_os = "android"))]
             if let Some(olocal) = &mut self.c.olocal {
                 while let Some(_e) = olocal.gilrs.next_event() {}
             }
+            #[cfg(not(target_os = "android"))]
             if let Some(olocal) = &mut self.c.olocal {
                 let gilrs = &mut olocal.gilrs;
                 for (id, gamepad) in gilrs.gamepads() {

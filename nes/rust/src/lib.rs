@@ -2,7 +2,6 @@
 /// use `x build --arch arm64 --platform android`
 /// or `x run --device ______`
 ///
-
 mod apu;
 mod cartridge;
 mod controller;
@@ -13,9 +12,22 @@ mod motherboard;
 mod ppu;
 mod windows;
 
-use emulator_data::NesEmulatorData;
+#[cfg(target_os = "android")]
+static INTERNAL_DATA_PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+#[cfg(target_os = "android")]
+pub fn set_application_data_path(p: &std::path::PathBuf) {
+    INTERNAL_DATA_PATH.set(p.clone());
+}
+
+#[cfg(target_os = "android")]
+pub fn get_application_data_path() -> std::path::PathBuf {
+    INTERNAL_DATA_PATH.get().unwrap().to_owned()
+}
+
 use crate::cartridge::NesCartridge;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use emulator_data::NesEmulatorData;
 
 use eframe::{egui, NativeOptions};
 
@@ -382,6 +394,9 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
         android_logger::Config::default().with_max_level(log::LevelFilter::Error),
     );
 
+    let internal_data_path = app.internal_data_path().unwrap();
+    set_application_data_path(&internal_data_path);
+
     let options = NativeOptions {
         android_app: Some(app),
         renderer: Renderer::Wgpu,
@@ -600,8 +615,7 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
 }
 
 #[cfg(not(target_os = "android"))]
-pub fn run()
-{
+pub fn run() {
     use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info");

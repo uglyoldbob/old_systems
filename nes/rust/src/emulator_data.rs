@@ -177,6 +177,7 @@ pub struct PendingBluetoothController {
 
 /// Just like LocalEmulatorDataClone, but the members do not implement Clone
 pub struct LocalEmulatorData {
+    #[cfg(not(target_os = "android"))]
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
     #[cfg(not(target_os = "android"))]
@@ -197,6 +198,7 @@ pub struct LocalEmulatorData {
 impl Default for LocalEmulatorData {
     fn default() -> Self {
         Self {
+            #[cfg(not(target_os = "android"))]
             gilrs: gilrs::GilrsBuilder::new().build().unwrap(),
             #[cfg(not(target_os = "android"))]
             bluetooth_controllers: [const { None }; 4],
@@ -222,6 +224,7 @@ pub struct LocalEmulatorDataClone {
     pub rom_test: common_emulator::rom_status::RomListTestParser,
     /// Indicates that the screen resolution is locked
     pub resolution_locked: bool,
+    #[cfg(not(target_os = "android"))]
     /// The way to get system specific paths
     dirs: directories::ProjectDirs,
     /// The stored resized image for the emulator
@@ -233,12 +236,18 @@ pub struct LocalEmulatorDataClone {
 impl LocalEmulatorDataClone {
     /// Returns the path to use for save states
     pub fn save_path(&self) -> std::path::PathBuf {
-        Self::get_save_path(&self.dirs)
+        #[cfg(not(target_os = "android"))]
+        return Self::get_save_path(&self.dirs);
+        #[cfg(target_os = "android")]
+        return crate::get_application_data_path();
     }
 
     /// Retrieve the path for other files that get saved
     pub fn get_save_other(&self) -> std::path::PathBuf {
-        self.dirs.data_dir().to_path_buf()
+        #[cfg(not(target_os = "android"))]
+        return self.dirs.data_dir().to_path_buf();
+        #[cfg(target_os = "android")]
+        return crate::get_application_data_path();
     }
 
     /// Retrieve the default path for roms. The user folder
@@ -252,7 +261,10 @@ impl LocalEmulatorDataClone {
         } else if let Some(bdirs) = directories::BaseDirs::new() {
             bdirs.home_dir().to_path_buf()
         } else {
-            self.dirs.data_local_dir().to_path_buf()
+            #[cfg(not(target_os = "android"))]
+            return self.dirs.data_local_dir().to_path_buf();
+            #[cfg(target_os = "android")]
+            return crate::get_application_data_path();
         }
     }
 
@@ -277,7 +289,7 @@ impl LocalEmulatorDataClone {
 
     /// Returns the path of where to save recordings to
     pub fn record_path(&self) -> std::path::PathBuf {
-        let mut pb = self.dirs.data_dir().to_path_buf();
+        let mut pb = self.get_save_other();
         pb.push("recordings");
         if !pb.exists() {
             let _ = std::fs::create_dir_all(&pb);
@@ -319,21 +331,31 @@ impl LocalEmulatorDataClone {
 
     /// Create a new Self object with the given event loop proxy
     fn new() -> Self {
+        #[cfg(not(target_os = "android"))]
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
-
+        #[cfg(not(target_os = "android"))]
         let mut user_path = dirs.config_dir().to_path_buf();
+        #[cfg(target_os = "android")]
+        let mut user_path = crate::get_application_data_path();
+
+        #[cfg(not(target_os = "android"))]
+        let other_path = Self::get_other_path(&dirs);
+        #[cfg(target_os = "android")]
+        let mut other_path = crate::get_application_data_path();
+
         user_path.push("config.toml");
         let user_config = EmulatorConfiguration::load(user_path);
 
         let config = user_config;
         Self {
             configuration: config,
-            parser: common_emulator::romlist::RomListParser::new(Self::get_other_path(&dirs)),
+            parser: common_emulator::romlist::RomListParser::new(other_path),
             #[cfg(feature = "rom_status")]
             rom_test: common_emulator::rom_status::RomListTestParser::new(
                 dirs.data_dir().to_path_buf(),
             ),
             resolution_locked: false,
+            #[cfg(not(target_os = "android"))]
             dirs,
             image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
