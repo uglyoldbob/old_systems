@@ -68,7 +68,6 @@ fn basic_cpu_test() {
 
             log::info!("Address is {:x} {:x}", address, cpu.get_pc());
             assert_eq!(cpu.get_pc(), address);
-            log::info!();
 
             let mut logcycle: u32 = 0;
             for i in 90..95 {

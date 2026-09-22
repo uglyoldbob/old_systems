@@ -381,14 +381,23 @@ impl NesEmulatorData {
         }
     }
 
+    /// Register the bluetooth controller info
+    pub fn register_bluetooth(
+        &mut self,
+        recv: tokio::sync::mpsc::Receiver<crate::BluetoothControllerInfo>,
+    ) {
+        if let Some(olocal) = &mut self.olocal {
+            olocal.blue_recv = Some(recv);
+        }
+    }
+
     /// Create a new nes emulator
-    pub fn new(recv: tokio::sync::mpsc::Receiver<crate::BluetoothControllerInfo>) -> Self {
+    pub fn new() -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let apu = NesApu::new();
 
-        let mut olocal = LocalEmulatorData::default();
-        olocal.blue_recv = Some(recv);
+        let olocal = LocalEmulatorData::default();
         Self {
             cpu: NesCpu::new(),
             cpu_peripherals: NesCpuPeripherals::new(ppu, apu),

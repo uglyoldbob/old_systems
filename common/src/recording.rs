@@ -186,21 +186,19 @@ impl Recording {
                     gstreamer::ClockTime::from_seconds(5),
                     &[gstreamer::MessageType::Eos, gstreamer::MessageType::Error],
                 ) {
-                    Some(msg) => {
-                        match msg.view() {
-                            gstreamer::MessageView::Eos(..) => {
-                                println!("Recording EOS received");
-                            }
-                            gstreamer::MessageView::Error(err) => {
-                                eprintln!(
-                                    "GStreamer recording error: {} ({:?})",
-                                    err.error(),
-                                    err.debug()
-                                );
-                            }
-                            _ => {}
+                    Some(msg) => match msg.view() {
+                        gstreamer::MessageView::Eos(..) => {
+                            println!("Recording EOS received");
                         }
-                    }
+                        gstreamer::MessageView::Error(err) => {
+                            eprintln!(
+                                "GStreamer recording error: {} ({:?})",
+                                err.error(),
+                                err.debug()
+                            );
+                        }
+                        _ => {}
+                    },
                     None => {
                         eprintln!("Timed out waiting for recording EOS");
                     }

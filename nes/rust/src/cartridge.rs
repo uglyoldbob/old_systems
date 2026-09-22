@@ -670,9 +670,8 @@ impl NesCartridge {
         }
     }
 
-    #[cfg(feature = "debugger")]
+    #[cfg(any(feature = "debugger", test))]
     ///Used in testing to over-write the contents of a specific byte in the rom image
-    #[cfg(test)]
     pub fn rom_byte_hack(&mut self, addr: u32, new_byte: u8) {
         self.mapper.rom_byte_hack(&mut self.data, addr, new_byte);
     }

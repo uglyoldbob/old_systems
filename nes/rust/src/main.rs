@@ -405,7 +405,8 @@ fn main() {
         }
     });
 
-    let mut nes_data = NesEmulatorData::new(chan.1);
+    let mut nes_data = NesEmulatorData::new();
+    nes_data.register_bluetooth(chan.1);
 
     let host = cpal::default_host();
     let device = host.default_output_device();
