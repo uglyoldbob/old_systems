@@ -93,17 +93,28 @@ impl ApuDmcChannel {
             if self.bit_counter < 7 {
                 self.bit_counter += 1;
             } else {
-                self.silence = self.sample_buffer.is_none();
-                if let Some(b) = self.sample_buffer {
-                    self.shift_register = b;
-                    self.sample_buffer = None;
-                } else {
-                    self.playing = false;
-                }
-                if self.length == 0 {
-                    self.playing = false;
-                }
                 self.bit_counter = 0;
+                // Load the next byte from the sample buffer if available
+                self.silence = self.sample_buffer.is_none();
+                if let Some(b) = self.sample_buffer.take() {
+                    self.shift_register = b;
+                } else {
+                    // Buffer empty and no new byte yet — go silent
+                    self.playing = false;
+                }
+                // If the sample length has been exhausted, handle end-of-sample
+                if self.length == 0 && self.sample_buffer.is_none() && self.dma_request.is_none() {
+                    if self.loop_flag {
+                        self.length = self.programmed_length;
+                        self.dma_address = 0xC000 + (self.registers[2] as u16 * 64);
+                        self.playing = true;
+                    } else {
+                        self.playing = false;
+                        if self.interrupt_enable {
+                            self.interrupt_flag = true;
+                        }
+                    }
+                }
             }
         }
     }

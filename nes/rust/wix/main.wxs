@@ -307,7 +307,7 @@
           Programs control panel for the application.
         -->
         <!--<Icon Id='ProductICO' SourceFile='wix\Product.ico'/>-->
-        <!--<Property Id='ARPPRODUCTICON' Value='ProductICO' />-->
+        <Property Id='ARPPRODUCTICON' Value='ApplicationIcon' />
 
         <!--
           Adding a URL to Add/Remove Programs control panel listing for the

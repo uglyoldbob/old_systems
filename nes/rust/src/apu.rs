@@ -209,14 +209,6 @@ impl NesApu {
         if self.dmc.dma_address == 0 {
             self.dmc.dma_address = 0x8000;
         }
-
-        if self.dmc.length == 0 {
-            if self.dmc.loop_flag {
-                self.dmc.length = self.dmc.programmed_length;
-            } else if self.dmc.interrupt_enable {
-                self.dmc.interrupt_flag = true;
-            }
-        }
     }
 
     /// Set the interrupt flag from the frame sequencer
@@ -276,7 +268,7 @@ impl NesApu {
 
     /// The quarter frame, as determined by the frame sequencer
     fn quarter_frame(&mut self) {
-        //TODO clock the triangle linear counter
+        self.triangle.clock_linear_counter();
         self.squares[0].envelope_clock();
         self.squares[1].envelope_clock();
         self.noise.envelope_clock();
@@ -401,10 +393,7 @@ impl NesApu {
         match addr {
             3 => {
                 let length = data >> 3;
-                if (self.status & (1 << 0)) != 0
-                    && self.squares[0].length_enabled
-                    && (!self.clock || !self.squares[0].length.running())
-                {
+                if (self.status & (1 << 0)) != 0 && self.squares[0].length_enabled {
                     self.squares[0].length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
@@ -412,10 +401,7 @@ impl NesApu {
             }
             7 => {
                 let length = data >> 3;
-                if (self.status & (1 << 1)) != 0
-                    && self.squares[1].length_enabled
-                    && (!self.clock || !self.squares[1].length.running())
-                {
+                if (self.status & (1 << 1)) != 0 && self.squares[1].length_enabled {
                     self.squares[1].length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
@@ -423,20 +409,15 @@ impl NesApu {
             }
             0xb => {
                 let length = data >> 3;
-                if (self.status & (1 << 2)) != 0
-                    && self.triangle.length_enabled
-                    && (!self.clock || !self.triangle.length.running())
-                {
+                if (self.status & (1 << 2)) != 0 && self.triangle.length_enabled {
                     self.triangle.length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
+                self.triangle.trigger_linear_counter_reload();
             }
             0xf => {
                 let length = data >> 3;
-                if (self.status & (1 << 3)) != 0
-                    && self.noise.length_enabled
-                    && (!self.clock || !self.noise.length.running())
-                {
+                if (self.status & (1 << 3)) != 0 && self.noise.length_enabled {
                     self.noise.length.set_length(length);
                     self.inhibit_length_clock = true;
                 }
@@ -481,6 +462,7 @@ impl NesApu {
                 } else if self.dmc.length == 0 {
                     self.dmc.programmed_length = (self.dmc.registers[3] as u16) * 16 + 1;
                     self.dmc.length = self.dmc.programmed_length;
+                    self.dmc.dma_address = 0xC000 + (self.dmc.registers[2] as u16 * 64);
                     self.dmc.playing = true;
                 }
                 self.dmc.interrupt_flag = false;
@@ -489,6 +471,7 @@ impl NesApu {
             0x17 => {
                 self.frame_sequencer_reset = 2;
                 if (data & 0x80) != 0 {
+                    self.quarter_frame();
                     self.half_frame();
                 }
                 self.fclock = data;

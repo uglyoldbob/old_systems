@@ -45,7 +45,7 @@ impl ApuNoiseChannel {
         } else {
             self.counter = FREQ_TABLE[(self.registers[2] & 0xF) as usize] - 1;
 
-            let shift = if (self.registers[3] & 0x80) != 0 {
+            let shift = if (self.registers[2] & 0x80) != 0 {
                 6
             } else {
                 1

@@ -51,10 +51,13 @@ impl ApuEnvelope {
                 } else if eloop {
                     self.decay = 15;
                 }
+            } else {
+                self.divider -= 1;
             }
         } else {
             self.decay = 15;
             self.divider = cv;
+            self.startflag = false;
         }
     }
 }
