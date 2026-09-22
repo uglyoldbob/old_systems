@@ -94,18 +94,21 @@ impl Window {
                         )
                         .clicked()
                     {
-                        let f = rfd::AsyncFileDialog::new()
-                            .set_title("Select rom folder")
-                            .set_directory(c.local.default_rom_path())
-                            .pick_folder();
-                        let message_sender = self.message_channel.0.clone();
-                        crate::execute(async move {
-                            let file = f.await;
-                            if let Some(file) = file {
-                                let fname = file.path().to_path_buf();
-                                message_sender.send(Message::NewRomPath(fname)).ok();
-                            }
-                        });
+                        #[cfg(not(target_os = "android"))]
+                        {
+                            let f = rfd::AsyncFileDialog::new()
+                                .set_title("Select rom folder")
+                                .set_directory(c.local.default_rom_path())
+                                .pick_folder();
+                            let message_sender = self.message_channel.0.clone();
+                            crate::execute(async move {
+                                let file = f.await;
+                                if let Some(file) = file {
+                                    let fname = file.path().to_path_buf();
+                                    message_sender.send(Message::NewRomPath(fname)).ok();
+                                }
+                            });
+                        }
                     }
 
                     if ui.button("Refresh rom list").clicked() {

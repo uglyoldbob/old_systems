@@ -5,20 +5,28 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[target.'cfg(not(target_os = "android"))'.dependencies]
+eframe = { version = "0.34.2" }
+gstreamer = "0.25.3"
+gstreamer-app = "0.25.2"
+gstreamer-audio = "0.25.3"
+gstreamer-video = "0.25.3"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = { version = "0.15", default-features = false }
+bluetooth-rust = { version = "0.4.2", features = ["sync"] }
+eframe = { version = "0.34.2", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
+wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
+
 [dependencies]
 async-channel = "2.5.0"
 asynchronous-codec = "0.7.0"
 bincode = "1.3.3"
 chrono = "0.4.44"
 compile-time = "0.2.0"
-eframe = { version = "0.34.2" }
 egui = { version = "0.34.2", features = ["serde"] }
 futures = "0.3.32"
 gilrs = {version = "0.11.1", features = ["serde-serialize"]}
-gstreamer = "0.25.2"
-gstreamer-app = "0.25.2"
-gstreamer-audio = "0.25.2"
-gstreamer-video = "0.25.2"
 libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 memmap2 = "0.9.10"
 ringbuf = "0.3.3"

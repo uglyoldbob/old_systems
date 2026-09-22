@@ -1230,9 +1230,11 @@ dependencies = [
 name = "common-emulator"
 version = "0.1.0"
 dependencies = [
+ "android_logger",
  "async-channel",
  "asynchronous-codec",
  "bincode",
+ "bluetooth-rust",
  "chrono",
  "compile-time",
  "eframe",
@@ -1251,6 +1253,7 @@ dependencies = [
  "strum 0.28.0",
  "tokio",
  "walkdir",
+ "wgpu 27.0.1",
 ]
 
 [[package]]
@@ -9016,6 +9019,7 @@ dependencies = [
 name = "zesty-nes"
 version = "0.2.4"
 dependencies = [
+ "android_logger",
  "async-channel",
  "asynchronous-codec",
  "bincode",
@@ -9030,6 +9034,7 @@ dependencies = [
  "directories",
  "eframe",
  "egui 0.34.2",
+ "egui-winit",
  "enum_dispatch",
  "futures",
  "gilrs",
@@ -9055,6 +9060,7 @@ dependencies = [
  "tokio",
  "toml 1.1.2+spec-1.1.0",
  "walkdir",
+ "wgpu 27.0.1",
  "winresource",
 ]
 

@@ -4,13 +4,18 @@ use std::io::Write;
 
 use crate::{
     controller::{ButtonCombination, NesControllerTrait},
-    emulator_data::BluetoothControllerOwner,
     NesEmulatorData,
 };
 
+#[cfg(not(target_os = "android"))]
+use crate::emulator_data::BluetoothControllerOwner;
+
+
+#[cfg(not(target_os = "android"))]
 use common_emulator::network::NodeRole;
 
 use common_emulator::audio::AudioProducerWithRate;
+#[cfg(not(target_os = "android"))]
 use common_emulator::recording::Recording;
 
 use eframe::egui;
@@ -50,8 +55,10 @@ pub struct MainNesWindow {
     mouse_delay: u8,
     /// The zapper was fired "off-screen"
     mouse_miss: bool,
+    #[cfg(not(target_os = "android"))]
     /// The result of opening gstreamer
     have_gstreamer: Result<(), gstreamer::glib::Error>,
+    #[cfg(not(target_os = "android"))]
     /// The recording object
     recording: Recording,
     /// The audio objects for a streaming server
@@ -60,6 +67,7 @@ pub struct MainNesWindow {
     render_percent: f32,
     /// The open rom window
     open_rom_window: Option<crate::windows::rom_finder::RomFinder>,
+    #[cfg(not(target_os = "android"))]
     /// The networking window
     networking_window: Option<crate::windows::network::Window>,
     /// The configuration window
@@ -106,9 +114,11 @@ impl MainNesWindow {
         stream: Option<cpal::Stream>,
     ) -> Self {
         use std::time::Duration;
-
+        #[cfg(not(target_os = "android"))]
         let have_gstreamer = gstreamer::init();
+        #[cfg(not(target_os = "android"))]
         gstreamer::log::set_threshold_from_string("appsink:WARN", false);
+        #[cfg(not(target_os = "android"))]
         if let Err(e) = &have_gstreamer {
             log::error!("Failed to open gstreamer: {:?}", e);
         }
@@ -116,6 +126,7 @@ impl MainNesWindow {
         let rom_checker_window = crate::windows::rom_checker::Window::new(&c);
         Self {
             c,
+            #[cfg(not(target_os = "android"))]
             have_gstreamer,
             rewind_point: None,
             rewinds: [Vec::new(), Vec::new(), Vec::new()],
@@ -133,12 +144,14 @@ impl MainNesWindow {
             mouse_vision: false,
             mouse_delay: 0,
             mouse_miss: false,
+            #[cfg(not(target_os = "android"))]
             recording: Recording::new(),
             audio_streaming: Vec::new(),
             render_percent: 0.0,
             configuration_window: None,
             controllers_window: None,
             game_genie_window: None,
+            #[cfg(not(target_os = "android"))]
             networking_window: None,
             open_rom_window: None,
             #[cfg(feature = "debugger")]
@@ -317,8 +330,10 @@ impl eframe::App for MainNesWindow {
                 }
             }
 
+            #[cfg(not(target_os = "android"))]
             self.c.check_bluetooth_controllers();
 
+            #[cfg(not(target_os = "android"))]
             if let Some(olocal) = &mut self.c.olocal {
                 if let Some(network) = &mut olocal.network {
                     match network.role() {
@@ -350,6 +365,7 @@ impl eframe::App for MainNesWindow {
             }
         }
 
+        #[cfg(not(target_os = "android"))]
         if let Some(olocal) = &mut self.c.olocal {
             if let Some(network) = &mut olocal.network {
                 match network.role() {
@@ -391,6 +407,7 @@ impl eframe::App for MainNesWindow {
             if let Some(s) = &mut self.sound {
                 sound.push(s);
             }
+            #[cfg(not(target_os = "android"))]
             if let Some(s) = self.recording.get_sound() {
                 sound.push(s);
             }
@@ -461,7 +478,9 @@ impl eframe::App for MainNesWindow {
                                 .resize(self.c.local.configuration.scaler);
                             self.c.local.image = image;
                         }
+                        #[cfg(not(target_os = "android"))]
                         self.recording.send_frame(&self.c.local.image);
+                        #[cfg(not(target_os = "android"))]
                         if let Some(olocal) = &mut self.c.olocal {
                             if let Some(network) = &mut olocal.network {
                                 if network.role() == NodeRole::PlayerHost {
@@ -522,6 +541,7 @@ impl eframe::App for MainNesWindow {
         //Some(true) means start recording, Some(false) means stop recording
         let mut start_stop_recording: Option<bool> = None;
 
+        #[cfg(not(target_os = "android"))]
         if let Some(olocal) = &mut self.c.olocal {
             let mut pop_front = false;
             let mut pending_player = None;
@@ -605,6 +625,7 @@ impl eframe::App for MainNesWindow {
                 self.game_genie_window.take();
             }
         }
+        #[cfg(not(target_os = "android"))]
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.networking_window {
@@ -731,6 +752,7 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
+                    #[cfg(not(target_os = "android"))]
                     if !self.recording.is_recording() {
                         let button = egui::Button::new("Begin recording - F7");
                         if ui.add_enabled(true, button).clicked()
@@ -788,10 +810,13 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
-                    let button = egui::Button::new("Networking");
-                    if ui.add_enabled(true, button).clicked() {
-                        self.networking_window = Some(crate::windows::network::Window::new());
-                        ui.close_kind(egui::UiKind::Menu);
+                    #[cfg(not(target_os = "android"))]
+                    {
+                        let button = egui::Button::new("Networking");
+                        if ui.add_enabled(true, button).clicked() {
+                            self.networking_window = Some(crate::windows::network::Window::new());
+                            ui.close_kind(egui::UiKind::Menu);
+                        }
                     }
 
                     let button = egui::Button::new("Exit");
@@ -891,6 +916,7 @@ impl eframe::App for MainNesWindow {
             load_state = true;
         }
 
+        #[cfg(not(target_os = "android"))]
         if !self.recording.is_recording() {
             if ui.ctx().input(|i| i.key_pressed(egui::Key::F7)) {
                 start_stop_recording = Some(true);
@@ -919,26 +945,29 @@ impl eframe::App for MainNesWindow {
                 .send_viewport_cmd(egui::ViewportCommand::Fullscreen(!f));
         }
 
-        let record_path = self.c.local.record_path();
-        if let Some(rec) = start_stop_recording {
-            if rec {
-                self.c.local.resolution_locked = true;
-                let sampling_frequency = self.c.cpu_frequency();
-                let tn = chrono::Local::now();
-                let mut recpath = record_path.clone();
-                recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
-                self.recording.start(
-                    &self.have_gstreamer,
-                    &self.c.local.image,
-                    self.c.ppu_frame_rate() as u8,
-                    recpath,
-                    sampling_frequency,
-                );
-            } else {
-                self.c.local.resolution_locked = false;
-                loop {
-                    if self.recording.stop().is_ok() {
-                        break;
+        #[cfg(not(target_os = "android"))]
+        {
+            let record_path = self.c.local.record_path();
+            if let Some(rec) = start_stop_recording {
+                if rec {
+                    self.c.local.resolution_locked = true;
+                    let sampling_frequency = self.c.cpu_frequency();
+                    let tn = chrono::Local::now();
+                    let mut recpath = record_path.clone();
+                    recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
+                    self.recording.start(
+                        &self.have_gstreamer,
+                        &self.c.local.image,
+                        self.c.ppu_frame_rate() as u8,
+                        recpath,
+                        sampling_frequency,
+                    );
+                } else {
+                    self.c.local.resolution_locked = false;
+                    loop {
+                        if self.recording.stop().is_ok() {
+                            break;
+                        }
                     }
                 }
             }
@@ -986,6 +1015,7 @@ impl eframe::App for MainNesWindow {
             let size = ui.available_size();
 
             // Controller buttons — draw outside the centering logic
+            #[cfg(not(target_os = "android"))]
             if let Some(olocal) = &mut self.c.olocal {
                 if let Some(network) = &mut olocal.network {
                     let myc = network.get_controller_id();

@@ -158,6 +158,7 @@ impl EmulatorConfiguration {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 /// The data used to convey what is being pressed and by who
 pub struct BluetoothControllerOwner {
     /// The bluetooth address of the soft controller
@@ -166,6 +167,7 @@ pub struct BluetoothControllerOwner {
     pub controller_config: crate::controller::ControllerConfig,
 }
 
+#[cfg(not(target_os = "android"))]
 pub struct PendingBluetoothController {
     /// The bluetooth address
     pub addr: [u8; 6],
@@ -177,13 +179,17 @@ pub struct PendingBluetoothController {
 pub struct LocalEmulatorData {
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
+    #[cfg(not(target_os = "android"))]
     /// The bluetooth controller button data
     pub bluetooth_controllers:
         [Option<std::sync::Arc<std::sync::Mutex<BluetoothControllerOwner>>>; 4],
+    #[cfg(not(target_os = "android"))]
     /// The network object for interacting with other emulators
     pub network: Option<common_emulator::network::Network>,
+    #[cfg(not(target_os = "android"))]
     /// The bluetooth receiver for bluetooth controllers
     pub blue_recv: Option<tokio::sync::mpsc::Receiver<crate::BluetoothControllerInfo>>,
+    #[cfg(not(target_os = "android"))]
     /// The pending bluetooth controller addresses
     pub pending_bluetooth_controllers: std::collections::VecDeque<PendingBluetoothController>,
 }
@@ -192,9 +198,13 @@ impl Default for LocalEmulatorData {
     fn default() -> Self {
         Self {
             gilrs: gilrs::GilrsBuilder::new().build().unwrap(),
+            #[cfg(not(target_os = "android"))]
             bluetooth_controllers: [const { None }; 4],
+            #[cfg(not(target_os = "android"))]
             network: None,
+            #[cfg(not(target_os = "android"))]
             blue_recv: None,
+            #[cfg(not(target_os = "android"))]
             pending_bluetooth_controllers: std::collections::VecDeque::new(),
         }
     }
@@ -374,6 +384,7 @@ pub struct NesEmulatorData {
 
 impl NesEmulatorData {
     pub fn check_network(&mut self) {
+        #[cfg(not(target_os = "android"))]
         if let Some(olocal) = &mut self.olocal {
             if let Some(network) = &mut olocal.network {
                 network.process_messages();
@@ -381,6 +392,7 @@ impl NesEmulatorData {
         }
     }
 
+    #[cfg(not(target_os = "android"))]
     /// Register the bluetooth controller info
     pub fn register_bluetooth(
         &mut self,
@@ -423,6 +435,7 @@ impl NesEmulatorData {
         }
     }
 
+    #[cfg(not(target_os = "android"))]
     /// Pull messages from bluetooth controllers
     pub fn check_bluetooth_controllers(&mut self) {
         if let Some(olocal) = &mut self.olocal {

@@ -21,6 +21,7 @@ use crate::audio::AudioProducerWithRate;
 
 use super::NodeRole;
 
+#[cfg(not(target_os = "android"))]
 use crate::streaming::{StreamingIn, StreamingOut};
 
 /// Represents a message that can be sent to and from other nodes in the network.
@@ -183,8 +184,10 @@ pub struct Handler {
     outbound_stream: Option<OutboundSubstreamState>,
     /// Messages that are pending to be sent to the network.
     pending_out: VecDeque<MessageToFromBehavior>,
+    #[cfg(not(target_os = "android"))]
     /// The struct used for converting video and audio data into a format that can be streamed.
     streamout: StreamingOut,
+    #[cfg(not(target_os = "android"))]
     /// This is how the stream data is obtained. Data is pulled from this and then sent over the network.
     avsink: Option<gstreamer_app::AppSink>,
     /// The audio source for the host
@@ -215,6 +218,7 @@ impl Handler {
         // up with the GStreamer encoding latency.
         if let Some(sink) = &avsink {
             let waker_clone = Arc::clone(&waker);
+            #[cfg(not(target_os = "android"))]
             sink.set_callbacks(
                 gstreamer_app::AppSinkCallbacks::builder()
                     .new_sample(move |_sink| {
@@ -397,6 +401,7 @@ impl ConnectionHandler for Handler {
                             }
                         }
                     }
+                    #[cfg(not(target_os = "android"))]
                     if let Some(source) = &mut self.avsink {
                         if let Some(a) =
                             source.try_pull_sample(gstreamer::ClockTime::from_mseconds(10))
