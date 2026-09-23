@@ -36,6 +36,8 @@ pub struct EmulatorConfiguration {
     pub controller_config: [crate::controller::ControllerConfig; 4],
     /// The scaler to use for the emulator
     pub scaler: Option<common_emulator::video::ScalingAlgorithm>,
+    #[cfg(target_os = "android")]
+    pub use_screen_controller: bool,
 }
 
 impl Default for EmulatorConfiguration {
@@ -46,6 +48,21 @@ impl Default for EmulatorConfiguration {
             crate::controller::ControllerConfig::new(),
             crate::controller::ControllerConfig::new(),
         ];
+        #[cfg(target_os = "android")]
+        {
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_A, 0);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_B, 1);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_TURBOA, 2);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_TURBOB, 3);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_SLOW, 4);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_START, 5);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_SELECT, 6);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_UP, 7);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_DOWN, 8);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_LEFT, 9);
+            controller[0].set_raw_key(crate::controller::BUTTON_COMBO_RIGHT, 10);
+        }
+        #[cfg(not(target_os = "android"))]
         {
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_A, egui::Key::F);
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_B, egui::Key::D);
@@ -75,6 +92,8 @@ impl Default for EmulatorConfiguration {
             ],
             controller_config: controller,
             scaler: None,
+            #[cfg(target_os = "android")]
+            use_screen_controller: true,
         }
     }
 }

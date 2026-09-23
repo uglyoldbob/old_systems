@@ -38,6 +38,11 @@ impl ControllerConfig {
         self.rates[index] = Duration::from_millis((500.0 / r) as u64);
     }
 
+    #[cfg(target_os = "android")]
+    pub fn set_raw_key(&mut self, index: usize, v: u8) {
+        self.buttons[index] = UserInput::DirectInput(v);
+    }
+
     /// Set the given button with egui data
     pub fn set_key_egui(&mut self, index: usize, k: egui::Key) {
         self.buttons[index] = UserInput::Egui(k);
@@ -279,6 +284,15 @@ impl ButtonCombination {
                     }
                 }
             }
+        }
+    }
+
+    /// Update raw button data
+    pub fn update_raw_button_data(&mut self, pressed: bool, index: u8) {
+        if pressed {
+            self.set_button(index as usize, 0);
+        } else {
+            self.clear_button(index as usize);
         }
     }
 

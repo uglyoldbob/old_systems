@@ -550,13 +550,12 @@ impl NesCartridge {
         })
     }
 
-    /// Load a cartridge, returning an error or the new cartridge
-    pub fn load_cartridge(name: String, sp: &Path) -> Result<Self, CartridgeError> {
-        let rom_contents = std::fs::read(name.clone());
-        if let Err(e) = rom_contents {
-            return Err(CartridgeError::FsError(e.kind().to_string()));
-        }
-        let rom_contents = rom_contents.unwrap();
+    /// Load a cartridge from a raw vector
+    pub fn load_cartridge_data(
+        name: String,
+        rom_contents: &[u8],
+        sp: &Path,
+    ) -> Result<Self, CartridgeError> {
         if rom_contents.len() < 16 {
             return Err(CartridgeError::InvalidRom);
         }
@@ -592,6 +591,16 @@ impl NesCartridge {
         }
 
         cart
+    }
+
+    /// Load a cartridge, returning an error or the new cartridge
+    pub fn load_cartridge(name: String, sp: &Path) -> Result<Self, CartridgeError> {
+        let rom_contents = std::fs::read(name.clone());
+        if let Err(e) = rom_contents {
+            return Err(CartridgeError::FsError(e.kind().to_string()));
+        }
+        let rom_contents = rom_contents.unwrap();
+        Self::load_cartridge_data(name, &rom_contents, sp)
     }
 }
 

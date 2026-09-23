@@ -14,3 +14,15 @@ members = [
 #opt-level = "z"  # Optimize for size.
 #lto = true
 #codegen-units = 1
+
+[profile.dev]
+opt-level = "z"
+debug = false
+split-debuginfo = "..." # Dependent on platform, omitting entirely matches release defaults
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = 'unwind'
+incremental = false
+codegen-units = 16
+rpath = false
