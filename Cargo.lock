@@ -9043,6 +9043,7 @@ dependencies = [
  "gstreamer-audio",
  "gstreamer-video",
  "hex_fmt",
+ "jni 0.22.4",
  "libp2p",
  "log",
  "memmap2",

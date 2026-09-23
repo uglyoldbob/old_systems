@@ -384,6 +384,81 @@ async fn run_bluetooth(
 }
 
 #[cfg(target_os = "android")]
+fn hide_system_bars(app: &winit::platform::android::activity::AndroidApp) {
+    use jni::objects::JObject;
+    use jni::JavaVM;
+
+    let vm = unsafe {
+        jni::JavaVM::from_raw(app.vm_as_ptr() as *mut *const jni::sys::JNIInvokeInterface_)
+    };
+    vm.attach_current_thread(|env| {
+        let context = unsafe {
+            jni::objects::JObject::from_raw(env, app.activity_as_ptr() as *mut jni::sys::_jobject)
+        };
+
+        let activity =
+            unsafe { JObject::from_raw(env, app.activity_as_ptr() as jni::sys::jobject) };
+
+        // Activity.getWindow()
+        let window = env
+            .call_method(
+                &activity,
+                jni::jni_str!("getWindow"),
+                jni::jni_sig!("()Landroid/view/Window;"),
+                &[],
+            )?
+            .l()?;
+
+        // Window.setDecorFitsSystemWindows(false)
+        env.call_method(
+            &window,
+            jni::jni_str!("setDecorFitsSystemWindows"),
+            jni::jni_sig!("(Z)V"),
+            &[false.into()],
+        )?;
+
+        // Window.getInsetsController()
+        let controller = env
+            .call_method(
+                &window,
+                jni::jni_str!("getInsetsController"),
+                jni::jni_sig!("()Landroid/view/WindowInsetsController;"),
+                &[],
+            )?
+            .l()?;
+
+        // WindowInsets.Type.systemBars()
+        let system_bars = env
+            .call_static_method(
+                jni::jni_str!("android/view/WindowInsets$Type"),
+                jni::jni_str!("systemBars"),
+                jni::jni_sig!("()I"),
+                &[],
+            )?
+            .i()?;
+
+        // WindowInsetsController.hide(systemBars)
+        env.call_method(
+            &controller,
+            jni::jni_str!("hide"),
+            jni::jni_sig!("(I)V"),
+            &[system_bars.into()],
+        )?;
+
+        // BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE = 2
+        env.call_method(
+            &controller,
+            jni::jni_str!("setSystemBarsBehavior"),
+            jni::jni_sig!("(I)V"),
+            &[2i32.into()],
+        )?;
+
+        Ok::<(), jni::errors::Error>(())
+    })
+    .unwrap();
+}
+
+#[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: winit::platform::android::activity::AndroidApp) {
     use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
@@ -393,6 +468,8 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
     android_logger::init_once(
         android_logger::Config::default().with_max_level(log::LevelFilter::Error),
     );
+
+    hide_system_bars(&app);
 
     let internal_data_path = app.internal_data_path().unwrap();
     set_application_data_path(&internal_data_path);

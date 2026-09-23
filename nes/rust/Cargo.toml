@@ -30,6 +30,7 @@ bluetooth-rust = { version = "0.4.2", features = ["async"] }
 android_logger = { version = "0.15", default-features = false }
 bluetooth-rust = { version = "0.4.2", features = ["sync"] }
 eframe = { version = "0.34.2", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
+jni = "0.22.4"
 wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
 egui-winit = { version = "0.34.2", default-features = false, features = ["clipboard", "links"] }
 

@@ -103,6 +103,85 @@ pub struct MainNesWindow {
     #[cfg(feature = "debugger")]
     /// the sprite dump window
     sprite_dump_window: Option<crate::windows::sprite_dump_window::DumpWindow>,
+    #[cfg(target_os = "android")]
+    android_menubar: AndroidMenuBar,
+}
+
+#[cfg(target_os = "android")]
+struct AndroidMenuBar {
+    show_menubar: bool,
+}
+
+#[cfg(target_os = "android")]
+impl Default for AndroidMenuBar {
+    fn default() -> Self {
+        Self {
+            show_menubar: false,
+        }
+    }
+}
+#[cfg(target_os = "android")]
+impl AndroidMenuBar {
+    const MENU_HEIGHT: f32 = 60.0;
+    const SNAP_SPEED: f32 = 0.30;
+
+    fn menu_button(ui: &mut egui::Ui, text: &str) -> egui::Response {
+        ui.add_sized([100.0, 52.0], egui::Button::new(text))
+    }
+
+    fn show(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        // --------------------------------------------------------
+        // Normal TopBottomPanel
+        // --------------------------------------------------------
+
+        if self.show_menubar {
+            egui::TopBottomPanel::top("android_menu_bar")
+                .exact_height(Self::MENU_HEIGHT)
+                .show_inside(ui, |menu_ui| {
+                    egui::MenuBar::new().ui(menu_ui, |menu_ui| {
+                        let rect = menu_ui.max_rect();
+
+                        // Normal menu.
+                        menu_ui.horizontal_centered(|ui| {
+                            if ui.add_sized([56.0, 52.0], egui::Button::new("☰")).clicked() {
+                                self.show_menubar = false;
+                            }
+
+                            ui.separator();
+
+                            if Self::menu_button(ui, "Load").clicked() {
+                                // ...
+                            }
+
+                            if Self::menu_button(ui, "Save").clicked() {
+                                // ...
+                            }
+
+                            if Self::menu_button(ui, "Settings").clicked() {
+                                // ...
+                            }
+                        });
+                    });
+                });
+        }
+
+        // --------------------------------------------------------
+        // Menu button when closed
+        // --------------------------------------------------------
+
+        if !self.show_menubar {
+            egui::Area::new(egui::Id::new("android_menu_button"))
+                .fixed_pos(egui::pos2(8.0, 8.0))
+                .order(egui::Order::Foreground)
+                .show(ui.ctx(), |ui| {
+                    let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
+
+                    if response.clicked() {
+                        self.show_menubar = true;
+                    }
+                });
+        }
+    }
 }
 
 impl MainNesWindow {
@@ -171,12 +250,14 @@ impl MainNesWindow {
             rom_checker_window: Some(rom_checker_window),
             #[cfg(feature = "debugger")]
             sprite_dump_window: None,
+            #[cfg(target_os = "android")]
+            android_menubar: Default::default(),
         }
     }
 }
 
 impl eframe::App for MainNesWindow {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         #[cfg(feature = "puffin")]
         {
             puffin::profile_function!();
@@ -727,6 +808,10 @@ impl eframe::App for MainNesWindow {
             }
         }
 
+        #[cfg(target_os = "android")]
+        self.android_menubar.show(ui, frame);
+
+        #[cfg(not(target_os = "android"))]
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 let is_fullscreen = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
