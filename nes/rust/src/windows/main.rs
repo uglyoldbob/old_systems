@@ -358,9 +358,605 @@ impl MainNesWindow {
             self.active_touches.values().any(|&pos| r.contains(pos))
         })
     }
+
+    #[cfg(target_os = "android")]
+    fn android_select_rom(&self) -> Result<(), jni::errors::Error> {
+        let app = self.c.local.android_app.as_ref().unwrap();
+        use jni::JavaVM;
+        use jni::{jni_sig, jni_str, objects::JObject, Env, JValue};
+
+        let vm = unsafe {
+            jni::JavaVM::from_raw(app.vm_as_ptr() as *mut *const jni::sys::JNIInvokeInterface_)
+        };
+        vm.attach_current_thread(|env| {
+            let context = unsafe {
+                jni::objects::JObject::from_raw(
+                    env,
+                    app.activity_as_ptr() as *mut jni::sys::_jobject,
+                )
+            };
+
+            let activity =
+                unsafe { JObject::from_raw(env, app.activity_as_ptr() as jni::sys::jobject) };
+
+            let action = env.new_string("android.intent.action.OPEN_DOCUMENT")?;
+
+            let intent = env.new_object(
+                jni_str!("android/content/Intent"),
+                jni_sig!("(Ljava/lang/String;)V"),
+                &[JValue::Object(&action.into())],
+            )?;
+
+            let category = env.new_string("android.intent.category.OPENABLE")?;
+
+            env.call_method(
+                &intent,
+                jni_str!("addCategory"),
+                jni_sig!("(Ljava/lang/String;)Landroid/content/Intent;"),
+                &[JValue::Object(&category.into())],
+            )?;
+
+            let mime = env.new_string("*/*")?;
+
+            env.call_method(
+                &intent,
+                jni_str!("setType"),
+                jni_sig!("(Ljava/lang/String;)Landroid/content/Intent;"),
+                &[JValue::Object(&mime.into())],
+            )?;
+
+            env.call_method(
+                activity,
+                jni_str!("startActivityForResult"),
+                jni_sig!("(Landroid/content/Intent;I)V"),
+                &[JValue::Object(&intent), JValue::Int(1001)],
+            )?;
+
+            Ok(())
+        })
+    }
+
+    fn render_scene(&mut self, size: egui::Vec2, ui: &mut egui::Ui) {
+        // Center the image manually using add_sized + centering offset
+        if let Some(t) = &self.texture {
+            let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
+
+            let img_size = egui::vec2(t.size()[0] as f32 * zoom, t.size()[1] as f32 * zoom);
+
+            let available = ui.available_size();
+
+            let offset = if available.x < available.y {
+                // Portrait: top-align
+                egui::vec2(((available.x - img_size.x) * 0.5).max(0.0), 0.0)
+            } else {
+                // Landscape: center
+                ((available - img_size) * 0.5).max(egui::Vec2::ZERO)
+            };
+
+            let rect = egui::Rect::from_min_size(ui.cursor().min + offset, img_size);
+
+            let r = ui.put(
+                rect,
+                egui::Image::from_texture(egui::load::SizedTexture {
+                    id: t.id(),
+                    size: img_size,
+                })
+                .sense(egui::Sense::click_and_drag()),
+            );
+
+            #[cfg(target_os = "android")]
+            if self.c.local.configuration.use_screen_controller {
+                let mut buttons_pressed = [false; 11];
+                let mut arrows_pressed = [false; 8];
+                let arrow_configs: Vec<(egui::Rect, &str, f32)> = if size.x > size.y {
+                    //landscape
+                    vec![
+                        (
+                            //up
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 2.0,
+                                    rect.min.y + 51.0 + 55.0 * 1.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            //down
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 2.0,
+                                    rect.min.y + 51.0 + 55.0 * 3.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            //left
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 3.0,
+                                    rect.min.y + 51.0 + 55.0 * 2.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            //right
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 1.0,
+                                    rect.min.y + 51.0 + 55.0 * 2.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // up-left
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 3.0,
+                                    rect.min.y + 51.0 + 55.0 * 1.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // up-right
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 1.0,
+                                    rect.min.y + 51.0 + 55.0 * 1.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // down-left
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 3.0,
+                                    rect.min.y + 51.0 + 55.0 * 3.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // down-right
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x - 51.0 - 55.0 * 1.0,
+                                    rect.min.y + 51.0 + 55.0 * 3.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                    ]
+                } else {
+                    //portrait
+                    vec![
+                        (
+                            //up
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 1.0, rect.min.y + img_size.y + 51.0 + 55.0 * 0.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            //down
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 1.0, rect.min.y + img_size.y + 51.0 + 55.0 * 2.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            //left
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 0.0, rect.min.y + img_size.y + 51.0 + 55.0 * 1.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            //right
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 2.0, rect.min.y + img_size.y + 51.0 + 55.0 * 1.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // up-left
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 0.0, rect.min.y + img_size.y + 51.0 + 55.0 * 0.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // up-right
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 2.0, rect.min.y + img_size.y + 51.0 + 55.0 * 0.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // down-left
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 0.0, rect.min.y + img_size.y + 51.0 + 55.0 * 2.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                        (
+                            // down-right
+                            egui::Rect::from_min_size(
+                                egui::pos2(55.0 * 2.0, rect.min.y + img_size.y + 51.0 + 55.0 * 2.0),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            " ",
+                            1.0,
+                        ),
+                    ]
+                };
+                let button_configs: Vec<(egui::Rect, &str, f32, usize)> = if size.x > size.y {
+                    //landscape
+                    vec![
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x + img_size.x + 51.0 + 55.0 * 2.0,
+                                    rect.min.y + 51.0 + 55.0 * 3.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "A",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_A,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x + img_size.x + 51.0 + 55.0 * 2.0,
+                                    rect.min.y + 51.0 + 55.0 * 2.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "AA",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_TURBOA,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x + img_size.x + 51.0 + 55.0 * 1.0,
+                                    rect.min.y + 51.0 + 55.0 * 2.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "BB",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_TURBOB,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x + img_size.x + 51.0 + 55.0 * 1.0,
+                                    rect.min.y + 51.0 + 55.0 * 3.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "B",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_B,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x + img_size.x + 51.0 + 55.0 * 1.0,
+                                    rect.min.y + 51.0 + 55.0 * 0.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "ST",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_START,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    rect.min.x + img_size.x + 51.0 + 55.0 * 2.0,
+                                    rect.min.y + 51.0 + 55.0 * 0.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "SE",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_SELECT,
+                        ),
+                    ]
+                } else {
+                    //portrait
+                    vec![
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    51.0 + 55.0 * 5.0,
+                                    rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "A",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_A,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    51.0 + 55.0 * 5.0,
+                                    rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "AA",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_TURBOA,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    51.0 + 55.0 * 4.0,
+                                    rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "BB",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_TURBOB,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    51.0 + 55.0 * 4.0,
+                                    rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "B",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_B,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    51.0 + 55.0 * 2.5,
+                                    rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "ST",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_START,
+                        ),
+                        (
+                            egui::Rect::from_min_size(
+                                egui::pos2(
+                                    51.0 + 55.0 * 2.5,
+                                    rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
+                                ),
+                                egui::vec2(51.0, 51.0),
+                            ),
+                            "SE",
+                            1.0,
+                            crate::controller::BUTTON_COMBO_SELECT,
+                        ),
+                    ]
+                };
+                for (i, button) in &mut self.on_screen_buttons.iter().enumerate() {
+                    if let Some(c) = button_configs.get(i) {
+                        let pressed = self.touch_hits(Some(c.0));
+                        if pressed {
+                            buttons_pressed[i] = true;
+                        }
+                        button.paint_btn(ui, c.0, c.1, pressed, c.2);
+                    }
+                }
+                for (i, arrow) in &mut self.on_screen_arrows.iter().enumerate() {
+                    if let Some(c) = arrow_configs.get(i) {
+                        let pressed = self.touch_hits(Some(c.0));
+                        if pressed {
+                            arrows_pressed[i] = true;
+                        }
+                        arrow.paint_btn(ui, c.0, c.1, pressed, c.2);
+                    }
+                }
+                //up
+                if arrows_pressed[0] {
+                    buttons_pressed[6] = true;
+                }
+                //down
+                if arrows_pressed[1] {
+                    buttons_pressed[7] = true;
+                }
+                //left
+                if arrows_pressed[2] {
+                    buttons_pressed[8] = true;
+                }
+                //right
+                if arrows_pressed[3] {
+                    buttons_pressed[9] = true;
+                }
+                //up-left
+                if arrows_pressed[4] {
+                    buttons_pressed[6] = true;
+                    buttons_pressed[8] = true;
+                }
+                //up-right
+                if arrows_pressed[5] {
+                    buttons_pressed[6] = true;
+                    buttons_pressed[9] = true;
+                }
+                //down-left
+                if arrows_pressed[6] {
+                    buttons_pressed[7] = true;
+                    buttons_pressed[8] = true;
+                }
+                //down-right
+                if arrows_pressed[7] {
+                    buttons_pressed[7] = true;
+                    buttons_pressed[9] = true;
+                }
+                if buttons_pressed[6] {
+                    buttons_pressed[7] = false;
+                }
+                if buttons_pressed[8] {
+                    buttons_pressed[9] = false;
+                }
+
+                let controller = self.c.mb.get_controller_mut(0);
+                if !controller.should_ignore_local_inputs() {
+                    if let crate::controller::NesController::Zapper(_z) = controller {
+                    } else {
+                        for (i, pressed) in buttons_pressed.iter().enumerate() {
+                            if let Some(bc) = button_configs.get(i) {
+                                for contr in controller.get_buttons_iter_mut() {
+                                    contr.update_raw_button_data(*pressed, bc.3 as u8);
+                                }
+                            }
+                        }
+                        for contr in controller.get_buttons_iter_mut() {
+                            contr.update_raw_button_data(
+                                buttons_pressed[6],
+                                crate::controller::BUTTON_COMBO_UP as u8,
+                            );
+                            contr.update_raw_button_data(
+                                buttons_pressed[7],
+                                crate::controller::BUTTON_COMBO_DOWN as u8,
+                            );
+                            contr.update_raw_button_data(
+                                buttons_pressed[8],
+                                crate::controller::BUTTON_COMBO_LEFT as u8,
+                            );
+                            contr.update_raw_button_data(
+                                buttons_pressed[9],
+                                crate::controller::BUTTON_COMBO_RIGHT as u8,
+                            );
+                        }
+                    }
+                }
+            }
+
+            if (r.clicked_by(egui::PointerButton::Secondary)
+                || r.dragged_by(egui::PointerButton::Secondary))
+                && !self.mouse
+            {
+                self.mouse = true;
+                self.mouse_miss = true;
+                self.mouse_delay = 15;
+            } else if (r.clicked() || r.dragged()) && !self.mouse {
+                self.mouse = true;
+                self.mouse_miss = false;
+                self.mouse_delay = 15;
+            }
+
+            if r.hovered() {
+                if let Some(pos) = r.hover_pos() {
+                    let coord = pos - r.rect.left_top();
+
+                    #[cfg(feature = "debugger")]
+                    {
+                        self.c.cpu_peripherals.ppu.bg_debug =
+                            Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
+                    }
+
+                    let scale_factor = self
+                        .c
+                        .local
+                        .configuration
+                        .scaler
+                        .map(|s| s.scale_factor())
+                        .unwrap_or(1.0);
+
+                    let zcoord = coord / (zoom * scale_factor);
+
+                    self.c
+                        .mb
+                        .set_zapper_coords(zcoord.x as u16, zcoord.y as u16);
+
+                    let pixel = self.c.local.image.get_pixel(coord / zoom);
+
+                    self.mouse_vision =
+                        !self.mouse_miss && pixel.r() > 100 && pixel.g() > 100 && pixel.b() > 100;
+                }
+            }
+        }
+
+        #[cfg(not(target_os = "android"))]
+        ui.ctx()
+            .send_viewport_cmd(egui::ViewportCommand::Title(format!(
+                "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
+                env!("CARGO_PKG_VERSION"),
+                self.emulator_fps,
+                self.render_percent * 100.0
+            )));
+    }
 }
 
 impl eframe::App for MainNesWindow {
+    fn on_exit(&mut self) {
+        #[cfg(target_os = "android")]
+        {
+            let name = if let Some(cart) = self.c.mb.cartridge() {
+                cart.save_name()
+            } else {
+                "state.bin".to_string()
+            };
+            let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+            let mut save_path = self.c.local.save_path();
+            save_path.push(ppp.file_name().unwrap());
+            if true {
+                let mut path = save_path.clone();
+                path.pop();
+                let _ = std::fs::create_dir_all(path);
+                let state = Box::new(self.c.serialize());
+                log::error!("Saving state to {} before exiting", save_path.display());
+                let _e = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(save_path.clone())
+                    .unwrap()
+                    .write_all(&state);
+            }
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         #[cfg(feature = "puffin")]
         {
@@ -432,8 +1028,12 @@ impl eframe::App for MainNesWindow {
         }
 
         #[cfg(target_os = "android")]
+        let mut show_config = false;
+
+        #[cfg(target_os = "android")]
         if self.android_menubar.show(ui, frame) {
             render = false;
+            show_config = true;
         }
 
         #[cfg(feature = "puffin")]
@@ -1250,540 +1850,7 @@ impl eframe::App for MainNesWindow {
                 }
             }
 
-            // Center the image manually using add_sized + centering offset
-            if let Some(t) = &self.texture {
-                let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
-
-                let img_size = egui::vec2(t.size()[0] as f32 * zoom, t.size()[1] as f32 * zoom);
-
-                let available = ui.available_size();
-
-                let offset = if available.x < available.y {
-                    // Portrait: top-align
-                    egui::vec2(((available.x - img_size.x) * 0.5).max(0.0), 0.0)
-                } else {
-                    // Landscape: center
-                    ((available - img_size) * 0.5).max(egui::Vec2::ZERO)
-                };
-
-                let rect = egui::Rect::from_min_size(ui.cursor().min + offset, img_size);
-
-                let r = ui.put(
-                    rect,
-                    egui::Image::from_texture(egui::load::SizedTexture {
-                        id: t.id(),
-                        size: img_size,
-                    })
-                    .sense(egui::Sense::click_and_drag()),
-                );
-
-                #[cfg(target_os = "android")]
-                if self.c.local.configuration.use_screen_controller {
-                    let mut buttons_pressed = [false; 11];
-                    let mut arrows_pressed = [false; 8];
-                    let arrow_configs: Vec<(egui::Rect, &str, f32)> = if size.x > size.y {
-                        //landscape
-                        vec![
-                            (
-                                //up
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 2.0,
-                                        rect.min.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                //down
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 2.0,
-                                        rect.min.y + 51.0 + 55.0 * 3.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                //left
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 3.0,
-                                        rect.min.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                //right
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 1.0,
-                                        rect.min.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // up-left
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 3.0,
-                                        rect.min.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // up-right
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 1.0,
-                                        rect.min.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // down-left
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 3.0,
-                                        rect.min.y + 51.0 + 55.0 * 3.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // down-right
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x - 51.0 - 55.0 * 1.0,
-                                        rect.min.y + 51.0 + 55.0 * 3.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                        ]
-                    } else {
-                        //portrait
-                        vec![
-                            (
-                                //up
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 1.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                //down
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 1.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                //left
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 0.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                //right
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 2.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // up-left
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 0.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // up-right
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 2.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // down-left
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 0.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                            (
-                                // down-right
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        55.0 * 2.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                " ",
-                                1.0,
-                            ),
-                        ]
-                    };
-                    let button_configs: Vec<(egui::Rect, &str, f32, usize)> = if size.x > size.y {
-                        //landscape
-                        vec![
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x + img_size.x + 51.0 + 55.0 * 2.0,
-                                        rect.min.y + 51.0 + 55.0 * 3.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "A",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_A,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x + img_size.x + 51.0 + 55.0 * 2.0,
-                                        rect.min.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "AA",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_TURBOA,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x + img_size.x + 51.0 + 55.0 * 1.0,
-                                        rect.min.y + 51.0 + 55.0 * 2.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "BB",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_TURBOB,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x + img_size.x + 51.0 + 55.0 * 1.0,
-                                        rect.min.y + 51.0 + 55.0 * 3.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "B",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_B,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x + img_size.x + 51.0 + 55.0 * 1.0,
-                                        rect.min.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "ST",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_START,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        rect.min.x + img_size.x + 51.0 + 55.0 * 2.0,
-                                        rect.min.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "SE",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_SELECT,
-                            ),
-                        ]
-                    } else {
-                        //portrait
-                        vec![
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        51.0 + 55.0 * 5.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "A",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_A,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        51.0 + 55.0 * 5.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "AA",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_TURBOA,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        51.0 + 55.0 * 4.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "BB",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_TURBOB,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        51.0 + 55.0 * 4.0,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "B",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_B,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        51.0 + 55.0 * 2.5,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 1.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "ST",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_START,
-                            ),
-                            (
-                                egui::Rect::from_min_size(
-                                    egui::pos2(
-                                        51.0 + 55.0 * 2.5,
-                                        rect.min.y + img_size.y + 51.0 + 55.0 * 0.0,
-                                    ),
-                                    egui::vec2(51.0, 51.0),
-                                ),
-                                "SE",
-                                1.0,
-                                crate::controller::BUTTON_COMBO_SELECT,
-                            ),
-                        ]
-                    };
-                    for (i, button) in &mut self.on_screen_buttons.iter().enumerate() {
-                        if let Some(c) = button_configs.get(i) {
-                            let pressed = self.touch_hits(Some(c.0));
-                            if pressed {
-                                buttons_pressed[i] = true;
-                            }
-                            button.paint_btn(ui, c.0, c.1, pressed, c.2);
-                        }
-                    }
-                    for (i, arrow) in &mut self.on_screen_arrows.iter().enumerate() {
-                        if let Some(c) = arrow_configs.get(i) {
-                            let pressed = self.touch_hits(Some(c.0));
-                            if pressed {
-                                arrows_pressed[i] = true;
-                            }
-                            arrow.paint_btn(ui, c.0, c.1, pressed, c.2);
-                        }
-                    }
-                    //up
-                    if arrows_pressed[0] {
-                        buttons_pressed[6] = true;
-                    }
-                    //down
-                    if arrows_pressed[1] {
-                        buttons_pressed[7] = true;
-                    }
-                    //left
-                    if arrows_pressed[2] {
-                        buttons_pressed[8] = true;
-                    }
-                    //right
-                    if arrows_pressed[3] {
-                        buttons_pressed[9] = true;
-                    }
-                    //up-left
-                    if arrows_pressed[4] {
-                        buttons_pressed[6] = true;
-                        buttons_pressed[8] = true;
-                    }
-                    //up-right
-                    if arrows_pressed[5] {
-                        buttons_pressed[6] = true;
-                        buttons_pressed[9] = true;
-                    }
-                    //down-left
-                    if arrows_pressed[6] {
-                        buttons_pressed[7] = true;
-                        buttons_pressed[8] = true;
-                    }
-                    //down-right
-                    if arrows_pressed[7] {
-                        buttons_pressed[7] = true;
-                        buttons_pressed[9] = true;
-                    }
-                    if (buttons_pressed[6]) {
-                        buttons_pressed[7] = false;
-                    }
-                    if (buttons_pressed[8]) {
-                        buttons_pressed[9] = false;
-                    }
-
-                    let controller = self.c.mb.get_controller_mut(0);
-                    if !controller.should_ignore_local_inputs() {
-                        if let crate::controller::NesController::Zapper(_z) = controller {
-                        } else {
-                            for (i, pressed) in buttons_pressed.iter().enumerate() {
-                                if let Some(bc) = button_configs.get(i) {
-                                    for contr in controller.get_buttons_iter_mut() {
-                                        contr.update_raw_button_data(*pressed, bc.3 as u8);
-                                    }
-                                }
-                            }
-                            for contr in controller.get_buttons_iter_mut() {
-                                contr.update_raw_button_data(
-                                    buttons_pressed[6],
-                                    crate::controller::BUTTON_COMBO_UP as u8,
-                                );
-                                contr.update_raw_button_data(
-                                    buttons_pressed[7],
-                                    crate::controller::BUTTON_COMBO_DOWN as u8,
-                                );
-                                contr.update_raw_button_data(
-                                    buttons_pressed[8],
-                                    crate::controller::BUTTON_COMBO_LEFT as u8,
-                                );
-                                contr.update_raw_button_data(
-                                    buttons_pressed[9],
-                                    crate::controller::BUTTON_COMBO_RIGHT as u8,
-                                );
-                            }
-                        }
-                    }
-                }
-
-                if (r.clicked_by(egui::PointerButton::Secondary)
-                    || r.dragged_by(egui::PointerButton::Secondary))
-                    && !self.mouse
-                {
-                    self.mouse = true;
-                    self.mouse_miss = true;
-                    self.mouse_delay = 15;
-                } else if (r.clicked() || r.dragged()) && !self.mouse {
-                    self.mouse = true;
-                    self.mouse_miss = false;
-                    self.mouse_delay = 15;
-                }
-
-                if r.hovered() {
-                    if let Some(pos) = r.hover_pos() {
-                        let coord = pos - r.rect.left_top();
-
-                        #[cfg(feature = "debugger")]
-                        {
-                            self.c.cpu_peripherals.ppu.bg_debug =
-                                Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
-                        }
-
-                        let scale_factor = self
-                            .c
-                            .local
-                            .configuration
-                            .scaler
-                            .map(|s| s.scale_factor())
-                            .unwrap_or(1.0);
-
-                        let zcoord = coord / (zoom * scale_factor);
-
-                        self.c
-                            .mb
-                            .set_zapper_coords(zcoord.x as u16, zcoord.y as u16);
-
-                        let pixel = self.c.local.image.get_pixel(coord / zoom);
-
-                        self.mouse_vision = !self.mouse_miss
-                            && pixel.r() > 100
-                            && pixel.g() > 100
-                            && pixel.b() > 100;
-                    }
-                }
-            }
-
-            #[cfg(not(target_os = "android"))]
-            ui.ctx()
-                .send_viewport_cmd(egui::ViewportCommand::Title(format!(
-                    "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
-                    env!("CARGO_PKG_VERSION"),
-                    self.emulator_fps,
-                    self.render_percent * 100.0
-                )));
+            self.render_scene(size, ui);
         });
 
         #[cfg(feature = "debugger")]

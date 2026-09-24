@@ -471,6 +471,8 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
 
     hide_system_bars(&app);
 
+    let appc = app.clone();
+
     let internal_data_path = app.internal_data_path().unwrap();
     set_application_data_path(&internal_data_path);
 
@@ -480,235 +482,11 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
         ..Default::default()
     };
 
-    let mut nes_data = NesEmulatorData::new();
-
-    let host = cpal::default_host();
-    let device = host.default_output_device();
-    let mut sound_rate = 0;
-    let mut sound_producer = None;
-    let sound_stream = if let Some(d) = &device {
-        let ranges = d.supported_output_configs();
-        if let Ok(r) = ranges {
-            let mut configs: Vec<cpal::SupportedStreamConfigRange> = r.collect();
-            for c in &configs {
-                log::info!(
-                    "Audio: {:?} {:?}-{:?}",
-                    c.sample_format(),
-                    c.min_sample_rate(),
-                    c.max_sample_rate()
-                );
-            }
-            configs.retain(|config| {
-                config.min_sample_rate() <= 44_100 && 44_100 <= config.max_sample_rate()
-            });
-            configs.sort_by(|a, b| {
-                let format_index = |sf| match sf {
-                    cpal::SampleFormat::F32 => 0,
-                    cpal::SampleFormat::U32 => 1,
-                    cpal::SampleFormat::U16 => 2,
-                    cpal::SampleFormat::U8 => 3,
-                    cpal::SampleFormat::I8
-                    | cpal::SampleFormat::I16
-                    | cpal::SampleFormat::I32
-                    | cpal::SampleFormat::I64
-                    | cpal::SampleFormat::U64
-                    | cpal::SampleFormat::F64 => 10,
-                    _ => 10,
-                };
-
-                format_index(a.sample_format())
-                    .cmp(&format_index(b.sample_format()))
-                    .then_with(|| b.max_sample_rate().cmp(&a.max_sample_rate()))
-            });
-
-            let supportedconfig = configs[0].clone().with_sample_rate(44100);
-            let format = supportedconfig.sample_format();
-            log::info!("output format is {:?}", format);
-            let mut config = supportedconfig.config();
-
-            let mut num_samples = (config.sample_rate as f32 * 0.10) as usize;
-            let sbs = supportedconfig.buffer_size();
-            let num_samples_buffer = if let cpal::SupportedBufferSize::Range { min, max } = sbs {
-                if num_samples > *max as usize {
-                    num_samples = *max as usize;
-                    cpal::BufferSize::Fixed(*max as cpal::FrameCount)
-                } else if num_samples < *min as usize {
-                    num_samples = *min as usize;
-                    cpal::BufferSize::Fixed(*min as cpal::FrameCount)
-                } else {
-                    cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
-                }
-            } else {
-                //TODO maybe do somethind else when buffer size is unknown
-                cpal::BufferSize::Fixed(num_samples as cpal::FrameCount)
-            };
-            config.buffer_size = num_samples_buffer;
-            config.channels = 2;
-            log::info!("SBS IS {:?}", sbs);
-
-            log::info!("audio config is {:?}", config);
-
-            log::info!(
-                "Audio buffer size is {} elements, sample rate is {}",
-                num_samples,
-                config.sample_rate
-            );
-
-            let (mut stream, user_audio) = match format {
-                cpal::SampleFormat::U8 => {
-                    let rb = ringbuf::HeapRb::new(num_samples * 4);
-                    let (producer, mut consumer) = rb.split();
-
-                    let user_audio =
-                        AudioProducerWithRate::new(AudioProducer::U8(producer), num_samples * 2);
-
-                    let stream = d
-                        .build_output_stream(
-                            &config,
-                            move |data: &mut [u8], _cb: &cpal::OutputCallbackInfo| {
-                                let mut index = 0;
-                                while index < data.len() {
-                                    let c = consumer.pop_slice(&mut data[index..]);
-                                    if c == 0 {
-                                        break;
-                                    }
-                                    index += c;
-                                }
-                            },
-                            move |_err| {},
-                            None,
-                        )
-                        .ok();
-                    (stream, user_audio)
-                }
-                cpal::SampleFormat::U16 => {
-                    let rb = ringbuf::HeapRb::new(num_samples * 4);
-                    let (producer, mut consumer) = rb.split();
-
-                    let user_audio =
-                        AudioProducerWithRate::new(AudioProducer::U16(producer), num_samples * 2);
-
-                    let stream = d
-                        .build_output_stream(
-                            &config,
-                            move |data: &mut [u16], _cb: &cpal::OutputCallbackInfo| {
-                                let mut index = 0;
-                                while index < data.len() {
-                                    let c = consumer.pop_slice(&mut data[index..]);
-                                    if c == 0 {
-                                        break;
-                                    }
-                                    index += c;
-                                }
-                            },
-                            move |_err| {},
-                            None,
-                        )
-                        .ok();
-                    (stream, user_audio)
-                }
-                cpal::SampleFormat::U32 => {
-                    let rb = ringbuf::HeapRb::new(num_samples * 4);
-                    let (producer, mut consumer) = rb.split();
-
-                    let user_audio =
-                        AudioProducerWithRate::new(AudioProducer::U32(producer), num_samples * 2);
-
-                    let stream = d
-                        .build_output_stream(
-                            &config,
-                            move |data: &mut [u32], _cb: &cpal::OutputCallbackInfo| {
-                                let mut index = 0;
-                                while index < data.len() {
-                                    let c = consumer.pop_slice(&mut data[index..]);
-                                    if c == 0 {
-                                        break;
-                                    }
-                                    index += c;
-                                }
-                            },
-                            move |_err| {},
-                            None,
-                        )
-                        .ok();
-                    (stream, user_audio)
-                }
-                cpal::SampleFormat::F32 => {
-                    let rb = ringbuf::HeapRb::new(num_samples * 4);
-                    let (producer, mut consumer) = rb.split();
-
-                    let user_audio =
-                        AudioProducerWithRate::new(AudioProducer::F32(producer), num_samples * 2);
-
-                    let stream = d
-                        .build_output_stream(
-                            &config,
-                            move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
-                                let mut index = 0;
-                                while index < data.len() {
-                                    let c = consumer.pop_slice(&mut data[index..]);
-                                    if c == 0 {
-                                        break;
-                                    }
-                                    index += c;
-                                }
-                            },
-                            move |_err| {},
-                            None,
-                        )
-                        .ok();
-                    (stream, user_audio)
-                }
-                _ => todo!(),
-            };
-
-            if let Some(s) = &mut stream {
-                s.play().unwrap();
-                sound_rate = config.sample_rate;
-                nes_data.local.set_sound_rate(config.sample_rate);
-                sound_producer = Some(user_audio);
-            }
-            stream
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    eframe::run_native(
-        "Zesty NES Emulator",
-        options,
-        Box::new(move |_cc| {
-            Ok(Box::new(crate::windows::main::MainNesWindow::new(
-                nes_data,
-                sound_rate,
-                sound_producer,
-                sound_stream,
-            )))
-        }),
-    )
-    .expect("Failed to run application");
+    run(options)
 }
 
-#[cfg(not(target_os = "android"))]
-pub fn run() {
+pub fn run(mut options: eframe::NativeOptions) {
     use common_emulator::audio::{AudioProducer, AudioProducerWithRate};
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let exe_dir = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .map(std::path::PathBuf::from)
-            .ok_or("Could not determine executable directory")
-            .unwrap();
-        std::env::set_var("GST_PLUGIN_PATH", exe_dir);
-    }
-    simple_file_logger::init_logger("ZestyNes", simple_file_logger::LogLevel::Info).unwrap();
 
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -720,23 +498,27 @@ pub fn run() {
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
 
-    let mut options = eframe::NativeOptions::default();
     //TODO only disable vsync when required
     options.vsync = false;
 
-    let trt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("Failed to start async runtime");
-    let chan = tokio::sync::mpsc::channel(100);
-    trt.spawn(async {
-        if let Err(e) = run_bluetooth(chan.0).await {
-            log::error!("Error running bluetooth: {:?}", e);
-        }
-    });
+    #[cfg(not(target_os = "android"))]
+    let chan = {
+        let trt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to start async runtime");
+        let chan = tokio::sync::mpsc::channel(100);
+        trt.spawn(async {
+            if let Err(e) = run_bluetooth(chan.0).await {
+                log::error!("Error running bluetooth: {:?}", e);
+            }
+        });
+        chan.1
+    };
 
     let mut nes_data = NesEmulatorData::new();
-    nes_data.register_bluetooth(chan.1);
+    #[cfg(not(target_os = "android"))]
+    nes_data.register_bluetooth(chan);
 
     let host = cpal::default_host();
     let device = host.default_output_device();
@@ -955,13 +737,20 @@ pub fn run() {
         if let Some(c) = nes_data.local.configuration.start_rom() {
             if let Ok(nc) = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path())
             {
-                nes_data.insert_cartridge(nc);
+                log::info!("Loaded sticky rom {c}");
+                nes_data.insert_cartridge(nc.0);
+                if let Some(save) = nc.1 {
+                    nes_data.deserialize(save);
+                }
+            }
+        }
+    }
             }
         }
     }
 
     eframe::run_native(
-        "UglyOldBob NES Emulator",
+        "Zesty NES Emulator",
         options,
         Box::new(move |_cc| {
             Ok(Box::new(crate::windows::main::MainNesWindow::new(

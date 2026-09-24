@@ -555,7 +555,7 @@ impl NesCartridge {
         name: String,
         rom_contents: &[u8],
         sp: &Path,
-    ) -> Result<Self, CartridgeError> {
+    ) -> Result<(Self, Option<Vec<u8>>), CartridgeError> {
         if rom_contents.len() < 16 {
             return Err(CartridgeError::InvalidRom);
         }
@@ -582,19 +582,36 @@ impl NesCartridge {
             Self::load_obsolete_ines(name, &rom_contents)
         };
 
-        if let Ok(c) = &mut cart {
+        let mut save_state = None;
+        if let Ok(cart) = &mut cart {
             let mut pb: PathBuf = sp.to_path_buf();
-            pb.push(format!("{}.prgram", c.save));
-            if c.data.volatile.battery_backup {
-                c.data.volatile.prg_ram.convert_to_nonvolatile(pb);
+            pb.push(format!("{}.prgram", cart.save));
+            if cart.data.volatile.battery_backup {
+                cart.data.volatile.prg_ram.convert_to_nonvolatile(pb);
+            }
+            #[cfg(target_os = "android")]
+            {
+                let name = cart.save_name();
+                let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+                let mut save_path = sp.clone().to_path_buf();
+                save_path.push(ppp.file_name().unwrap());
+                if let Ok(a) = std::fs::read(save_path) {
+                    log::error!("Got a save state for the rom i just loaded");
+                    save_state = Some(a);
+                }
             }
         }
-
-        cart
+        match cart {
+            Ok(cart) => Ok((cart, save_state)),
+            Err(e) => Err(e),
+        }
     }
 
     /// Load a cartridge, returning an error or the new cartridge
-    pub fn load_cartridge(name: String, sp: &Path) -> Result<Self, CartridgeError> {
+    pub fn load_cartridge(
+        name: String,
+        sp: &Path,
+    ) -> Result<(Self, Option<Vec<u8>>), CartridgeError> {
         let rom_contents = std::fs::read(name.clone());
         if let Err(e) = rom_contents {
             return Err(CartridgeError::FsError(e.kind().to_string()));

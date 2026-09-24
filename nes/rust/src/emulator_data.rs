@@ -250,6 +250,9 @@ pub struct LocalEmulatorDataClone {
     pub image: common_emulator::video::PixelImage<egui::Color32>,
     /// The number of samples per second of the audio output.
     sound_rate: u32,
+    #[cfg(target_os = "android")]
+    /// The android app object
+    pub android_app: Option<egui_winit::winit::platform::android::activity::AndroidApp>,
 }
 
 impl LocalEmulatorDataClone {
@@ -326,8 +329,9 @@ impl LocalEmulatorDataClone {
 
     /// Process the list of roms
     pub fn process_roms(&mut self) {
-        self.parser
-            .process_roms(self.save_path(), |n, p| NesCartridge::load_cartridge(n, p))
+        self.parser.process_roms(self.save_path(), |n, p| {
+            NesCartridge::load_cartridge(n, p).map(|a| a.0)
+        })
     }
 }
 
@@ -378,6 +382,8 @@ impl LocalEmulatorDataClone {
             dirs,
             image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
+            #[cfg(target_os = "android")]
+            android_app: None,
         }
     }
 }
@@ -424,6 +430,15 @@ pub struct NesEmulatorData {
 }
 
 impl NesEmulatorData {
+    #[cfg(target_os = "android")]
+    /// Set the android specific app object
+    pub fn set_android_app(
+        &mut self,
+        android_app: egui_winit::winit::platform::android::activity::AndroidApp,
+    ) {
+        self.local.android_app = Some(android_app);
+    }
+
     pub fn check_network(&mut self) {
         #[cfg(not(target_os = "android"))]
         if let Some(olocal) = &mut self.olocal {
@@ -631,7 +646,10 @@ impl NesEmulatorData {
             let name = cart.rom_name();
             let cart = NesCartridge::load_cartridge(name, &self.local.save_path());
             if let Ok(cart) = cart {
-                self.insert_cartridge(cart);
+                self.insert_cartridge(cart.0);
+                if let Some(save) = cart.1 {
+                    self.deserialize(save);
+                }
             }
         }
     }

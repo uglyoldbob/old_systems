@@ -108,7 +108,10 @@ impl RomFinder {
                         }
                         if let Some(nc) = new_rom {
                             c.remove_cartridge();
-                            c.insert_cartridge(nc);
+                            c.insert_cartridge(nc.0);
+                            if let Some(save) = nc.1 {
+                                c.deserialize(save);
+                            }
                             c.power_cycle();
                         }
                     });
