@@ -379,38 +379,8 @@ impl MainNesWindow {
             let activity =
                 unsafe { JObject::from_raw(env, app.activity_as_ptr() as jni::sys::jobject) };
 
-            let action = env.new_string("android.intent.action.OPEN_DOCUMENT")?;
-
-            let intent = env.new_object(
-                jni_str!("android/content/Intent"),
-                jni_sig!("(Ljava/lang/String;)V"),
-                &[JValue::Object(&action.into())],
-            )?;
-
-            let category = env.new_string("android.intent.category.OPENABLE")?;
-
-            env.call_method(
-                &intent,
-                jni_str!("addCategory"),
-                jni_sig!("(Ljava/lang/String;)Landroid/content/Intent;"),
-                &[JValue::Object(&category.into())],
-            )?;
-
-            let mime = env.new_string("*/*")?;
-
-            env.call_method(
-                &intent,
-                jni_str!("setType"),
-                jni_sig!("(Ljava/lang/String;)Landroid/content/Intent;"),
-                &[JValue::Object(&mime.into())],
-            )?;
-
-            env.call_method(
-                activity,
-                jni_str!("startActivityForResult"),
-                jni_sig!("(Landroid/content/Intent;I)V"),
-                &[JValue::Object(&intent), JValue::Int(1001)],
-            )?;
+            log::error!("About to have user select a rom");
+            env.call_method(&activity, jni_str!("openRomPicker"), jni_sig!("()V"), &[])?;
 
             Ok(())
         })
@@ -973,6 +943,30 @@ impl eframe::App for MainNesWindow {
             puffin::profile_function!();
             puffin::GlobalProfiler::lock().new_frame(); // call once per frame!
             puffin_egui::profiler_window(&egui.egui_ctx);
+        }
+
+        #[cfg(target_os = "android")]
+        {
+            let mut new_rom = None;
+            if let Some(olocal) = &mut self.c.olocal {
+                if let Some(recv) = &olocal.event_recv {
+                    while let Ok(event) = recv.try_recv() {
+                        match event {
+                            crate::AndroidJavaEvent::NewRomContents(name, rom) => {
+                                new_rom = Some((name, rom));
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some((name, rom)) = new_rom {
+                log::error!("Need to load rom of {} bytes", rom.len());
+                if let Err(e) = self.c.load_cartridge_for_user(name, rom) {
+                    log::error!("Error loading rom: {:?}", e);
+                } else {
+                    log::error!("Loaded rom successfully");
+                }
+            }
         }
 
         ui.input(|i| {

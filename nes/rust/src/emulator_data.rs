@@ -212,6 +212,9 @@ pub struct LocalEmulatorData {
     #[cfg(not(target_os = "android"))]
     /// The pending bluetooth controller addresses
     pub pending_bluetooth_controllers: std::collections::VecDeque<PendingBluetoothController>,
+    #[cfg(target_os = "android")]
+    /// used to receive events from java on android
+    pub event_recv: Option<std::sync::mpsc::Receiver<crate::AndroidJavaEvent>>,
 }
 
 impl Default for LocalEmulatorData {
@@ -227,6 +230,8 @@ impl Default for LocalEmulatorData {
             blue_recv: None,
             #[cfg(not(target_os = "android"))]
             pending_bluetooth_controllers: std::collections::VecDeque::new(),
+            #[cfg(target_os = "android")]
+            event_recv: None,
         }
     }
 }
@@ -454,6 +459,24 @@ impl NesEmulatorData {
         self.local.android_app = Some(android_app);
     }
 
+    pub fn load_cartridge_for_user(
+        &mut self,
+        name: String,
+        contents: Vec<u8>,
+    ) -> Result<(), common_emulator::CartridgeError> {
+        let nc =
+            NesCartridge::load_cartridge_data(name.clone(), &contents, &self.local.save_path())?;
+        log::error!("Loaded user rom {name}");
+        self.remove_cartridge();
+        self.insert_cartridge(nc.0);
+        self.power_cycle();
+        if let Some(save) = nc.1 {
+            log::error!("Loading initial save state for {name}");
+            self.deserialize(save);
+        }
+        Ok(())
+    }
+
     pub fn check_network(&mut self) {
         #[cfg(not(target_os = "android"))]
         if let Some(olocal) = &mut self.olocal {
@@ -511,9 +534,13 @@ impl NesEmulatorData {
     }
 
     #[cfg(target_os = "android")]
-    pub fn new_android(app: egui_winit::winit::platform::android::activity::AndroidApp) -> Self {
+    pub fn new_android(
+        app: egui_winit::winit::platform::android::activity::AndroidApp,
+        event_recv: std::sync::mpsc::Receiver<crate::AndroidJavaEvent>,
+    ) -> Self {
         let mut s = Self::new_with_path(app.internal_data_path().unwrap());
         s.local.android_app = Some(app);
+        s.olocal.as_mut().unwrap().event_recv = Some(event_recv);
         s
     }
 
@@ -670,13 +697,8 @@ impl NesEmulatorData {
         self.prev_irq = false;
         if let Some(cart) = cart {
             let name = cart.rom_name();
-            let cart = NesCartridge::load_cartridge(name, &self.local.save_path());
-            if let Ok(cart) = cart {
-                self.insert_cartridge(cart.0);
-                if let Some(save) = cart.1 {
-                    self.deserialize(save);
-                }
-            }
+            log::error!("Inserting cartridge {name}");
+            self.insert_cartridge(cart);
         }
     }
 

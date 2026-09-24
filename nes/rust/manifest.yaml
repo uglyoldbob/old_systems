@@ -1,0 +1,33 @@
+android:
+  icon: "./icon.png"
+  java_code_dir: java
+  gradle: true
+  manifest:
+    sdk:
+      min_sdk_version: 35
+      target_sdk_version: 35
+    application:
+      label: "ZestyNes"
+      has_code: true
+      activities: [
+        { 
+          name: .ZestyActivity,
+          config_changes: 'orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode',
+          intent_filters: [
+            {
+              categories: [
+                android.intent.category.DEFAULT,
+              ]
+            }
+          ],
+          launch_mode: singleTop,
+          window_soft_input_mode: adjustResize,
+          hardware_accelerated: true,
+        },
+      ]
+    package: "com.uglyoldbob.ZestyNes"
+    uses_permission: [
+    ]
+    uses_feature: [
+        { name: android.hardware.camera, required: false }
+    ]

@@ -12,7 +12,6 @@ mod motherboard;
 mod ppu;
 mod windows;
 
-
 use crate::cartridge::NesCartridge;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use emulator_data::NesEmulatorData;
@@ -446,6 +445,57 @@ fn hide_system_bars(app: &winit::platform::android::activity::AndroidApp) {
     .unwrap();
 }
 
+/// Used to send events from java code on android
+#[cfg(target_os = "android")]
+static JAVA_EVENT_SENDER: std::sync::OnceLock<std::sync::mpsc::Sender<AndroidJavaEvent>> =
+    std::sync::OnceLock::new();
+
+/// The actual event delivered from java code on android
+#[cfg(target_os = "android")]
+enum AndroidJavaEvent {
+    /// The user is loading a new rom, specify the name of the rom
+    NewRomContents(String, Vec<u8>),
+}
+
+#[cfg(target_os = "android")]
+#[allow(non_snake_case)]
+#[no_mangle]
+pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selected_1rom<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _: jni::objects::JObject<'local>,
+    rom: jni::objects::JByteArray<'local>,
+    name: jni::objects::JString<'local>,
+) {
+    let e = env.with_env(|env| {
+        log::error!("Trying to use rom contents");
+
+        let len = env.get_array_length(&rom)?;
+        log::error!("Rom length is {}", len);
+
+        let mut data = vec![0i8; len as usize];
+
+        env.get_byte_array_region(&rom, 0, &mut data)?;
+
+        // Java byte is signed, Rust NES ROM data is u8.
+        let rom: Vec<u8> = data.into_iter().map(|x| x as u8).collect();
+
+        let name: String = env.get_string(&name)?.into();
+
+        log::info!("Received ROM: {} bytes", rom.len());
+
+        if let Some(sender) = JAVA_EVENT_SENDER.get() {
+            if let Err(e) = sender.send(AndroidJavaEvent::NewRomContents(name, rom)) {
+                log::error!("Failed to send ROM to game loop: {e}");
+            }
+        } else {
+            log::error!("ROM sender has not been initialized");
+        }
+
+        Ok::<(), jni::errors::Error>(())
+    });
+    log::error!("Done? parsing rom: {:?}", e);
+}
+
 #[cfg(target_os = "android")]
 #[no_mangle]
 fn android_main(app: winit::platform::android::activity::AndroidApp) {
@@ -484,6 +534,12 @@ pub fn run(mut options: eframe::NativeOptions) {
     #[cfg(target_os = "android")]
     let appc = options.android_app.as_ref().unwrap().to_owned();
 
+    #[cfg(target_os = "android")]
+    let (java_event_sender, java_event_receiver) = std::sync::mpsc::channel::<AndroidJavaEvent>();
+
+    #[cfg(target_os = "android")]
+    JAVA_EVENT_SENDER.set(java_event_sender).unwrap();
+
     #[cfg(not(target_os = "android"))]
     let chan = {
         let trt = tokio::runtime::Builder::new_multi_thread()
@@ -500,7 +556,7 @@ pub fn run(mut options: eframe::NativeOptions) {
     };
 
     #[cfg(target_os = "android")]
-    let mut nes_data = NesEmulatorData::new_android(appc);
+    let mut nes_data = NesEmulatorData::new_android(appc, java_event_receiver);
     #[cfg(not(target_os = "android"))]
     let mut nes_data = NesEmulatorData::new();
 
@@ -733,9 +789,6 @@ pub fn run(mut options: eframe::NativeOptions) {
                 if let Some(save) = nc.1 {
                     nes_data.deserialize(save);
                 }
-            }
-        }
-    }
             }
         }
     }
