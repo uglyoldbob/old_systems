@@ -12,18 +12,6 @@ mod motherboard;
 mod ppu;
 mod windows;
 
-#[cfg(target_os = "android")]
-static INTERNAL_DATA_PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-
-#[cfg(target_os = "android")]
-pub fn set_application_data_path(p: &std::path::PathBuf) {
-    INTERNAL_DATA_PATH.set(p.clone());
-}
-
-#[cfg(target_os = "android")]
-pub fn get_application_data_path() -> std::path::PathBuf {
-    INTERNAL_DATA_PATH.get().unwrap().to_owned()
-}
 
 use crate::cartridge::NesCartridge;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -471,11 +459,6 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
 
     hide_system_bars(&app);
 
-    let appc = app.clone();
-
-    let internal_data_path = app.internal_data_path().unwrap();
-    set_application_data_path(&internal_data_path);
-
     let options = NativeOptions {
         android_app: Some(app),
         renderer: Renderer::Wgpu,
@@ -498,6 +481,9 @@ pub fn run(mut options: eframe::NativeOptions) {
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
 
+    #[cfg(target_os = "android")]
+    let appc = options.android_app.as_ref().unwrap().to_owned();
+
     //TODO only disable vsync when required
     options.vsync = false;
 
@@ -516,7 +502,11 @@ pub fn run(mut options: eframe::NativeOptions) {
         chan.1
     };
 
+    #[cfg(target_os = "android")]
+    let mut nes_data = NesEmulatorData::new_android(appc);
+    #[cfg(not(target_os = "android"))]
     let mut nes_data = NesEmulatorData::new();
+
     #[cfg(not(target_os = "android"))]
     nes_data.register_bluetooth(chan);
 

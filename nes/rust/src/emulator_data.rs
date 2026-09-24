@@ -261,7 +261,12 @@ impl LocalEmulatorDataClone {
         #[cfg(not(target_os = "android"))]
         return Self::get_save_path(&self.dirs);
         #[cfg(target_os = "android")]
-        return crate::get_application_data_path();
+        return self
+            .android_app
+            .as_ref()
+            .unwrap()
+            .internal_data_path()
+            .unwrap();
     }
 
     /// Retrieve the path for other files that get saved
@@ -269,7 +274,12 @@ impl LocalEmulatorDataClone {
         #[cfg(not(target_os = "android"))]
         return self.dirs.data_dir().to_path_buf();
         #[cfg(target_os = "android")]
-        return crate::get_application_data_path();
+        return self
+            .android_app
+            .as_ref()
+            .unwrap()
+            .internal_data_path()
+            .unwrap();
     }
 
     /// Retrieve the default path for roms. The user folder
@@ -286,7 +296,12 @@ impl LocalEmulatorDataClone {
             #[cfg(not(target_os = "android"))]
             return self.dirs.data_local_dir().to_path_buf();
             #[cfg(target_os = "android")]
-            return crate::get_application_data_path();
+            return self
+                .android_app
+                .as_ref()
+                .unwrap()
+                .internal_data_path()
+                .unwrap();
         }
     }
 
@@ -337,7 +352,7 @@ impl LocalEmulatorDataClone {
 
 impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
-        Self::new()
+        Self::new(PathBuf::new())
     }
 }
 
@@ -353,18 +368,18 @@ impl LocalEmulatorDataClone {
     }
 
     /// Create a new Self object with the given event loop proxy
-    fn new() -> Self {
+    fn new(path: PathBuf) -> Self {
         #[cfg(not(target_os = "android"))]
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
         #[cfg(not(target_os = "android"))]
         let mut user_path = dirs.config_dir().to_path_buf();
         #[cfg(target_os = "android")]
-        let mut user_path = crate::get_application_data_path();
+        let mut user_path = path.clone();
 
         #[cfg(not(target_os = "android"))]
         let other_path = Self::get_other_path(&dirs);
         #[cfg(target_os = "android")]
-        let mut other_path = crate::get_application_data_path();
+        let mut other_path = path.clone();
 
         user_path.push("config.toml");
         let user_config = EmulatorConfiguration::load(user_path);
@@ -459,8 +474,7 @@ impl NesEmulatorData {
         }
     }
 
-    /// Create a new nes emulator
-    pub fn new() -> Self {
+    fn new_with_path(path: PathBuf) -> Self {
         let mb: NesMotherboard = NesMotherboard::new();
         let ppu = NesPpu::new();
         let apu = NesApu::new();
@@ -486,9 +500,21 @@ impl NesEmulatorData {
             prev_irq: false,
             big_counter: 0,
             vblank_just_set: 0,
-            local: LocalEmulatorDataClone::new(),
+            local: LocalEmulatorDataClone::new(path),
             olocal: Some(olocal),
         }
+    }
+
+    /// Create a new nes emulator
+    pub fn new() -> Self {
+        Self::new_with_path(PathBuf::new())
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn new_android(app: egui_winit::winit::platform::android::activity::AndroidApp) -> Self {
+        let mut s = Self::new_with_path(app.internal_data_path().unwrap());
+        s.local.android_app = Some(app);
+        s
     }
 
     #[cfg(not(target_os = "android"))]
