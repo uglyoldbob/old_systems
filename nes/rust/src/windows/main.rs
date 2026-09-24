@@ -199,8 +199,8 @@ impl AndroidMenuBar {
         // --------------------------------------------------------
 
         if self.show_menubar {
-            egui::TopBottomPanel::top("android_menu_bar")
-                .exact_height(Self::MENU_HEIGHT)
+            egui::Panel::top("android_menu_bar")
+                .exact_size(Self::MENU_HEIGHT)
                 .show_inside(ui, |menu_ui| {
                     egui::MenuBar::new().ui(menu_ui, |menu_ui| {
                         let rect = menu_ui.max_rect();
@@ -234,8 +234,8 @@ impl AndroidMenuBar {
         // --------------------------------------------------------
 
         if !self.show_menubar {
-            egui::TopBottomPanel::top("android_menu_bar")
-                .exact_height(Self::MENU_HEIGHT)
+            egui::Panel::top("android_menu_bar")
+                .exact_size(Self::MENU_HEIGHT)
                 .show_inside(ui, |ui| {
                     let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
 
@@ -414,6 +414,16 @@ impl MainNesWindow {
 
             Ok(())
         })
+    }
+
+    #[cfg(target_os = "android")]
+    fn render_config(&mut self, size: egui::Vec2, ui: &mut egui::Ui) {
+        if ui
+            .add(egui::Button::new("Open ROM").min_size(egui::vec2(51.0, 51.0)))
+            .clicked()
+        {
+            self.android_select_rom();
+        }
     }
 
     fn render_scene(&mut self, size: egui::Vec2, ui: &mut egui::Ui) {
@@ -1850,6 +1860,15 @@ impl eframe::App for MainNesWindow {
                 }
             }
 
+            #[cfg(target_os = "android")]
+            {
+                if show_config {
+                    self.render_config(size, ui);
+                } else {
+                    self.render_scene(size, ui);
+                }
+            }
+            #[cfg(not(target_os = "android"))]
             self.render_scene(size, ui);
         });
 

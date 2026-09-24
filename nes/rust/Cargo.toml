@@ -18,7 +18,7 @@ rom_status = []
 puffin = ["dep:puffin", "dep:puffin_egui"]
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
-eframe = { version = "0.34.2" }
+eframe = { version = "0.36.2" }
 gstreamer = "0.25.3"
 gstreamer-app = "0.25.2"
 gstreamer-audio = "0.25.3"
@@ -29,10 +29,10 @@ bluetooth-rust = { version = "0.4.2", features = ["async"] }
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.15", default-features = false }
 bluetooth-rust = { version = "0.4.2", features = ["sync"] }
-eframe = { version = "0.34.2", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
+eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
 jni = "0.22.4"
 wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
-egui-winit = { version = "0.34.2", default-features = false, features = ["clipboard", "links"] }
+egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard", "links"] }
 
 [dependencies]
 async-channel = "2.5.0"
@@ -51,7 +51,7 @@ libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp
 log = "0.4.30"
 simple_file_logger = "0.4.2"
 winresource = "0.1.31"
-egui = { version = "0.34.2", features = ["serde"] }
+egui = { version = "0.36.2", features = ["serde"] }
 futures = "0.3.32"
 memmap2 = "0.9.10"
 open = "5.3.5"

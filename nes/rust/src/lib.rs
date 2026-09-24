@@ -484,9 +484,6 @@ pub fn run(mut options: eframe::NativeOptions) {
     #[cfg(target_os = "android")]
     let appc = options.android_app.as_ref().unwrap().to_owned();
 
-    //TODO only disable vsync when required
-    options.vsync = false;
-
     #[cfg(not(target_os = "android"))]
     let chan = {
         let trt = tokio::runtime::Builder::new_multi_thread()
@@ -594,6 +591,7 @@ pub fn run(mut options: eframe::NativeOptions) {
                         .build_output_stream(
                             &config,
                             move |data: &mut [u8], _cb: &cpal::OutputCallbackInfo| {
+                                data.fill(0);
                                 let mut index = 0;
                                 while index < data.len() {
                                     let c = consumer.pop_slice(&mut data[index..]);
@@ -620,6 +618,7 @@ pub fn run(mut options: eframe::NativeOptions) {
                         .build_output_stream(
                             &config,
                             move |data: &mut [u16], _cb: &cpal::OutputCallbackInfo| {
+                                data.fill(0);
                                 let mut index = 0;
                                 while index < data.len() {
                                     let c = consumer.pop_slice(&mut data[index..]);
@@ -646,6 +645,7 @@ pub fn run(mut options: eframe::NativeOptions) {
                         .build_output_stream(
                             &config,
                             move |data: &mut [u32], _cb: &cpal::OutputCallbackInfo| {
+                                data.fill(0);
                                 let mut index = 0;
                                 while index < data.len() {
                                     let c = consumer.pop_slice(&mut data[index..]);
@@ -672,6 +672,7 @@ pub fn run(mut options: eframe::NativeOptions) {
                         .build_output_stream(
                             &config,
                             move |data: &mut [f32], _cb: &cpal::OutputCallbackInfo| {
+                                data.fill(0.0);
                                 let mut index = 0;
                                 while index < data.len() {
                                     let c = consumer.pop_slice(&mut data[index..]);
