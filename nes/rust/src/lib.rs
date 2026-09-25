@@ -784,8 +784,16 @@ pub fn run(mut options: eframe::NativeOptions) {
 
     if nes_data.local.configuration.sticky_rom {
         if let Some(c) = nes_data.local.configuration.start_rom() {
-            if let Ok(nc) = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path())
-            {
+            log::error!("Attempting to load {}", c);
+            #[cfg(target_os = "android")]
+            let cart = NesCartridge::android_load_cart(
+                nes_data.local.android_app.as_ref().unwrap(),
+                &c,
+                &nes_data.local.save_path(),
+            );
+            #[cfg(not(target_os = "android"))]
+            let cart = NesCartridge::load_cartridge(c.to_string(), &nes_data.local.save_path());
+            if let Ok(nc) = cart {
                 log::info!("Loaded sticky rom {c}");
                 nes_data.insert_cartridge(nc.0);
                 if let Some(save) = nc.1 {
