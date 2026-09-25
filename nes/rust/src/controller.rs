@@ -48,7 +48,7 @@ impl ControllerConfig {
         self.buttons[index] = UserInput::Egui(k);
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Set the keys to all bluetooth control
     pub fn set_keys_bluetooth(&mut self, addr: [u8; 6]) {
         for (i, b) in self.buttons.iter_mut().enumerate() {
@@ -56,13 +56,13 @@ impl ControllerConfig {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Set the given button with gilrs code data
     pub fn set_key_gilrs_button(&mut self, index: usize, id: gilrs::GamepadId, c: gilrs::ev::Code) {
         self.buttons[index] = UserInput::GilrsButton(id, c);
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Set the given button with gilrs axis data as a button
     pub fn set_key_gilrs_axis(
         &mut self,
@@ -196,7 +196,7 @@ impl ButtonCombination {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Update button information with bluetooth button presses
     pub fn update_bluetooth_buttons(
         &mut self,
@@ -212,7 +212,7 @@ impl ButtonCombination {
             if index == BUTTON_COMBO_TURBOB {
                 self.try_set_rate(index, config.rates[1]);
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let UserInput::BluetoothButton(baddress, match_index) = b {
                 if address == *baddress && button_index == *match_index {
                     if state {
@@ -225,7 +225,7 @@ impl ButtonCombination {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Update button information with button data from gilrs
     pub fn update_gilrs_buttons(
         &mut self,
@@ -253,7 +253,7 @@ impl ButtonCombination {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Update button information with axis data fromm gilrs
     pub fn update_gilrs_axes(
         &mut self,

@@ -62,7 +62,7 @@ impl Default for EmulatorConfiguration {
             controller[0].set_raw_key(crate::controller::BUTTON_COMBO_LEFT, 9);
             controller[0].set_raw_key(crate::controller::BUTTON_COMBO_RIGHT, 10);
         }
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_A, egui::Key::F);
             controller[0].set_key_egui(crate::controller::BUTTON_COMBO_B, egui::Key::D);
@@ -177,7 +177,7 @@ impl EmulatorConfiguration {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 /// The data used to convey what is being pressed and by who
 pub struct BluetoothControllerOwner {
     /// The bluetooth address of the soft controller
@@ -186,7 +186,7 @@ pub struct BluetoothControllerOwner {
     pub controller_config: crate::controller::ControllerConfig,
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub struct PendingBluetoothController {
     /// The bluetooth address
     pub addr: [u8; 6],
@@ -196,20 +196,20 @@ pub struct PendingBluetoothController {
 
 /// Just like LocalEmulatorDataClone, but the members do not implement Clone
 pub struct LocalEmulatorData {
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The object for interfacing with joysticks.
     pub gilrs: gilrs::Gilrs,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The bluetooth controller button data
     pub bluetooth_controllers:
         [Option<std::sync::Arc<std::sync::Mutex<BluetoothControllerOwner>>>; 4],
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The network object for interacting with other emulators
     pub network: Option<common_emulator::network::Network>,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The bluetooth receiver for bluetooth controllers
     pub blue_recv: Option<tokio::sync::mpsc::Receiver<crate::BluetoothControllerInfo>>,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The pending bluetooth controller addresses
     pub pending_bluetooth_controllers: std::collections::VecDeque<PendingBluetoothController>,
     #[cfg(target_os = "android")]
@@ -220,15 +220,15 @@ pub struct LocalEmulatorData {
 impl Default for LocalEmulatorData {
     fn default() -> Self {
         Self {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             gilrs: gilrs::GilrsBuilder::new().build().unwrap(),
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             bluetooth_controllers: [const { None }; 4],
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             network: None,
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             blue_recv: None,
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             pending_bluetooth_controllers: std::collections::VecDeque::new(),
             #[cfg(target_os = "android")]
             event_recv: None,
@@ -248,7 +248,7 @@ pub struct LocalEmulatorDataClone {
     pub rom_test: common_emulator::rom_status::RomListTestParser,
     /// Indicates that the screen resolution is locked
     pub resolution_locked: bool,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The way to get system specific paths
     dirs: directories::ProjectDirs,
     /// The stored resized image for the emulator
@@ -263,7 +263,9 @@ pub struct LocalEmulatorDataClone {
 impl LocalEmulatorDataClone {
     /// Returns the path to use for save states
     pub fn save_path(&self) -> std::path::PathBuf {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(target_os = "ios")]
+        return std::path::PathBuf::from("./");
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         return Self::get_save_path(&self.dirs);
         #[cfg(target_os = "android")]
         return self
@@ -276,7 +278,9 @@ impl LocalEmulatorDataClone {
 
     /// Retrieve the path for other files that get saved
     pub fn get_save_other(&self) -> std::path::PathBuf {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(target_os = "ios")]
+        return std::path::PathBuf::from("./");
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         return self.dirs.data_dir().to_path_buf();
         #[cfg(target_os = "android")]
         return self
@@ -298,7 +302,9 @@ impl LocalEmulatorDataClone {
         } else if let Some(bdirs) = directories::BaseDirs::new() {
             bdirs.home_dir().to_path_buf()
         } else {
-            #[cfg(not(target_os = "android"))]
+            #[cfg(target_os = "ios")]
+            return std::path::PathBuf::from("./");
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             return self.dirs.data_local_dir().to_path_buf();
             #[cfg(target_os = "android")]
             return self
@@ -374,16 +380,16 @@ impl LocalEmulatorDataClone {
 
     /// Create a new Self object with the given event loop proxy
     fn new(path: PathBuf) -> Self {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let mut user_path = dirs.config_dir().to_path_buf();
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_os = "ios"))]
         let mut user_path = path.clone();
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let other_path = Self::get_other_path(&dirs);
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_os = "ios"))]
         let mut other_path = path.clone();
 
         user_path.push("config.toml");
@@ -398,7 +404,7 @@ impl LocalEmulatorDataClone {
                 dirs.data_dir().to_path_buf(),
             ),
             resolution_locked: false,
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             dirs,
             image: common_emulator::video::PixelImage::<egui::Color32>::default(),
             sound_rate: 0,
@@ -459,13 +465,16 @@ impl NesEmulatorData {
         self.local.android_app = Some(android_app);
     }
 
+    #[cfg(target_os = "android")]
     pub fn load_cartridge_for_user(
         &mut self,
         name: String,
+        uri: String,
         contents: Vec<u8>,
     ) -> Result<(), common_emulator::CartridgeError> {
-        let nc =
+        let mut nc =
             NesCartridge::load_cartridge_data(name.clone(), &contents, &self.local.save_path())?;
+        nc.0.android_uri = uri;
         log::error!("Loaded user rom {name}");
         self.remove_cartridge();
         self.insert_cartridge(nc.0);
@@ -478,7 +487,7 @@ impl NesEmulatorData {
     }
 
     pub fn check_network(&mut self) {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Some(olocal) = &mut self.olocal {
             if let Some(network) = &mut olocal.network {
                 network.process_messages();
@@ -486,7 +495,7 @@ impl NesEmulatorData {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Register the bluetooth controller info
     pub fn register_bluetooth(
         &mut self,
@@ -544,7 +553,7 @@ impl NesEmulatorData {
         s
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Pull messages from bluetooth controllers
     pub fn check_bluetooth_controllers(&mut self) {
         if let Some(olocal) = &mut self.olocal {
@@ -709,9 +718,14 @@ impl NesEmulatorData {
 
     /// Insert a cartridge into the motherboard.
     pub fn insert_cartridge(&mut self, cart: NesCartridge) {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         self.local
             .configuration
             .set_startup(cart.rom_name().to_owned());
+        #[cfg(target_os = "android")]
+        self.local
+            .configuration
+            .set_startup(cart.android_uri.to_owned());
         self.mb.insert_cartridge(cart);
     }
 

@@ -44,13 +44,13 @@ impl Window {
                 .with_inner_size([400.0, 300.0]),
             |ui, _class| {
                 egui::CentralPanel::default().show_inside(ui, |ui| {
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     let mut first_joy_button;
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     let mut first_joy_axis;
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     let (old_gilrs_button, old_gilrs_axis) = self.gilrs_last_known.clone();
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     {
                         if let Some(olocal) = &mut c.olocal {
                             let gilrs = &mut olocal.gilrs;
@@ -145,7 +145,7 @@ impl Window {
                                 self.waiting_for_input = None;
                                 save_config = true;
                             } else {
-                                #[cfg(not(target_os = "android"))]
+                                #[cfg(not(any(target_os = "android", target_os = "ios")))]
                                 if let Some((id, joybutton)) = first_joy_button {
                                     config.set_key_gilrs_button(index, *id, *joybutton);
                                     self.waiting_for_input = None;

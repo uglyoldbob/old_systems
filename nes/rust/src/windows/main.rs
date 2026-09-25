@@ -7,14 +7,14 @@ use crate::{
     NesEmulatorData,
 };
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::emulator_data::BluetoothControllerOwner;
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use common_emulator::network::NodeRole;
 
 use common_emulator::audio::AudioProducerWithRate;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use common_emulator::recording::Recording;
 
 use eframe::egui;
@@ -111,10 +111,10 @@ pub struct MainNesWindow {
     mouse_delay: u8,
     /// The zapper was fired "off-screen"
     mouse_miss: bool,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The result of opening gstreamer
     have_gstreamer: Result<(), gstreamer::glib::Error>,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The recording object
     recording: Recording,
     /// The audio objects for a streaming server
@@ -123,7 +123,7 @@ pub struct MainNesWindow {
     render_percent: f32,
     /// The open rom window
     open_rom_window: Option<crate::windows::rom_finder::RomFinder>,
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The networking window
     networking_window: Option<crate::windows::network::Window>,
     /// The configuration window
@@ -256,11 +256,11 @@ impl MainNesWindow {
         stream: Option<cpal::Stream>,
     ) -> Self {
         use std::time::Duration;
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let have_gstreamer = gstreamer::init();
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         gstreamer::log::set_threshold_from_string("appsink:WARN", false);
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Err(e) = &have_gstreamer {
             log::error!("Failed to open gstreamer: {:?}", e);
         }
@@ -296,7 +296,7 @@ impl MainNesWindow {
 
         Self {
             c,
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             have_gstreamer,
             rewind_point: None,
             rewinds: [Vec::new(), Vec::new(), Vec::new()],
@@ -314,14 +314,14 @@ impl MainNesWindow {
             mouse_vision: false,
             mouse_delay: 0,
             mouse_miss: false,
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             recording: Recording::new(),
             audio_streaming: Vec::new(),
             render_percent: 0.0,
             configuration_window: None,
             controllers_window: None,
             game_genie_window: None,
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             networking_window: None,
             open_rom_window: None,
             #[cfg(feature = "debugger")]
@@ -897,7 +897,7 @@ impl MainNesWindow {
             }
         }
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         ui.ctx()
             .send_viewport_cmd(egui::ViewportCommand::Title(format!(
                 "UglyOldBob NES Emulator {} - {:.0} FPS {:.1} percent",
@@ -909,34 +909,6 @@ impl MainNesWindow {
 }
 
 impl eframe::App for MainNesWindow {
-    fn on_exit(&mut self) {
-        #[cfg(target_os = "android")]
-        {
-            let name = if let Some(cart) = self.c.mb.cartridge() {
-                cart.save_name()
-            } else {
-                "state.bin".to_string()
-            };
-            let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
-            let mut save_path = self.c.local.save_path();
-            save_path.push(ppp.file_name().unwrap());
-            if true {
-                let mut path = save_path.clone();
-                path.pop();
-                let _ = std::fs::create_dir_all(path);
-                let state = Box::new(self.c.serialize());
-                log::error!("Saving state to {} before exiting", save_path.display());
-                let _e = std::fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(save_path.clone())
-                    .unwrap()
-                    .write_all(&state);
-            }
-        }
-    }
-
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         #[cfg(feature = "puffin")]
         {
@@ -952,16 +924,16 @@ impl eframe::App for MainNesWindow {
                 if let Some(recv) = &olocal.event_recv {
                     while let Ok(event) = recv.try_recv() {
                         match event {
-                            crate::AndroidJavaEvent::NewRomContents(name, rom) => {
-                                new_rom = Some((name, rom));
+                            crate::AndroidJavaEvent::NewRomContents(name, uri, rom) => {
+                                new_rom = Some((name, uri, rom));
                             }
                         }
                     }
                 }
             }
-            if let Some((name, rom)) = new_rom {
+            if let Some((name, uri, rom)) = new_rom {
                 log::error!("Need to load rom of {} bytes", rom.len());
-                if let Err(e) = self.c.load_cartridge_for_user(name, rom) {
+                if let Err(e) = self.c.load_cartridge_for_user(name, uri, rom) {
                     log::error!("Error loading rom: {:?}", e);
                 } else {
                     log::error!("Loaded rom successfully");
@@ -1094,11 +1066,11 @@ impl eframe::App for MainNesWindow {
                     }
                 }
             });
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(olocal) = &mut self.c.olocal {
                 while let Some(_e) = olocal.gilrs.next_event() {}
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(olocal) = &mut self.c.olocal {
                 let gilrs = &mut olocal.gilrs;
                 for (id, gamepad) in gilrs.gamepads() {
@@ -1140,10 +1112,10 @@ impl eframe::App for MainNesWindow {
                 }
             }
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             self.c.check_bluetooth_controllers();
 
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(olocal) = &mut self.c.olocal {
                 if let Some(network) = &mut olocal.network {
                     match network.role() {
@@ -1175,7 +1147,7 @@ impl eframe::App for MainNesWindow {
             }
         }
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Some(olocal) = &mut self.c.olocal {
             if let Some(network) = &mut olocal.network {
                 match network.role() {
@@ -1217,7 +1189,7 @@ impl eframe::App for MainNesWindow {
             if let Some(s) = &mut self.sound {
                 sound.push(s);
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(s) = self.recording.get_sound() {
                 sound.push(s);
             }
@@ -1288,9 +1260,9 @@ impl eframe::App for MainNesWindow {
                                 .resize(self.c.local.configuration.scaler);
                             self.c.local.image = image;
                         }
-                        #[cfg(not(target_os = "android"))]
+                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
                         self.recording.send_frame(&self.c.local.image);
-                        #[cfg(not(target_os = "android"))]
+                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
                         if let Some(olocal) = &mut self.c.olocal {
                             if let Some(network) = &mut olocal.network {
                                 if network.role() == NodeRole::PlayerHost {
@@ -1351,7 +1323,7 @@ impl eframe::App for MainNesWindow {
         //Some(true) means start recording, Some(false) means stop recording
         let mut start_stop_recording: Option<bool> = None;
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if let Some(olocal) = &mut self.c.olocal {
             let mut pop_front = false;
             let mut pending_player = None;
@@ -1435,7 +1407,7 @@ impl eframe::App for MainNesWindow {
                 self.game_genie_window.take();
             }
         }
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.networking_window {
@@ -1536,7 +1508,7 @@ impl eframe::App for MainNesWindow {
             }
         }
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         egui::Panel::top("menu_bar").show_inside(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 let is_fullscreen = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
@@ -1563,7 +1535,7 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     if !self.recording.is_recording() {
                         let button = egui::Button::new("Begin recording - F7");
                         if ui.add_enabled(true, button).clicked()
@@ -1621,7 +1593,7 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
-                    #[cfg(not(target_os = "android"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     {
                         let button = egui::Button::new("Networking");
                         if ui.add_enabled(true, button).clicked() {
@@ -1727,7 +1699,7 @@ impl eframe::App for MainNesWindow {
             load_state = true;
         }
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         if !self.recording.is_recording() {
             if ui.ctx().input(|i| i.key_pressed(egui::Key::F7)) {
                 start_stop_recording = Some(true);
@@ -1756,7 +1728,7 @@ impl eframe::App for MainNesWindow {
                 .send_viewport_cmd(egui::ViewportCommand::Fullscreen(!f));
         }
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             let record_path = self.c.local.record_path();
             if let Some(rec) = start_stop_recording {
@@ -1826,7 +1798,7 @@ impl eframe::App for MainNesWindow {
             let size = ui.available_size();
 
             // Controller buttons — draw outside the centering logic
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let Some(olocal) = &mut self.c.olocal {
                 if let Some(network) = &mut olocal.network {
                     let myc = network.get_controller_id();
@@ -1862,7 +1834,7 @@ impl eframe::App for MainNesWindow {
                     self.render_scene(size, ui);
                 }
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             self.render_scene(size, ui);
         });
 

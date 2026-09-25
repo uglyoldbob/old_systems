@@ -17,7 +17,25 @@ debugger = []
 rom_status = []
 puffin = ["dep:puffin", "dep:puffin_egui"]
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
+eframe = { version = "0.36.2" }
+gstreamer = "0.25.3"
+gstreamer-app = "0.25.2"
+gstreamer-audio = "0.25.3"
+gstreamer-video = "0.25.3"
+rfd = "0.17.2"
+bluetooth-rust = { version = "0.4.2", features = ["async"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+eframe = { version = "0.36.2" }
+gstreamer = "0.25.3"
+gstreamer-app = "0.25.2"
+gstreamer-audio = "0.25.3"
+gstreamer-video = "0.25.3"
+rfd = "0.17.2"
+bluetooth-rust = { version = "0.4.2", features = ["async"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
 eframe = { version = "0.36.2" }
 gstreamer = "0.25.3"
 gstreamer-app = "0.25.2"
@@ -29,10 +47,15 @@ bluetooth-rust = { version = "0.4.2", features = ["async"] }
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.15", default-features = false }
 bluetooth-rust = { version = "0.4.2", features = ["sync"] }
-eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
+eframe = { version = "0.36.2", default-features = false, features = ["glow", "android-native-activity", "default_fonts"] }
 jni = "0.22.4"
-wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
 egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard", "links"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "default_fonts"] }
+jni = "0.22.4"
+egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard", "links"] }
+wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
 
 [dependencies]
 async-channel = "2.5.0"
@@ -86,10 +109,6 @@ harness = false
 [[bin]]
 name = "zesty-nes"
 path = "./src/main.rs"
-
-[[bin]]
-name = "stream"
-path = "./src/streamtest.rs"
 
 [package.metadata.bundle]
 identifier = "com.uglyoldbob.nes_emulator"

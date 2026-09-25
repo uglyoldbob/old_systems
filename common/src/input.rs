@@ -10,13 +10,13 @@ pub enum UserInput {
     DirectInput(u8),
     /// User input provided by egui input layer
     Egui(egui::Key),
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// User input provided by a button from gilrs
     GilrsButton(gilrs::GamepadId, gilrs::ev::Code),
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// User input button provided by an axis from gilrs, true means positive direction
     GilrsAxisButton(gilrs::GamepadId, gilrs::ev::Code, bool),
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// A bluetooth controller input
     /// bluetooth address and button index
     BluetoothButton([u8; 6], u8),
@@ -30,18 +30,18 @@ impl UserInput {
         match self {
             #[cfg(target_os = "android")]
             UserInput::DirectInput(_) => "NA".to_string(),
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             UserInput::BluetoothButton(address, index) => {
                 format!("{:x?} {}", address, index)
             }
             UserInput::Egui(k) => {
                 format!("{:?}", k)
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             UserInput::GilrsButton(id, b) => {
                 format!("Gamepad {} {:?}", id, b)
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             UserInput::GilrsAxisButton(id, a, dir) => {
                 format!(
                     "Gamepad {} {:?} {}",

@@ -219,6 +219,8 @@ pub struct NesCartridge {
     #[serde(skip)]
     /// The convenience name of the rom
     rom_name: String,
+    #[cfg(target_os = "android")]
+    pub android_uri: String,
 }
 
 /// The data from a cartridge that needs to be saved when loading a save state
@@ -434,6 +436,8 @@ impl NesCartridge {
                 .unwrap()
                 .to_string(),
             rom_name: name.to_owned(),
+            #[cfg(target_os = "android")]
+            android_uri: String::new(),
         })
     }
 
@@ -547,6 +551,8 @@ impl NesCartridge {
                 .unwrap()
                 .to_string(),
             rom_name: name.to_owned(),
+            #[cfg(target_os = "android")]
+            android_uri: String::new(),
         })
     }
 

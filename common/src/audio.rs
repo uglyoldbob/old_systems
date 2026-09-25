@@ -284,7 +284,7 @@ pub enum AudioSample {
 enum AudioProducerMethod {
     /// A ring buffer is used to produce the audio
     RingBuffer(AudioProducer),
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// The audio is pushed directly to gstreamer for recordings
     GStreamer {
         appsrc: gstreamer_app::AppSrc,
@@ -302,7 +302,7 @@ impl AudioProducerMethod {
             AudioProducerMethod::RingBuffer(rb) => {
                 rb.push_slice(slice);
             }
-            #[cfg(not(target_os = "android"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             AudioProducerMethod::GStreamer {
                 appsrc,
                 rate,
@@ -360,7 +360,7 @@ impl AudioProducerWithRate {
         }
     }
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     /// Create a new object and a new ringbuffer based on size
     pub fn new_gstreamer(
         size: usize,

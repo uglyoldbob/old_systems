@@ -14,7 +14,7 @@ pub mod genie;
 pub mod main;
 #[cfg(feature = "debugger")]
 pub mod name_table_dump_window;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod network;
 #[cfg(feature = "debugger")]
 pub mod pattern_table_dump_window;

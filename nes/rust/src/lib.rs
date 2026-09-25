@@ -32,12 +32,12 @@ pub fn execute<F: std::future::Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 struct BluetoothReadHalf(std::sync::Arc<tokio::sync::Mutex<bluetooth_rust::BluetoothStream>>);
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 struct BluetoothWriteHalf(std::sync::Arc<tokio::sync::Mutex<bluetooth_rust::BluetoothStream>>);
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl tokio::io::AsyncRead for BluetoothReadHalf {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
@@ -52,7 +52,7 @@ impl tokio::io::AsyncRead for BluetoothReadHalf {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl tokio::io::AsyncWrite for BluetoothWriteHalf {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
@@ -89,7 +89,7 @@ impl tokio::io::AsyncWrite for BluetoothWriteHalf {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn split_bluetooth(
     stream: bluetooth_rust::BluetoothStream,
 ) -> (BluetoothReadHalf, BluetoothWriteHalf) {
@@ -100,7 +100,7 @@ fn split_bluetooth(
     )
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 struct BluetoothPacketReceiver {
     stream: BluetoothReadHalf,
     len0: Option<u8>,
@@ -109,7 +109,7 @@ struct BluetoothPacketReceiver {
     buf_pos: usize,
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl BluetoothPacketReceiver {
     async fn receive_packet(&mut self) -> Option<Option<::controller::ControllerSend>> {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -149,7 +149,7 @@ impl BluetoothPacketReceiver {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 struct BluetoothControllerClient {
     streamr: BluetoothPacketReceiver,
     streamw: BluetoothWriteHalf,
@@ -162,7 +162,7 @@ struct BluetoothControllerClient {
     my_player_number: Option<u8>,
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 impl BluetoothControllerClient {
     fn new(
         stream: bluetooth_rust::BluetoothStream,
@@ -318,7 +318,7 @@ pub struct BluetoothControllerInfo {
     pub message: BluetoothControllerInfoMessage,
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 async fn run_bluetooth(
     send: tokio::sync::mpsc::Sender<BluetoothControllerInfo>,
 ) -> Result<(), String> {
@@ -453,8 +453,8 @@ static JAVA_EVENT_SENDER: std::sync::OnceLock<std::sync::mpsc::Sender<AndroidJav
 /// The actual event delivered from java code on android
 #[cfg(target_os = "android")]
 enum AndroidJavaEvent {
-    /// The user is loading a new rom, specify the name of the rom
-    NewRomContents(String, Vec<u8>),
+    /// The user is loading a new rom, specify the name of the rom, the uri, and the contents of the rom
+    NewRomContents(String, String, Vec<u8>),
 }
 
 #[cfg(target_os = "android")]
@@ -465,6 +465,7 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selecte
     _: jni::objects::JObject<'local>,
     rom: jni::objects::JByteArray<'local>,
     name: jni::objects::JString<'local>,
+    uri: jni::objects::JString<'local>,
 ) {
     let e = env.with_env(|env| {
         log::error!("Trying to use rom contents");
@@ -479,12 +480,13 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selecte
         // Java byte is signed, Rust NES ROM data is u8.
         let rom: Vec<u8> = data.into_iter().map(|x| x as u8).collect();
 
+        let uri: String = env.get_string(&uri)?.into();
         let name: String = env.get_string(&name)?.into();
 
         log::info!("Received ROM: {} bytes", rom.len());
 
         if let Some(sender) = JAVA_EVENT_SENDER.get() {
-            if let Err(e) = sender.send(AndroidJavaEvent::NewRomContents(name, rom)) {
+            if let Err(e) = sender.send(AndroidJavaEvent::NewRomContents(name, uri, rom)) {
                 log::error!("Failed to send ROM to game loop: {e}");
             }
         } else {
@@ -511,7 +513,7 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
 
     let options = NativeOptions {
         android_app: Some(app),
-        renderer: Renderer::Wgpu,
+        renderer: Renderer::Glow,
         ..Default::default()
     };
 
@@ -540,7 +542,7 @@ pub fn run(mut options: eframe::NativeOptions) {
     #[cfg(target_os = "android")]
     JAVA_EVENT_SENDER.set(java_event_sender).unwrap();
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let chan = {
         let trt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -560,7 +562,7 @@ pub fn run(mut options: eframe::NativeOptions) {
     #[cfg(not(target_os = "android"))]
     let mut nes_data = NesEmulatorData::new();
 
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     nes_data.register_bluetooth(chan);
 
     let host = cpal::default_host();

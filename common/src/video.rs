@@ -86,7 +86,7 @@ impl PixelImage<egui::Color32> {
     }
 
     /// Converts to a slice that gstreamer can use
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub fn to_gstreamer(&self, buf: &mut gstreamer::Buffer) {
         let v = self.to_gstreamer_vec();
         let mut p = buf.make_mut().map_writable().unwrap();

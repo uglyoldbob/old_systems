@@ -94,7 +94,7 @@ impl Window {
                         )
                         .clicked()
                     {
-                        #[cfg(not(target_os = "android"))]
+                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
                         {
                             let f = rfd::AsyncFileDialog::new()
                                 .set_title("Select rom folder")

@@ -2,14 +2,14 @@ use serde::{Deserialize, Serialize};
 
 pub mod audio;
 pub mod input;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod network;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod recording;
 pub mod rom_status;
 pub mod romlist;
 pub mod storage;
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub mod streaming;
 pub mod video;
 

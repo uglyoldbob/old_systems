@@ -103,11 +103,11 @@ public class ZestyActivity extends NativeActivity {
         try {
             byte[] rom = readRom(uri);
             String name = getRomName(uri);
-            send_user_selected_rom(rom, name);
+            send_user_selected_rom(rom, name, uri.toString());
         } catch (IOException e) {
             Log.e("ZestyNes", "Failed to read ROM", e);
         }
     }
 
-    public static native void send_user_selected_rom(byte[] rom, String name);
+    public static native void send_user_selected_rom(byte[] rom, String name, String uri);
 }
