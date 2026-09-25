@@ -77,6 +77,12 @@ public class ZestyActivity extends NativeActivity {
     }
 
     @Override
+    protected void onStop() {
+        nativeActivityStopped();
+        super.onStop();
+    }
+
+    @Override
     protected void onActivityResult(
             int requestCode,
             int resultCode,
@@ -109,5 +115,6 @@ public class ZestyActivity extends NativeActivity {
         }
     }
 
+    public static native void nativeActivityStopped();
     public static native void send_user_selected_rom(byte[] rom, String name, String uri);
 }

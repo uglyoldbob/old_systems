@@ -931,8 +931,7 @@ impl NesControllerTrait for StandardController {
                 }
                 _ => Duration::from_millis(50),
             };
-            if !req.is_zero()
-            {
+            if !req.is_zero() {
                 while *t >= req {
                     *t -= req;
                     *flag = !*flag;

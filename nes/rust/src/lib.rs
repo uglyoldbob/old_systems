@@ -460,6 +460,16 @@ enum AndroidJavaEvent {
 #[cfg(target_os = "android")]
 #[allow(non_snake_case)]
 #[no_mangle]
+pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_nativeActivityStopped<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _: jni::objects::JObject<'local>,
+) {
+    log::error!("Need to signal stopping activity");
+}
+
+#[cfg(target_os = "android")]
+#[allow(non_snake_case)]
+#[no_mangle]
 pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selected_1rom<'local>(
     mut env: jni::EnvUnowned<'local>,
     _: jni::objects::JObject<'local>,
@@ -490,7 +500,7 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selecte
                 log::error!("Failed to send ROM to game loop: {e}");
             }
         } else {
-            log::error!("ROM sender has not been initialized");
+            log::error!("JAva event sender has not been initialized");
         }
 
         Ok::<(), jni::errors::Error>(())
