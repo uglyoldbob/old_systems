@@ -1,0 +1,31 @@
+name: IOS Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Checkout GitLab Repo
+      uses: sudosubin/git-clone-action@v1
+      with:
+        repository: 'thomas.epperson/xbuild'
+        platform: 'gitlab'
+        path: 'xbuild'
+    - name: Setup 'xbuild'
+      working-directory: ./xbuild/xbuild
+      run: cargo install --path .
+    - name: Build
+      working-directory: ./nes/rust
+      run: x build --platform=ios --arch=arm64
