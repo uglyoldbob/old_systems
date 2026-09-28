@@ -550,7 +550,7 @@ fn android_main(app: winit::platform::android::activity::AndroidApp) {
 
     hide_system_bars(&app);
 
-    let options = NativeOptions {
+    let options = eframe::NativeOptions {
         android_app: Some(app),
         renderer: Renderer::Glow,
         ..Default::default()
