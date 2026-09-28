@@ -15,15 +15,16 @@ fn main() {
             .expect("could not find target directory");
 
         let gst_bin = Path::new(r"C:\Program Files\gstreamer\1.0\msvc_x86_64\bin");
+        if gst_bin.exists() {
+            for entry in fs::read_dir(gst_bin).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
 
-        for entry in fs::read_dir(gst_bin).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
+                if path.extension().and_then(|x| x.to_str()) == Some("dll") {
+                    let dst = target_dir.join(path.file_name().unwrap());
 
-            if path.extension().and_then(|x| x.to_str()) == Some("dll") {
-                let dst = target_dir.join(path.file_name().unwrap());
-
-                fs::copy(&path, &dst).unwrap_or_else(|e| panic!("failed to copy {path:?}: {e}"));
+                    fs::copy(&path, &dst).unwrap_or_else(|e| panic!("failed to copy {path:?}: {e}"));
+                }
             }
         }
     }
