@@ -1,4 +1,4 @@
-name: Ubuntu Build
+name: Android Build
 
 on:
   push:
@@ -17,6 +17,18 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - name: Install LLVM
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y llvm
+    - name: Add LLVM to PATH
+      run: |
+        LLVM_BIN="$(llvm-config --bindir)"
+        echo "$LLVM_BIN" >> "$GITHUB_PATH"
+    - name: Verify LLVM tools
+      run: |
+        which llvm-ar
+        llvm-ar --version
     - name: Checkout xbuild
       run: git clone https://gitlab.com/thomas.epperson/xbuild.git
     - name: Setup 'xbuild'

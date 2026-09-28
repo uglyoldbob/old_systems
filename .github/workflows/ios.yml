@@ -17,6 +17,15 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - name: Add Android LLVM tools to PATH
+      shell: bash
+      run: |
+        LLVM_BIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-$(uname -m)/bin"
+        echo "$LLVM_BIN" >> "$GITHUB_PATH"
+    - name: Verify LLVM tools
+      run: |
+        which llvm-ar
+        llvm-ar --version
     - name: Checkout xbuild
       run: git clone https://gitlab.com/thomas.epperson/xbuild.git
     - name: Setup 'xbuild'
