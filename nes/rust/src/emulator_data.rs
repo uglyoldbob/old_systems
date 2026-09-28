@@ -47,7 +47,7 @@ impl Default for EmulatorConfiguration {
             crate::controller::ControllerConfig::new(),
             crate::controller::ControllerConfig::new(),
         ];
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_os = "ios"))]
         {
             controller[0].set_raw_key(crate::controller::BUTTON_COMBO_A, 0);
             controller[0].set_raw_key(crate::controller::BUTTON_COMBO_B, 1);
@@ -401,7 +401,7 @@ impl LocalEmulatorDataClone {
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let other_path = Self::get_other_path(&dirs);
         #[cfg(any(target_os = "android", target_os = "ios"))]
-        let mut other_path = if let Some(path) = &path {
+        let other_path = if let Some(path) = &path {
             path.clone()
         } else {
             crate::CONFIG_TOML_PATH.get().unwrap().clone()
@@ -485,7 +485,7 @@ impl NesEmulatorData {
         name: String,
         path: &std::path::Path,
     ) -> Result<(), common_emulator::CartridgeError> {
-        let mut nc = NesCartridge::load_cartridge(name.clone(), path)?;
+        let nc = NesCartridge::load_cartridge(name.clone(), path)?;
         self.remove_cartridge();
         self.insert_cartridge(nc.0);
         self.power_cycle();

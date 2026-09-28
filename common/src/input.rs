@@ -5,8 +5,8 @@ use eframe::egui;
 /// The types of user input that can be accepted
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub enum UserInput {
-    #[cfg(target_os = "android")]
-    /// Direct controller button input, used by the android touchscreen buttons
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    /// Direct controller button input, used by the touchscreen buttons
     DirectInput(u8),
     /// User input provided by egui input layer
     Egui(egui::Key),
@@ -28,7 +28,7 @@ impl UserInput {
     /// Convert the user input to a string, suitable for the user to see.
     pub fn as_string(&self) -> String {
         match self {
-            #[cfg(target_os = "android")]
+            #[cfg(any(target_os = "android", target_os = "ios"))]
             UserInput::DirectInput(_) => "NA".to_string(),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             UserInput::BluetoothButton(address, index) => {

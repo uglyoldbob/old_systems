@@ -17,7 +17,6 @@ use crate::cartridge::NesCartridge;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use emulator_data::NesEmulatorData;
 
-use eframe::{egui, NativeOptions};
 use std::sync::OnceLock;
 
 /// The emulator data

@@ -37,7 +37,7 @@ impl DumpWindow {
                 .with_title("Nametable dump")
                 .with_inner_size([400.0, 300.0]),
             |ui, _class| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
                     ui.label("PPU Name Table Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         c.cpu_peripherals.ppu.render_nametable(&mut self.buf, &c.mb);

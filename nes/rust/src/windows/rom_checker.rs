@@ -53,7 +53,7 @@ impl Window {
                 .with_title("ROM checker")
                 .with_inner_size([400.0, 300.0]),
             |ui, class| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         ui.label("Rom checking window");
                         let mut save_state = None;

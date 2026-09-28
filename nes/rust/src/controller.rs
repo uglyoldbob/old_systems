@@ -38,7 +38,7 @@ impl ControllerConfig {
         self.rates[index] = Duration::from_millis((500.0 / r) as u64);
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_os = "ios"))]
     pub fn set_raw_key(&mut self, index: usize, v: u8) {
         self.buttons[index] = UserInput::DirectInput(v);
     }

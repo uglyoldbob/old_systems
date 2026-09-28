@@ -585,6 +585,9 @@ impl NesCartridge {
             Self::load_obsolete_ines(name, &rom_contents)
         };
 
+        #[cfg(not(target_os = "android"))]
+        let save_state = None;
+        #[cfg(target_os = "android")]
         let mut save_state = None;
         if let Ok(cart) = &mut cart {
             let mut pb: PathBuf = sp.to_path_buf();

@@ -38,7 +38,7 @@ impl RomFinder {
 
         let mut save_list = false;
         let sp = c.local.save_path();
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 let mut new_rom = None;
                 for ranking in RomRanking::iter() {

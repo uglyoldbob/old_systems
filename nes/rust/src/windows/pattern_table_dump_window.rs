@@ -31,7 +31,7 @@ impl DumpWindow {
                 .with_title("Pattern Table Dump")
                 .with_inner_size([400.0, 300.0]),
             |ui, _class| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
                     ui.label("PPU Pattern Table Dump Window");
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         c.cpu_peripherals

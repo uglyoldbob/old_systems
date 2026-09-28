@@ -5,7 +5,7 @@ use std::{io::Write, ops::DerefMut};
 #[cfg(target_os = "android")]
 use crate::windows::rom_finder::RomFinder;
 use crate::{
-    controller::{ButtonCombination, NesControllerTrait},
+    controller::NesControllerTrait,
     NesEmulatorData,
 };
 
@@ -214,7 +214,7 @@ impl AndroidMenuBar {
             {
                 egui::Panel::top("android_menu_bar")
                     .exact_size(Self::MENU_HEIGHT)
-                    .show_inside(ui, |ui| {
+                    .show(ui, |ui| {
                         let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
 
                         if response.clicked() {
@@ -227,7 +227,7 @@ impl AndroidMenuBar {
             {
                 egui::Panel::top("android_menu_bar")
                     .exact_size(Self::MENU_HEIGHT)
-                    .show_inside(ui, |ui| {
+                    .show(ui, |ui| {
                         let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
 
                         if response.clicked() {
@@ -1158,6 +1158,7 @@ impl MainNesWindow {
                         NodeRole::PlayerHost => {
                             for i in 0..4 {
                                 if let Some(bc) = network.get_button_data(i) {
+                                    use crate::controller::ButtonCombination;
                                     if let Ok(bc) = bincode::deserialize::<ButtonCombination>(bc) {
                                         let controller = c.mb.get_controller_mut(i);
                                         if let Some(con) = controller.get_buttons_iter_mut().next()
@@ -1344,6 +1345,9 @@ impl MainNesWindow {
         let mut load_state = false;
         let mut rewind_state = false;
         //Some(true) means start recording, Some(false) means stop recording
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let start_stop_recording: Option<bool> = None;
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let mut start_stop_recording: Option<bool> = None;
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1357,7 +1361,7 @@ impl MainNesWindow {
                         .with_title("Controller Config")
                         .with_inner_size([400.0, 300.0]),
                     |ui, _class| {
-                        egui::CentralPanel::default().show_inside(ui, |ui| {
+                        egui::CentralPanel::default().show(ui, |ui| {
                             ui.label(format!("Select the player number for {:x?}", pending.addr));
                             ui.horizontal(|ui| {
                                 for i in 0..4 {
@@ -1532,7 +1536,7 @@ impl MainNesWindow {
         }
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        egui::Panel::top("menu_bar").show_inside(ui, |ui| {
+        egui::Panel::top("menu_bar").show(ui, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 let is_fullscreen = ui.ctx().input(|i| i.viewport().fullscreen.unwrap_or(false));
                 ui.menu_button("File", |ui| {
@@ -1817,7 +1821,7 @@ impl MainNesWindow {
             }
         }
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let size = ui.available_size();
 
             // Controller buttons — draw outside the centering logic

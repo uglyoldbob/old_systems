@@ -26,7 +26,7 @@ impl Window {
                 .with_title("Game genie")
                 .with_inner_size([400.0, 300.0]),
             |ui, _class| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
                     if let Some(cart) = c.mb.cartridge_mut() {
                         let mut delete = None;
                         for code in &cart.cartridge().volatile.genie {

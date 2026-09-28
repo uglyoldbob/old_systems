@@ -37,7 +37,7 @@ impl Window {
                 .with_title("Configuration")
                 .with_inner_size([400.0, 300.0]),
             |ui, _class| {
-                egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
                     ui.label("Emulator Configuration Window");
 
                     let mut save_config = false;
