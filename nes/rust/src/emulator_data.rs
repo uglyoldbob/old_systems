@@ -5,7 +5,6 @@ use std::{io::Write, path::PathBuf};
 use crate::{
     apu::NesApu,
     cartridge::NesCartridge,
-    controller::NesControllerTrait,
     cpu::{NesCpu, NesCpuPeripherals},
     motherboard::NesMotherboard,
     ppu::NesPpu,
@@ -307,12 +306,20 @@ impl LocalEmulatorDataClone {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             return self.dirs.data_local_dir().to_path_buf();
             #[cfg(target_os = "android")]
-            return self
-                .android_app
-                .as_ref()
-                .unwrap()
-                .internal_data_path()
-                .unwrap();
+            {
+                let mut pb = self
+                    .android_app
+                    .as_ref()
+                    .unwrap()
+                    .internal_data_path()
+                    .unwrap();
+                pb.push("roms");
+                if !pb.exists() {
+                    let a = std::fs::create_dir_all(&pb);
+                    log::error!("Error creating rom path? {:?}", a);
+                }
+                return pb;
+            }
         }
     }
 
@@ -363,7 +370,7 @@ impl LocalEmulatorDataClone {
 
 impl Default for LocalEmulatorDataClone {
     fn default() -> Self {
-        Self::new(PathBuf::new())
+        Self::new(None)
     }
 }
 
@@ -379,18 +386,26 @@ impl LocalEmulatorDataClone {
     }
 
     /// Create a new Self object with the given event loop proxy
-    fn new(path: PathBuf) -> Self {
+    fn new(path: Option<PathBuf>) -> Self {
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let dirs = directories::ProjectDirs::from("com", "uglyoldbob", "nes_emulator").unwrap();
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let mut user_path = dirs.config_dir().to_path_buf();
         #[cfg(any(target_os = "android", target_os = "ios"))]
-        let mut user_path = path.clone();
+        let mut user_path = if let Some(path) = &path {
+            path.clone()
+        } else {
+            crate::CONFIG_TOML_PATH.get().unwrap().clone()
+        };
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let other_path = Self::get_other_path(&dirs);
         #[cfg(any(target_os = "android", target_os = "ios"))]
-        let mut other_path = path.clone();
+        let mut other_path = if let Some(path) = &path {
+            path.clone()
+        } else {
+            crate::CONFIG_TOML_PATH.get().unwrap().clone()
+        };
 
         user_path.push("config.toml");
         let user_config = EmulatorConfiguration::load(user_path);
@@ -465,17 +480,12 @@ impl NesEmulatorData {
         self.local.android_app = Some(android_app);
     }
 
-    #[cfg(target_os = "android")]
-    pub fn load_cartridge_for_user(
+    pub fn load_user_cartridge(
         &mut self,
         name: String,
-        uri: String,
-        contents: Vec<u8>,
+        path: &std::path::Path,
     ) -> Result<(), common_emulator::CartridgeError> {
-        let mut nc =
-            NesCartridge::load_cartridge_data(name.clone(), &contents, &self.local.save_path())?;
-        nc.0.android_uri = uri;
-        log::error!("Loaded user rom {name}");
+        let mut nc = NesCartridge::load_cartridge(name.clone(), path)?;
         self.remove_cartridge();
         self.insert_cartridge(nc.0);
         self.power_cycle();
@@ -483,6 +493,28 @@ impl NesEmulatorData {
             log::error!("Loading initial save state for {name}");
             self.deserialize(save);
         }
+        Ok(())
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn import_cartridge_for_user(
+        &mut self,
+        name: String,
+        uri: String,
+        contents: Vec<u8>,
+    ) -> Result<(), common_emulator::CartridgeError> {
+        let mut nc =
+            NesCartridge::load_cartridge_data(name.clone(), &contents, &self.local.save_path())?;
+        let mut rom_path = self.local.default_rom_path();
+        let romname = format!("{}.nes", name);
+        rom_path.push(romname);
+        if !rom_path.exists() {
+            let mut f = std::fs::File::create(rom_path)
+                .map_err(|e| common_emulator::CartridgeError::FsError(e.to_string()))?;
+            f.write_all(&contents)
+                .map_err(|e| common_emulator::CartridgeError::FsError(e.to_string()))?;
+        }
+        log::error!("Loaded user rom {name}");
         Ok(())
     }
 
@@ -532,7 +564,7 @@ impl NesEmulatorData {
             prev_irq: false,
             big_counter: 0,
             vblank_just_set: 0,
-            local: LocalEmulatorDataClone::new(path),
+            local: LocalEmulatorDataClone::new(Some(path)),
             olocal: Some(olocal),
         }
     }
@@ -644,7 +676,7 @@ impl NesEmulatorData {
                 cd.and_then(|cd| {
                     self.mb
                         .cartridge_mut()
-                        .map(|c| c.restore_cart_data(cd, self.local.save_path()))
+                        .map(|c| c.restore_cart_data(cd, lcl.save_path()))
                 });
                 self.mb.set_controller(0, controller1);
                 self.mb.set_controller(1, controller2);
@@ -725,7 +757,7 @@ impl NesEmulatorData {
         #[cfg(target_os = "android")]
         self.local
             .configuration
-            .set_startup(cart.android_uri.to_owned());
+            .set_startup(cart.rom_name().to_owned());
         self.mb.insert_cartridge(cart);
     }
 

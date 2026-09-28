@@ -2,6 +2,8 @@
 //!
 use std::{io::Write, ops::DerefMut};
 
+#[cfg(target_os = "android")]
+use crate::windows::rom_finder::RomFinder;
 use crate::{
     controller::{ButtonCombination, NesControllerTrait},
     NesEmulatorData,
@@ -19,6 +21,14 @@ use common_emulator::recording::Recording;
 
 use eframe::egui;
 use std::collections::HashMap;
+
+#[cfg(target_os = "android")]
+#[derive(PartialEq)]
+enum ActivePage {
+    Emulator,
+    MainConfiguration,
+    SelectRomFromList,
+}
 
 #[cfg(target_os = "android")]
 struct OnscreenButton {
@@ -166,18 +176,22 @@ pub struct MainNesWindow {
     #[cfg(target_os = "android")]
     on_screen_arrows: [OnscreenButton; 8],
     active_touches: HashMap<u64, egui::Pos2>,
+    #[cfg(target_os = "android")]
+    show_config: ActivePage,
+    #[cfg(target_os = "android")]
+    rom_list_open: Option<RomFinder>,
+    #[cfg(target_os = "android")]
+    roms_to_show: Vec<std::fs::DirEntry>,
 }
 
 #[cfg(target_os = "android")]
 struct AndroidMenuBar {
-    show_menubar: bool,
 }
 
 #[cfg(target_os = "android")]
 impl Default for AndroidMenuBar {
     fn default() -> Self {
         Self {
-            show_menubar: false,
         }
     }
 }
@@ -192,58 +206,39 @@ impl AndroidMenuBar {
 
     /// This function handles the android menu system, returning true if it showed the menu system
     /// This indicates that the emulator should be paused
-    fn show(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) -> bool {
-        // --------------------------------------------------------
-        // Normal TopBottomPanel
-        // --------------------------------------------------------
+    fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        _frame: &mut eframe::Frame,
+        config: &mut ActivePage,
+    ) -> bool {
+        if *config == ActivePage::Emulator {
+            {
+                egui::Panel::top("android_menu_bar")
+                    .exact_size(Self::MENU_HEIGHT)
+                    .show_inside(ui, |ui| {
+                        let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
 
-        if self.show_menubar {
-            egui::Panel::top("android_menu_bar")
-                .exact_size(Self::MENU_HEIGHT)
-                .show_inside(ui, |menu_ui| {
-                    egui::MenuBar::new().ui(menu_ui, |menu_ui| {
-                        let rect = menu_ui.max_rect();
-
-                        // Normal menu.
-                        menu_ui.horizontal_centered(|ui| {
-                            if ui.add_sized([56.0, 52.0], egui::Button::new("☰")).clicked() {
-                                self.show_menubar = false;
-                            }
-
-                            ui.separator();
-
-                            if Self::menu_button(ui, "Load").clicked() {
-                                // ...
-                            }
-
-                            if Self::menu_button(ui, "Save").clicked() {
-                                // ...
-                            }
-
-                            if Self::menu_button(ui, "Settings").clicked() {
-                                // ...
-                            }
-                        });
+                        if response.clicked() {
+                            *config = ActivePage::MainConfiguration;
+                        }
                     });
-                });
+            }            
+            false
+        } else {
+            {
+                egui::Panel::top("android_menu_bar")
+                    .exact_size(Self::MENU_HEIGHT)
+                    .show_inside(ui, |ui| {
+                        let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
+
+                        if response.clicked() {
+                            *config = ActivePage::Emulator;
+                        }
+                    });
+            }
+            *config != ActivePage::Emulator
         }
-
-        // --------------------------------------------------------
-        // Menu button when closed
-        // --------------------------------------------------------
-
-        if !self.show_menubar {
-            egui::Panel::top("android_menu_bar")
-                .exact_size(Self::MENU_HEIGHT)
-                .show_inside(ui, |ui| {
-                    let response = ui.add_sized([56.0, 56.0], egui::Button::new("☰"));
-
-                    if response.clicked() {
-                        self.show_menubar = true;
-                    }
-                });
-        }
-        self.show_menubar
     }
 }
 
@@ -346,6 +341,12 @@ impl MainNesWindow {
             #[cfg(target_os = "android")]
             on_screen_arrows,
             active_touches: HashMap::new(),
+            #[cfg(target_os = "android")]
+            show_config: ActivePage::Emulator,
+            #[cfg(target_os = "android")]
+            rom_list_open: None,
+            #[cfg(target_os = "android")]
+            roms_to_show: Vec::new(),
         }
     }
 
@@ -354,6 +355,29 @@ impl MainNesWindow {
         rect.map_or(false, |r| {
             self.active_touches.values().any(|&pos| r.contains(pos))
         })
+    }
+
+    #[cfg(target_os = "android")]
+    fn android_select_from_imported_roms(
+        &mut self,
+        ui: &mut egui::Ui,
+        c: &mut NesEmulatorData,
+    ) -> Result<(), std::io::Error> {
+        for rom in &self.roms_to_show {
+            let rom_name = rom.file_name().into_string().unwrap();
+            let text = format!("{}", rom_name);
+            if ui
+                .add(egui::Button::new(&text).min_size(egui::vec2(51.0, 51.0)))
+                .clicked()
+            {
+                let a =
+                    c.load_user_cartridge(rom.path().display().to_string(), &c.local.save_path());
+                if a.is_ok() {
+                    self.show_config = ActivePage::Emulator;
+                }
+            }
+        }
+        Ok(())
     }
 
     #[cfg(target_os = "android")]
@@ -386,10 +410,24 @@ impl MainNesWindow {
     #[cfg(target_os = "android")]
     fn render_config(&mut self, size: egui::Vec2, ui: &mut egui::Ui, c: &mut NesEmulatorData) {
         if ui
-            .add(egui::Button::new("Open ROM").min_size(egui::vec2(51.0, 51.0)))
+            .add(egui::Button::new("Import ROM").min_size(egui::vec2(51.0, 51.0)))
             .clicked()
         {
             self.android_select_rom(c);
+        }
+        if ui
+            .add(egui::Button::new("Open ROM").min_size(egui::vec2(51.0, 51.0)))
+            .clicked()
+        {
+            let rompath = c.local.default_rom_path();
+            if let Ok(entries) = std::fs::read_dir(rompath) {
+                let entries = entries.collect::<Result<Vec<_>, std::io::Error>>();
+                if let Ok(mut entries) = entries {
+                    entries.sort_by_key(|de| de.file_name());
+                    self.roms_to_show = entries;
+                }
+            }
+            self.show_config = ActivePage::SelectRomFromList;
         }
     }
 
@@ -930,7 +968,7 @@ impl MainNesWindow {
             }
             if let Some((name, uri, rom)) = new_rom {
                 log::error!("Need to load rom of {} bytes", rom.len());
-                if let Err(e) = c.load_cartridge_for_user(name, uri, rom) {
+                if let Err(e) = c.import_cartridge_for_user(name, uri, rom) {
                     log::error!("Error loading rom: {:?}", e);
                 } else {
                     log::error!("Loaded rom successfully");
@@ -1001,12 +1039,8 @@ impl MainNesWindow {
         }
 
         #[cfg(target_os = "android")]
-        let mut show_config = false;
-
-        #[cfg(target_os = "android")]
-        if self.android_menubar.show(ui, frame) {
+        if self.android_menubar.show(ui, frame, &mut self.show_config) {
             render = false;
-            show_config = true;
         }
 
         #[cfg(feature = "puffin")]
@@ -1819,10 +1853,24 @@ impl MainNesWindow {
 
             #[cfg(target_os = "android")]
             {
-                if show_config {
-                    self.render_config(size, ui, c);
+                let mut rf_quit = false;
+                if let Some(rf) = &mut self.rom_list_open {
+                    rf.ui(ui, &mut rf_quit, c);
                 } else {
-                    self.render_scene(size, ui, c);
+                    match self.show_config {
+                        ActivePage::Emulator => {
+                            self.render_scene(size, ui, c);
+                        }
+                        ActivePage::MainConfiguration => {
+                            self.render_config(size, ui, c);
+                        }
+                        ActivePage::SelectRomFromList => {
+                            self.android_select_from_imported_roms(ui, c);
+                        }
+                    }
+                }
+                if rf_quit {
+                    self.rom_list_open.take();
                 }
             }
             #[cfg(not(any(target_os = "android", target_os = "ios")))]

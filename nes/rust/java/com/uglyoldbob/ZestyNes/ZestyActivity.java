@@ -102,10 +102,6 @@ public class ZestyActivity extends NativeActivity {
             return;
         }
 
-        int flags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
-
-        getContentResolver().takePersistableUriPermission(uri, flags);
-
         try {
             byte[] rom = readRom(uri);
             String name = getRomName(uri);

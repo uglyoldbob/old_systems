@@ -21,6 +21,8 @@ use std::sync::OnceLock;
 
 /// The emulator data
 pub static EMULATOR_DATA: OnceLock<std::sync::Mutex<NesEmulatorData>> = OnceLock::new();
+/// The path for the config.toml file
+pub static CONFIG_TOML_PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -593,6 +595,9 @@ pub fn run(mut options: eframe::NativeOptions) {
         });
         chan.1
     };
+
+    #[cfg(target_os = "android")]
+    CONFIG_TOML_PATH.get_or_init(|| appc.internal_data_path().unwrap());
 
     #[cfg(target_os = "android")]
     let mut nes_data = NesEmulatorData::new_android(appc, java_event_receiver);
