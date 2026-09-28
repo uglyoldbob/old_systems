@@ -22,6 +22,6 @@ jobs:
     - name: Setup 'xbuild'
       working-directory: ./xbuild/xbuild
       run: cargo install --path .
-    - name: Build
+    - name: Build with xbuild
       working-directory: ./nes/rust
       run: x build --platform=ios --arch=arm64
