@@ -469,6 +469,28 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_nativeActivityStopp
     _: jni::objects::JObject<'local>,
 ) {
     log::error!("Need to signal stopping activity");
+    let mut c = crate::EMULATOR_DATA.get().unwrap().lock().unwrap();
+    let name = if let Some(cart) = c.mb.cartridge() {
+        cart.save_name()
+    } else {
+        "state.bin".to_string()
+    };
+    let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
+    let mut save_path = c.local.save_path();
+    save_path.push(ppp.file_name().unwrap());
+    if true {
+        let mut path = save_path.clone();
+        path.pop();
+        let _ = std::fs::create_dir_all(path);
+        let state = Box::new(c.serialize());
+        let _e = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(save_path.clone())
+            .unwrap()
+            .write_all(&state);
+    }
 }
 
 #[cfg(target_os = "android")]
