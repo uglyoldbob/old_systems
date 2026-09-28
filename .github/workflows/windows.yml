@@ -17,9 +17,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    - name: Install build dependencies
+    - name: Install GStreamer
+      uses: blinemedical/setup-gstreamer@v1
+      with:
+        version: '1.22.7'
+    - name: Set PKG_CONFIG_PATH
       run: |
-        choco install gstreamer-devel
-        refreshenv
+        echo "PKG_CONFIG_PATH=C:\gstreamer\1.0\msvc_x86_64\lib\pkgconfig" >> $env:GITHUB_ENV
     - name: Build
-      run: cargo build --verbose
+      working-directory: ./nes/rust
+      run: cargo build --verbose --bin zesty-nes

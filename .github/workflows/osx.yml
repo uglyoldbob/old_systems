@@ -22,4 +22,5 @@ jobs:
         brew update
         brew install gstreamer
     - name: Build
-      run: cargo build --verbose
+      working-directory: ./nes/rust
+      run: cargo build --verbose --bin zesty-nes
