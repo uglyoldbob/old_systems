@@ -1,4 +1,4 @@
-name: Ubuntu Build
+name: Windows Build
 
 on:
   push:
@@ -12,14 +12,13 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Install build dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install libgstreamer1.0-dev libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 gstreamer1.0-plugins-good gstreamer1.0-plugins-bad libglib2.0-dev
+        choco install ninja
     - name: Build
       run: cargo build --verbose
