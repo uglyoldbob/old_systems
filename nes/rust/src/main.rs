@@ -4,22 +4,7 @@
 
 //! This is the nes emulator written in rust. It is compatible with windows, linux, and osx.
 
-mod apu;
-mod cartridge;
-mod controller;
-mod cpu;
-mod emulator_data;
-mod genie;
-mod motherboard;
-mod ppu;
-
-use emulator_data::NesEmulatorData;
 use zesty_nes::*;
-
-#[cfg(test)]
-mod tests;
-
-mod windows;
 
 fn main() {
     if std::env::var("RUST_LOG").is_err() {

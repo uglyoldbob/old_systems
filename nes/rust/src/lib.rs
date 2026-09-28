@@ -17,6 +17,10 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use emulator_data::NesEmulatorData;
 
 use eframe::{egui, NativeOptions};
+use std::sync::OnceLock;
+
+/// The emulator data
+pub static EMULATOR_DATA: OnceLock<std::sync::Mutex<NesEmulatorData>> = OnceLock::new();
 
 #[cfg(target_os = "android")]
 use egui_winit::winit;
@@ -813,12 +817,12 @@ pub fn run(mut options: eframe::NativeOptions) {
         }
     }
 
+    EMULATOR_DATA.get_or_init(|| std::sync::Mutex::new(nes_data));
     eframe::run_native(
         "Zesty NES Emulator",
         options,
         Box::new(move |_cc| {
             Ok(Box::new(crate::windows::main::MainNesWindow::new(
-                nes_data,
                 sound_rate,
                 sound_producer,
                 sound_stream,

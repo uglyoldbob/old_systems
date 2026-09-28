@@ -1,6 +1,6 @@
 //! The main window of the emulator
 //!
-use std::io::Write;
+use std::{io::Write, ops::DerefMut};
 
 use crate::{
     controller::{ButtonCombination, NesControllerTrait},
@@ -88,7 +88,6 @@ pub struct MainNesWindow {
     last_emulated_frame: std::time::Instant,
     /// Used to synchronize the emulator to the right frame rate
     emulator_time: std::time::Duration,
-    pub c: NesEmulatorData,
     /// The calculated frames per second performance of the program. Will be higher than the fps of the emulator.
     fps: f64,
     /// The calculated frames per second performance of the emulator.
@@ -250,7 +249,6 @@ impl AndroidMenuBar {
 
 impl MainNesWindow {
     pub fn new(
-        c: NesEmulatorData,
         _rate: u32,
         producer: Option<AudioProducerWithRate>,
         stream: Option<cpal::Stream>,
@@ -295,7 +293,6 @@ impl MainNesWindow {
         ];
 
         Self {
-            c,
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             have_gstreamer,
             rewind_point: None,
@@ -360,8 +357,8 @@ impl MainNesWindow {
     }
 
     #[cfg(target_os = "android")]
-    fn android_select_rom(&self) -> Result<(), jni::errors::Error> {
-        let app = self.c.local.android_app.as_ref().unwrap();
+    fn android_select_rom(&self, c: &mut NesEmulatorData) -> Result<(), jni::errors::Error> {
+        let app = c.local.android_app.as_ref().unwrap();
         use jni::JavaVM;
         use jni::{jni_sig, jni_str, objects::JObject, Env, JValue};
 
@@ -396,7 +393,7 @@ impl MainNesWindow {
         }
     }
 
-    fn render_scene(&mut self, size: egui::Vec2, ui: &mut egui::Ui) {
+    fn render_scene(&mut self, size: egui::Vec2, ui: &mut egui::Ui, c: &mut NesEmulatorData) {
         // Center the image manually using add_sized + centering offset
         if let Some(t) = &self.texture {
             let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
@@ -425,7 +422,7 @@ impl MainNesWindow {
             );
 
             #[cfg(target_os = "android")]
-            if self.c.local.configuration.use_screen_controller {
+            if c.local.configuration.use_screen_controller {
                 let mut buttons_pressed = [false; 11];
                 let mut arrows_pressed = [false; 8];
                 let arrow_configs: Vec<(egui::Rect, &str, f32)> = if size.x > size.y {
@@ -819,7 +816,7 @@ impl MainNesWindow {
                     buttons_pressed[9] = false;
                 }
 
-                let controller = self.c.mb.get_controller_mut(0);
+                let controller = c.mb.get_controller_mut(0);
                 if !controller.should_ignore_local_inputs() {
                     if let crate::controller::NesController::Zapper(_z) = controller {
                     } else {
@@ -871,12 +868,11 @@ impl MainNesWindow {
 
                     #[cfg(feature = "debugger")]
                     {
-                        self.c.cpu_peripherals.ppu.bg_debug =
+                        c.cpu_peripherals.ppu.bg_debug =
                             Some(((coord.x / zoom) as u8, (coord.y / zoom) as u8));
                     }
 
-                    let scale_factor = self
-                        .c
+                    let scale_factor = c
                         .local
                         .configuration
                         .scaler
@@ -885,11 +881,9 @@ impl MainNesWindow {
 
                     let zcoord = coord / (zoom * scale_factor);
 
-                    self.c
-                        .mb
-                        .set_zapper_coords(zcoord.x as u16, zcoord.y as u16);
+                    c.mb.set_zapper_coords(zcoord.x as u16, zcoord.y as u16);
 
-                    let pixel = self.c.local.image.get_pixel(coord / zoom);
+                    let pixel = c.local.image.get_pixel(coord / zoom);
 
                     self.mouse_vision =
                         !self.mouse_miss && pixel.r() > 100 && pixel.g() > 100 && pixel.b() > 100;
@@ -906,10 +900,13 @@ impl MainNesWindow {
                 self.render_percent * 100.0
             )));
     }
-}
 
-impl eframe::App for MainNesWindow {
-    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+    fn ui_with_emulator_data(
+        &mut self,
+        ui: &mut egui::Ui,
+        frame: &mut eframe::Frame,
+        c: &mut NesEmulatorData,
+    ) {
         #[cfg(feature = "puffin")]
         {
             puffin::profile_function!();
@@ -920,7 +917,7 @@ impl eframe::App for MainNesWindow {
         #[cfg(target_os = "android")]
         {
             let mut new_rom = None;
-            if let Some(olocal) = &mut self.c.olocal {
+            if let Some(olocal) = &mut c.olocal {
                 if let Some(recv) = &olocal.event_recv {
                     while let Ok(event) = recv.try_recv() {
                         match event {
@@ -933,7 +930,7 @@ impl eframe::App for MainNesWindow {
             }
             if let Some((name, uri, rom)) = new_rom {
                 log::error!("Need to load rom of {} bytes", rom.len());
-                if let Err(e) = self.c.load_cartridge_for_user(name, uri, rom) {
+                if let Err(e) = c.load_cartridge_for_user(name, uri, rom) {
                     log::error!("Error loading rom: {:?}", e);
                 } else {
                     log::error!("Loaded rom successfully");
@@ -956,7 +953,7 @@ impl eframe::App for MainNesWindow {
             }
         });
 
-        self.c.check_network();
+        c.check_network();
 
         let time_now = std::time::Instant::now();
         let frame_time = time_now.duration_since(self.last_frame_time);
@@ -964,16 +961,16 @@ impl eframe::App for MainNesWindow {
 
         if self.rewind_point.is_none() {
             self.rewind_point = Some(time_now);
-            let p = self.c.serialize();
+            let p = c.serialize();
             self.rewinds[0] = p.clone();
             self.rewinds[1] = p.clone();
             self.rewinds[2] = p.clone();
         } else if let Some(t) = self.rewind_point {
-            if let Some(rew) = self.c.local.configuration.rewind_interval {
+            if let Some(rew) = c.local.configuration.rewind_interval {
                 if time_now.duration_since(t) > rew {
                     self.rewinds[2] = self.rewinds[1].clone();
                     self.rewinds[1] = self.rewinds[0].clone();
-                    self.rewinds[0] = self.c.serialize();
+                    self.rewinds[0] = c.serialize();
                     self.rewind_point = Some(time_now);
                 }
             }
@@ -982,12 +979,12 @@ impl eframe::App for MainNesWindow {
         let new_fps = 1_000_000_000.0 / frame_time.as_nanos() as f64;
         self.fps = (self.fps * 0.95) + (0.05 * new_fps);
 
-        self.c.mb.get_controller_mut(0).rapid_fire(frame_time);
-        self.c.mb.get_controller_mut(1).rapid_fire(frame_time);
-        self.c.mb.get_controller_mut(2).rapid_fire(frame_time);
-        self.c.mb.get_controller_mut(3).rapid_fire(frame_time);
+        c.mb.get_controller_mut(0).rapid_fire(frame_time);
+        c.mb.get_controller_mut(1).rapid_fire(frame_time);
+        c.mb.get_controller_mut(2).rapid_fire(frame_time);
+        c.mb.get_controller_mut(3).rapid_fire(frame_time);
 
-        let nanos = 1_000_000_000.0 / (self.c.ppu_frame_rate() * self.c.mb.speed_ratio);
+        let nanos = 1_000_000_000.0 / (c.ppu_frame_rate() * c.mb.speed_ratio);
         let emulator_frame = std::time::Duration::from_nanos(nanos as u64);
         let mut render = false;
         self.emulator_time += frame_time;
@@ -1026,7 +1023,7 @@ impl eframe::App for MainNesWindow {
         if self.filter.is_none()
             && (self.sound_stream.is_some() || !self.audio_streaming.is_empty())
         {
-            let local_rate = self.c.local.get_sound_rate();
+            let local_rate = c.local.get_sound_rate();
             let rf = if local_rate == 0 {
                 // Matches the audio rate used by the streaming pipeline.
                 44100.0
@@ -1034,7 +1031,7 @@ impl eframe::App for MainNesWindow {
                 local_rate as f32
             };
             log::info!("Initializing audio filter with sample rate {}", rf);
-            let sampling_frequency = self.c.cpu_frequency();
+            let sampling_frequency = c.cpu_frequency();
             let filter_coeff = biquad::Coefficients::<f32>::from_params(
                 biquad::Type::LowPass,
                 biquad::Hertz::<f32>::from_hz(sampling_frequency).unwrap(),
@@ -1051,7 +1048,7 @@ impl eframe::App for MainNesWindow {
         {
             ui.ctx().input(|i| {
                 for index in 0..4 {
-                    let controller = self.c.mb.get_controller_mut(index);
+                    let controller = c.mb.get_controller_mut(index);
                     if !controller.should_ignore_local_inputs() {
                         if let crate::controller::NesController::Zapper(z) = controller {
                             z.provide_zapper_data(self.mouse, self.mouse_vision);
@@ -1059,7 +1056,7 @@ impl eframe::App for MainNesWindow {
                             for contr in controller.get_buttons_iter_mut() {
                                 let cnum = index;
                                 let button_config =
-                                    &self.c.local.configuration.controller_config[cnum as usize];
+                                    &c.local.configuration.controller_config[cnum as usize];
                                 contr.update_egui_buttons(i, button_config);
                             }
                         }
@@ -1067,25 +1064,24 @@ impl eframe::App for MainNesWindow {
                 }
             });
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if let Some(olocal) = &mut self.c.olocal {
+            if let Some(olocal) = &mut c.olocal {
                 while let Some(_e) = olocal.gilrs.next_event() {}
             }
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if let Some(olocal) = &mut self.c.olocal {
+            if let Some(olocal) = &mut c.olocal {
                 let gilrs = &mut olocal.gilrs;
                 for (id, gamepad) in gilrs.gamepads() {
                     let gs = gamepad.state();
                     for (code, button) in gs.buttons() {
                         for index in 0..4 {
-                            let controller = self.c.mb.get_controller_mut(index);
+                            let controller = c.mb.get_controller_mut(index);
                             if !controller.should_ignore_local_inputs() {
                                 if let crate::controller::NesController::Zapper(_z) = controller {
                                 } else {
                                     for contr in controller.get_buttons_iter_mut() {
                                         let cnum = index;
                                         let button_config =
-                                            &self.c.local.configuration.controller_config
-                                                [cnum as usize];
+                                            &c.local.configuration.controller_config[cnum as usize];
                                         contr.update_gilrs_buttons(id, code, button, button_config);
                                     }
                                 }
@@ -1094,15 +1090,14 @@ impl eframe::App for MainNesWindow {
                     }
                     for (code, axis) in gs.axes() {
                         for index in 0..4 {
-                            let controller = self.c.mb.get_controller_mut(index);
+                            let controller = c.mb.get_controller_mut(index);
                             if !controller.should_ignore_local_inputs() {
                                 if let crate::controller::NesController::Zapper(_z) = controller {
                                 } else {
                                     for contr in controller.get_buttons_iter_mut() {
                                         let cnum = index;
                                         let button_config =
-                                            &self.c.local.configuration.controller_config
-                                                [cnum as usize];
+                                            &c.local.configuration.controller_config[cnum as usize];
                                         contr.update_gilrs_axes(id, code, axis, button_config);
                                     }
                                 }
@@ -1113,14 +1108,14 @@ impl eframe::App for MainNesWindow {
             }
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            self.c.check_bluetooth_controllers();
+            c.check_bluetooth_controllers();
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if let Some(olocal) = &mut self.c.olocal {
+            if let Some(olocal) = &mut c.olocal {
                 if let Some(network) = &mut olocal.network {
                     match network.role() {
                         NodeRole::Player => {
-                            let controller = self.c.mb.get_controller_ref(0);
+                            let controller = c.mb.get_controller_ref(0);
                             for i in 0..4 {
                                 let _e = network.send_controller_data(
                                     i,
@@ -1132,7 +1127,7 @@ impl eframe::App for MainNesWindow {
                             for i in 0..4 {
                                 if let Some(bc) = network.get_button_data(i) {
                                     if let Ok(bc) = bincode::deserialize::<ButtonCombination>(bc) {
-                                        let controller = self.c.mb.get_controller_mut(i);
+                                        let controller = c.mb.get_controller_mut(i);
                                         if let Some(con) = controller.get_buttons_iter_mut().next()
                                         {
                                             *con = bc;
@@ -1148,12 +1143,12 @@ impl eframe::App for MainNesWindow {
         }
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        if let Some(olocal) = &mut self.c.olocal {
+        if let Some(olocal) = &mut c.olocal {
             if let Some(network) = &mut olocal.network {
                 match network.role() {
                     NodeRole::Observer | NodeRole::Player => {
                         if render {
-                            network.get_video_data(&mut self.c.local.image);
+                            network.get_video_data(&mut c.local.image);
                             if let Some(sound) = &mut self.sound {
                                 network.push_audio(sound);
                             }
@@ -1196,25 +1191,24 @@ impl eframe::App for MainNesWindow {
             'emulator_loop: loop {
                 #[cfg(feature = "debugger")]
                 {
-                    if !self.c.paused {
-                        self.c
-                            .cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
-                        if self.c.cpu_clock_counter == 0
-                            && self.c.cpu.breakpoint_option()
-                            && (self.c.cpu.breakpoint() || self.c.single_step)
+                    if !c.paused {
+                        c.cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
+                        if c.cpu_clock_counter == 0
+                            && c.cpu.breakpoint_option()
+                            && (c.cpu.breakpoint() || c.single_step)
                         {
-                            self.c.paused = true;
-                            self.c.single_step = false;
+                            c.paused = true;
+                            c.single_step = false;
                             break 'emulator_loop;
                         }
                     } else {
                         break 'emulator_loop;
                     }
-                    if self.c.cpu_peripherals.ppu_frame_end() {
-                        if self.c.wait_for_frame_end {
+                    if c.cpu_peripherals.ppu_frame_end() {
+                        if c.wait_for_frame_end {
                             log::debug!("End of frame for debugger");
-                            self.c.paused = true;
-                            self.c.wait_for_frame_end = false;
+                            c.paused = true;
+                            c.wait_for_frame_end = false;
                         }
                         if !self.paused {
                             let image = self
@@ -1222,14 +1216,14 @@ impl eframe::App for MainNesWindow {
                                 .cpu_peripherals
                                 .ppu_get_frame()
                                 .to_pixels_egui()
-                                .resize(self.c.local.configuration.scaler);
-                            self.c.local.image = image;
+                                .resize(c.local.configuration.scaler);
+                            c.local.image = image;
                         }
-                        self.recording.send_frame(&self.c.local.image);
-                        if let Some(olocal) = &mut self.c.olocal {
+                        self.recording.send_frame(&c.local.image);
+                        if let Some(olocal) = &mut c.olocal {
                             if let Some(network) = &mut olocal.network {
                                 if network.role() == NodeRole::PlayerHost {
-                                    let _e = network.video_data(&self.c.local.image);
+                                    let _e = network.video_data(&c.local.image);
                                 }
                             }
                         }
@@ -1247,26 +1241,24 @@ impl eframe::App for MainNesWindow {
                 #[cfg(not(feature = "debugger"))]
                 {
                     {
-                        self.c
-                            .cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
+                        c.cycle_step(&mut sound, &mut self.audio_streaming, &mut self.filter);
                     }
-                    if self.c.cpu_peripherals.ppu_frame_end() {
+                    if c.cpu_peripherals.ppu_frame_end() {
                         if !self.paused {
-                            let image = self
-                                .c
+                            let image = c
                                 .cpu_peripherals
                                 .ppu_get_frame()
                                 .to_pixels_egui()
-                                .resize(self.c.local.configuration.scaler);
-                            self.c.local.image = image;
+                                .resize(c.local.configuration.scaler);
+                            c.local.image = image;
                         }
                         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                        self.recording.send_frame(&self.c.local.image);
+                        self.recording.send_frame(&c.local.image);
                         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                        if let Some(olocal) = &mut self.c.olocal {
+                        if let Some(olocal) = &mut c.olocal {
                             if let Some(network) = &mut olocal.network {
                                 if network.role() == NodeRole::PlayerHost {
-                                    let _e = network.video_data(&self.c.local.image);
+                                    let _e = network.video_data(&c.local.image);
                                 }
                             }
                         }
@@ -1289,15 +1281,14 @@ impl eframe::App for MainNesWindow {
         }
 
         if self.paused {
-            let image = self
-                .c
+            let image = c
                 .cpu_peripherals
                 .ppu_get_frame()
                 .to_pixels_egui()
-                .resize(self.c.local.configuration.scaler);
-            self.c.local.image = image;
+                .resize(c.local.configuration.scaler);
+            c.local.image = image;
         }
-        let image = self.c.local.image.clone().to_egui();
+        let image = c.local.image.clone().to_egui();
 
         if self.texture.is_none() {
             self.texture = Some(ui.ctx().load_texture(
@@ -1324,12 +1315,12 @@ impl eframe::App for MainNesWindow {
         let mut start_stop_recording: Option<bool> = None;
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        if let Some(olocal) = &mut self.c.olocal {
+        if let Some(olocal) = &mut c.olocal {
             let mut pop_front = false;
             let mut pending_player = None;
             if let Some(pending) = olocal.pending_bluetooth_controllers.front() {
                 ui.ctx().show_viewport_immediate(
-                    egui::ViewportId::from_hash_of("CONTROLLERS_WINDOW"),
+                    egui::ViewportId::from_hash_of("self.controllers_window"),
                     egui::ViewportBuilder::default()
                         .with_title("Controller Config")
                         .with_inner_size([400.0, 300.0]),
@@ -1357,7 +1348,7 @@ impl eframe::App for MainNesWindow {
                 if let Some(a) = olocal.pending_bluetooth_controllers.pop_front() {
                     let addr = a.addr;
                     if let Some(player) = pending_player {
-                        let nes_controller = self.c.mb.get_controller_mut(player);
+                        let nes_controller = c.mb.get_controller_mut(player);
                         nes_controller.ignore_local_inputs(true);
                         let c = &mut olocal.bluetooth_controllers[player as usize];
                         let mut cc = crate::controller::ControllerConfig::new();
@@ -1374,7 +1365,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_rom_window = false;
             if let Some(win) = &mut self.open_rom_window {
-                win.show(ui, &mut quit_rom_window, &mut self.c);
+                win.show(ui, &mut quit_rom_window, c);
             }
             if quit_rom_window {
                 self.open_rom_window.take();
@@ -1383,7 +1374,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.configuration_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.configuration_window.take();
@@ -1392,7 +1383,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.controllers_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.controllers_window.take();
@@ -1401,7 +1392,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.game_genie_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.game_genie_window.take();
@@ -1411,7 +1402,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.networking_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.networking_window.take();
@@ -1420,38 +1411,38 @@ impl eframe::App for MainNesWindow {
         #[cfg(feature = "debugger")]
         {
             let mut quit_window = false;
-            if let Some(win) = &mut self.cartridge_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+            if let Some(win) = &mut cartridge_dump_window {
+                win.show(ui, &mut quit_window, &mut c);
             }
             if quit_window {
-                self.cartridge_dump_window.take();
+                cartridge_dump_window.take();
             }
         }
         #[cfg(feature = "debugger")]
         {
             let mut quit_window = false;
-            if let Some(win) = &mut self.cartridge_prm_ram_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+            if let Some(win) = &mut cartridge_prm_ram_dump_window {
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
-                self.cartridge_prm_ram_dump_window.take();
+                cartridge_prm_ram_dump_window.take();
             }
         }
         #[cfg(feature = "debugger")]
         {
             let mut quit_window = false;
-            if let Some(win) = &mut self.cpu_memory_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+            if let Some(win) = &mut cpu_memory_dump_window {
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
-                self.cpu_memory_dump_window.take();
+                cpu_memory_dump_window.take();
             }
         }
         #[cfg(feature = "debugger")]
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.debug_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.debug_window.take();
@@ -1461,7 +1452,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.nametable_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.nametable_dump_window.take();
@@ -1471,7 +1462,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.pattern_table_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.pattern_table_dump_window.take();
@@ -1481,7 +1472,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.ppu_memory_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.ppu_memory_dump_window.take();
@@ -1491,7 +1482,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.rom_checker_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.rom_checker_window.take();
@@ -1501,7 +1492,7 @@ impl eframe::App for MainNesWindow {
         {
             let mut quit_window = false;
             if let Some(win) = &mut self.sprite_dump_window {
-                win.show(ui, &mut quit_window, &mut self.c);
+                win.show(ui, &mut quit_window, c);
             }
             if quit_window {
                 self.sprite_dump_window.take();
@@ -1562,19 +1553,19 @@ impl eframe::App for MainNesWindow {
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
-                    if self.c.mb.speed_ratio < 1.0 {
+                    if c.mb.speed_ratio < 1.0 {
                         let button = egui::Button::new("Disable slow mode - F11");
                         if ui.add_enabled(true, button).clicked()
                             || ui.ctx().input(|i| i.key_pressed(egui::Key::F11))
                         {
-                            self.c.mb.speed_ratio = 1.0;
+                            c.mb.speed_ratio = 1.0;
                         }
                     } else {
                         let button = egui::Button::new("Enable slow mode - F11");
                         if ui.add_enabled(true, button).clicked()
                             || ui.ctx().input(|i| i.key_pressed(egui::Key::F11))
                         {
-                            self.c.mb.speed_ratio = 0.5;
+                            c.mb.speed_ratio = 0.5;
                         }
                     }
 
@@ -1589,7 +1580,7 @@ impl eframe::App for MainNesWindow {
 
                     let button = egui::Button::new("Open data path");
                     if ui.add_enabled(true, button).clicked() {
-                        open::that_in_background(self.c.local.get_save_other());
+                        open::that_in_background(c.local.get_save_other());
                         ui.close_kind(egui::UiKind::Menu);
                     }
 
@@ -1627,11 +1618,11 @@ impl eframe::App for MainNesWindow {
                     }
                     if ui.button("Reset").clicked() {
                         ui.close_kind(egui::UiKind::Menu);
-                        self.c.reset();
+                        c.reset();
                     }
                     if ui.button("Power cycle").clicked() {
                         ui.close_kind(egui::UiKind::Menu);
-                        self.c.power_cycle();
+                        c.power_cycle();
                     }
                 });
                 #[cfg(feature = "debugger")]
@@ -1643,7 +1634,7 @@ impl eframe::App for MainNesWindow {
                         }
                         if ui.button("Dump CPU Data").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            self.cpu_memory_dump_window =
+                            cpu_memory_dump_window =
                                 Some(super::cpu_memory_dump_window::CpuMemoryDumpWindow::new());
                         }
                         if ui.button("Dump PPU Data").clicked() {
@@ -1653,12 +1644,12 @@ impl eframe::App for MainNesWindow {
                         }
                         if ui.button("Dump Cartridge Data").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            self.cartridge_dump_window =
+                            cartridge_dump_window =
                                 Some(super::cartridge_dump::CartridgeMemoryDumpWindow::new());
                         }
                         if ui.button("Dump Cartridge RAM").clicked() {
                             ui.close_kind(egui::UiKind::Menu);
-                            self.cartridge_prm_ram_dump_window = Some(
+                            cartridge_prm_ram_dump_window = Some(
                                 super::cartridge_prg_ram_dump::CartridgeMemoryDumpWindow::new(),
                             );
                         }
@@ -1715,10 +1706,10 @@ impl eframe::App for MainNesWindow {
         }
 
         if ui.ctx().input(|i| i.key_pressed(egui::Key::F11)) {
-            if self.c.mb.speed_ratio < 1.0 {
-                self.c.mb.speed_ratio = 1.0;
+            if c.mb.speed_ratio < 1.0 {
+                c.mb.speed_ratio = 1.0;
             } else {
-                self.c.mb.speed_ratio = 0.5;
+                c.mb.speed_ratio = 0.5;
             }
         }
 
@@ -1730,23 +1721,23 @@ impl eframe::App for MainNesWindow {
 
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
-            let record_path = self.c.local.record_path();
+            let record_path = c.local.record_path();
             if let Some(rec) = start_stop_recording {
                 if rec {
-                    self.c.local.resolution_locked = true;
-                    let sampling_frequency = self.c.cpu_frequency();
+                    c.local.resolution_locked = true;
+                    let sampling_frequency = c.cpu_frequency();
                     let tn = chrono::Local::now();
                     let mut recpath = record_path.clone();
                     recpath.push(format!("{}.avi", tn.format("%Y-%m-%d %H%M%S")));
                     self.recording.start(
                         &self.have_gstreamer,
-                        &self.c.local.image,
-                        self.c.ppu_frame_rate() as u8,
+                        &c.local.image,
+                        c.ppu_frame_rate() as u8,
                         recpath,
                         sampling_frequency,
                     );
                 } else {
-                    self.c.local.resolution_locked = false;
+                    c.local.resolution_locked = false;
                     loop {
                         if self.recording.stop().is_ok() {
                             break;
@@ -1756,19 +1747,19 @@ impl eframe::App for MainNesWindow {
             }
         }
 
-        let name = if let Some(cart) = self.c.mb.cartridge() {
+        let name = if let Some(cart) = c.mb.cartridge() {
             cart.save_name()
         } else {
             "state.bin".to_string()
         };
         let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
-        let mut save_path = self.c.local.save_path();
+        let mut save_path = c.local.save_path();
         save_path.push(ppp.file_name().unwrap());
         if save_state {
             let mut path = save_path.clone();
             path.pop();
             let _ = std::fs::create_dir_all(path);
-            let state = Box::new(self.c.serialize());
+            let state = Box::new(c.serialize());
             let _e = std::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
@@ -1780,7 +1771,7 @@ impl eframe::App for MainNesWindow {
 
         if load_state {
             if let Ok(a) = std::fs::read(save_path) {
-                let e = self.c.deserialize(a);
+                let e = c.deserialize(a);
                 if e.is_err() {
                     log::error!("Error loading state {:?}", e);
                 }
@@ -1788,7 +1779,7 @@ impl eframe::App for MainNesWindow {
         }
 
         if rewind_state {
-            let e = self.c.deserialize(self.rewinds[1].clone());
+            let e = c.deserialize(self.rewinds[1].clone());
             if e.is_err() {
                 log::error!("Error loading rewind state {:?}", e);
             }
@@ -1799,7 +1790,7 @@ impl eframe::App for MainNesWindow {
 
             // Controller buttons — draw outside the centering logic
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            if let Some(olocal) = &mut self.c.olocal {
+            if let Some(olocal) = &mut c.olocal {
                 if let Some(network) = &mut olocal.network {
                     let myc = network.get_controller_id();
                     if network.role() == NodeRole::Observer || network.role() == NodeRole::Player {
@@ -1835,21 +1826,28 @@ impl eframe::App for MainNesWindow {
                 }
             }
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            self.render_scene(size, ui);
+            self.render_scene(size, ui, c);
         });
 
         #[cfg(feature = "debugger")]
         {
             use cpal::traits::StreamTrait;
             if let Some(s) = &mut self.sound_stream {
-                if self.c.paused && !self.paused {
+                if c.paused && !self.paused {
                     self.paused = s.pause().is_ok();
                 }
-                if !self.c.paused && self.paused {
+                if !c.paused && self.paused {
                     self.paused = s.play().is_err();
                 }
             }
         }
         ui.ctx().request_repaint();
+    }
+}
+
+impl eframe::App for MainNesWindow {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
+        let mut c = crate::EMULATOR_DATA.get().unwrap().lock().unwrap();
+        self.ui_with_emulator_data(ui, frame, c.deref_mut());
     }
 }
