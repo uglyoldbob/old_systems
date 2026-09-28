@@ -468,6 +468,7 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_nativeActivityStopp
     mut env: jni::EnvUnowned<'local>,
     _: jni::objects::JObject<'local>,
 ) {
+    use std::io::Write;
     log::error!("Need to signal stopping activity");
     let mut c = crate::EMULATOR_DATA.get().unwrap().lock().unwrap();
     let name = if let Some(cart) = c.mb.cartridge() {

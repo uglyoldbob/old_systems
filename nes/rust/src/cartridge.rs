@@ -705,7 +705,7 @@ impl NesCartridge {
             {
                 let name = cart.save_name();
                 let ppp = <std::path::PathBuf as std::str::FromStr>::from_str(&name).unwrap();
-                let mut save_path = sp.clone().to_path_buf();
+                let mut save_path = sp.to_path_buf();
                 save_path.push(ppp.file_name().unwrap());
                 if let Ok(a) = std::fs::read(save_path) {
                     log::error!("Got a save state for the rom i just loaded");

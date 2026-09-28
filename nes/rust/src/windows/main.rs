@@ -384,12 +384,12 @@ impl MainNesWindow {
     }
 
     #[cfg(target_os = "android")]
-    fn render_config(&mut self, size: egui::Vec2, ui: &mut egui::Ui) {
+    fn render_config(&mut self, size: egui::Vec2, ui: &mut egui::Ui, c: &mut NesEmulatorData) {
         if ui
             .add(egui::Button::new("Open ROM").min_size(egui::vec2(51.0, 51.0)))
             .clicked()
         {
-            self.android_select_rom();
+            self.android_select_rom(c);
         }
     }
 
@@ -1820,9 +1820,9 @@ impl MainNesWindow {
             #[cfg(target_os = "android")]
             {
                 if show_config {
-                    self.render_config(size, ui);
+                    self.render_config(size, ui, c);
                 } else {
-                    self.render_scene(size, ui);
+                    self.render_scene(size, ui, c);
                 }
             }
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
