@@ -1,5 +1,6 @@
 //! This contains the android code for the nes emulator
 /// use `x build --arch arm64 --platform android`
+/// or `x build --platform=ios --arch=arm64`
 /// or `x run --device ______`
 ///
 mod apu;

@@ -602,6 +602,7 @@ impl NesEmulatorData {
                         crate::BluetoothControllerInfoMessage::Dummy => {}
                         crate::BluetoothControllerInfoMessage::Disconnect(pnum) => {
                             if let Some(pnum) = pnum {
+                                use crate::controller::NesControllerTrait;
                                 let controller = self.mb.get_controller_mut(pnum);
                                 controller.ignore_local_inputs(false);
                             }
@@ -611,6 +612,7 @@ impl NesEmulatorData {
                             {
                                 if let Some(bcontrol) = bcontrol {
                                     if let Ok(b2) = bcontrol.lock() {
+                                        use crate::controller::NesControllerTrait;
                                         let controller = self.mb.get_controller_mut(pnum);
                                         if let Some(button_combo) =
                                             controller.get_buttons_iter_mut().next()
