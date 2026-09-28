@@ -17,13 +17,39 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    - name: Install GStreamer
-      uses: blinemedical/setup-gstreamer@v1.4.0
-      with:
-        version: '1.22.12'
+    - name: Install GStreamer 1.26 (Complete Devel + All Plugins)
+      shell: powershell
+      run: |
+        # Exact paths matching the msvc directory structure
+        $baseUri = "https://gstreamer.freedesktop.org/data/pkg/windows/1.26.11/msvc/"
+        $runtimeMsi = "gstreamer-1.0-msvc-x86_64-1.26.11.msi"
+        $develMsi = "gstreamer-1.0-devel-msvc-x86_64-1.26.11.msi"
+
+        # 1. Download installers
+        Write-Host "Downloading GStreamer Runtime..."
+        Invoke-WebRequest -Uri "$baseUri$runtimeMsi" -OutFile $runtimeMsi
+        Write-Host "Downloading GStreamer Development Headers..."
+        Invoke-WebRequest -Uri "$baseUri$develMsi" -OutFile $develMsi
+
+        # 2. Install Runtime with ALL plugins (good, bad, ugly)
+        Write-Host "Installing Runtime..."
+        Start-Process msiexec.exe -Wait -ArgumentList "/i $runtimeMsi /quiet /norestart ADDLOCAL=ALL"
+
+        # 3. Install Development Headers
+        Write-Host "Installing Development Tools..."
+        Start-Process msiexec.exe -Wait -ArgumentList "/i $develMsi /quiet /norestart ADDLOCAL=ALL"
+
+        # 4. Expose GStreamer environment variables to subsequent steps
+        $gstRoot = "C:\Program Files\gstreamer\1.0\msvc_x86_64"
+        echo "GSTREAMER_1_0_ROOT_X86_64=$gstRoot" >> $env:GITHUB_ENV
+        echo "$gstRoot\bin" >> $env:GITHUB_PATH
+        
+        Write-Host "GStreamer 1.26.11 installation complete with all plugins and headers."
+    - name: List files with CMD
+      run: dir "C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\pkgconfig"
     - name: Set PKG_CONFIG_PATH
       run: |
-        echo "PKG_CONFIG_PATH=C:\gstreamer\1.0\msvc_x86_64\lib\pkgconfig" >> $env:GITHUB_ENV
+        echo "PKG_CONFIG_PATH=C:\Program Files\gstreamer\1.0\msvc_x86_64\lib\pkgconfig" >> $env:GITHUB_ENV
     - name: Build
       working-directory: ./nes/rust
       run: cargo build --verbose --bin zesty-nes
