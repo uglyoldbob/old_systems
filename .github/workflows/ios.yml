@@ -17,12 +17,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    - name: Checkout GitLab Repo
-      uses: sudosubin/git-clone-action@v1
-      with:
-        repository: 'thomas.epperson/xbuild'
-        platform: 'gitlab'
-        path: 'xbuild'
+    - name: Checkout xbuild
+      run: git clone https://gitlab.com/thomas.epperson/xbuild.git
     - name: Setup 'xbuild'
       working-directory: ./xbuild/xbuild
       run: cargo install --path .
