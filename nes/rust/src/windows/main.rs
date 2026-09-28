@@ -185,14 +185,12 @@ pub struct MainNesWindow {
 }
 
 #[cfg(target_os = "android")]
-struct AndroidMenuBar {
-}
+struct AndroidMenuBar {}
 
 #[cfg(target_os = "android")]
 impl Default for AndroidMenuBar {
     fn default() -> Self {
-        Self {
-        }
+        Self {}
     }
 }
 #[cfg(target_os = "android")]
@@ -223,7 +221,7 @@ impl AndroidMenuBar {
                             *config = ActivePage::MainConfiguration;
                         }
                     });
-            }            
+            }
             false
         } else {
             {
