@@ -31,3 +31,6 @@ android:
     uses_feature: [
         { name: android.hardware.camera, required: false }
     ]
+ios:
+  swift_dir: ios/swift
+  info:
