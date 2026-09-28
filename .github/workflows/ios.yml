@@ -19,6 +19,15 @@ jobs:
       uses: actions/checkout@v4
     - name: Install LLVM
       run: brew install llvm
+    - name: Setup LLVM vars
+      run: |
+        echo "/opt/homebrew/opt/llvm/bin" >> $GITHUB_PATH
+        echo LDFLAGS="-L/opt/homebrew/opt/llvm/lib" >> $GITHUB_ENV
+        echo CPPFLAGS="-I/opt/homebrew/opt/llvm/include" >> $GITHUB_ENV
+    - name: Verify LLVM tools
+      run: |
+        which llvm-ar
+        llvm-ar --version
     - name: Checkout xbuild
       run: git clone https://gitlab.com/thomas.epperson/xbuild.git
     - name: Setup 'xbuild'
