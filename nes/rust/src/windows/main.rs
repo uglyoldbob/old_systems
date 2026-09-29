@@ -424,6 +424,39 @@ impl MainNesWindow {
             }
             self.show_config = ActivePage::SelectRomFromList;
         }
+
+        let mut save_config = false;
+        let mut scaler = c.local.configuration.scaler;
+        if !c.local.resolution_locked {
+            use strum::IntoEnumIterator;
+            egui::ComboBox::from_label("Scaling algorithm")
+                .selected_text(
+                    scaler
+                        .map(|i| format!("{}", i))
+                        .unwrap_or("None".to_string())
+                        .to_string(),
+                )
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut scaler, None, "None");
+                    for opt in common_emulator::video::ScalingAlgorithm::iter() {
+                        ui.selectable_value(&mut scaler, Some(opt), opt.to_string());
+                    }
+                });
+            if scaler != c.local.configuration.scaler {
+                c.local.configuration.scaler = scaler;
+                save_config = true;
+            }
+        } else {
+            ui.label(format!(
+                "Scaling algorithm: {}",
+                scaler
+                    .map(|i| format!("{}", i))
+                    .unwrap_or("None".to_string())
+            ));
+        }
+        if save_config {
+            c.local.configuration.save();
+        }
     }
 
     fn render_scene(&mut self, size: egui::Vec2, ui: &mut egui::Ui, c: &mut NesEmulatorData) {

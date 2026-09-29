@@ -578,7 +578,9 @@ pub fn run(mut options: eframe::NativeOptions) {
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
 
     #[cfg(target_os = "ios")]
-    xbuild_swift_test();
+    unsafe {
+        xbuild_swift_test();
+    }
 
     #[cfg(target_os = "android")]
     let appc = options.android_app.as_ref().unwrap().to_owned();
