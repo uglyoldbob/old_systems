@@ -23,7 +23,8 @@ fn main() {
                 if path.extension().and_then(|x| x.to_str()) == Some("dll") {
                     let dst = target_dir.join(path.file_name().unwrap());
 
-                    fs::copy(&path, &dst).unwrap_or_else(|e| panic!("failed to copy {path:?}: {e}"));
+                    fs::copy(&path, &dst)
+                        .unwrap_or_else(|e| panic!("failed to copy {path:?}: {e}"));
                 }
             }
         }

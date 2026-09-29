@@ -24,6 +24,11 @@ pub static EMULATOR_DATA: OnceLock<std::sync::Mutex<NesEmulatorData>> = OnceLock
 /// The path for the config.toml file
 pub static CONFIG_TOML_PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
 
+#[cfg(target_os = "ios")]
+unsafe extern "C" {
+    fn xbuild_swift_test();
+}
+
 #[cfg(target_os = "android")]
 use egui_winit::winit;
 
@@ -571,6 +576,9 @@ pub fn run(mut options: eframe::NativeOptions) {
 
     #[cfg(feature = "puffin")]
     puffin::set_scopes_on(true); // Remember to call this, or puffin will be disabled!
+
+    #[cfg(target_os = "ios")]
+    xbuild_swift_test();
 
     #[cfg(target_os = "android")]
     let appc = options.android_app.as_ref().unwrap().to_owned();

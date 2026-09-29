@@ -4,10 +4,7 @@ use std::{io::Write, ops::DerefMut};
 
 #[cfg(target_os = "android")]
 use crate::windows::rom_finder::RomFinder;
-use crate::{
-    controller::NesControllerTrait,
-    NesEmulatorData,
-};
+use crate::{controller::NesControllerTrait, NesEmulatorData};
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use crate::emulator_data::BluetoothControllerOwner;

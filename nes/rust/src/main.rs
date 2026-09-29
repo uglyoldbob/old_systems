@@ -4,7 +4,6 @@
 
 //! This is the nes emulator written in rust. It is compatible with windows, linux, and osx.
 
-
 fn main() {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "info");
