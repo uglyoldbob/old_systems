@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Debug for linking
-      run: xcrun --sdk iphoneos swiftc -print-target-info
+      run: xcrun --sdk iphoneos swiftc -target arm64-apple-ios -print-target-info
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Install LLVM
