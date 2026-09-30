@@ -17,6 +17,7 @@ use common_emulator::audio::AudioProducerWithRate;
 use common_emulator::recording::Recording;
 
 use eframe::egui;
+use egui::PopupAnchor;
 use std::collections::HashMap;
 
 #[cfg(target_os = "android")]
@@ -464,6 +465,34 @@ impl MainNesWindow {
     }
 
     fn render_scene(&mut self, size: egui::Vec2, ui: &mut egui::Ui, c: &mut NesEmulatorData) {
+        #[cfg(feature = "trial")]
+        {
+            c.num_frames_rendered += 1;
+
+            if c.num_frames_rendered >= (60 * 10) {
+                let parent_size = ui.max_rect().size();
+
+                let popup_size = egui::vec2(parent_size.x * 0.60, parent_size.y * 0.40);
+                let middle = ui.available_rect_before_wrap().center();
+                let p = egui::Popup::new(
+                    egui::Id::new("Trial expired"),
+                    ui.ctx().clone(),
+                    PopupAnchor::Position(middle),
+                    egui::LayerId::new(
+                        egui::Order::Foreground,
+                        egui::Id::new("Trial expired layer"),
+                    ),
+                );
+                p.show(|ui| {
+                    ui.set_min_size(popup_size);
+                    ui.label(
+                        egui::RichText::new("The trial period has expired for this game")
+                            .size(24.0),
+                    );
+                });
+            }
+        }
+
         // Center the image manually using add_sized + centering offset
         if let Some(t) = &self.texture {
             let zoom = (size.x / t.size()[0] as f32).min(size.y / t.size()[1] as f32);
@@ -1244,6 +1273,13 @@ impl MainNesWindow {
                 }
             }
             self.audio_streaming = tvec;
+        }
+
+        #[cfg(feature = "trial")]
+        {
+            if c.num_frames_rendered >= (60 * 10) {
+                render = false;
+            }
         }
 
         if render {

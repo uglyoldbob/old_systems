@@ -468,6 +468,7 @@ enum AndroidJavaEvent {
     NewRomContents(String, String, Vec<u8>),
 }
 
+#[cfg(target_os = "android")]
 fn activity_stopped<'local>(mut env: jni::EnvUnowned<'local>) {
     use std::io::Write;
     log::error!("Need to signal stopping activity");
@@ -515,11 +516,8 @@ pub fn native_activity_stopped<'local>(
 }
 
 #[cfg(target_os = "android")]
-#[allow(non_snake_case)]
-#[no_mangle]
-pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selected_1rom<'local>(
+fn import_rom<'local>(
     mut env: jni::EnvUnowned<'local>,
-    _: jni::objects::JObject<'local>,
     rom: jni::objects::JByteArray<'local>,
     name: jni::objects::JString<'local>,
     uri: jni::objects::JString<'local>,
@@ -553,6 +551,34 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selecte
         Ok::<(), jni::errors::Error>(())
     });
     log::error!("Done? parsing rom: {:?}", e);
+}
+
+#[cfg(target_os = "android")]
+#[allow(non_snake_case)]
+#[no_mangle]
+pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_send_1user_1selected_1rom<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _: jni::objects::JObject<'local>,
+    rom: jni::objects::JByteArray<'local>,
+    name: jni::objects::JString<'local>,
+    uri: jni::objects::JString<'local>,
+) {
+    import_rom(env, rom, name, uri);
+}
+
+#[cfg(target_os = "android")]
+#[allow(non_snake_case)]
+#[no_mangle]
+pub extern "C" fn Java_com_uglyoldbob_ZestyNesTrial_ZestyActivity_send_1user_1selected_1rom<
+    'local,
+>(
+    mut env: jni::EnvUnowned<'local>,
+    _: jni::objects::JObject<'local>,
+    rom: jni::objects::JByteArray<'local>,
+    name: jni::objects::JString<'local>,
+    uri: jni::objects::JString<'local>,
+) {
+    import_rom(env, rom, name, uri);
 }
 
 #[cfg(target_os = "android")]
