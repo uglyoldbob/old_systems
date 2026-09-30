@@ -404,6 +404,10 @@ impl MainNesWindow {
 
     #[cfg(target_os = "android")]
     fn render_config(&mut self, size: egui::Vec2, ui: &mut egui::Ui, c: &mut NesEmulatorData) {
+        #[cfg(feature = "trial")]
+        {
+            ui.label("This is the trial");
+        }
         if ui
             .add(egui::Button::new("Import ROM").min_size(egui::vec2(51.0, 51.0)))
             .clicked()

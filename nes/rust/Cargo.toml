@@ -16,6 +16,7 @@ default = []
 debugger = []
 rom_status = []
 puffin = ["dep:puffin", "dep:puffin_egui"]
+trial = []
 
 [target.'cfg(target_os = "windows")'.dependencies]
 eframe = { version = "0.36.2" }

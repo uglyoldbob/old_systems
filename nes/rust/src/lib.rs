@@ -468,13 +468,7 @@ enum AndroidJavaEvent {
     NewRomContents(String, String, Vec<u8>),
 }
 
-#[cfg(target_os = "android")]
-#[allow(non_snake_case)]
-#[no_mangle]
-pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_nativeActivityStopped<'local>(
-    mut env: jni::EnvUnowned<'local>,
-    _: jni::objects::JObject<'local>,
-) {
+fn activity_stopped<'local>(mut env: jni::EnvUnowned<'local>) {
     use std::io::Write;
     log::error!("Need to signal stopping activity");
     let mut c = crate::EMULATOR_DATA.get().unwrap().lock().unwrap();
@@ -499,6 +493,25 @@ pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_nativeActivityStopp
             .unwrap()
             .write_all(&state);
     }
+}
+
+#[cfg(target_os = "android")]
+#[allow(non_snake_case)]
+#[no_mangle]
+pub extern "C" fn Java_com_uglyoldbob_ZestyNes_ZestyActivity_nativeActivityStopped<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _: jni::objects::JObject<'local>,
+) {
+    activity_stopped(env);
+}
+
+#[cfg(target_os = "android")]
+#[jni::jni_mangle("com.uglyoldbob.ZestyNesTrial.ZestyActivity")]
+pub fn native_activity_stopped<'local>(
+    mut env: jni::EnvUnowned<'local>,
+    _: jni::objects::JObject<'local>,
+) {
+    activity_stopped(env);
 }
 
 #[cfg(target_os = "android")]
