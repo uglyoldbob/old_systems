@@ -37,6 +37,7 @@ gstreamer-video = "0.25.3"
 rfd = "0.17.2"
 bluetooth-rust = { version = "0.4.2", features = ["async"] }
 libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
+simple_file_logger = "0.4.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { version = "0.36.2" }
@@ -47,6 +48,7 @@ gstreamer-video = "0.25.3"
 rfd = "0.17.2"
 bluetooth-rust = { version = "0.4.2", features = ["async"] }
 libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
+simple_file_logger = "0.4.2"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.15", default-features = false }
@@ -59,10 +61,10 @@ egui-winit = { version = "0.36.2", default-features = false, features = ["clipbo
 eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "default_fonts"] }
 jni = "0.22.4"
 egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard", "links"] }
+env_logger = "0.11.11"
 wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
 
 [dependencies]
-async-channel = "2.5.0"
 asynchronous-codec = "0.7.0"
 biquad = "0.6.0"
 chrono = "0.4.44"
@@ -75,7 +77,6 @@ enum_dispatch = "0.3.13"
 gilrs = {version = "0.11.1", features = ["serde-serialize"]}
 hex_fmt = "0.3.0"
 log = "0.4.30"
-simple_file_logger = "0.4.2"
 winresource = "0.1.31"
 egui = { version = "0.36.2", features = ["serde"] }
 futures = "0.3.32"

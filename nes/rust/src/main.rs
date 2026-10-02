@@ -19,7 +19,15 @@ fn main() {
             .unwrap();
         std::env::set_var("GST_PLUGIN_PATH", exe_dir);
     }
-    simple_file_logger::init_logger("ZestyNes", simple_file_logger::LogLevel::Info).unwrap();
+    #[cfg(not(target_os = "ios"))]
+    {
+        simple_file_logger::init_logger("ZestyNes", simple_file_logger::LogLevel::Info).unwrap();
+    }
+    #[cfg(target_os = "ios")]
+    {
+        env_logger::builder().target(env_logger::fmt::Target::Stdout).init();
+    }
+    log::info!("Starting up");
     let options = eframe::NativeOptions::default();
     zesty_nes::run(options)
 }

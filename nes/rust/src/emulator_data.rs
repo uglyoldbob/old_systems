@@ -159,15 +159,18 @@ impl EmulatorConfiguration {
                 .create(true)
                 .truncate(true)
                 .open(&self.path)
-                .unwrap()
         } else {
             options
                 .write(true)
                 .create_new(true)
                 .open(&self.path)
-                .unwrap()
         };
-        let _e = f.write_all(data.as_bytes());
+        if let Ok(f) = f {
+            let _e = f.write_all(data.as_bytes());
+        }
+        else {
+            log::error!("Unable to save configuration");
+        }
     }
 
     ///Retrieve the start rom
