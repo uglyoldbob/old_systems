@@ -468,6 +468,8 @@ pub struct NesEmulatorData {
     /// Local emulator data that cannot be cloned
     #[serde(skip)]
     pub olocal: Option<LocalEmulatorData>,
+    #[cfg(feature = "trial")]
+    pub num_frames_rendered: u64,
 }
 
 impl NesEmulatorData {
@@ -566,6 +568,8 @@ impl NesEmulatorData {
             vblank_just_set: 0,
             local: LocalEmulatorDataClone::new(Some(path)),
             olocal: Some(olocal),
+            #[cfg(feature = "trial")]
+            num_frames_rendered: 0,
         }
     }
 
@@ -738,6 +742,10 @@ impl NesEmulatorData {
             .as_millis();
         self.nmi = [false; 5];
         self.prev_irq = false;
+        #[cfg(feature = "trial")]
+        {
+            self.num_frames_rendered = 0;
+        }
         if let Some(cart) = cart {
             let name = cart.rom_name();
             log::error!("Inserting cartridge {name}");
