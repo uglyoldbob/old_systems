@@ -62,6 +62,7 @@ eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "de
 jni = "0.22.4"
 egui-winit = { version = "0.36.2", default-features = false, features = ["clipboard", "links"] }
 env_logger = "0.11.11"
+sysdirs = "0.9.4"
 wgpu = { version = "27.0.1", default-features = false, features = ["gles"] }
 
 [dependencies]

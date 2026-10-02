@@ -77,11 +77,21 @@ impl Default for EmulatorConfiguration {
                 .set_key_egui(crate::controller::BUTTON_COMBO_RIGHT, egui::Key::ArrowRight);
         }
 
+        let mut path = "".to_string();
+        #[cfg(target_os = "ios")]
+        {
+            if let Some(p) = sysdirs::home_dir() {
+                if let Ok(p) = p.into_string() {
+                    path = p;
+                }
+            }
+        }
+
         Self {
             sticky_rom: true,
             start_rom: None,
             rewind_interval: Some(std::time::Duration::from_millis(5000)),
-            path: "".to_string(),
+            path,
             rom_path: "./roms".to_string(),
             controller_type: [
                 crate::controller::NesControllerType::StandardController,
@@ -165,7 +175,7 @@ impl EmulatorConfiguration {
                 .create_new(true)
                 .open(&self.path)
         };
-        if let Ok(f) = f {
+        if let Ok(mut f) = f {
             let _e = f.write_all(data.as_bytes());
         }
         else {

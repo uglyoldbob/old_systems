@@ -650,6 +650,12 @@ pub fn run(mut options: eframe::NativeOptions) {
     let device = host.default_output_device();
     let mut sound_rate = 0;
     let mut sound_producer = None;
+
+    #[cfg(target_os = "ios")]
+    let audio_rate = 48000;
+    #[cfg(not(target_os = "ios"))]
+    let audio_rate = 44100;
+
     let sound_stream = if let Some(d) = &device {
         let ranges = d.supported_output_configs();
         if let Ok(r) = ranges {
@@ -663,7 +669,7 @@ pub fn run(mut options: eframe::NativeOptions) {
                 );
             }
             configs.retain(|config| {
-                config.min_sample_rate() <= 44_100 && 44_100 <= config.max_sample_rate()
+                config.min_sample_rate() <= audio_rate && audio_rate <= config.max_sample_rate()
             });
             configs.sort_by(|a, b| {
                 let format_index = |sf| match sf {
@@ -684,8 +690,9 @@ pub fn run(mut options: eframe::NativeOptions) {
                     .cmp(&format_index(b.sample_format()))
                     .then_with(|| b.max_sample_rate().cmp(&a.max_sample_rate()))
             });
-
-            let supportedconfig = configs[0].clone().with_sample_rate(44100);
+            
+            log::info!("Trying for audio rate {}", audio_rate);
+            let supportedconfig = configs[0].clone().with_sample_rate(audio_rate);
             let format = supportedconfig.sample_format();
             log::info!("output format is {:?}", format);
             let mut config = supportedconfig.config();
