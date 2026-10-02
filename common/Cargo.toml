@@ -12,6 +12,7 @@ gstreamer = "0.25.3"
 gstreamer-app = "0.25.2"
 gstreamer-audio = "0.25.3"
 gstreamer-video = "0.25.3"
+libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 eframe = { version = "0.36.2" }
@@ -20,6 +21,7 @@ gstreamer = "0.25.3"
 gstreamer-app = "0.25.2"
 gstreamer-audio = "0.25.3"
 gstreamer-video = "0.25.3"
+libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 eframe = { version = "0.36.2" }
@@ -28,6 +30,7 @@ gstreamer = "0.25.3"
 gstreamer-app = "0.25.2"
 gstreamer-audio = "0.25.3"
 gstreamer-video = "0.25.3"
+libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.15", default-features = false }
@@ -46,7 +49,6 @@ chrono = "0.4.44"
 compile-time = "0.2.0"
 egui = { version = "0.36.2", features = ["serde"] }
 futures = "0.3.32"
-libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 memmap2 = "0.9.10"
 ringbuf = "0.3.3"
 serde = {version = "1.0.228", features = ["derive"]}

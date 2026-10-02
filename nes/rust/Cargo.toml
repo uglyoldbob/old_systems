@@ -26,6 +26,7 @@ gstreamer-audio = "0.25.3"
 gstreamer-video = "0.25.3"
 rfd = "0.17.2"
 bluetooth-rust = { version = "0.4.2", features = ["async"] }
+libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 eframe = { version = "0.36.2" }
@@ -35,6 +36,7 @@ gstreamer-audio = "0.25.3"
 gstreamer-video = "0.25.3"
 rfd = "0.17.2"
 bluetooth-rust = { version = "0.4.2", features = ["async"] }
+libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { version = "0.36.2" }
@@ -44,6 +46,7 @@ gstreamer-audio = "0.25.3"
 gstreamer-video = "0.25.3"
 rfd = "0.17.2"
 bluetooth-rust = { version = "0.4.2", features = ["async"] }
+libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.15", default-features = false }
@@ -71,7 +74,6 @@ directories = "6.0.0"
 enum_dispatch = "0.3.13"
 gilrs = {version = "0.11.1", features = ["serde-serialize"]}
 hex_fmt = "0.3.0"
-libp2p = { version = "0.56", features = ["tokio", "dns", "macros", "noise", "tcp", "upnp", "yamux", "serde"] }
 log = "0.4.30"
 simple_file_logger = "0.4.2"
 winresource = "0.1.31"
@@ -81,7 +83,7 @@ memmap2 = "0.9.10"
 open = "5.3.5"
 puffin = { version = "0.20", optional=true}
 puffin_egui = { version = "0.30", optional=true }
-ring = "0.17.14"
+sha2 = "0.11.0"
 strum = { version = "0.28", features = ["derive"] }
 tokio = { version = "1.52.3", features = ["full"] }
 toml = "1.1.2"

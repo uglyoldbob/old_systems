@@ -234,9 +234,8 @@ pub struct NesCartridgeBackup {
 
 /// Calculate the sha256 of a chunk of data, and return it in a hex encoded string.
 fn calc_sha256(data: &[u8]) -> String {
-    let mut context = ring::digest::Context::new(&ring::digest::SHA256);
-    context.update(data);
-    let digest = context.finish();
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(data);
     data_encoding::HEXLOWER.encode(digest.as_ref())
 }
 
